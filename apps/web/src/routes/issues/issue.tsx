@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { GateControls } from "@/components/gate-controls";
 import { IssueTimeline } from "@/components/issue-timeline.tsx";
 import { Markdown } from "@/components/markdown.tsx";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +45,8 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
     );
   }
 
-  const { id, key, title, description, state, assignee, parent, children } = issue.data;
+  const { id, key, title, description, state, assignee, parent, children, gateDecisions } =
+    issue.data;
 
   return (
     <article className="flex flex-col gap-6">
@@ -52,11 +54,6 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{key}</Badge>
           <Badge variant={state.isGate ? "outline" : "default"}>{state.name}</Badge>
-          {state.isGate ? (
-            <span className="text-xs text-muted-foreground">
-              A Gate: approving it arrives with the next slice.
-            </span>
-          ) : null}
           {parent ? (
             <Link
               to="/issues/$issueKey"
@@ -91,6 +88,13 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
       {!editing && !description ? (
         <p className="text-sm text-muted-foreground">No description yet.</p>
       ) : null}
+
+      <GateControls
+        issueKey={key}
+        projectKey={issue.data.project.key}
+        state={state}
+        decisions={gateDecisions}
+      />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">Assignee</h2>

@@ -2,6 +2,7 @@ import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, authRelations, session, user, verification } from "./schema/auth.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
+import { gateDecision } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
 import { project, team, teamMember, workflowState } from "./schema/project.ts";
 import { member, workspace } from "./schema/workspace.ts";
@@ -20,6 +21,7 @@ export const tables = {
   project,
   workflowState,
   issue,
+  gateDecision,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -75,6 +77,16 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     creator: r.one.member({ from: r.issue.createdBy, to: r.member.id }),
     parent: r.one.issue({ from: r.issue.parentId, to: r.issue.id }),
     children: r.many.issue({ from: r.issue.id, to: r.issue.parentId }),
+    gateDecisions: r.many.gateDecision({ from: r.issue.id, to: r.gateDecision.issueId }),
+  },
+  gateDecision: {
+    issue: r.one.issue({ from: r.gateDecision.issueId, to: r.issue.id, optional: false }),
+    state: r.one.workflowState({
+      from: r.gateDecision.stateId,
+      to: r.workflowState.id,
+      optional: false,
+    }),
+    decidedBy: r.one.member({ from: r.gateDecision.memberId, to: r.member.id }),
   },
   workflowState: {
     project: r.one.project({ from: r.workflowState.projectId, to: r.project.id, optional: false }),

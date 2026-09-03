@@ -1,6 +1,7 @@
 import {
   allowlistRule,
   event,
+  gateDecision,
   issue,
   member,
   project,
@@ -51,9 +52,12 @@ export const IssueSummarySchema = IssueSchema.extend({
   assignee: MemberWithUserSchema.nullable(),
 });
 
-/** An Issue as its own page shows one: the summary plus its family. */
+export const GateDecisionSchema = createSelectSchema(gateDecision);
+
+/** An Issue as its own page shows one: the summary plus its family and its Gate history. */
 export const IssueDetailSchema = IssueSummarySchema.extend({
   project: ProjectSchema,
   parent: IssueSummarySchema.nullable(),
   children: z.array(IssueSummarySchema),
+  gateDecisions: z.array(GateDecisionSchema),
 });

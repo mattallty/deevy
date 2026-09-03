@@ -28,6 +28,7 @@ const stub = vi.hoisted(() => {
     children: [] as unknown[],
     closedAt: null,
     project: { id: "p1", key: "DEV", name: "deevy" },
+    gateDecisions: [] as unknown[],
   };
   const child = {
     ...epic,
@@ -71,8 +72,14 @@ vi.mock("../src/lib/orpc.ts", async () => {
         states: stub.states,
       }),
     },
+    workflow: {
+      get: async () => ({ states: stub.states }),
+      update: async () => ({ states: stub.states }),
+    },
+    gates: { approve: async () => stub.epic, reject: async () => stub.epic },
     issues: {
       list: async () => ({ issues: [stub.epic, stub.child], nextCursor: 2 }),
+      move: async () => stub.epic,
       get: async ({ key }: { key: string }) => byKey[key] ?? Promise.reject(new Error("nope")),
       create: async (input: unknown) => {
         stub.created.push(input);
@@ -157,7 +164,8 @@ describe("the Issue page", () => {
 
     expect(await screen.findByText("DEV-1")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Ship the Event log", level: 1 })).toBeTruthy();
-    expect(screen.getByText("Intent")).toBeTruthy();
+    // The State names the badge and the Gate controls, so both are expected.
+    expect(screen.getAllByText("Intent").length).toBeGreaterThan(0);
     // Rendered markdown, not the raw "## Why"
     expect(screen.getByRole("heading", { name: "Why", level: 2 })).toBeTruthy();
   });

@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, isNull, ne } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   allowlistRule as allowlistRuleTable,
@@ -9,6 +9,8 @@ import {
   allowlistRuleKinds,
   issue as issueTable,
   project as projectTable,
+  workflowState as workflowStateTable,
+  workflowStateCategories,
   team as teamTable,
   teamMember as teamMemberTable,
 } from "@deevy/db";
@@ -22,12 +24,21 @@ import {
 } from "../issues.ts";
 import { createProject, ProjectKeyPattern } from "../projects.ts";
 import {
+  assertHuman,
+  assertLeavable,
+  enterState,
+  nextState,
+  previousState,
+  recordGateDecision,
+} from "../workflow.ts";
+import {
   AllowlistRuleSchema,
   EventSchema,
   IssueDetailSchema,
   IssueSummarySchema,
   ProjectWithStatesSchema,
   TeamWithMembersSchema,
+  WorkflowStateSchema,
   MemberSchema,
   MemberWithUserSchema,
   UserSchema,
@@ -791,6 +802,7 @@ async function loadIssue(context: ContextFor<"member">, id: string) {
       project: true,
       parent: { with: issueWith },
       children: { with: issueWith, orderBy: { number: "asc" } },
+      gateDecisions: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Issue" });
@@ -814,6 +826,240 @@ async function requireAssignee(context: ContextFor<"member">, memberId: string) 
   }
   return found;
 }
+
+/** The Issue, its Project, and that Project's States in order: what a move needs. */
+async function requireIssueForMove(context: ContextFor<"member">, key: string) {
+  const { issue, project } = await requireIssue(context, key);
+  const states = await context.db.query.workflowState.findMany({
+    where: { projectId: project.id },
+    orderBy: { position: "asc" },
+  });
+  const from = states.find((state) => state.id === issue.stateId);
+  if (!from) throw new ORPCError("BAD_REQUEST", { message: "This Issue is in no known State" });
+  return { issue, project, states, from };
+}
+
+export const workflow = {
+  get: defineOperation({
+    name: "workflow.get",
+    summary: "A Project's Workflow: its States in order, and which are Gates",
+    method: "GET",
+    path: "/projects/{projectKey}/workflow",
+    auth: "member",
+    input: z.object({ projectKey: ProjectKeyLookup }),
+    output: z.object({ states: z.array(WorkflowStateSchema) }),
+    handler: async ({ input, context }) => {
+      const project = await requireProject(context, input.projectKey);
+      const states = await context.db.query.workflowState.findMany({
+        where: { projectId: project.id },
+        orderBy: { position: "asc" },
+      });
+      return { states };
+    },
+  }),
+
+  update: defineOperation({
+    name: "workflow.update",
+    summary: "Rewrite a Project's Workflow: add, rename, reorder or delete States",
+    method: "PUT",
+    path: "/projects/{projectKey}/workflow",
+    auth: "member",
+    input: z.object({
+      projectKey: ProjectKeyLookup,
+      /** The Workflow as it should end up. Order in this array is the new order. */
+      states: z.array(
+        z.object({
+          /** Omitted for a State being added. */
+          id: z.string().optional(),
+          name: z.string().trim().min(1).max(60),
+          isGate: z.boolean().default(false),
+          category: z.enum(workflowStateCategories),
+        }),
+      ),
+      deleteStates: z.array(z.string()).default([]),
+      /** Where the Issues in a deleted State go. Required when any of them holds Issues. */
+      moveIssuesTo: z.string().nullish(),
+    }),
+    output: z.object({ states: z.array(WorkflowStateSchema) }),
+    handler: async ({ input, context }) => {
+      const project = await requireProjectOrAdmin(context, input.projectKey);
+      if (input.states.length === 0) {
+        throw new ORPCError("BAD_REQUEST", { message: "A Workflow needs at least one State" });
+      }
+      const existing = await context.db.query.workflowState.findMany({
+        where: { projectId: project.id },
+      });
+      const known = new Set(existing.map((state) => state.id));
+      for (const state of input.states) {
+        if (state.id && !known.has(state.id)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "That State belongs to another Project's Workflow",
+          });
+        }
+      }
+
+      const doomed = input.deleteStates.filter((id) => known.has(id));
+      if (doomed.length > 0) {
+        const stranded = await context.db.query.issue.findMany({
+          where: { projectId: project.id, stateId: { in: doomed } },
+          columns: { id: true },
+        });
+        if (stranded.length > 0) {
+          const destination = input.moveIssuesTo;
+          const surviving = new Set(input.states.map((state) => state.id).filter(Boolean));
+          if (!destination || !surviving.has(destination)) {
+            throw new ORPCError("BAD_REQUEST", {
+              message:
+                "Deleting a State that holds Issues needs moveIssuesTo, a State that survives",
+            });
+          }
+          // One statement rather than a write per Issue, since D1 charges per
+          // round trip (docs/plans/m1.md).
+          await context.db
+            .update(issueTable)
+            .set({ stateId: destination, stateEnteredAt: new Date() })
+            .where(and(eq(issueTable.projectId, project.id), inArray(issueTable.stateId, doomed)));
+        }
+      }
+
+      // Positions come from the order of `states`, so a reorder is just a
+      // different array. Kept as sequential writes: D1 has no transactions.
+      const kept: string[] = [];
+      for (const [position, state] of input.states.entries()) {
+        if (state.id) {
+          await context.db
+            .update(workflowStateTable)
+            .set({
+              name: state.name,
+              position,
+              isGate: state.isGate,
+              category: state.category,
+            })
+            .where(eq(workflowStateTable.id, state.id));
+          kept.push(state.id);
+        } else {
+          const id = crypto.randomUUID();
+          await context.db.insert(workflowStateTable).values({
+            id,
+            projectId: project.id,
+            name: state.name,
+            position,
+            isGate: state.isGate,
+            category: state.category,
+          });
+          kept.push(id);
+        }
+      }
+      const remove = doomed.filter((id) => !kept.includes(id));
+      if (remove.length > 0) {
+        await context.db
+          .delete(workflowStateTable)
+          .where(
+            and(
+              eq(workflowStateTable.projectId, project.id),
+              inArray(workflowStateTable.id, remove),
+            ),
+          );
+      }
+
+      await appendEvent(context, {
+        kind: "workflow.updated",
+        subjectType: "project",
+        subjectId: project.id,
+        projectId: project.id,
+        payload: { states: input.states.map((state) => state.name), removed: remove.length },
+      });
+      const states = await context.db.query.workflowState.findMany({
+        where: { projectId: project.id },
+        orderBy: { position: "asc" },
+      });
+      return { states };
+    },
+  }),
+};
+
+export const gates = {
+  approve: defineOperation({
+    name: "gates.approve",
+    summary: "Let an Issue out of the Gate it is in, into the next State",
+    method: "POST",
+    path: "/issues/{key}/gate/approve",
+    auth: "member",
+    input: z.object({ key: z.string(), note: z.string().max(4000).nullish() }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      assertHuman(context.member);
+      const { issue, project, states, from } = await requireIssueForMove(context, input.key);
+      if (!from.isGate) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `${input.key} is not in a Gate; move it instead`,
+        });
+      }
+      const to = nextState(states, from);
+      if (!to) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `${from.name} is the last State; there is nowhere to approve it to`,
+        });
+      }
+
+      await recordGateDecision(context.db, {
+        issueId: issue.id,
+        stateId: from.id,
+        decision: "approved",
+        note: input.note,
+        memberId: context.member.id,
+      });
+      await enterState(context.db, issue, to);
+      await appendEvent(context, {
+        kind: "gate.approved",
+        subjectType: "issue",
+        subjectId: issue.id,
+        projectId: project.id,
+        payload: { state: from.name, to: to.name, note: input.note ?? null },
+      });
+      return loadIssue(context, issue.id);
+    },
+  }),
+
+  reject: defineOperation({
+    name: "gates.reject",
+    summary: "Send an Issue back from the Gate it is in, to the State before it",
+    method: "POST",
+    path: "/issues/{key}/gate/reject",
+    auth: "member",
+    input: z.object({ key: z.string(), note: z.string().max(4000).nullish() }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      assertHuman(context.member);
+      const { issue, project, states, from } = await requireIssueForMove(context, input.key);
+      if (!from.isGate) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `${input.key} is not in a Gate; move it instead`,
+        });
+      }
+      // A rejection in the first State keeps the Issue where it is: there is
+      // nowhere further back, and the decision is still worth recording.
+      const to = previousState(states, from);
+
+      await recordGateDecision(context.db, {
+        issueId: issue.id,
+        stateId: from.id,
+        decision: "rejected",
+        note: input.note,
+        memberId: context.member.id,
+      });
+      if (to.id !== from.id) await enterState(context.db, issue, to);
+      await appendEvent(context, {
+        kind: "gate.rejected",
+        subjectType: "issue",
+        subjectId: issue.id,
+        projectId: project.id,
+        payload: { state: from.name, to: to.name, note: input.note ?? null },
+      });
+      return loadIssue(context, issue.id);
+    },
+  }),
+};
 
 export const issues = {
   create: defineOperation({
@@ -932,6 +1178,37 @@ export const issues = {
     },
   }),
 
+  move: defineOperation({
+    name: "issues.move",
+    summary: "Put an Issue in another State of its Project's Workflow",
+    method: "POST",
+    path: "/issues/{key}/move",
+    auth: "member",
+    input: z.object({ key: z.string(), stateId: z.string() }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      const { issue, project, states, from } = await requireIssueForMove(context, input.key);
+      const to = states.find((state) => state.id === input.stateId);
+      if (!to) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "That State belongs to another Project's Workflow",
+        });
+      }
+      if (to.id === from.id) return loadIssue(context, issue.id);
+      assertLeavable(from, input.key);
+
+      await enterState(context.db, issue, to);
+      await appendEvent(context, {
+        kind: "issue.moved",
+        subjectType: "issue",
+        subjectId: issue.id,
+        projectId: project.id,
+        payload: { from: from.name, to: to.name },
+      });
+      return loadIssue(context, issue.id);
+    },
+  }),
+
   update: defineOperation({
     name: "issues.update",
     summary: "Change an Issue's title, description, Assignee, or parent",
@@ -1037,5 +1314,7 @@ export const router = {
   projects,
   teams,
   issues,
+  gates,
+  workflow,
 };
 export type AppRouter = typeof router;

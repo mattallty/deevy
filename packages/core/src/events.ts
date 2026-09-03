@@ -29,7 +29,11 @@ export type EventKind =
   | "issue.created"
   | "issue.updated"
   | "issue.assigned"
-  | "issue.reparented";
+  | "issue.reparented"
+  | "issue.moved"
+  | "gate.approved"
+  | "gate.rejected"
+  | "workflow.updated";
 
 export type EventPayload = Record<string, unknown>;
 
