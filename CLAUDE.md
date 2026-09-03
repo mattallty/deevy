@@ -1,0 +1,73 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+deevy is project management where Humans and Agents collaborate as peers on the same Issues. Use the
+vocabulary in [CONTEXT.md](CONTEXT.md) (Member, Human, Agent, Sponsor, Workspace, Issue, Gate, Run, Event) in
+code, API names, and UI copy; it lists the words to avoid. Hard-to-reverse choices live in `docs/adr`, the
+milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`. Current milestone: M0 done
+(sign in, see an empty Workspace); M1 (Humans) is next.
+
+## Commands
+
+Everything runs through Vite+ (`vp`), a pnpm workspace. If `vp` is not on PATH, `. ~/.config/vite-plus/env`.
+`vp dev`, `vp build`, `vp test`, `vp check` are built-ins that ignore package.json scripts; `vp run <script>`
+runs scripts, `-r` recursively, `pkg#script` for one package (package names are `web`, `server`, `core`, `db`,
+`adapters`).
+
+- `vp check` (root): format, lint, typecheck the whole tree; `vp check --fix` applies formatting. Run it before
+  every commit; CI runs it first.
+- `vp run -r test`: all tests. One file: `cd packages/core && vp test tests/app.test.ts`; one case: add
+  `-t "name substring"`. Tests import from `vite-plus/test`, not `vitest`.
+- `vp run -r --parallel dev`: Node server on 3000 (rebuilt and restarted by `vp pack --watch`) plus the SPA
+  on 5173 proxying `/api`, `/rpc`, `/healthz`. Needs a `.env` (copy `.env.example`).
+- `vp run -r build`, `vp run web#build:workers` then `vp run web#check:workers` (wrangler dry run).
+- Schema change: edit `packages/db/src/schema`, `vp run db#generate`, then hand-patch `NOT NULL` onto every
+  `text PRIMARY KEY` in the new `migration.sql` (drizzle-kit rc regression) and run `vp run db#check:migrations`.
+- API change: `vp run core#snapshot:openapi` and commit `packages/core/openapi.json`; CI fails on a stale snapshot.
+- Better Auth options that affect tables live twice: `packages/core/src/auth.ts` (runtime) and
+  `packages/db/auth.generate.config.ts` (generator). Change both, then `vp run db#generate:auth` regenerates
+  `packages/db/src/schema/auth.ts` (never edit it by hand).
+
+## Architecture
+
+One typed core, projected to three surfaces (ADR-0005), on two runtimes from one codebase (ADR-0006).
+
+**Operation registry** (`packages/core/src/operations/registry.ts`): every API operation is a `defineOperation({
+name, summary, method, path, auth, input, output, handler })`. `auth` is `public | session | member` and is
+enforced by middleware; the handler's `context` type narrows accordingly. oRPC is the implementation behind it:
+the same procedure becomes the RPC endpoint (`/rpc`, used by the SPA through `@orpc/tanstack-query`), the OpenAPI
+route (`/api`, reference UI at `/api/docs`), and in M2 an MCP tool. Add operations in
+`packages/core/src/operations/index.ts` and never build oRPC procedures elsewhere (ADR-0009). GET operations
+need an object input schema; use `NoInput` for none.
+
+**Request context** is built once per request in `packages/core/src/app.ts`: Better Auth session, then the
+caller's Member row and the Workspace. `createApp({ db, auth?, origin })` is the Hono app both entries mount:
+`apps/server` (Node, `@hono/node-server`) and `apps/web/src/worker.ts` (Cloudflare Worker, D1, no auth yet).
+
+**Runtime boundary**: `packages/core` and `packages/db` use web-standard APIs only; no `node:` imports and no
+`types: ["node"]` in their tsconfigs. Anything runtime-specific goes in `packages/adapters` (`./node`:
+`node:sqlite`, migrator, SPA serving; `./workers`: D1). The Workers build in CI is what catches a leak.
+The core uses no interactive transactions because D1 has none; multi-statement writes are sequential
+(bootstrap) or batches.
+
+**Identity** (ADR-0007): every Member is a Better Auth user (`user.kind` is `human | agent`); deevy's own
+`workspace` and `member` tables hold roles and Sponsors. A single instance serves one Workspace, created by
+`bootstrapWorkspace` when `DEEVY_ADMIN_EMAIL` signs in (runs on user creation and on every new session, and is
+idempotent). Other sign-ins get a user row and no Member until M1's allowlist and invitations.
+
+**Data** (ADR-0008): Drizzle 1.0 rc on the SQLite dialect. Relations use `defineRelations` /
+`defineRelationsPart` merged per table in `packages/db/src/relations.ts`; dates are integer `timestamp_ms`
+columns; the Better Auth adapter is the `/relations-v2` entry. Migrations are applied by the Node migrator at
+startup (`openDatabase`) or by `wrangler d1 migrations apply`, never by `drizzle-kit migrate`.
+
+**Builds**: `vp pack` bundles every dependency into `apps/server/dist/index.mjs` and copies the migrations next
+to it, so the Docker runtime image carries `dist/` and the SPA only. `apps/web` builds the Worker only when
+`DEEVY_TARGET=workers`.
+
+## Dependencies
+
+Better Auth 1.7.x, Drizzle 1.0.0-rc.x, and oRPC 2.0.0-beta.x are pinned exactly in the catalog in
+`pnpm-workspace.yaml`. Upgrade a line on purpose and as a whole (all `@better-auth/*` or `@orpc/*` together),
+never by `latest` or `rc`/`beta` tags, then regenerate the OpenAPI snapshot and check migrations. New packages
+take their version from the catalog (`"catalog:"`).

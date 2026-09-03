@@ -10,6 +10,12 @@ Canonical repo moved to https://github.com/middleapi/orpc; docs at https://orpc.
 - Runtimes: fetch adapter for Hono and Cloudflare Workers; Node adapter; @orpc/cloudflare has DurablePublisher.
 - OpenAPI 3.1 generator with per-route metadata and a reference UI plugin.
 - Client: RPCLink + typed client; @orpc/tanstack-query; SSE via async-iterator handlers with lastEventId + retry plugin.
+- beta.32 specifics (verified 2026-09-03): no `@orpc/hono` or `@orpc/openapi-reference` packages; Hono uses
+  `@orpc/server/fetch` (`RPCHandler`) and `@orpc/openapi/fetch` (`OpenAPIHandler`); the reference UI is
+  `OpenAPIReferenceHandlerPlugin` in `@orpc/openapi/plugins` (Scalar from CDN). `RPCHandler` rejects GET by default
+  (CSRF); CORS is opt-in via `CORSHandlerPlugin` with `origin: '*'` default. There is no `isProcedure`: use
+  `instanceof Procedure` or `walkProcedureContractsAsync`. Route meta is `.meta(openapi({ method, path, ... }))`;
+  custom meta via `defineMeta`. `RPCLink` takes `url` as a path with a separate `origin`.
 - MCP: no official adapter. Community orpc-mcp 0.1.3 (1 author, 11 stars) needs v2 beta and reimplements the
   protocol instead of using @modelcontextprotocol/server. Rolling our own projection from oRPC introspection
   (procedure['~orpc'].inputSchemas/outputSchemas + registerTool with Standard Schema) is ~40 lines; verified by prototype.

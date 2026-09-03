@@ -1,0 +1,25 @@
+{
+  "name": "@deevy/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp pack --watch --on-success \"node --env-file-if-exists=../../.env dist/index.mjs\"",
+    "build": "vp pack",
+    "start": "node dist/index.mjs",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "@deevy/adapters": "workspace:*",
+    "@deevy/core": "workspace:*",
+    "@deevy/db": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

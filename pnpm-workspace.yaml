@@ -1,0 +1,58 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+catalogMode: prefer
+
+# Exact pins for the pre-release lines are deliberate (docs/PLAN.md "Risks worth naming",
+# ADR-0007, ADR-0008, ADR-0009). Upgrade them on purpose, all packages of a line together.
+catalog:
+  # toolchain
+  "@types/node": ^26.1.1
+  typescript: ^7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.0
+  vite-plus: 0.3.0
+  # auth (ADR-0007): pin the whole 1.7.2 line
+  better-auth: 1.7.2
+  "@better-auth/drizzle-adapter": 1.7.2
+  auth: 1.7.2
+  # data (ADR-0008): exact rc, never the `rc` tag
+  drizzle-orm: 1.0.0-rc.4
+  drizzle-kit: 1.0.0-rc.4
+  # operations (ADR-0009): exact beta
+  "@orpc/server": 2.0.0-beta.32
+  "@orpc/client": 2.0.0-beta.32
+  "@orpc/contract": 2.0.0-beta.32
+  "@orpc/openapi": 2.0.0-beta.32
+  "@orpc/zod": 2.0.0-beta.32
+  "@orpc/json-schema": 2.0.0-beta.32
+  "@orpc/tanstack-query": 2.0.0-beta.32
+  "@orpc/shared": 2.0.0-beta.32
+  # http
+  hono: 4.13.5
+  "@hono/node-server": 2.1.1
+  zod: 4.5.4
+  # web
+  react: 19.2.8
+  react-dom: 19.2.8
+  "@types/react": ^19.2.18
+  "@types/react-dom": ^19.2.4
+  "@vitejs/plugin-react": ^6.1.0
+  "@tanstack/react-query": 5.102.8
+  # workers (ADR-0006)
+  "@cloudflare/vite-plugin": 1.54.3
+  "@cloudflare/workers-types": 5.20260903.1
+  wrangler: 4.128.0
+overrides:
+  vite@*: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
+minimumReleaseAgeExclude:
+  - "@cloudflare/workers-types@5.20260903.1"
+allowBuilds:
+  esbuild: true
+  workerd: true

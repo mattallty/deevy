@@ -1,0 +1,30 @@
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { mountSpa, openDatabase } from "@deevy/adapters/node";
+import { createApp, createAuth } from "@deevy/core";
+import type { ServerEnv } from "./env.ts";
+
+/** Builds the fully wired Node app. Separate from the listener so tests can drive it with Request objects. */
+export function buildServer(env: ServerEnv) {
+  if (env.databasePath !== ":memory:")
+    mkdirSync(dirname(resolve(env.databasePath)), { recursive: true });
+  const { db, close } = openDatabase({
+    path: env.databasePath,
+    migrationsFolder: env.migrationsFolder,
+  });
+  const origin = [env.webOrigin, env.baseURL].filter((o): o is string => Boolean(o));
+  const auth = createAuth({
+    db,
+    env: {
+      baseURL: env.baseURL,
+      secret: env.secret,
+      trustedOrigins: origin,
+      github: env.github,
+      adminEmail: env.adminEmail,
+      workspaceName: env.workspaceName,
+    },
+  });
+  const app = createApp({ db, auth, origin });
+  if (env.webDist) mountSpa(app, resolve(env.webDist));
+  return { app, close };
+}
