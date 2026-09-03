@@ -14,7 +14,7 @@ cp .env.example .env   # fill in the values described in the file
 vp run --parallel dev
 ```
 
-`vp run --parallel dev` starts two tasks: the Node server on http://localhost:3000 (rebuilt and restarted by
+`vp run -r --parallel dev` starts two tasks: the Node server on http://localhost:3000 (rebuilt and restarted by
 `vp pack --watch` on every change) and the Vite dev server on http://localhost:5173, which serves the SPA and
 proxies `/api`, `/rpc`, and `/healthz` to the Node server. Open http://localhost:5173.
 

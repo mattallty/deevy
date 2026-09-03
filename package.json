@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
-    "dev": "vp run --parallel dev",
+    "dev": "vp run -r --parallel dev",
     "ready": "vp check && vp run -r test && vp run -r build"
   },
   "devDependencies": {

@@ -51,7 +51,7 @@ export interface OperationDef<
   }) => Promise<InferSchemaInput<TOutput>>;
 }
 
-/** Input for operations that take nothing: the RPC link sends undefined, the OpenAPI handler an empty object. */
+/** Input for operations that take nothing: the RPC link sends undefined, the OpenAPI handler an empty object (GET inputs must be objects). */
 export const NoInput = z.object({}).optional();
 
 export const [operationMeta, getOperationMeta] = defineMeta(

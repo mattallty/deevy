@@ -4,7 +4,10 @@
     {
       "name": "dev",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", ". \"$HOME/.config/vite-plus/env\" 2>/dev/null; command vp run --parallel dev"],
+      "runtimeArgs": [
+        "-c",
+        ". \"$HOME/.config/vite-plus/env\" 2>/dev/null; command vp run -r --parallel dev"
+      ],
       "port": 5173
     }
   ]

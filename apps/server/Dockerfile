@@ -14,7 +14,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /src/apps/server/dist ./dist
 COPY --from=build /src/apps/web/dist ./web
-ENV PORT=3000 \
+ENV DEEVY_PORT=3000 \
     DEEVY_DATABASE_PATH=/data/deevy.sqlite \
     DEEVY_WEB_DIST=/app/web
 VOLUME ["/data"]
