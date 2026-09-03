@@ -74,6 +74,10 @@ vi.mock("../src/lib/orpc.ts", async () => {
       update: async () => stub.projects[0],
       archive: async () => stub.projects[0],
     },
+    issues: {
+      list: async () => ({ issues: [], nextCursor: null }),
+      create: async () => ({}),
+    },
     teams: {
       list: async () => ({ teams: stub.teams }),
       create: async () => stub.teams[0],
@@ -154,10 +158,11 @@ describe("the Project page", () => {
     ).toEqual(["IntentGate", "SpecGate", "PlanGate", "Build", "ReviewGate", "Done"]);
   });
 
-  it("says Issues arrive in the next slice rather than showing an empty table", async () => {
+  it("offers the new-Issue form and says so when the Project has none", async () => {
     await mountAt("/projects/DEV");
 
-    expect(await screen.findByText(/No Issues yet/)).toBeTruthy();
+    expect(await screen.findByLabelText("New Issue")).toBeTruthy();
+    expect(await screen.findByText("No Issues yet")).toBeTruthy();
   });
 });
 

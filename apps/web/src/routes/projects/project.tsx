@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { IssueList } from "./issue-list.tsx";
 import { Badge } from "@/components/ui/badge";
 import { orpc } from "@/lib/orpc.ts";
 
@@ -43,11 +44,7 @@ export function ProjectPage({ projectKey }: { projectKey: string }) {
         </ul>
       </div>
 
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No Issues yet. Creating and working them arrives with the next slice.
-        </p>
-      </div>
+      <IssueList projectKey={key} />
     </section>
   );
 }

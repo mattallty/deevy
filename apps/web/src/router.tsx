@@ -5,6 +5,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { ProjectsPage } from "./routes/index.tsx";
+import { IssuePage } from "./routes/issues/issue.tsx";
 import { ProjectPage } from "./routes/projects/project.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
@@ -33,6 +34,13 @@ const projectRoute = createRoute({
     return <ProjectPage projectKey={projectRoute.useParams().key} />;
   },
 });
+const issueRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/issues/$issueKey",
+  component: function Issue() {
+    return <IssuePage issueKey={issueRoute.useParams().issueKey} />;
+  },
+});
 const teamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/teams",
@@ -52,6 +60,7 @@ const allowlistRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   projectRoute,
+  issueRoute,
   teamsRoute,
   membersRoute,
   allowlistRoute,
