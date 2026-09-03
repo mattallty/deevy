@@ -5,35 +5,8 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
-  const client = {
-    members: {
-      list: async () => ({ members: [] }),
-      updateRole: async () => ({}),
-      suspend: async () => ({}),
-      reinstate: async () => ({}),
-    },
-    allowlist: {
-      list: async () => ({ rules: [] }),
-      add: async () => ({}),
-      remove: async () => ({ removed: true }),
-    },
-    issues: { list: async () => ({ issues: [], nextCursor: null }), create: async () => ({}) },
-    projects: {
-      list: async () => ({ projects: [] }),
-      get: async () => ({}),
-      create: async () => ({}),
-      update: async () => ({}),
-      archive: async () => ({}),
-    },
-    teams: {
-      list: async () => ({ teams: [] }),
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({ deleted: true }),
-      addMember: async () => ({}),
-      removeMember: async () => ({}),
-    },
-  };
+  const { stubClient } = await import("./stub-client.ts");
+  const client = stubClient();
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 

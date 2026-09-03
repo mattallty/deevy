@@ -6,3 +6,4 @@ export * from "./project.ts";
 export * from "./issue.ts";
 export * from "./gate.ts";
 export * from "./document.ts";
+export * from "./label.ts";

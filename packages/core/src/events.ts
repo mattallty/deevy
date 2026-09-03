@@ -35,7 +35,11 @@ export type EventKind =
   | "gate.rejected"
   | "workflow.updated"
   | "document.created"
-  | "document.updated";
+  | "document.updated"
+  | "label.created"
+  | "label.updated"
+  | "label.deleted"
+  | "issue.labels_changed";
 
 export type EventPayload = Record<string, unknown>;
 

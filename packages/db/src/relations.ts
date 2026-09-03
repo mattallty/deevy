@@ -5,6 +5,7 @@ import { event } from "./schema/event.ts";
 import { document, documentVersion } from "./schema/document.ts";
 import { gateDecision } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
+import { issueLabel, label } from "./schema/label.ts";
 import { project, team, teamMember, workflowState } from "./schema/project.ts";
 import { member, workspace } from "./schema/workspace.ts";
 
@@ -25,12 +26,15 @@ export const tables = {
   gateDecision,
   document,
   documentVersion,
+  label,
+  issueLabel,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
   workspace: {
     members: r.many.member({ from: r.workspace.id, to: r.member.workspaceId }),
     events: r.many.event({ from: r.workspace.id, to: r.event.workspaceId }),
+    labels: r.many.label({ from: r.workspace.id, to: r.label.workspaceId }),
     allowlistRules: r.many.allowlistRule({
       from: r.workspace.id,
       to: r.allowlistRule.workspaceId,
@@ -82,6 +86,21 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     children: r.many.issue({ from: r.issue.id, to: r.issue.parentId }),
     gateDecisions: r.many.gateDecision({ from: r.issue.id, to: r.gateDecision.issueId }),
     documents: r.many.document({ from: r.issue.id, to: r.document.issueId }),
+    labels: r.many.label({
+      from: r.issue.id.through(r.issueLabel.issueId),
+      to: r.label.id.through(r.issueLabel.labelId),
+    }),
+  },
+  label: {
+    workspace: r.one.workspace({ from: r.label.workspaceId, to: r.workspace.id, optional: false }),
+    issues: r.many.issue({
+      from: r.label.id.through(r.issueLabel.labelId),
+      to: r.issue.id.through(r.issueLabel.issueId),
+    }),
+  },
+  issueLabel: {
+    issue: r.one.issue({ from: r.issueLabel.issueId, to: r.issue.id, optional: false }),
+    label: r.one.label({ from: r.issueLabel.labelId, to: r.label.id, optional: false }),
   },
   document: {
     issue: r.one.issue({ from: r.document.issueId, to: r.issue.id, optional: false }),

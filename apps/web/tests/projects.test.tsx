@@ -57,8 +57,8 @@ const stub = vi.hoisted(() => {
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
-  const client = {
-    me: { get: async () => ({ member: { role: "admin" } }) },
+  const { stubClient } = await import("./stub-client.ts");
+  const client = stubClient({
     members: { list: async () => ({ members: stub.teams[0]!.members }) },
     projects: {
       list: async () => ({ projects: stub.projects }),
@@ -71,22 +71,10 @@ vi.mock("../src/lib/orpc.ts", async () => {
         stub.created.push(input);
         return stub.projects[0];
       },
-      update: async () => stub.projects[0],
-      archive: async () => stub.projects[0],
     },
-    issues: {
-      list: async () => ({ issues: [], nextCursor: null }),
-      create: async () => ({}),
-    },
-    teams: {
-      list: async () => ({ teams: stub.teams }),
-      create: async () => stub.teams[0],
-      update: async () => stub.teams[0],
-      delete: async () => ({ deleted: true }),
-      addMember: async () => stub.teams[0],
-      removeMember: async () => stub.teams[0],
-    },
-  };
+    workflow: { get: async () => ({ states: stub.states }) },
+    teams: { list: async () => ({ teams: stub.teams }) },
+  });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 

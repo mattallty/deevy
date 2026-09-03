@@ -29,19 +29,11 @@ const stub = vi.hoisted(() => ({
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
-  const client = {
-    members: {
-      list: async () => ({ members: stub.members }),
-      updateRole: async () => stub.members[0],
-      suspend: async () => stub.members[1],
-      reinstate: async () => stub.members[1],
-    },
-    allowlist: {
-      list: async () => ({ rules: stub.rules }),
-      add: async () => stub.rules[0],
-      remove: async () => ({ removed: true }),
-    },
-  };
+  const { stubClient } = await import("./stub-client.ts");
+  const client = stubClient({
+    members: { list: async () => ({ members: stub.members }) },
+    allowlist: { list: async () => ({ rules: stub.rules }) },
+  });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 

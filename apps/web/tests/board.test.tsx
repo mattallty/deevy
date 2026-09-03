@@ -52,11 +52,10 @@ const stub = vi.hoisted(() => {
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
-  const client = {
+  const { stubClient } = await import("./stub-client.ts");
+  const client = stubClient({
     members: { list: async () => ({ members: [stub.ada] }) },
-    teams: { list: async () => ({ teams: [] }) },
     projects: {
-      list: async () => ({ projects: [] }),
       get: async () => ({
         id: "p1",
         key: "DEV",
@@ -67,10 +66,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
         states: stub.states,
       }),
     },
-    workflow: {
-      get: async () => ({ states: stub.states }),
-      update: async () => ({ states: stub.states }),
-    },
+    workflow: { get: async () => ({ states: stub.states }) },
     issues: {
       list: async (input: { assigneeMemberId?: string }) => ({
         issues: input.assigneeMemberId
@@ -78,9 +74,6 @@ vi.mock("../src/lib/orpc.ts", async () => {
           : stub.issues,
         nextCursor: 2,
       }),
-      get: async () => stub.issues[0],
-      create: async () => stub.issues[0],
-      update: async () => stub.issues[0],
       move: async (input: unknown) => {
         stub.moved.push(input);
         return stub.issues[1];
@@ -91,31 +84,8 @@ vi.mock("../src/lib/orpc.ts", async () => {
         stub.approved.push(input);
         return stub.issues[0];
       },
-      reject: async () => stub.issues[0],
     },
-    documents: {
-      list: async () => ({ documents: [] }),
-      get: async () => ({
-        id: "d",
-        name: "intent",
-        currentVersion: 1,
-        issueId: "i1",
-        version: 1,
-        body: "",
-        authorMemberId: null,
-      }),
-      write: async () => ({
-        id: "d",
-        name: "intent",
-        currentVersion: 2,
-        issueId: "i1",
-        version: 2,
-        body: "",
-        authorMemberId: null,
-      }),
-    },
-    events: { list: async () => ({ events: [], nextCursor: null }) },
-  };
+  });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 

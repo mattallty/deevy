@@ -19,6 +19,7 @@ const stub = vi.hoisted(() => ({
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
+  const { stubClient } = await import("./stub-client.ts");
   const issue = {
     id: "i1",
     key: "DEV-1",
@@ -29,31 +30,12 @@ vi.mock("../src/lib/orpc.ts", async () => {
     parent: null,
     children: [],
     gateDecisions: [],
+    labels: [],
     project: { id: "p1", key: "DEV", name: "deevy" },
   };
-  const client = {
-    members: { list: async () => ({ members: [] }) },
-    teams: { list: async () => ({ teams: [] }) },
-    projects: { list: async () => ({ projects: [] }), get: async () => ({ states: stub.states }) },
-    workflow: {
-      get: async () => ({ states: stub.states }),
-      update: async () => ({ states: stub.states }),
-    },
-    issues: {
-      get: async () => issue,
-      list: async () => ({ issues: [], nextCursor: null }),
-      update: async () => issue,
-      move: async () => issue,
-      create: async () => issue,
-    },
-    gates: { approve: async () => issue, reject: async () => issue },
-    events: {
-      list: async () => ({ events: [], nextCursor: null }),
-      subscribe: async () =>
-        (async function* () {
-          await new Promise(() => {});
-        })(),
-    },
+  const client = stubClient({
+    issues: { get: async () => issue },
+    workflow: { get: async () => ({ states: stub.states }) },
     documents: {
       list: async () => ({ documents: stub.documents }),
       get: async ({ name, version }: { name: string; version?: number }) => {
@@ -71,7 +53,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
         return { ...stub.documents[0], version: 3, body: "written", authorMemberId: null };
       },
     },
-  };
+  });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 

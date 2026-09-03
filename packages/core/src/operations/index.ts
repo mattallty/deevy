@@ -8,6 +8,8 @@ import {
 import {
   allowlistRuleKinds,
   issue as issueTable,
+  issueLabel as issueLabelTable,
+  label as labelTable,
   project as projectTable,
   workflowState as workflowStateTable,
   workflowStateCategories,
@@ -23,6 +25,7 @@ import {
   parseIssueKey,
 } from "../issues.ts";
 import { ensureStateDocument, writeVersion } from "../documents.ts";
+import { oneLabelPerScope, replaceIssueLabels } from "../labels.ts";
 import { createProject, ProjectKeyPattern } from "../projects.ts";
 import {
   assertHuman,
@@ -39,6 +42,7 @@ import {
   IssueSummarySchema,
   DocumentAtVersionSchema,
   DocumentSchema,
+  LabelSchema,
   ProjectWithStatesSchema,
   TeamWithMembersSchema,
   WorkflowStateSchema,
@@ -803,7 +807,7 @@ export const teams = {
 };
 
 /** The relations every Issue shape needs loaded, and the key derived onto it. */
-const issueWith = { state: true, assignee: { with: { user: true } } } as const;
+const issueWith = { state: true, assignee: { with: { user: true } }, labels: true } as const;
 
 type LoadedIssue = { number: number; project?: { key: string } } & Record<string, unknown>;
 
@@ -1196,6 +1200,7 @@ export const issues = {
       after: z.coerce.number().int().nonnegative().optional(),
       stateId: z.string().optional(),
       assigneeMemberId: z.string().optional(),
+      labelId: z.string().optional(),
       /** Only Issues whose State is not a `done` one. */
       open: QueryFlag.optional(),
       limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -1216,6 +1221,7 @@ export const issues = {
             ? {}
             : { assigneeMemberId: input.assigneeMemberId }),
           ...(input.open ? { closedAt: { isNull: true } } : {}),
+          ...(input.labelId === undefined ? {} : { labels: { id: input.labelId } }),
         },
         with: issueWith,
         orderBy: { number: "asc" },
@@ -1270,6 +1276,47 @@ export const issues = {
         payload: { from: from.name, to: to.name },
       });
       await openStateDocument(context, issue.id, project.id, to);
+      return loadIssue(context, issue.id);
+    },
+  }),
+
+  setLabels: defineOperation({
+    name: "issues.setLabels",
+    summary: "Replace an Issue's Labels; one per scope survives, the last given",
+    method: "PUT",
+    path: "/issues/{key}/labels",
+    auth: "member",
+    input: z.object({ key: z.string(), labelIds: z.array(z.string()) }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      const { issue, project } = await requireIssue(context, input.key);
+      const chosen = await context.db.query.label.findMany({
+        where: { id: { in: input.labelIds }, workspaceId: context.workspace.id },
+      });
+      if (chosen.length !== new Set(input.labelIds).size) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "One of those Labels is not defined in this Workspace",
+        });
+      }
+      // Order matters for the one-per-scope rule, and findMany does not keep it.
+      const ordered = input.labelIds
+        .map((id) => chosen.find((label) => label.id === id))
+        .filter((label) => label !== undefined);
+
+      const change = await replaceIssueLabels(
+        context.db,
+        issue.id,
+        oneLabelPerScope(ordered).map((label) => label.id),
+      );
+      if (change.added.length > 0 || change.removed.length > 0) {
+        await appendEvent(context, {
+          kind: "issue.labels_changed",
+          subjectType: "issue",
+          subjectId: issue.id,
+          projectId: project.id,
+          payload: change,
+        });
+      }
       return loadIssue(context, issue.id);
     },
   }),
@@ -1378,6 +1425,154 @@ async function requireDocument(context: ContextFor<"member">, issueId: string, n
   return found;
 }
 
+/** The Label an operation names, or NOT_FOUND. Scoped to the Workspace. */
+async function requireLabel(context: ContextFor<"member">, labelId: string) {
+  const found = await context.db.query.label.findFirst({
+    where: { id: labelId, workspaceId: context.workspace.id },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Label in this Workspace" });
+  return found;
+}
+
+export const labels = {
+  list: defineOperation({
+    name: "labels.list",
+    summary: "The Labels this Workspace defines",
+    method: "GET",
+    path: "/labels",
+    auth: "member",
+    input: NoInput,
+    output: z.object({ labels: z.array(LabelSchema) }),
+    handler: async ({ context }) => {
+      const rows = await context.db.query.label.findMany({
+        where: { workspaceId: context.workspace.id },
+        orderBy: { name: "asc" },
+      });
+      return { labels: rows };
+    },
+  }),
+
+  create: defineOperation({
+    name: "labels.create",
+    summary: "Define a Label, plain or scoped",
+    method: "POST",
+    path: "/labels",
+    auth: "member",
+    input: z.object({
+      /** Null for a plain Label; an Issue carries at most one Label per scope. */
+      scope: z.string().trim().min(1).max(40).nullish(),
+      name: z.string().trim().min(1).max(60),
+      color: z.string().trim().max(30),
+    }),
+    output: LabelSchema,
+    handler: async ({ input, context }) => {
+      const scope = input.scope ?? null;
+      const taken = await context.db.query.label.findFirst({
+        // A relational filter takes { isNull: true } rather than a bare null.
+        where: {
+          workspaceId: context.workspace.id,
+          scope: scope === null ? { isNull: true } : scope,
+          name: input.name,
+        },
+      });
+      if (taken) throw new ORPCError("CONFLICT", { message: "That Label already exists" });
+
+      const id = crypto.randomUUID();
+      const [row] = await context.db
+        .insert(labelTable)
+        .values({
+          id,
+          workspaceId: context.workspace.id,
+          scope,
+          name: input.name,
+          color: input.color,
+        })
+        .returning();
+      if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR");
+      await appendEvent(context, {
+        kind: "label.created",
+        subjectType: "label",
+        subjectId: id,
+        payload: { scope, name: input.name },
+      });
+      return row;
+    },
+  }),
+
+  update: defineOperation({
+    name: "labels.update",
+    summary: "Rename a Label or change its colour",
+    method: "PATCH",
+    path: "/labels/{labelId}",
+    auth: "member",
+    input: z.object({
+      labelId: z.string(),
+      name: z.string().trim().min(1).max(60).optional(),
+      color: z.string().trim().max(30).optional(),
+    }),
+    output: LabelSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireLabel(context, input.labelId);
+      const [row] = await context.db
+        .update(labelTable)
+        .set({
+          ...(input.name === undefined ? {} : { name: input.name }),
+          ...(input.color === undefined ? {} : { color: input.color }),
+        })
+        .where(eq(labelTable.id, found.id))
+        .returning();
+      await appendEvent(context, {
+        kind: "label.updated",
+        subjectType: "label",
+        subjectId: found.id,
+        payload: { name: input.name ?? found.name },
+      });
+      return row ?? found;
+    },
+  }),
+
+  delete: defineOperation({
+    name: "labels.delete",
+    summary: "Remove a Label from the Workspace and from every Issue carrying it",
+    method: "DELETE",
+    path: "/labels/{labelId}",
+    auth: "admin",
+    input: z.object({ labelId: z.string() }),
+    output: z.object({ deleted: z.literal(true) }),
+    handler: async ({ input, context }) => {
+      const found = await requireLabel(context, input.labelId);
+      // Read the affected Issues before the delete cascades the join rows away,
+      // so each one still gets its own Event.
+      const affected = await context.db
+        .select({ issueId: issueLabelTable.issueId })
+        .from(issueLabelTable)
+        .where(eq(issueLabelTable.labelId, found.id));
+      const projects = await context.db.query.issue.findMany({
+        where: { id: { in: affected.map((row) => row.issueId) } },
+        columns: { id: true, projectId: true },
+      });
+
+      await context.db.delete(labelTable).where(eq(labelTable.id, found.id));
+      await appendEvent(context, {
+        kind: "label.deleted",
+        subjectType: "label",
+        subjectId: found.id,
+        payload: { scope: found.scope, name: found.name },
+      });
+      for (const issue of projects) {
+        await appendEvent(context, {
+          kind: "issue.labels_changed",
+          subjectType: "issue",
+          subjectId: issue.id,
+          projectId: issue.projectId,
+          payload: { added: [], removed: [found.id] },
+        });
+      }
+      return { deleted: true as const };
+    },
+  }),
+};
+
 export const documents = {
   list: defineOperation({
     name: "documents.list",
@@ -1471,5 +1666,6 @@ export const router = {
   gates,
   workflow,
   documents,
+  labels,
 };
 export type AppRouter = typeof router;

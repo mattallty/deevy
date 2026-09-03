@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { GateControls } from "@/components/gate-controls";
 import { IssueDocuments } from "@/components/issue-documents";
+import { LabelPicker } from "@/components/label-picker";
 import { IssueTimeline } from "@/components/issue-timeline.tsx";
 import { Markdown } from "@/components/markdown.tsx";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,7 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
     );
   }
 
-  const { id, key, title, description, state, assignee, parent, children, gateDecisions } =
+  const { id, key, title, description, state, assignee, parent, children, gateDecisions, labels } =
     issue.data;
 
   return (
@@ -89,6 +90,8 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
       {!editing && !description ? (
         <p className="text-sm text-muted-foreground">No description yet.</p>
       ) : null}
+
+      <LabelPicker issueKey={key} labels={labels} />
 
       <IssueDocuments issueKey={key} />
 

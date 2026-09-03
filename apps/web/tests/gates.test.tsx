@@ -24,6 +24,7 @@ const stub = vi.hoisted(() => {
     closedAt: null,
     project: { id: "p1", key: "DEV", name: "deevy" },
     gateDecisions: [],
+    labels: [],
   };
   return {
     states,
@@ -49,12 +50,10 @@ const stub = vi.hoisted(() => {
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
+  const { stubClient } = await import("./stub-client.ts");
   const byKey: Record<string, unknown> = { "DEV-1": stub.inGate, "DEV-2": stub.inBuild };
-  const client = {
-    members: { list: async () => ({ members: [] }) },
-    teams: { list: async () => ({ teams: [] }) },
+  const client = stubClient({
     projects: {
-      list: async () => ({ projects: [] }),
       get: async () => ({
         id: "p1",
         key: "DEV",
@@ -65,15 +64,9 @@ vi.mock("../src/lib/orpc.ts", async () => {
         states: stub.states,
       }),
     },
-    workflow: {
-      get: async () => ({ states: stub.states }),
-      update: async () => ({ states: stub.states }),
-    },
+    workflow: { get: async () => ({ states: stub.states }) },
     issues: {
-      list: async () => ({ issues: [], nextCursor: null }),
       get: async ({ key }: { key: string }) => byKey[key],
-      create: async () => stub.inGate,
-      update: async () => stub.inGate,
       move: async (input: unknown) => {
         stub.moved.push(input);
         return stub.inBuild;
@@ -89,29 +82,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
         return stub.inGate;
       },
     },
-    documents: {
-      list: async () => ({ documents: [] }),
-      get: async () => ({
-        id: "d",
-        name: "intent",
-        currentVersion: 1,
-        issueId: "i1",
-        version: 1,
-        body: "",
-        authorMemberId: null,
-      }),
-      write: async () => ({
-        id: "d",
-        name: "intent",
-        currentVersion: 2,
-        issueId: "i1",
-        version: 2,
-        body: "",
-        authorMemberId: null,
-      }),
-    },
-    events: { list: async () => ({ events: [], nextCursor: null }) },
-  };
+  });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 

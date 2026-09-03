@@ -5,6 +5,7 @@ import {
   event,
   gateDecision,
   issue,
+  label,
   member,
   project,
   team,
@@ -47,11 +48,14 @@ export const TeamWithMembersSchema = TeamSchema.extend({
 
 export const IssueSchema = createSelectSchema(issue);
 
-/** An Issue as a list shows one: the row plus its derived key and its State. */
+export const LabelSchema = createSelectSchema(label);
+
+/** An Issue as a list shows one: the row plus its derived key, State and Labels. */
 export const IssueSummarySchema = IssueSchema.extend({
   key: z.string(),
   state: WorkflowStateSchema,
   assignee: MemberWithUserSchema.nullable(),
+  labels: z.array(LabelSchema),
 });
 
 export const GateDecisionSchema = createSelectSchema(gateDecision);

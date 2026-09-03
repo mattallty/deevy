@@ -3639,6 +3639,46 @@
                         }
                       ]
                     },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "project": {
                       "type": "object",
                       "properties": {
@@ -3955,6 +3995,46 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -3973,7 +4053,8 @@
                             "closedAt",
                             "key",
                             "state",
-                            "assignee"
+                            "assignee",
+                            "labels"
                           ],
                           "additionalProperties": false
                         },
@@ -4235,6 +4316,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -4253,7 +4374,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -4327,6 +4449,7 @@
                     "key",
                     "state",
                     "assignee",
+                    "labels",
                     "project",
                     "parent",
                     "children",
@@ -4377,6 +4500,15 @@
           {
             "in": "query",
             "name": "assigneeMemberId",
+            "schema": {
+              "type": "string"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "in": "query",
+            "name": "labelId",
             "schema": {
               "type": "string"
             },
@@ -4671,6 +4803,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -4689,7 +4861,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -4990,6 +5163,46 @@
                         }
                       ]
                     },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "project": {
                       "type": "object",
                       "properties": {
@@ -5306,6 +5519,46 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -5324,7 +5577,8 @@
                             "closedAt",
                             "key",
                             "state",
-                            "assignee"
+                            "assignee",
+                            "labels"
                           ],
                           "additionalProperties": false
                         },
@@ -5586,6 +5840,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -5604,7 +5898,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -5678,6 +5973,7 @@
                     "key",
                     "state",
                     "assignee",
+                    "labels",
                     "project",
                     "parent",
                     "children",
@@ -5999,6 +6295,46 @@
                         }
                       ]
                     },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "project": {
                       "type": "object",
                       "properties": {
@@ -6315,6 +6651,46 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -6333,7 +6709,8 @@
                             "closedAt",
                             "key",
                             "state",
-                            "assignee"
+                            "assignee",
+                            "labels"
                           ],
                           "additionalProperties": false
                         },
@@ -6595,6 +6972,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -6613,7 +7030,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -6687,6 +7105,7 @@
                     "key",
                     "state",
                     "assignee",
+                    "labels",
                     "project",
                     "parent",
                     "children",
@@ -6989,6 +7408,46 @@
                         }
                       ]
                     },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "project": {
                       "type": "object",
                       "properties": {
@@ -7305,6 +7764,46 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -7323,7 +7822,8 @@
                             "closedAt",
                             "key",
                             "state",
-                            "assignee"
+                            "assignee",
+                            "labels"
                           ],
                           "additionalProperties": false
                         },
@@ -7585,6 +8085,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -7603,7 +8143,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -7677,6 +8218,1123 @@
                     "key",
                     "state",
                     "assignee",
+                    "labels",
+                    "project",
+                    "parent",
+                    "children",
+                    "gateDecisions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issues/{key}/labels": {
+      "put": {
+        "operationId": "issues.setLabels",
+        "summary": "Replace an Issue's Labels; one per scope survives, the last given",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "key",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "labelIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "labelIds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "stateId": {
+                      "type": "string"
+                    },
+                    "stateEnteredAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "assigneeMemberId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "parentId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdBy": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "closedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "x-native-type": "date"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "position": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "isGate": {
+                          "type": "boolean"
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "backlog",
+                            "active",
+                            "done"
+                          ]
+                        },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "x-native-type": "date"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "projectId",
+                        "name",
+                        "position",
+                        "isGate",
+                        "category",
+                        "documentName",
+                        "documentTemplate",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "assignee": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "workspaceId": {
+                              "type": "string"
+                            },
+                            "userId": {
+                              "type": "string"
+                            },
+                            "handle": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "admin",
+                                "member"
+                              ]
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "human",
+                                "agent"
+                              ]
+                            },
+                            "sponsorId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            "suspendedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "user": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                },
+                                "image": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "kind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "human",
+                                        "agent"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "email",
+                                "image",
+                                "kind"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "workspaceId",
+                            "userId",
+                            "handle",
+                            "role",
+                            "kind",
+                            "sponsorId",
+                            "createdAt",
+                            "suspendedAt",
+                            "user"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "project": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "workspaceId": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "teamId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "nextIssueNumber": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "x-native-type": "date"
+                        },
+                        "archivedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "workspaceId",
+                        "key",
+                        "name",
+                        "description",
+                        "teamId",
+                        "nextIssueNumber",
+                        "createdAt",
+                        "archivedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "parent": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "projectId": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "stateId": {
+                              "type": "string"
+                            },
+                            "stateEnteredAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            "assigneeMemberId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "parentId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "createdBy": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            "closedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "key": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "projectId": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "position": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "isGate": {
+                                  "type": "boolean"
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "backlog",
+                                    "active",
+                                    "done"
+                                  ]
+                                },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "projectId",
+                                "name",
+                                "position",
+                                "isGate",
+                                "category",
+                                "documentName",
+                                "documentTemplate",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "assignee": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "workspaceId": {
+                                      "type": "string"
+                                    },
+                                    "userId": {
+                                      "type": "string"
+                                    },
+                                    "handle": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "enum": [
+                                        "admin",
+                                        "member"
+                                      ]
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "human",
+                                        "agent"
+                                      ]
+                                    },
+                                    "sponsorId": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "createdAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "x-native-type": "date"
+                                    },
+                                    "suspendedAt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "x-native-type": "date"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "user": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "email": {
+                                          "type": "string"
+                                        },
+                                        "image": {
+                                          "type": [
+                                            "string",
+                                            "null"
+                                          ]
+                                        },
+                                        "kind": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "enum": [
+                                                "human",
+                                                "agent"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name",
+                                        "email",
+                                        "image",
+                                        "kind"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "workspaceId",
+                                    "userId",
+                                    "handle",
+                                    "role",
+                                    "kind",
+                                    "sponsorId",
+                                    "createdAt",
+                                    "suspendedAt",
+                                    "user"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "projectId",
+                            "number",
+                            "title",
+                            "description",
+                            "stateId",
+                            "stateEnteredAt",
+                            "assigneeMemberId",
+                            "parentId",
+                            "createdBy",
+                            "createdAt",
+                            "updatedAt",
+                            "closedAt",
+                            "key",
+                            "state",
+                            "assignee",
+                            "labels"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "stateId": {
+                            "type": "string"
+                          },
+                          "stateEnteredAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          },
+                          "assigneeMemberId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "parentId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdBy": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          },
+                          "closedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "projectId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "position": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "isGate": {
+                                "type": "boolean"
+                              },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "backlog",
+                                  "active",
+                                  "done"
+                                ]
+                              },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "projectId",
+                              "name",
+                              "position",
+                              "isGate",
+                              "category",
+                              "documentName",
+                              "documentTemplate",
+                              "createdAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "assignee": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "userId": {
+                                    "type": "string"
+                                  },
+                                  "handle": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "role": {
+                                    "type": "string",
+                                    "enum": [
+                                      "admin",
+                                      "member"
+                                    ]
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "human",
+                                      "agent"
+                                    ]
+                                  },
+                                  "sponsorId": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  },
+                                  "suspendedAt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "x-native-type": "date"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "user": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "email": {
+                                        "type": "string"
+                                      },
+                                      "image": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "kind": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "human",
+                                              "agent"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "email",
+                                      "image",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "userId",
+                                  "handle",
+                                  "role",
+                                  "kind",
+                                  "sponsorId",
+                                  "createdAt",
+                                  "suspendedAt",
+                                  "user"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "projectId",
+                          "number",
+                          "title",
+                          "description",
+                          "stateId",
+                          "stateEnteredAt",
+                          "assigneeMemberId",
+                          "parentId",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt",
+                          "closedAt",
+                          "key",
+                          "state",
+                          "assignee",
+                          "labels"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "gateDecisions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "issueId": {
+                            "type": "string"
+                          },
+                          "stateId": {
+                            "type": "string"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": [
+                              "approved",
+                              "rejected"
+                            ]
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "memberId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "issueId",
+                          "stateId",
+                          "decision",
+                          "note",
+                          "memberId",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "number",
+                    "title",
+                    "description",
+                    "stateId",
+                    "stateEnteredAt",
+                    "assigneeMemberId",
+                    "parentId",
+                    "createdBy",
+                    "createdAt",
+                    "updatedAt",
+                    "closedAt",
+                    "key",
+                    "state",
+                    "assignee",
+                    "labels",
                     "project",
                     "parent",
                     "children",
@@ -7983,6 +9641,46 @@
                         }
                       ]
                     },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "project": {
                       "type": "object",
                       "properties": {
@@ -8299,6 +9997,46 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -8317,7 +10055,8 @@
                             "closedAt",
                             "key",
                             "state",
-                            "assignee"
+                            "assignee",
+                            "labels"
                           ],
                           "additionalProperties": false
                         },
@@ -8579,6 +10318,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -8597,7 +10376,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -8671,6 +10451,7 @@
                     "key",
                     "state",
                     "assignee",
+                    "labels",
                     "project",
                     "parent",
                     "children",
@@ -8977,6 +10758,46 @@
                         }
                       ]
                     },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "project": {
                       "type": "object",
                       "properties": {
@@ -9293,6 +11114,46 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "scope": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "scope",
+                                  "name",
+                                  "color",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -9311,7 +11172,8 @@
                             "closedAt",
                             "key",
                             "state",
-                            "assignee"
+                            "assignee",
+                            "labels"
                           ],
                           "additionalProperties": false
                         },
@@ -9573,6 +11435,46 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "workspaceId": {
+                                  "type": "string"
+                                },
+                                "scope": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "color": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "workspaceId",
+                                "scope",
+                                "name",
+                                "color",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -9591,7 +11493,8 @@
                           "closedAt",
                           "key",
                           "state",
-                          "assignee"
+                          "assignee",
+                          "labels"
                         ],
                         "additionalProperties": false
                       }
@@ -9665,6 +11568,7 @@
                     "key",
                     "state",
                     "assignee",
+                    "labels",
                     "project",
                     "parent",
                     "children",
@@ -10222,6 +12126,285 @@
                     "version",
                     "body",
                     "authorMemberId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/labels": {
+      "get": {
+        "operationId": "labels.list",
+        "summary": "The Labels this Workspace defines",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "scope",
+                          "name",
+                          "color",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "labels"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "labels.create",
+        "summary": "Define a Label, plain or scoped",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "color": {
+                    "type": "string",
+                    "maxLength": 30
+                  }
+                },
+                "required": [
+                  "name",
+                  "color"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "scope",
+                    "name",
+                    "color",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/labels/{labelId}": {
+      "patch": {
+        "operationId": "labels.update",
+        "summary": "Rename a Label or change its colour",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "labelId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "color": {
+                    "type": "string",
+                    "maxLength": 30
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "scope",
+                    "name",
+                    "color",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "labels.delete",
+        "summary": "Remove a Label from the Workspace and from every Issue carrying it",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "labelId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "deleted"
                   ],
                   "additionalProperties": false
                 }

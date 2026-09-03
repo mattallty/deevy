@@ -22,4 +22,5 @@ export type WorkflowState = typeof import("./schema/project.ts").workflowState.$
 export type Issue = typeof import("./schema/issue.ts").issue.$inferSelect;
 export type GateDecision = typeof import("./schema/gate.ts").gateDecision.$inferSelect;
 export type Document = typeof import("./schema/document.ts").document.$inferSelect;
+export type Label = typeof import("./schema/label.ts").label.$inferSelect;
 export type DocumentVersion = typeof import("./schema/document.ts").documentVersion.$inferSelect;

@@ -29,6 +29,7 @@ const stub = vi.hoisted(() => {
     closedAt: null,
     project: { id: "p1", key: "DEV", name: "deevy" },
     gateDecisions: [] as unknown[],
+    labels: [] as unknown[],
   };
   const child = {
     ...epic,
@@ -56,12 +57,11 @@ const stub = vi.hoisted(() => {
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
+  const { stubClient } = await import("./stub-client.ts");
   const byKey: Record<string, unknown> = { "DEV-1": stub.epic, "DEV-2": stub.child };
-  const client = {
+  const client = stubClient({
     members: { list: async () => ({ members: [stub.ada] }) },
-    teams: { list: async () => ({ teams: [] }) },
     projects: {
-      list: async () => ({ projects: [] }),
       get: async () => ({
         id: "p1",
         key: "DEV",
@@ -72,14 +72,9 @@ vi.mock("../src/lib/orpc.ts", async () => {
         states: stub.states,
       }),
     },
-    workflow: {
-      get: async () => ({ states: stub.states }),
-      update: async () => ({ states: stub.states }),
-    },
-    gates: { approve: async () => stub.epic, reject: async () => stub.epic },
+    workflow: { get: async () => ({ states: stub.states }) },
     issues: {
       list: async () => ({ issues: [stub.epic, stub.child], nextCursor: 2 }),
-      move: async () => stub.epic,
       get: async ({ key }: { key: string }) => byKey[key] ?? Promise.reject(new Error("nope")),
       create: async (input: unknown) => {
         stub.created.push(input);
@@ -89,27 +84,6 @@ vi.mock("../src/lib/orpc.ts", async () => {
         stub.updated.push(input);
         return stub.epic;
       },
-    },
-    documents: {
-      list: async () => ({ documents: [] }),
-      get: async () => ({
-        id: "d",
-        name: "intent",
-        currentVersion: 1,
-        issueId: "i1",
-        version: 1,
-        body: "",
-        authorMemberId: null,
-      }),
-      write: async () => ({
-        id: "d",
-        name: "intent",
-        currentVersion: 2,
-        issueId: "i1",
-        version: 2,
-        body: "",
-        authorMemberId: null,
-      }),
     },
     events: {
       list: async () => ({
@@ -132,7 +106,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
         nextCursor: 2,
       }),
     },
-  };
+  });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
