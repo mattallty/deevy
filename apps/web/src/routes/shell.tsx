@@ -18,6 +18,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { useLiveEvents } from "@/lib/live";
 
 interface NavItem {
   to: string;
@@ -45,6 +46,9 @@ export interface ShellProps {
 
 /** The frame every signed-in page sits in: the Workspace sidebar, a header, and the route. */
 export function AppShell({ workspaceName, memberName }: ShellProps) {
+  // Mounted once for the whole signed-in app, so one stream serves every page.
+  useLiveEvents(true);
+
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">

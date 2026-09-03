@@ -37,6 +37,26 @@ export interface OperationMeta {
   auth: AuthRule;
 }
 
+/**
+ * A streaming operation: the same shape, but its handler returns an async
+ * iterator and its output is an oRPC event iterator. The SSE stream is the
+ * third surface of ADR-0005, so it stays inside the registry like the rest
+ * (ADR-0009).
+ */
+export interface StreamOperationDef<
+  TAuth extends AuthRule,
+  TInput extends AnySchema,
+> extends OperationMeta {
+  auth: TAuth;
+  input: TInput;
+  output: AnySchema;
+  handler: (args: {
+    input: InferSchemaOutput<TInput>;
+    context: ContextFor<TAuth>;
+    signal?: AbortSignal;
+  }) => AsyncGenerator<unknown, void, unknown>;
+}
+
 export interface OperationDef<
   TAuth extends AuthRule,
   TInput extends AnySchema,
@@ -99,4 +119,32 @@ export function defineOperation<
     .input(def.input)
     .output(def.output)
     .handler(({ input, context }) => def.handler({ input, context: context as ContextFor<TAuth> }));
+}
+
+/**
+ * The streaming counterpart of defineOperation. Everything but the handler's
+ * shape is the same, so an event stream carries the same auth rule, meta and
+ * OpenAPI entry as any other operation.
+ */
+export function defineStreamOperation<TAuth extends AuthRule, TInput extends z.ZodType>(
+  def: StreamOperationDef<TAuth, TInput>,
+) {
+  const meta: OperationMeta = {
+    name: def.name,
+    summary: def.summary,
+    method: def.method,
+    path: def.path,
+    auth: def.auth,
+  };
+  return base
+    .use(authorize(def.auth))
+    .meta(operationMeta(meta))
+    .meta(
+      openapi({ method: def.method, path: def.path, operationId: def.name, summary: def.summary }),
+    )
+    .input(def.input)
+    .output(def.output)
+    .handler(({ input, context, signal }) =>
+      def.handler({ input, context: context as ContextFor<TAuth>, signal }),
+    );
 }

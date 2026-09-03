@@ -46,7 +46,9 @@ import {
 } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
-import { NoInput, defineOperation } from "./registry.ts";
+import { eventIterator } from "@orpc/server";
+import { subscribeToEvents } from "../live.ts";
+import { NoInput, defineOperation, defineStreamOperation } from "./registry.ts";
 import type { ContextFor } from "./registry.ts";
 
 /** The Member an admin operation names, or NOT_FOUND. Scoped to the Workspace. */
@@ -170,6 +172,33 @@ export const events = {
         .limit(input.limit);
       return { events: rows, nextCursor: rows.at(-1)?.seq ?? null };
     },
+  }),
+
+  subscribe: defineStreamOperation({
+    name: "events.subscribe",
+    summary: "The Event log as it happens, from a cursor, with heartbeats",
+    method: "GET",
+    path: "/events/subscribe",
+    auth: "member",
+    input: z.object({
+      /** Resume from here. Omitted, the stream starts with what happens next. */
+      after: z.coerce.number().int().nonnegative().optional(),
+      projectId: z.string().optional(),
+    }),
+    output: eventIterator(
+      z.union([
+        z.object({ type: z.literal("event"), event: EventSchema }),
+        z.object({ type: z.literal("heartbeat"), cursor: z.number().int().nullable() }),
+      ]),
+    ),
+    handler: ({ input, context, signal }) =>
+      subscribeToEvents({
+        db: context.db,
+        workspaceId: context.workspace.id,
+        projectId: input.projectId,
+        after: input.after,
+        signal,
+      }),
   }),
 };
 
