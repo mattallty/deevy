@@ -18,7 +18,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { useQuery } from "@tanstack/react-query";
 import { useLiveEvents } from "@/lib/live";
+import { orpc } from "@/lib/orpc";
 
 interface NavItem {
   to: string;
@@ -30,7 +32,7 @@ interface NavItem {
 
 const work: NavItem[] = [
   { to: "/", label: "Projects", icon: FolderKanban },
-  { to: "/inbox", label: "Inbox", icon: Inbox, soon: true },
+  { to: "/inbox", label: "Inbox", icon: Inbox },
 ];
 
 const settings: NavItem[] = [
@@ -60,7 +62,7 @@ export function AppShell({ workspaceName, memberName }: ShellProps) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <NavGroup label="Work" items={work} />
+          <NavGroup label="Work" items={work} withInboxBadge />
           <NavGroup label="Settings" items={settings} />
         </SidebarContent>
       </Sidebar>
@@ -82,7 +84,21 @@ export function AppShell({ workspaceName, memberName }: ShellProps) {
   );
 }
 
-function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+function NavGroup({
+  label,
+  items,
+  withInboxBadge = false,
+}: {
+  label: string;
+  items: NavItem[];
+  withInboxBadge?: boolean;
+}) {
+  // useLiveEvents invalidates this on any Event, so the badge follows the log.
+  const unread = useQuery({
+    ...orpc.inbox.unreadCount.queryOptions({ input: {} }),
+    enabled: withInboxBadge,
+  });
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
@@ -103,6 +119,14 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
                 >
                   <Icon />
                   <span>{text}</span>
+                  {to === "/inbox" && (unread.data?.unread ?? 0) > 0 ? (
+                    <span
+                      aria-label={`${unread.data?.unread} unread`}
+                      className="ml-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
+                    >
+                      {unread.data?.unread}
+                    </span>
+                  ) : null}
                 </SidebarMenuButton>
               )}
             </SidebarMenuItem>

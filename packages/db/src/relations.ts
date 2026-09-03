@@ -3,6 +3,7 @@ import { account, authRelations, session, user, verification } from "./schema/au
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
+import { notification } from "./schema/notification.ts";
 import { issueLink, repository } from "./schema/repository.ts";
 import { document, documentVersion } from "./schema/document.ts";
 import { gateDecision } from "./schema/gate.ts";
@@ -33,6 +34,7 @@ export const tables = {
   comment,
   repository,
   issueLink,
+  notification,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -157,6 +159,15 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       optional: false,
     }),
     creator: r.one.member({ from: r.allowlistRule.createdBy, to: r.member.id }),
+  },
+  notification: {
+    recipient: r.one.member({
+      from: r.notification.recipientMemberId,
+      to: r.member.id,
+      optional: false,
+    }),
+    event: r.one.event({ from: r.notification.eventId, to: r.event.seq, optional: false }),
+    issue: r.one.issue({ from: r.notification.issueId, to: r.issue.id }),
   },
   event: {
     workspace: r.one.workspace({ from: r.event.workspaceId, to: r.workspace.id, optional: false }),

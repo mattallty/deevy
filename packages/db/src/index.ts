@@ -22,6 +22,7 @@ export type WorkflowState = typeof import("./schema/project.ts").workflowState.$
 export type Issue = typeof import("./schema/issue.ts").issue.$inferSelect;
 export type GateDecision = typeof import("./schema/gate.ts").gateDecision.$inferSelect;
 export type Document = typeof import("./schema/document.ts").document.$inferSelect;
+export type Notification = typeof import("./schema/notification.ts").notification.$inferSelect;
 export type Repository = typeof import("./schema/repository.ts").repository.$inferSelect;
 export type IssueLink = typeof import("./schema/repository.ts").issueLink.$inferSelect;
 export type Comment = typeof import("./schema/comment.ts").comment.$inferSelect;

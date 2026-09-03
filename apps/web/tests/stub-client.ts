@@ -94,6 +94,12 @@ export function stubClient(overrides: StubOverrides = {}): never {
       }),
       write: async () => ({}),
     },
+    inbox: {
+      list: async () => ({ notifications: [], nextCursor: null }),
+      unreadCount: async () => ({ unread: 0 }),
+      markRead: async () => ({ read: 0 }),
+      markAllRead: async () => ({ read: 0 }),
+    },
     repositories: {
       list: async () => ({ repositories: [] }),
       create: async () => ({}),

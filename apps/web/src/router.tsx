@@ -5,6 +5,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { ProjectsPage } from "./routes/index.tsx";
+import { InboxPage } from "./routes/inbox.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectPage } from "./routes/projects/project.tsx";
@@ -37,6 +38,11 @@ const projectRoute = createRoute({
   component: function Project() {
     return <ProjectPage projectKey={projectRoute.useParams().key} />;
   },
+});
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/inbox",
+  component: InboxPage,
 });
 const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -87,6 +93,7 @@ const allowlistRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  inboxRoute,
   projectRoute,
   boardRoute,
   workflowRoute,

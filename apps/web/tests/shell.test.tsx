@@ -43,11 +43,13 @@ describe("the app shell", () => {
     );
   });
 
-  it("shows Inbox as a placeholder rather than a link, until its slice", async () => {
+  it("links to the Inbox now that slice 12 has filled it in", async () => {
     await mountAt("/");
 
-    expect(screen.queryByRole("link", { name: /Inbox/ })).toBeNull();
-    expect(screen.getByText("soon")).toBeTruthy();
+    const sidebar = document.querySelector('[data-slot="sidebar"]') as HTMLElement;
+    expect(within(sidebar).getByRole("link", { name: /Inbox/ }).getAttribute("href")).toBe(
+      "/inbox",
+    );
   });
 
   it("renders the Projects page at the root", async () => {

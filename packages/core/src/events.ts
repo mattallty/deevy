@@ -1,4 +1,5 @@
 import { event, type Db, type Event, type Member, type Workspace } from "@deevy/db";
+import { deriveNotifications } from "./notifications.ts";
 
 /**
  * The Event log is the audit trail (docs/PLAN.md): every write appends one
@@ -84,5 +85,8 @@ export async function appendEvent(source: EventSource, input: EventInput): Promi
     })
     .returning();
   if (!row) throw new Error("appendEvent: the insert returned no row");
+  // Notifications derive from the Event, in the same request and right after
+  // it, so nothing else has to remember to tell anyone (docs/plans/m1.md).
+  await deriveNotifications(source.db, row);
   return row;
 }

@@ -8,6 +8,7 @@ import {
   issue,
   issueLink,
   label,
+  notification,
   repository,
   member,
   project,
@@ -94,4 +95,12 @@ export const IssueLinkSchema = createSelectSchema(issueLink);
 /** A Link as the Issue page shows one: the row plus the Repository it belongs to. */
 export const IssueLinkWithRepositorySchema = IssueLinkSchema.extend({
   repository: RepositorySchema.nullable(),
+});
+
+export const NotificationSchema = createSelectSchema(notification);
+
+/** A Notification as the inbox shows one: the row plus the Issue it is about. */
+export const NotificationWithIssueSchema = NotificationSchema.extend({
+  issue: IssueSummarySchema.nullable(),
+  event: EventSchema,
 });
