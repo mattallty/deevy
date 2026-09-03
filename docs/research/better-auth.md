@@ -22,4 +22,8 @@
   (#11081 DCR rejects Claude w/ extra grant types; #11136 CIMD 429s; #10937 localhost redirect).
 - Admin plugin: roles, ban, adminUserIds env bootstrap, `auth create-admin`. "First user becomes admin" not
   built in; hook-based count check is racy without transactions.
-- Schema: `npx auth generate --adapter drizzle --dialect sqlite` -> merge into own Drizzle schema -> drizzle-kit.
+- Schema: `npx auth@1.7.2 generate --config <file>` where the config imports `@better-auth/drizzle-adapter/relations-v2`
+  -> emits `defineRelationsPart` -> merge into own Drizzle schema -> drizzle-kit. The flag form (`--adapter drizzle
+  --dialect sqlite`, no config) emits the removed `relations()` API (#10924). `@better-auth/cli` is deprecated; the
+  CLI is the npm package `auth`. The adapter config has no `relations` option: relations come from `drizzle(client,
+  { relations })`. Keep `transaction: false` on node:sqlite (its transactions are synchronous).

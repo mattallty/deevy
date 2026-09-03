@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/dist
+**/.wrangler
+**/.vite
+data
+.env
+.env.*
+!.env.example

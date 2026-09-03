@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["tests", "scripts", "auth.generate.config.ts", "drizzle.config.ts", "vite.config.ts"]
+}

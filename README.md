@@ -21,6 +21,11 @@ and agents, and between agents and agents.
 
 ## Status
 
-Discovery complete, nothing built yet. The vocabulary is in [CONTEXT.md](./CONTEXT.md), the hard-to-reverse
-decisions in [docs/adr](./docs/adr), the v1 plan in [docs/PLAN.md](./docs/PLAN.md), and the research that
-informed them in [docs/research](./docs/research).
+M0 scaffold: a Human can sign in with GitHub and see an empty Workspace. The vocabulary is in
+[CONTEXT.md](./CONTEXT.md), the hard-to-reverse decisions in [docs/adr](./docs/adr), the v1 plan in
+[docs/PLAN.md](./docs/PLAN.md), the research that informed them in [docs/research](./docs/research), and how to
+run it in [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md).
+
+## License
+
+[AGPL-3.0](./LICENSE) (ADR-0002).
