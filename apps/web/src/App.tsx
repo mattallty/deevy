@@ -16,7 +16,13 @@ export function SignedOut() {
       <p>Project management where Humans and Agents collaborate as peers.</p>
       <button
         type="button"
-        onClick={() => authClient.signIn.social({ provider: "github", callbackURL: "/" })}
+        onClick={() =>
+          authClient.signIn.social({
+            provider: "github",
+            callbackURL: home(),
+            errorCallbackURL: home(),
+          })
+        }
       >
         Sign in with GitHub
       </button>
@@ -58,6 +64,12 @@ function SignedIn() {
       )}
     </Shell>
   );
+}
+
+// Absolute so Better Auth sends the browser back to the SPA origin (5173 in dev),
+// not to its own base URL (the Node server on 3000).
+function home(): string {
+  return `${window.location.origin}/`;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

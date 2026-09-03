@@ -89,6 +89,23 @@ describe("bootstrapWorkspace", () => {
     expect(await db.select().from(member)).toHaveLength(1);
   });
 
+  it("adds the admin Member when the Workspace already exists without one", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await db.insert(user).values({ id: "u1", name: "Ada", email: "ada@example.com" });
+    await db.insert(workspace).values({ id: "w1", name: "deevy", slug: "deevy" });
+
+    await bootstrapWorkspace(
+      db,
+      { userId: "u1", email: "ada@example.com" },
+      { adminEmail: "ada@example.com" },
+    );
+    expect(await db.select().from(workspace)).toHaveLength(1);
+    expect(await db.query.member.findMany()).toMatchObject([
+      { userId: "u1", workspaceId: "w1", role: "admin" },
+    ]);
+  });
+
   it("slugifies names", () => {
     expect(slugify("Flippable Team!")).toBe("flippable-team");
     expect(slugify("   ")).toBe("workspace");
