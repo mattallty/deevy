@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { ProjectsPage } from "./routes/index.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
+import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectPage } from "./routes/projects/project.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
@@ -33,6 +34,13 @@ const projectRoute = createRoute({
   path: "/projects/$key",
   component: function Project() {
     return <ProjectPage projectKey={projectRoute.useParams().key} />;
+  },
+});
+const boardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$key/board",
+  component: function Board() {
+    return <BoardPage projectKey={boardRoute.useParams().key} />;
   },
 });
 const workflowRoute = createRoute({
@@ -68,6 +76,7 @@ const allowlistRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   projectRoute,
+  boardRoute,
   workflowRoute,
   issueRoute,
   teamsRoute,

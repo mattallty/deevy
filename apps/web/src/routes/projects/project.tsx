@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 import { IssueList } from "./issue-list.tsx";
 import { Badge } from "@/components/ui/badge";
 import { orpc } from "@/lib/orpc.ts";
@@ -25,7 +27,23 @@ export function ProjectPage({ projectKey }: { projectKey: string }) {
           {team ? <span className="text-sm text-muted-foreground">{team.name}</span> : null}
           {archivedAt ? <Badge variant="outline">Archived</Badge> : null}
         </div>
-        <h1 className="text-2xl font-semibold">{name}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="flex-1 text-2xl font-semibold">{name}</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link to="/projects/$key/board" params={{ key }} />}
+          >
+            Board
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link to="/projects/$key/settings/workflow" params={{ key }} />}
+          >
+            Workflow
+          </Button>
+        </div>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </header>
 
