@@ -27,6 +27,8 @@ export const member = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    /** Unique across the Workspace; slice 10 mentions a Member by it. */
+    handle: text("handle"),
     role: text("role", { enum: memberRoles }).default("member").notNull(),
     kind: text("kind", { enum: memberKinds }).default("human").notNull(),
     sponsorId: text("sponsor_id"),
@@ -35,6 +37,7 @@ export const member = sqliteTable(
   },
   (table) => [
     uniqueIndex("member_userId_uidx").on(table.userId),
+    uniqueIndex("member_handle_uidx").on(table.handle),
     index("member_workspaceId_idx").on(table.workspaceId),
     index("member_sponsorId_idx").on(table.sponsorId),
   ],

@@ -29,8 +29,12 @@ Create one at https://github.com/settings/developers with:
 - Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
 
 Put the client id and secret in `.env`. Set `DEEVY_ADMIN_EMAIL` to the primary email of the GitHub account
-that should become the Workspace admin: the first sign-in with that address creates the Workspace. Anyone else
-who signs in gets an account but no Membership until M1 adds the allowlist and invitations.
+that should become the Workspace admin: the first sign-in with that address creates the Workspace.
+
+Anyone else who signs in joins as a Member when an allowlist rule matches them, and otherwise gets an account
+and no Membership. The admin manages the rules under Settings, Allowlist. A `github_org` rule is matched by
+listing the organizations the sign-in's token can see, which needs the `read:org` scope: deevy requests it, so
+an OAuth App created before this slice asks for the extra scope the next time someone signs in.
 
 ## Everyday commands
 

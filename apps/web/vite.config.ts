@@ -1,5 +1,7 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
 // DEEVY_TARGET=workers adds the Cloudflare plugin so `vp build` emits the Worker
@@ -19,7 +21,10 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
   },
-  plugins: lazyPlugins(() => [react(), ...(workers ? [cloudflare()] : [])]),
+  plugins: lazyPlugins(() => [react(), tailwindcss(), ...(workers ? [cloudflare()] : [])]),
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
   server: {
     port: 5173,
     proxy: {
@@ -31,5 +36,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.tsx"],
+    setupFiles: ["./tests/setup.ts"],
+    globals: true,
   },
 });

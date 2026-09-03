@@ -23,5 +23,6 @@ describe("operation registry", () => {
     expect(paths["/health/ping"]?.get?.operationId).toBe("health.ping");
     expect(paths["/me"]?.get?.operationId).toBe("me.get");
     expect(paths["/workspace"]?.get?.operationId).toBe("workspace.get");
+    expect(paths["/events"]?.get?.operationId).toBe("events.list");
   });
 });

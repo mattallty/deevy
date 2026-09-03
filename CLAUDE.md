@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 deevy is project management where Humans and Agents collaborate as peers on the same Issues. Use the
 vocabulary in [CONTEXT.md](CONTEXT.md) (Member, Human, Agent, Sponsor, Workspace, Issue, Gate, Run, Event) in
 code, API names, and UI copy; it lists the words to avoid. Hard-to-reverse choices live in `docs/adr`, the
-milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`. Current milestone: M0 done
-(sign in, see an empty Workspace); M1 (Humans) is next.
+milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`, running the image in
+`docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen slices from `docs/plans/m1.md`;
+M2 (Agents) is next.
 
 ## Commands
 
@@ -25,6 +26,10 @@ runs scripts, `-r` recursively, `pkg#script` for one package (package names are 
 - Schema change: edit `packages/db/src/schema`, `vp run db#generate`, then hand-patch `NOT NULL` onto every
   `text PRIMARY KEY` in the new `migration.sql` (drizzle-kit rc regression) and run `vp run db#check:migrations`.
 - API change: `vp run core#snapshot:openapi` and commit `packages/core/openapi.json`; CI fails on a stale snapshot.
+- UI components come from the shadcn registry (`apps/web/components.json`, style `base-mira`, Base UI not
+  Radix): `pnpm dlx shadcn@latest add <name> --overwrite` from `apps/web`. It rewrites `pnpm-workspace.yaml`
+  and strips its comments, and it pins new dependencies, so move them to the catalog and put the comments back.
+- SPA tests mock `lib/orpc` with `tests/stub-client.ts`; a test overrides only the operations it asserts on.
 - Better Auth options that affect tables live twice: `packages/core/src/auth.ts` (runtime) and
   `packages/db/auth.generate.config.ts` (generator). Change both, then `vp run db#generate:auth` regenerates
   `packages/db/src/schema/auth.ts` (never edit it by hand).
@@ -34,8 +39,10 @@ runs scripts, `-r` recursively, `pkg#script` for one package (package names are 
 One typed core, projected to three surfaces (ADR-0005), on two runtimes from one codebase (ADR-0006).
 
 **Operation registry** (`packages/core/src/operations/registry.ts`): every API operation is a `defineOperation({
-name, summary, method, path, auth, input, output, handler })`. `auth` is `public | session | member` and is
-enforced by middleware; the handler's `context` type narrows accordingly. oRPC is the implementation behind it:
+name, summary, method, path, auth, input, output, handler })`. `auth` is `public | session | member | admin`
+and is enforced by middleware, which also treats a suspended Member as no Member; the handler's `context` type
+narrows accordingly. A streaming operation (the SSE Event stream) is a `defineStreamOperation` with an
+`eventIterator` output and a handler returning an async generator. oRPC is the implementation behind it:
 the same procedure becomes the RPC endpoint (`/rpc`, used by the SPA through `@orpc/tanstack-query`), the OpenAPI
 route (`/api`, reference UI at `/api/docs`), and in M2 an MCP tool. Add operations in
 `packages/core/src/operations/index.ts` and never build oRPC procedures elsewhere (ADR-0009). GET operations
@@ -55,6 +62,11 @@ The core uses no interactive transactions because D1 has none; multi-statement w
 `workspace` and `member` tables hold roles and Sponsors. A single instance serves one Workspace, created by
 `bootstrapWorkspace` when `DEEVY_ADMIN_EMAIL` signs in (runs on user creation and on every new session, and is
 idempotent). Other sign-ins get a user row and no Member until M1's allowlist and invitations.
+
+**Events**: every write appends one through `appendEvent` (`packages/core/src/events.ts`) in the same handler,
+and `deriveNotifications` turns Events into inbox rows right after the insert. The Event log is the only record
+of what happened: the timeline, the live stream and the inbox all read it rather than keeping a second source.
+Add a new kind to the `EventKind` union.
 
 **Data** (ADR-0008): Drizzle 1.0 rc on the SQLite dialect. Relations use `defineRelations` /
 `defineRelationsPart` merged per table in `packages/db/src/relations.ts`; dates are integer `timestamp_ms`
