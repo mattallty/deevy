@@ -1,5 +1,14 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { FolderKanban, GitBranch, Inbox, ShieldCheck, Tags, Users, UsersRound } from "lucide-react";
+import {
+  FolderKanban,
+  GitBranch,
+  Inbox,
+  Settings,
+  ShieldCheck,
+  Tags,
+  Users,
+  UsersRound,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +45,7 @@ const work: NavItem[] = [
 ];
 
 const settings: NavItem[] = [
+  { to: "/settings/workspace", label: "Workspace", icon: Settings },
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/labels", label: "Labels", icon: Tags },
   { to: "/settings/repositories", label: "Repositories", icon: GitBranch },

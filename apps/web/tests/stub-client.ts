@@ -34,6 +34,10 @@ const emptyIssue = {
 export function stubClient(overrides: StubOverrides = {}): never {
   const base: Record<string, Record<string, StubOperation>> = {
     me: { get: async () => ({ user: {}, member: { role: "admin" }, workspace: {} }) },
+    workspace: {
+      get: async () => ({ id: "w1", name: "deevy", slug: "deevy" }),
+      update: async () => ({ id: "w1", name: "deevy", slug: "deevy" }),
+    },
     members: {
       list: async () => ({ members: [] }),
       updateRole: async () => ({}),

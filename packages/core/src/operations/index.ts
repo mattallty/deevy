@@ -11,6 +11,7 @@ import {
   comment as commentTable,
   issueLink as issueLinkTable,
   notification as notificationTable,
+  workspace as workspaceTable,
   issueLinkKinds,
   repository as repositoryTable,
   repositoryProviders,
@@ -149,6 +150,31 @@ export const workspace = {
     input: NoInput,
     output: WorkspaceSchema,
     handler: async ({ context }) => context.workspace,
+  }),
+
+  update: defineOperation({
+    name: "workspace.update",
+    summary: "Rename the Workspace this instance serves",
+    method: "PATCH",
+    path: "/workspace",
+    auth: "admin",
+    input: z.object({ name: z.string().trim().min(1).max(120) }),
+    output: WorkspaceSchema,
+    handler: async ({ input, context }) => {
+      if (input.name === context.workspace.name) return context.workspace;
+      const [row] = await context.db
+        .update(workspaceTable)
+        .set({ name: input.name, slug: slugify(input.name) })
+        .where(eq(workspaceTable.id, context.workspace.id))
+        .returning();
+      await appendEvent(context, {
+        kind: "workspace.updated",
+        subjectType: "workspace",
+        subjectId: context.workspace.id,
+        payload: { from: context.workspace.name, to: input.name },
+      });
+      return row ?? context.workspace;
+    },
   }),
 };
 

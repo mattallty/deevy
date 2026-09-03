@@ -13,6 +13,7 @@ import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
 import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
+import { WorkspacePage } from "./routes/settings/workspace.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
 import { AppShell, type ShellProps } from "./routes/shell.tsx";
@@ -65,6 +66,11 @@ const issueRoute = createRoute({
     return <IssuePage issueKey={issueRoute.useParams().issueKey} />;
   },
 });
+const workspaceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/workspace",
+  component: WorkspacePage,
+});
 const teamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/teams",
@@ -98,6 +104,7 @@ const routeTree = rootRoute.addChildren([
   boardRoute,
   workflowRoute,
   issueRoute,
+  workspaceRoute,
   teamsRoute,
   labelsRoute,
   repositoriesRoute,
