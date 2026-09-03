@@ -10,6 +10,7 @@ import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectPage } from "./routes/projects/project.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
+import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
@@ -68,6 +69,11 @@ const labelsRoute = createRoute({
   path: "/settings/labels",
   component: LabelsPage,
 });
+const repositoriesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/repositories",
+  component: RepositoriesPage,
+});
 const membersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/members",
@@ -87,6 +93,7 @@ const routeTree = rootRoute.addChildren([
   issueRoute,
   teamsRoute,
   labelsRoute,
+  repositoriesRoute,
   membersRoute,
   allowlistRoute,
 ]);

@@ -6,7 +6,9 @@ import {
   event,
   gateDecision,
   issue,
+  issueLink,
   label,
+  repository,
   member,
   project,
   team,
@@ -84,4 +86,12 @@ export const CommentSchema = createSelectSchema(comment);
 /** A comment as the thread shows one: the row plus who wrote it. */
 export const CommentWithAuthorSchema = CommentSchema.extend({
   author: MemberWithUserSchema.nullable(),
+});
+
+export const RepositorySchema = createSelectSchema(repository);
+export const IssueLinkSchema = createSelectSchema(issueLink);
+
+/** A Link as the Issue page shows one: the row plus the Repository it belongs to. */
+export const IssueLinkWithRepositorySchema = IssueLinkSchema.extend({
+  repository: RepositorySchema.nullable(),
 });

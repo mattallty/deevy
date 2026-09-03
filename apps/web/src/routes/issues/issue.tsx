@@ -4,6 +4,7 @@ import { useState } from "react";
 import { GateControls } from "@/components/gate-controls";
 import { IssueComments } from "@/components/issue-comments";
 import { IssueDocuments } from "@/components/issue-documents";
+import { IssueLinks } from "@/components/issue-links";
 import { LabelPicker } from "@/components/label-picker";
 import { IssueTimeline } from "@/components/issue-timeline.tsx";
 import { Markdown } from "@/components/markdown.tsx";
@@ -151,6 +152,8 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
           </ul>
         </section>
       ) : null}
+
+      <IssueLinks issueKey={key} />
 
       <IssueComments issueKey={key} />
 

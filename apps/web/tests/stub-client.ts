@@ -94,6 +94,16 @@ export function stubClient(overrides: StubOverrides = {}): never {
       }),
       write: async () => ({}),
     },
+    repositories: {
+      list: async () => ({ repositories: [] }),
+      create: async () => ({}),
+      delete: async () => ({ deleted: true }),
+    },
+    links: {
+      list: async () => ({ links: [] }),
+      add: async () => ({}),
+      remove: async () => ({ removed: true }),
+    },
     comments: {
       list: async () => ({ comments: [] }),
       create: async () => ({}),

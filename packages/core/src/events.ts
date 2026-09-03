@@ -42,7 +42,11 @@ export type EventKind =
   | "issue.labels_changed"
   | "comment.created"
   | "comment.edited"
-  | "comment.deleted";
+  | "comment.deleted"
+  | "repository.created"
+  | "repository.deleted"
+  | "issue.link_added"
+  | "issue.link_removed";
 
 export type EventPayload = Record<string, unknown>;
 

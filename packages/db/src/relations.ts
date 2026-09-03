@@ -3,6 +3,7 @@ import { account, authRelations, session, user, verification } from "./schema/au
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
+import { issueLink, repository } from "./schema/repository.ts";
 import { document, documentVersion } from "./schema/document.ts";
 import { gateDecision } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
@@ -30,6 +31,8 @@ export const tables = {
   label,
   issueLabel,
   comment,
+  repository,
+  issueLink,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -37,6 +40,7 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     members: r.many.member({ from: r.workspace.id, to: r.member.workspaceId }),
     events: r.many.event({ from: r.workspace.id, to: r.event.workspaceId }),
     labels: r.many.label({ from: r.workspace.id, to: r.label.workspaceId }),
+    repositories: r.many.repository({ from: r.workspace.id, to: r.repository.workspaceId }),
     allowlistRules: r.many.allowlistRule({
       from: r.workspace.id,
       to: r.allowlistRule.workspaceId,
@@ -93,6 +97,19 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       to: r.label.id.through(r.issueLabel.labelId),
     }),
     comments: r.many.comment({ from: r.issue.id, to: r.comment.issueId }),
+    links: r.many.issueLink({ from: r.issue.id, to: r.issueLink.issueId }),
+  },
+  repository: {
+    workspace: r.one.workspace({
+      from: r.repository.workspaceId,
+      to: r.workspace.id,
+      optional: false,
+    }),
+    links: r.many.issueLink({ from: r.repository.id, to: r.issueLink.repositoryId }),
+  },
+  issueLink: {
+    issue: r.one.issue({ from: r.issueLink.issueId, to: r.issue.id, optional: false }),
+    repository: r.one.repository({ from: r.issueLink.repositoryId, to: r.repository.id }),
   },
   comment: {
     issue: r.one.issue({ from: r.comment.issueId, to: r.issue.id, optional: false }),
