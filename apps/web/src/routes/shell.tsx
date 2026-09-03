@@ -1,8 +1,23 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { FolderKanban, Inbox, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
+import { FolderKanban, Inbox, ShieldCheck, Users, UsersRound } from "lucide-react";
 import type { ComponentType } from "react";
-import { Button } from "@/components/ui/button.tsx";
-import { authClient } from "@/lib/auth.ts";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 interface NavItem {
   to: string;
@@ -12,9 +27,12 @@ interface NavItem {
   soon?: boolean;
 }
 
-const nav: NavItem[] = [
+const work: NavItem[] = [
   { to: "/", label: "Projects", icon: FolderKanban },
   { to: "/inbox", label: "Inbox", icon: Inbox, soon: true },
+];
+
+const settings: NavItem[] = [
   { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/members", label: "Members", icon: Users },
   { to: "/settings/allowlist", label: "Allowlist", icon: ShieldCheck },
@@ -25,54 +43,81 @@ export interface ShellProps {
   memberName: string;
 }
 
-/** The frame every signed-in page sits in: a sidebar, a header, and the route. */
+/** The frame every signed-in page sits in: the Workspace sidebar, a header, and the route. */
 export function AppShell({ workspaceName, memberName }: ShellProps) {
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-60 shrink-0 flex-col gap-1 border-r bg-sidebar p-4 sm:flex">
-        <div className="mb-4 flex items-center gap-2 px-2">
-          <Settings className="size-4 text-muted-foreground" />
-          <span className="truncate font-semibold">{workspaceName}</span>
-        </div>
-        <nav className="flex flex-col gap-1">
-          {nav.map(({ to, label, icon: Icon, soon }) =>
-            soon ? (
-              <span
-                key={to}
-                className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground/60"
-              >
-                <Icon className="size-4" />
-                {label}
-                <span className="ml-auto text-xs">soon</span>
-              </span>
-            ) : (
-              <Link
-                key={to}
-                to={to}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent [&.active]:bg-sidebar-accent [&.active]:font-medium"
-                activeOptions={{ exact: to === "/" }}
-              >
-                <Icon className="size-4" />
-                {label}
-              </Link>
-            ),
-          )}
-        </nav>
-      </aside>
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <div className="flex items-center gap-2 px-2 py-1">
+            <span className="truncate font-semibold">{workspaceName}</span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <NavGroup label="Work" items={work} />
+          <NavGroup label="Settings" items={settings} />
+        </SidebarContent>
+      </Sidebar>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b px-6 py-3">
-          <span className="text-sm text-muted-foreground sm:hidden">{workspaceName}</span>
+      <SidebarInset>
+        <header className="flex h-12 items-center gap-2 border-b px-4">
+          <SidebarTrigger />
+          <Separator orientation="vertical" className="h-4" />
           <span className="flex-1" />
           <span className="text-sm">{memberName}</span>
-          <Button variant="outline" size="sm" onClick={() => authClient.signOut()}>
-            Sign out
-          </Button>
+          <SignOutButton />
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 p-6">
           <Outlet />
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+      <Toaster />
+    </SidebarProvider>
+  );
+}
+
+function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map(({ to, label: text, icon: Icon, soon }) => (
+            <SidebarMenuItem key={to}>
+              {soon ? (
+                <SidebarMenuButton disabled tooltip={`${text} arrives in a later slice`}>
+                  <Icon />
+                  <span>{text}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">soon</span>
+                </SidebarMenuButton>
+              ) : (
+                <SidebarMenuButton
+                  tooltip={text}
+                  render={<Link to={to} activeOptions={{ exact: to === "/" }} />}
+                >
+                  <Icon />
+                  <span>{text}</span>
+                </SidebarMenuButton>
+              )}
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+function SignOutButton() {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={async () => {
+        const { authClient } = await import("@/lib/auth");
+        await authClient.signOut();
+      }}
+    >
+      Sign out
+    </Button>
   );
 }

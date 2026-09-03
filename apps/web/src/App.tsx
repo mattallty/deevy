@@ -1,7 +1,7 @@
 import { RouterProvider } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { Button } from "@/components/ui/button.tsx";
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth.ts";
 import { orpc } from "@/lib/orpc.ts";
 import { createAppRouter } from "@/router.tsx";

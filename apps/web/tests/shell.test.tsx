@@ -17,6 +17,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
       add: async () => ({}),
       remove: async () => ({ removed: true }),
     },
+    issues: { list: async () => ({ issues: [], nextCursor: null }), create: async () => ({}) },
     projects: {
       list: async () => ({ projects: [] }),
       get: async () => ({}),
@@ -56,8 +57,9 @@ describe("the app shell", () => {
   it("names the Workspace and the signed-in Human, and links to the settings", async () => {
     await mountAt("/");
 
-    // The Workspace is named twice, once per breakpoint; the sidebar is the desktop one.
-    const sidebar = await screen.findByRole("complementary");
+    // shadcn's Sidebar is a div carrying data-slot, not a landmark element.
+    await screen.findByText("Flippable Team");
+    const sidebar = document.querySelector('[data-slot="sidebar"]') as HTMLElement;
     expect(within(sidebar).getByText("Flippable Team")).toBeTruthy();
     expect(screen.getByText("Ada Lovelace")).toBeTruthy();
     expect(within(sidebar).getByRole("link", { name: "Members" }).getAttribute("href")).toBe(

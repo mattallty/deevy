@@ -2,6 +2,7 @@ import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, authRelations, session, user, verification } from "./schema/auth.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
+import { issue } from "./schema/issue.ts";
 import { project, team, teamMember, workflowState } from "./schema/project.ts";
 import { member, workspace } from "./schema/workspace.ts";
 
@@ -18,6 +19,7 @@ export const tables = {
   teamMember,
   project,
   workflowState,
+  issue,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -60,6 +62,19 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     }),
     team: r.one.team({ from: r.project.teamId, to: r.team.id }),
     states: r.many.workflowState({ from: r.project.id, to: r.workflowState.projectId }),
+    issues: r.many.issue({ from: r.project.id, to: r.issue.projectId }),
+  },
+  issue: {
+    project: r.one.project({ from: r.issue.projectId, to: r.project.id, optional: false }),
+    state: r.one.workflowState({
+      from: r.issue.stateId,
+      to: r.workflowState.id,
+      optional: false,
+    }),
+    assignee: r.one.member({ from: r.issue.assigneeMemberId, to: r.member.id }),
+    creator: r.one.member({ from: r.issue.createdBy, to: r.member.id }),
+    parent: r.one.issue({ from: r.issue.parentId, to: r.issue.id }),
+    children: r.many.issue({ from: r.issue.id, to: r.issue.parentId }),
   },
   workflowState: {
     project: r.one.project({ from: r.workflowState.projectId, to: r.project.id, optional: false }),

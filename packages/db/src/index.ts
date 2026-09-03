@@ -19,3 +19,4 @@ export type AllowlistRule = typeof import("./schema/allowlist.ts").allowlistRule
 export type Team = typeof import("./schema/project.ts").team.$inferSelect;
 export type Project = typeof import("./schema/project.ts").project.$inferSelect;
 export type WorkflowState = typeof import("./schema/project.ts").workflowState.$inferSelect;
+export type Issue = typeof import("./schema/issue.ts").issue.$inferSelect;

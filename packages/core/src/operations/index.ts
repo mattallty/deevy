@@ -7,15 +7,25 @@ import {
 } from "@deevy/db";
 import {
   allowlistRuleKinds,
+  issue as issueTable,
   project as projectTable,
   team as teamTable,
   teamMember as teamMemberTable,
 } from "@deevy/db";
 import { allocateHandle, slugify } from "../handles.ts";
+import {
+  insertIssue,
+  isSelfOrDescendant,
+  issueKey,
+  nextIssueNumber,
+  parseIssueKey,
+} from "../issues.ts";
 import { createProject, ProjectKeyPattern } from "../projects.ts";
 import {
   AllowlistRuleSchema,
   EventSchema,
+  IssueDetailSchema,
+  IssueSummarySchema,
   ProjectWithStatesSchema,
   TeamWithMembersSchema,
   MemberSchema,
@@ -749,5 +759,283 @@ export const teams = {
   }),
 };
 
-export const router = { health, me, workspace, events, members, allowlist, projects, teams };
+/** The relations every Issue shape needs loaded, and the key derived onto it. */
+const issueWith = { state: true, assignee: { with: { user: true } } } as const;
+
+type LoadedIssue = { number: number; project?: { key: string } } & Record<string, unknown>;
+
+function withKey<T extends LoadedIssue>(row: T, projectKey: string) {
+  return { ...row, key: issueKey(projectKey, row.number) };
+}
+
+/** The Issue an operation names by key, or NOT_FOUND. Scoped to the Workspace. */
+async function requireIssue(context: ContextFor<"member">, key: string) {
+  const parsed = parseIssueKey(key);
+  if (!parsed) throw new ORPCError("NOT_FOUND", { message: "Not an Issue key" });
+  const project = await context.db.query.project.findFirst({
+    where: { workspaceId: context.workspace.id, key: parsed.projectKey },
+  });
+  if (!project) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+  const found = await context.db.query.issue.findFirst({
+    where: { projectId: project.id, number: parsed.number },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: `No such Issue: ${key}` });
+  return { issue: found, project };
+}
+
+async function loadIssue(context: ContextFor<"member">, id: string) {
+  const found = await context.db.query.issue.findFirst({
+    where: { id },
+    with: {
+      ...issueWith,
+      project: true,
+      parent: { with: issueWith },
+      children: { with: issueWith, orderBy: { number: "asc" } },
+    },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Issue" });
+  const key = found.project.key;
+  return {
+    ...withKey(found, key),
+    parent: found.parent ? withKey(found.parent, key) : null,
+    children: found.children.map((child) => withKey(child, key)),
+  };
+}
+
+/** The Member an Issue may be assigned to, or BAD_REQUEST. */
+async function requireAssignee(context: ContextFor<"member">, memberId: string) {
+  const found = await context.db.query.member.findFirst({
+    where: { id: memberId, workspaceId: context.workspace.id },
+  });
+  if (!found) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "An Issue can only be assigned to a Member of this Workspace",
+    });
+  }
+  return found;
+}
+
+export const issues = {
+  create: defineOperation({
+    name: "issues.create",
+    summary: "Add an Issue to a Project, in the first State of its Workflow",
+    method: "POST",
+    path: "/issues",
+    auth: "member",
+    input: z.object({
+      projectKey: ProjectKeyLookup,
+      title: z.string().trim().min(1).max(300),
+      description: z.string().max(100_000).nullish(),
+      assigneeMemberId: z.string().nullish(),
+      parentKey: z.string().nullish(),
+    }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      const project = await requireProject(context, input.projectKey);
+      const first = await context.db.query.workflowState.findFirst({
+        where: { projectId: project.id },
+        orderBy: { position: "asc" },
+      });
+      if (!first) {
+        throw new ORPCError("BAD_REQUEST", { message: "This Project has no Workflow States" });
+      }
+      if (input.assigneeMemberId) await requireAssignee(context, input.assigneeMemberId);
+
+      let parentId: string | null = null;
+      if (input.parentKey) {
+        const parent = await requireIssue(context, input.parentKey);
+        if (parent.project.id !== project.id) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "A parent Issue must be in the same Project",
+          });
+        }
+        parentId = parent.issue.id;
+      }
+
+      const number = await nextIssueNumber(context.db, project.id);
+      const created = await insertIssue(context.db, {
+        projectId: project.id,
+        number,
+        title: input.title,
+        description: input.description,
+        stateId: first.id,
+        assigneeMemberId: input.assigneeMemberId,
+        parentId,
+        createdBy: context.member.id,
+      });
+      await appendEvent(context, {
+        kind: "issue.created",
+        subjectType: "issue",
+        subjectId: created.id,
+        projectId: project.id,
+        payload: { key: issueKey(project.key, number), title: created.title },
+      });
+      return loadIssue(context, created.id);
+    },
+  }),
+
+  list: defineOperation({
+    name: "issues.list",
+    summary: "A Project's Issues, by number, from a cursor",
+    method: "GET",
+    path: "/projects/{projectKey}/issues",
+    auth: "member",
+    input: z.object({
+      projectKey: ProjectKeyLookup,
+      /** Return Issues numbered above this. Pass back the previous page's nextCursor. */
+      after: z.coerce.number().int().nonnegative().optional(),
+      stateId: z.string().optional(),
+      assigneeMemberId: z.string().optional(),
+      /** Only Issues whose State is not a `done` one. */
+      open: QueryFlag.optional(),
+      limit: z.coerce.number().int().min(1).max(200).default(50),
+    }),
+    output: z.object({
+      issues: z.array(IssueSummarySchema),
+      /** The number of the last Issue returned, or null when the page is empty. */
+      nextCursor: z.number().int().nullable(),
+    }),
+    handler: async ({ input, context }) => {
+      const project = await requireProject(context, input.projectKey);
+      const rows = await context.db.query.issue.findMany({
+        where: {
+          projectId: project.id,
+          ...(input.after === undefined ? {} : { number: { gt: input.after } }),
+          ...(input.stateId === undefined ? {} : { stateId: input.stateId }),
+          ...(input.assigneeMemberId === undefined
+            ? {}
+            : { assigneeMemberId: input.assigneeMemberId }),
+          ...(input.open ? { closedAt: { isNull: true } } : {}),
+        },
+        with: issueWith,
+        orderBy: { number: "asc" },
+        limit: input.limit,
+      });
+      return {
+        issues: rows.map((row) => withKey(row, project.key)),
+        nextCursor: rows.at(-1)?.number ?? null,
+      };
+    },
+  }),
+
+  get: defineOperation({
+    name: "issues.get",
+    summary: "One Issue by its key, with its State, Assignee, parent and children",
+    method: "GET",
+    path: "/issues/{key}",
+    auth: "member",
+    input: z.object({ key: z.string() }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      const { issue } = await requireIssue(context, input.key);
+      return loadIssue(context, issue.id);
+    },
+  }),
+
+  update: defineOperation({
+    name: "issues.update",
+    summary: "Change an Issue's title, description, Assignee, or parent",
+    method: "PATCH",
+    path: "/issues/{key}",
+    auth: "member",
+    input: z.object({
+      key: z.string(),
+      title: z.string().trim().min(1).max(300).optional(),
+      description: z.string().max(100_000).nullish(),
+      assigneeMemberId: z.string().nullish(),
+      /** Pass null to detach the Issue from its parent. */
+      parentKey: z.string().nullish(),
+    }),
+    output: IssueDetailSchema,
+    handler: async ({ input, context }) => {
+      const { issue: found, project } = await requireIssue(context, input.key);
+
+      // Assignment and reparenting each get their own Event, since the inbox
+      // and the timeline read them differently from an edit (docs/plans/m1.md).
+      let parentId: string | null | undefined;
+      if (input.parentKey !== undefined) {
+        if (input.parentKey === null) {
+          parentId = null;
+        } else {
+          const parent = await requireIssue(context, input.parentKey);
+          if (parent.project.id !== project.id) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "A parent Issue must be in the same Project",
+            });
+          }
+          if (await isSelfOrDescendant(context.db, found.id, parent.issue.id)) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "An Issue cannot be its own parent or a child of its own descendant",
+            });
+          }
+          parentId = parent.issue.id;
+        }
+      }
+      if (input.assigneeMemberId) await requireAssignee(context, input.assigneeMemberId);
+
+      const edits: Record<string, { from: unknown; to: unknown }> = {};
+      if (input.title !== undefined && input.title !== found.title) {
+        edits.title = { from: found.title, to: input.title };
+      }
+      if (input.description !== undefined && input.description !== found.description) {
+        edits.description = { from: found.description, to: input.description ?? null };
+      }
+      const assigneeChanged =
+        input.assigneeMemberId !== undefined &&
+        (input.assigneeMemberId ?? null) !== found.assigneeMemberId;
+      const parentChanged = parentId !== undefined && parentId !== found.parentId;
+
+      if (Object.keys(edits).length === 0 && !assigneeChanged && !parentChanged) {
+        return loadIssue(context, found.id);
+      }
+
+      await context.db
+        .update(issueTable)
+        .set({
+          ...(input.title === undefined ? {} : { title: input.title }),
+          ...(input.description === undefined ? {} : { description: input.description ?? null }),
+          ...(assigneeChanged ? { assigneeMemberId: input.assigneeMemberId ?? null } : {}),
+          ...(parentChanged ? { parentId } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(issueTable.id, found.id));
+
+      const subject = {
+        subjectType: "issue",
+        subjectId: found.id,
+        projectId: project.id,
+      } as const;
+      if (Object.keys(edits).length > 0) {
+        await appendEvent(context, { kind: "issue.updated", ...subject, payload: edits });
+      }
+      if (assigneeChanged) {
+        await appendEvent(context, {
+          kind: "issue.assigned",
+          ...subject,
+          payload: { from: found.assigneeMemberId, to: input.assigneeMemberId ?? null },
+        });
+      }
+      if (parentChanged) {
+        await appendEvent(context, {
+          kind: "issue.reparented",
+          ...subject,
+          payload: { from: found.parentId, to: parentId ?? null },
+        });
+      }
+      return loadIssue(context, found.id);
+    },
+  }),
+};
+
+export const router = {
+  health,
+  me,
+  workspace,
+  events,
+  members,
+  allowlist,
+  projects,
+  teams,
+  issues,
+};
 export type AppRouter = typeof router;

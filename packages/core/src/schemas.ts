@@ -1,6 +1,7 @@
 import {
   allowlistRule,
   event,
+  issue,
   member,
   project,
   team,
@@ -39,4 +40,20 @@ export const ProjectWithStatesSchema = ProjectSchema.extend({
 
 export const TeamWithMembersSchema = TeamSchema.extend({
   members: z.array(MemberWithUserSchema),
+});
+
+export const IssueSchema = createSelectSchema(issue);
+
+/** An Issue as a list shows one: the row plus its derived key and its State. */
+export const IssueSummarySchema = IssueSchema.extend({
+  key: z.string(),
+  state: WorkflowStateSchema,
+  assignee: MemberWithUserSchema.nullable(),
+});
+
+/** An Issue as its own page shows one: the summary plus its family. */
+export const IssueDetailSchema = IssueSummarySchema.extend({
+  project: ProjectSchema,
+  parent: IssueSummarySchema.nullable(),
+  children: z.array(IssueSummarySchema),
 });

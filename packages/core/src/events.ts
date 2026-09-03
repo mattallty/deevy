@@ -25,7 +25,11 @@ export type EventKind =
   | "team.updated"
   | "team.deleted"
   | "team.member_added"
-  | "team.member_removed";
+  | "team.member_removed"
+  | "issue.created"
+  | "issue.updated"
+  | "issue.assigned"
+  | "issue.reparented";
 
 export type EventPayload = Record<string, unknown>;
 

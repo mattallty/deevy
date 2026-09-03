@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge.tsx";
+import { Badge } from "@/components/ui/badge";
 import { orpc } from "@/lib/orpc.ts";
 
 /** A Project's header and its Workflow. The Issue list arrives in slice 4. */
