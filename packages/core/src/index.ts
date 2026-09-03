@@ -7,6 +7,13 @@ export {
   type AuthEnv,
   type Session,
 } from "./auth.ts";
+export {
+  appendEvent,
+  type EventInput,
+  type EventKind,
+  type EventPayload,
+  type EventSource,
+} from "./events.ts";
 export { generateSpec } from "./openapi.ts";
 export { router, type AppRouter } from "./operations/index.ts";
 export {
@@ -17,4 +24,4 @@ export {
   type OperationDef,
   type OperationMeta,
 } from "./operations/registry.ts";
-export { MemberSchema, UserSchema, WorkspaceSchema } from "./schemas.ts";
+export { EventSchema, MemberSchema, UserSchema, WorkspaceSchema } from "./schemas.ts";

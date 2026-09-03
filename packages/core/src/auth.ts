@@ -1,6 +1,7 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { member, workspace, type Db } from "@deevy/db";
 import { betterAuth } from "better-auth";
+import { appendEvent } from "./events.ts";
 
 export interface AuthEnv {
   /** Public URL of the server; callbacks derive from it. */
@@ -77,8 +78,9 @@ export type Session = Auth["$Infer"]["Session"];
  * Deterministic first-admin bootstrap (ADR-0007): when the configured admin
  * email signs in and no Workspace exists yet, create the Workspace and the
  * admin Member; if the Workspace exists but the admin has no Member row yet,
- * add it. Sequential writes, no transaction (ADR-0006). Anyone else gets a
- * user row and no Member until M1's allowlist and invitations.
+ * add it. Each write appends its Event with no actor, since deevy itself is
+ * doing the writing. Sequential writes, no transaction (ADR-0006). Anyone else
+ * gets a user row and no Member until M1's allowlist.
  */
 export async function bootstrapWorkspace(
   db: Db,
@@ -88,17 +90,33 @@ export async function bootstrapWorkspace(
   if (!env.adminEmail || user.email.toLowerCase() !== env.adminEmail.toLowerCase()) return;
   if (await db.query.member.findFirst({ where: { userId: user.userId } })) return;
   let workspaceId = (await db.query.workspace.findFirst())?.id;
+  const source = { db, workspace: { id: "" }, member: null };
   if (!workspaceId) {
     const name = env.workspaceName?.trim() || "deevy";
     workspaceId = crypto.randomUUID();
     await db.insert(workspace).values({ id: workspaceId, name, slug: slugify(name) });
+    source.workspace.id = workspaceId;
+    await appendEvent(source, {
+      kind: "workspace.created",
+      subjectType: "workspace",
+      subjectId: workspaceId,
+      payload: { name },
+    });
   }
+  source.workspace.id = workspaceId;
+  const memberId = crypto.randomUUID();
   await db.insert(member).values({
-    id: crypto.randomUUID(),
+    id: memberId,
     workspaceId,
     userId: user.userId,
     role: "admin",
     kind: "human",
+  });
+  await appendEvent(source, {
+    kind: "member.joined",
+    subjectType: "member",
+    subjectId: memberId,
+    payload: { role: "admin", kind: "human" },
   });
 }
 

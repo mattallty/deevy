@@ -1,4 +1,4 @@
-import { member, user, workspace } from "@deevy/db";
+import { event, member, user, workspace } from "@deevy/db";
 import { createSelectSchema } from "drizzle-orm/zod";
 
 export const WorkspaceSchema = createSelectSchema(workspace);
@@ -10,3 +10,4 @@ export const UserSchema = createSelectSchema(user).pick({
   image: true,
   kind: true,
 });
+export const EventSchema = createSelectSchema(event);
