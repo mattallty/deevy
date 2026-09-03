@@ -1,5 +1,6 @@
 import {
   allowlistRule,
+  comment,
   document,
   documentVersion,
   event,
@@ -76,4 +77,11 @@ export const DocumentAtVersionSchema = DocumentSchema.extend({
   version: z.number().int(),
   body: z.string(),
   authorMemberId: z.string().nullable(),
+});
+
+export const CommentSchema = createSelectSchema(comment);
+
+/** A comment as the thread shows one: the row plus who wrote it. */
+export const CommentWithAuthorSchema = CommentSchema.extend({
+  author: MemberWithUserSchema.nullable(),
 });

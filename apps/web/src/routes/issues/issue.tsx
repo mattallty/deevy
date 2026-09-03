@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { GateControls } from "@/components/gate-controls";
+import { IssueComments } from "@/components/issue-comments";
 import { IssueDocuments } from "@/components/issue-documents";
 import { LabelPicker } from "@/components/label-picker";
 import { IssueTimeline } from "@/components/issue-timeline.tsx";
@@ -150,6 +151,8 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
           </ul>
         </section>
       ) : null}
+
+      <IssueComments issueKey={key} />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">Timeline</h2>

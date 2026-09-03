@@ -39,7 +39,10 @@ export type EventKind =
   | "label.created"
   | "label.updated"
   | "label.deleted"
-  | "issue.labels_changed";
+  | "issue.labels_changed"
+  | "comment.created"
+  | "comment.edited"
+  | "comment.deleted";
 
 export type EventPayload = Record<string, unknown>;
 

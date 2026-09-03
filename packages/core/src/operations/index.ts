@@ -8,6 +8,7 @@ import {
 import {
   allowlistRuleKinds,
   issue as issueTable,
+  comment as commentTable,
   issueLabel as issueLabelTable,
   label as labelTable,
   project as projectTable,
@@ -26,6 +27,7 @@ import {
 } from "../issues.ts";
 import { ensureStateDocument, writeVersion } from "../documents.ts";
 import { oneLabelPerScope, replaceIssueLabels } from "../labels.ts";
+import { resolveMentions } from "../mentions.ts";
 import { createProject, ProjectKeyPattern } from "../projects.ts";
 import {
   assertHuman,
@@ -42,6 +44,7 @@ import {
   IssueSummarySchema,
   DocumentAtVersionSchema,
   DocumentSchema,
+  CommentWithAuthorSchema,
   LabelSchema,
   ProjectWithStatesSchema,
   TeamWithMembersSchema,
@@ -1395,7 +1398,17 @@ export const issues = {
         projectId: project.id,
       } as const;
       if (Object.keys(edits).length > 0) {
-        await appendEvent(context, { kind: "issue.updated", ...subject, payload: edits });
+        // A description mentions people the same way a comment does, so the
+        // inbox reads one payload shape for both.
+        const mentionedMemberIds =
+          input.description === undefined
+            ? []
+            : await resolveMentions(context.db, context.workspace.id, input.description ?? "");
+        await appendEvent(context, {
+          kind: "issue.updated",
+          ...subject,
+          payload: { ...edits, mentionedMemberIds },
+        });
       }
       if (assigneeChanged) {
         await appendEvent(context, {
@@ -1423,6 +1436,15 @@ async function requireDocument(context: ContextFor<"member">, issueId: string, n
   });
   if (!found) throw new ORPCError("NOT_FOUND", { message: `This Issue has no ${name} Document` });
   return found;
+}
+
+async function loadComment(context: ContextFor<"member">, id: string) {
+  const found = await context.db.query.comment.findFirst({
+    where: { id },
+    with: { author: { with: { user: true } } },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such comment" });
+  return found.deletedAt ? { ...found, body: "" } : found;
 }
 
 /** The Label an operation names, or NOT_FOUND. Scoped to the Workspace. */
@@ -1573,6 +1595,140 @@ export const labels = {
   }),
 };
 
+/** The comment an operation names, with the Issue it belongs to. Scoped to the Workspace. */
+async function requireComment(context: ContextFor<"member">, commentId: string) {
+  const found = await context.db.query.comment.findFirst({
+    where: { id: commentId },
+    with: { issue: { with: { project: true } } },
+  });
+  if (!found || found.issue.project.workspaceId !== context.workspace.id) {
+    throw new ORPCError("NOT_FOUND", { message: "No such comment" });
+  }
+  return found;
+}
+
+/** Its author may change a comment; an admin may also remove one. */
+function assertMayEdit(context: ContextFor<"member">, authorMemberId: string | null) {
+  if (authorMemberId === context.member.id) return;
+  throw new ORPCError("FORBIDDEN", { message: "Only its author can change this comment" });
+}
+
+export const comments = {
+  list: defineOperation({
+    name: "comments.list",
+    summary: "The comments on an Issue, oldest first",
+    method: "GET",
+    path: "/issues/{issueKey}/comments",
+    auth: "member",
+    input: z.object({ issueKey: z.string() }),
+    output: z.object({ comments: z.array(CommentWithAuthorSchema) }),
+    handler: async ({ input, context }) => {
+      const { issue } = await requireIssue(context, input.issueKey);
+      const rows = await context.db.query.comment.findMany({
+        where: { issueId: issue.id },
+        with: { author: { with: { user: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+      // A deleted comment keeps its place in the thread but not its words.
+      return {
+        comments: rows.map((row) => (row.deletedAt ? { ...row, body: "" } : row)),
+      };
+    },
+  }),
+
+  create: defineOperation({
+    name: "comments.create",
+    summary: "Say something on an Issue, mentioning Members and Teams by handle",
+    method: "POST",
+    path: "/issues/{issueKey}/comments",
+    auth: "member",
+    input: z.object({ issueKey: z.string(), body: z.string().trim().min(1).max(100_000) }),
+    output: CommentWithAuthorSchema,
+    handler: async ({ input, context }) => {
+      const { issue, project } = await requireIssue(context, input.issueKey);
+      const id = crypto.randomUUID();
+      await context.db.insert(commentTable).values({
+        id,
+        issueId: issue.id,
+        authorMemberId: context.member.id,
+        body: input.body,
+      });
+      const mentionedMemberIds = await resolveMentions(
+        context.db,
+        context.workspace.id,
+        input.body,
+      );
+      await appendEvent(context, {
+        kind: "comment.created",
+        subjectType: "issue",
+        subjectId: issue.id,
+        projectId: project.id,
+        payload: { commentId: id, mentionedMemberIds },
+      });
+      return loadComment(context, id);
+    },
+  }),
+
+  update: defineOperation({
+    name: "comments.update",
+    summary: "Edit a comment you wrote",
+    method: "PATCH",
+    path: "/comments/{commentId}",
+    auth: "member",
+    input: z.object({ commentId: z.string(), body: z.string().trim().min(1).max(100_000) }),
+    output: CommentWithAuthorSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireComment(context, input.commentId);
+      assertMayEdit(context, found.authorMemberId);
+      await context.db
+        .update(commentTable)
+        .set({ body: input.body, editedAt: new Date() })
+        .where(eq(commentTable.id, found.id));
+      const mentionedMemberIds = await resolveMentions(
+        context.db,
+        context.workspace.id,
+        input.body,
+      );
+      await appendEvent(context, {
+        kind: "comment.edited",
+        subjectType: "issue",
+        subjectId: found.issueId,
+        projectId: found.issue.projectId,
+        payload: { commentId: found.id, mentionedMemberIds },
+      });
+      return loadComment(context, found.id);
+    },
+  }),
+
+  delete: defineOperation({
+    name: "comments.delete",
+    summary: "Withdraw a comment; it keeps its place in the thread",
+    method: "DELETE",
+    path: "/comments/{commentId}",
+    auth: "member",
+    input: z.object({ commentId: z.string() }),
+    output: z.object({ deleted: z.literal(true) }),
+    handler: async ({ input, context }) => {
+      const found = await requireComment(context, input.commentId);
+      if (context.member.role !== "admin") assertMayEdit(context, found.authorMemberId);
+      if (found.deletedAt) return { deleted: true as const };
+
+      await context.db
+        .update(commentTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(commentTable.id, found.id));
+      await appendEvent(context, {
+        kind: "comment.deleted",
+        subjectType: "issue",
+        subjectId: found.issueId,
+        projectId: found.issue.projectId,
+        payload: { commentId: found.id },
+      });
+      return { deleted: true as const };
+    },
+  }),
+};
+
 export const documents = {
   list: defineOperation({
     name: "documents.list",
@@ -1667,5 +1823,6 @@ export const router = {
   workflow,
   documents,
   labels,
+  comments,
 };
 export type AppRouter = typeof router;

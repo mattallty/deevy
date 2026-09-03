@@ -2,6 +2,7 @@ import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, authRelations, session, user, verification } from "./schema/auth.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
+import { comment } from "./schema/comment.ts";
 import { document, documentVersion } from "./schema/document.ts";
 import { gateDecision } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
@@ -28,6 +29,7 @@ export const tables = {
   documentVersion,
   label,
   issueLabel,
+  comment,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -90,6 +92,11 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       from: r.issue.id.through(r.issueLabel.issueId),
       to: r.label.id.through(r.issueLabel.labelId),
     }),
+    comments: r.many.comment({ from: r.issue.id, to: r.comment.issueId }),
+  },
+  comment: {
+    issue: r.one.issue({ from: r.comment.issueId, to: r.issue.id, optional: false }),
+    author: r.one.member({ from: r.comment.authorMemberId, to: r.member.id }),
   },
   label: {
     workspace: r.one.workspace({ from: r.label.workspaceId, to: r.workspace.id, optional: false }),

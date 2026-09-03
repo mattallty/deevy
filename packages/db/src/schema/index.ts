@@ -7,3 +7,4 @@ export * from "./issue.ts";
 export * from "./gate.ts";
 export * from "./document.ts";
 export * from "./label.ts";
+export * from "./comment.ts";

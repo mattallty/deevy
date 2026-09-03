@@ -94,6 +94,12 @@ export function stubClient(overrides: StubOverrides = {}): never {
       }),
       write: async () => ({}),
     },
+    comments: {
+      list: async () => ({ comments: [] }),
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({ deleted: true }),
+    },
     events: {
       list: async () => ({ events: [], nextCursor: null }),
       // Stays open the way the real stream does, so the live hook does not spin.
