@@ -5,6 +5,8 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { ProjectsPage } from "./routes/index.tsx";
+import { ProjectPage } from "./routes/projects/project.tsx";
+import { TeamsPage } from "./routes/settings/teams.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
 import { AppShell, type ShellProps } from "./routes/shell.tsx";
@@ -24,6 +26,18 @@ const indexRoute = createRoute({
   path: "/",
   component: ProjectsPage,
 });
+const projectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$key",
+  component: function Project() {
+    return <ProjectPage projectKey={projectRoute.useParams().key} />;
+  },
+});
+const teamsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/teams",
+  component: TeamsPage,
+});
 const membersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/members",
@@ -35,7 +49,13 @@ const allowlistRoute = createRoute({
   component: AllowlistPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, membersRoute, allowlistRoute]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  projectRoute,
+  teamsRoute,
+  membersRoute,
+  allowlistRoute,
+]);
 
 export interface AppRouterOptions {
   /** Tests drive the routes without a browser URL bar. */

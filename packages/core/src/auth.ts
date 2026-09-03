@@ -1,6 +1,7 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { allowlistRule, member, workspace, type Db } from "@deevy/db";
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { allocateHandle, slugify } from "./handles.ts";
 import { betterAuth } from "better-auth";
 import { appendEvent } from "./events.ts";
 
@@ -119,6 +120,8 @@ function githubPorts(db: Db, userId: string): JoinOptions {
   };
 }
 
+export { allocateHandle, slugify } from "./handles.ts";
+
 export type Auth = ReturnType<typeof createAuth>;
 export type Session = Auth["$Infer"]["Session"];
 
@@ -167,15 +170,6 @@ export async function bootstrapWorkspace(
     subjectId: memberId,
     payload: { role: "admin", kind: "human" },
   });
-}
-
-export function slugify(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "workspace";
 }
 
 /** The sign-in a join decision is made about. */
@@ -251,26 +245,4 @@ async function matchesAllowlist(
   if (orgRules.length === 0 || !options.listOrgs) return false;
   const orgs = new Set((await options.listOrgs()).map((org) => org.toLowerCase()));
   return orgRules.some((rule) => orgs.has(rule.value));
-}
-
-/**
- * A handle unique across the Workspace. The taken ones are read in a single
- * statement rather than probed one suffix at a time, since D1 charges per
- * round trip (docs/plans/m1.md).
- */
-export async function allocateHandle(db: Db, from: string): Promise<string> {
-  const base = slugify(from.split("@")[0] ?? from);
-  const taken = new Set(
-    (
-      await db
-        .select({ handle: member.handle })
-        .from(member)
-        .where(like(member.handle, `${base}%`))
-    ).map((row) => row.handle),
-  );
-  if (!taken.has(base)) return base;
-  for (let suffix = 2; ; suffix += 1) {
-    const candidate = `${base}-${suffix}`;
-    if (!taken.has(candidate)) return candidate;
-  }
 }

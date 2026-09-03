@@ -5,10 +5,19 @@ import {
   event as eventTable,
   member as memberTable,
 } from "@deevy/db";
-import { allowlistRuleKinds } from "@deevy/db";
+import {
+  allowlistRuleKinds,
+  project as projectTable,
+  team as teamTable,
+  teamMember as teamMemberTable,
+} from "@deevy/db";
+import { allocateHandle, slugify } from "../handles.ts";
+import { createProject, ProjectKeyPattern } from "../projects.ts";
 import {
   AllowlistRuleSchema,
   EventSchema,
+  ProjectWithStatesSchema,
+  TeamWithMembersSchema,
   MemberSchema,
   MemberWithUserSchema,
   UserSchema,
@@ -335,5 +344,410 @@ export const allowlist = {
   }),
 };
 
-export const router = { health, me, workspace, events, members, allowlist };
+/** Strict on the way in: `dev` is a mistake worth reporting, not something to correct silently. */
+const ProjectKey = z
+  .string()
+  .trim()
+  .regex(ProjectKeyPattern, "Two to six uppercase letters, as in DEV");
+
+/** Lenient on the way out, so `/projects/dev` finds DEV. */
+const ProjectKeyLookup = z.string().trim().toUpperCase().regex(ProjectKeyPattern);
+
+/**
+ * A boolean in a GET input. The OpenAPI surface sends it as a query string and
+ * the RPC link sends a real boolean, so both are accepted.
+ */
+const QueryFlag = z.union([z.boolean(), z.stringbool()]);
+
+/** The Project an operation names by key, or NOT_FOUND. Scoped to the Workspace. */
+async function requireProject(context: ContextFor<"member">, key: string) {
+  const found = await context.db.query.project.findFirst({
+    where: { workspaceId: context.workspace.id, key },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+  return found;
+}
+
+/**
+ * An admin, or a Member of the Team that owns the Project, may change it. A
+ * Project no Team owns is the admins' to change (docs/plans/m1.md).
+ */
+async function requireProjectOrAdmin(context: ContextFor<"member">, key: string) {
+  const found = await requireProject(context, key);
+  if (context.member.role === "admin") return found;
+  const onTeam = found.teamId
+    ? await context.db.query.teamMember.findFirst({
+        where: { teamId: found.teamId, memberId: context.member.id },
+      })
+    : undefined;
+  if (!onTeam) {
+    throw new ORPCError("FORBIDDEN", {
+      message: "Only an admin or a Member of the owning Team can change this Project",
+    });
+  }
+  return found;
+}
+
+/** The Team an operation names, or NOT_FOUND. Scoped to the Workspace. */
+async function requireTeam(context: ContextFor<"member">, teamId: string) {
+  const found = await context.db.query.team.findFirst({
+    where: { id: teamId, workspaceId: context.workspace.id },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Team in this Workspace" });
+  return found;
+}
+
+/** A Project with its Workflow and Team, the shape every Project operation returns. */
+async function loadProject(db: ContextFor<"member">["db"], id: string) {
+  const found = await db.query.project.findFirst({
+    where: { id },
+    with: { states: { orderBy: { position: "asc" } }, team: true },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+  return found;
+}
+
+export const projects = {
+  list: defineOperation({
+    name: "projects.list",
+    summary: "The Projects in this Workspace",
+    method: "GET",
+    path: "/projects",
+    auth: "member",
+    input: z.object({
+      /** Archived Projects are left out unless asked for. */
+      includeArchived: QueryFlag.default(false),
+    }),
+    output: z.object({ projects: z.array(ProjectWithStatesSchema) }),
+    handler: async ({ input, context }) => {
+      const rows = await context.db.query.project.findMany({
+        where: {
+          workspaceId: context.workspace.id,
+          ...(input.includeArchived ? {} : { archivedAt: { isNull: true } }),
+        },
+        with: { states: { orderBy: { position: "asc" } }, team: true },
+        orderBy: { createdAt: "asc" },
+      });
+      return { projects: rows };
+    },
+  }),
+
+  get: defineOperation({
+    name: "projects.get",
+    summary: "One Project by its key, with its Workflow",
+    method: "GET",
+    path: "/projects/{key}",
+    auth: "member",
+    input: z.object({ key: ProjectKeyLookup }),
+    output: ProjectWithStatesSchema,
+    handler: async ({ input, context }) => {
+      const found = await context.db.query.project.findFirst({
+        where: { workspaceId: context.workspace.id, key: input.key },
+        with: { states: { orderBy: { position: "asc" } }, team: true },
+      });
+      if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+      return found;
+    },
+  }),
+
+  update: defineOperation({
+    name: "projects.update",
+    summary: "Rename a Project, change its description, or hand it to a Team",
+    method: "PATCH",
+    path: "/projects/{key}",
+    auth: "member",
+    input: z.object({
+      key: ProjectKeyLookup,
+      name: z.string().trim().min(1).max(120).optional(),
+      description: z.string().max(4000).nullish(),
+      teamId: z.string().nullish(),
+    }),
+    output: ProjectWithStatesSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireProjectOrAdmin(context, input.key);
+      if (input.teamId) await requireTeam(context, input.teamId);
+
+      const changes: Record<string, { from: unknown; to: unknown }> = {};
+      if (input.name !== undefined && input.name !== found.name) {
+        changes.name = { from: found.name, to: input.name };
+      }
+      if (input.description !== undefined && input.description !== found.description) {
+        changes.description = { from: found.description, to: input.description ?? null };
+      }
+      if (input.teamId !== undefined && input.teamId !== found.teamId) {
+        changes.teamId = { from: found.teamId, to: input.teamId ?? null };
+      }
+      if (Object.keys(changes).length === 0) return loadProject(context.db, found.id);
+
+      await context.db
+        .update(projectTable)
+        .set({
+          ...(input.name === undefined ? {} : { name: input.name }),
+          ...(input.description === undefined ? {} : { description: input.description ?? null }),
+          ...(input.teamId === undefined ? {} : { teamId: input.teamId ?? null }),
+        })
+        .where(eq(projectTable.id, found.id));
+      await appendEvent(context, {
+        kind: "project.updated",
+        subjectType: "project",
+        subjectId: found.id,
+        projectId: found.id,
+        payload: changes,
+      });
+      return loadProject(context.db, found.id);
+    },
+  }),
+
+  archive: defineOperation({
+    name: "projects.archive",
+    summary: "Close a Project down; it stays readable and keeps its Issues",
+    method: "POST",
+    path: "/projects/{key}/archive",
+    auth: "admin",
+    input: z.object({ key: ProjectKeyLookup }),
+    output: ProjectWithStatesSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireProject(context, input.key);
+      if (found.archivedAt) return loadProject(context.db, found.id);
+
+      await context.db
+        .update(projectTable)
+        .set({ archivedAt: new Date() })
+        .where(eq(projectTable.id, found.id));
+      await appendEvent(context, {
+        kind: "project.archived",
+        subjectType: "project",
+        subjectId: found.id,
+        projectId: found.id,
+        payload: { key: found.key },
+      });
+      return loadProject(context.db, found.id);
+    },
+  }),
+
+  create: defineOperation({
+    name: "projects.create",
+    summary: "Start a Project with the default Workflow",
+    method: "POST",
+    path: "/projects",
+    auth: "admin",
+    input: z.object({
+      key: ProjectKey,
+      name: z.string().trim().min(1).max(120),
+      description: z.string().max(4000).nullish(),
+      teamId: z.string().nullish(),
+    }),
+    output: ProjectWithStatesSchema,
+    handler: async ({ input, context }) => {
+      const taken = await context.db.query.project.findFirst({
+        where: { workspaceId: context.workspace.id, key: input.key },
+      });
+      if (taken) {
+        throw new ORPCError("CONFLICT", { message: `Another Project already uses ${input.key}` });
+      }
+      if (input.teamId) await requireTeam(context, input.teamId);
+
+      const created = await createProject(context.db, {
+        workspaceId: context.workspace.id,
+        key: input.key,
+        name: input.name,
+        description: input.description,
+        teamId: input.teamId,
+      });
+      await appendEvent(context, {
+        kind: "project.created",
+        subjectType: "project",
+        subjectId: created.id,
+        projectId: created.id,
+        payload: { key: created.key, name: created.name },
+      });
+      return loadProject(context.db, created.id);
+    },
+  }),
+};
+
+/** A Team with the Members on it, the shape every Team operation returns. */
+async function loadTeam(db: ContextFor<"member">["db"], id: string) {
+  const found = await db.query.team.findFirst({
+    where: { id },
+    with: { members: { with: { user: true } } },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Team" });
+  return found;
+}
+
+/**
+ * A Team is not a permission wall, but its own Members maintain it: an admin,
+ * or someone on the Team, may change it (docs/plans/m1.md).
+ */
+async function requireTeamOrAdmin(context: ContextFor<"member">, teamId: string) {
+  const found = await requireTeam(context, teamId);
+  if (context.member.role === "admin") return found;
+  const onTeam = await context.db.query.teamMember.findFirst({
+    where: { teamId, memberId: context.member.id },
+  });
+  if (!onTeam) {
+    throw new ORPCError("FORBIDDEN", {
+      message: "Only an admin or a Member of this Team can do that",
+    });
+  }
+  return found;
+}
+
+export const teams = {
+  list: defineOperation({
+    name: "teams.list",
+    summary: "The Teams in this Workspace, with their Members",
+    method: "GET",
+    path: "/teams",
+    auth: "member",
+    input: NoInput,
+    output: z.object({ teams: z.array(TeamWithMembersSchema) }),
+    handler: async ({ context }) => {
+      const rows = await context.db.query.team.findMany({
+        where: { workspaceId: context.workspace.id },
+        with: { members: { with: { user: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+      return { teams: rows };
+    },
+  }),
+
+  create: defineOperation({
+    name: "teams.create",
+    summary: "Name a group of Members that owns Projects and can be mentioned",
+    method: "POST",
+    path: "/teams",
+    auth: "admin",
+    input: z.object({
+      name: z.string().trim().min(1).max(120),
+      /** Defaults to a slug of the name, suffixed if a Member or Team holds it. */
+      handle: z.string().trim().max(60).nullish(),
+    }),
+    output: TeamWithMembersSchema,
+    handler: async ({ input, context }) => {
+      const id = crypto.randomUUID();
+      const handle = await allocateHandle(context.db, slugify(input.handle ?? input.name));
+      await context.db
+        .insert(teamTable)
+        .values({ id, workspaceId: context.workspace.id, name: input.name, handle });
+      await appendEvent(context, {
+        kind: "team.created",
+        subjectType: "team",
+        subjectId: id,
+        payload: { name: input.name, handle },
+      });
+      return loadTeam(context.db, id);
+    },
+  }),
+
+  update: defineOperation({
+    name: "teams.update",
+    summary: "Rename a Team",
+    method: "PATCH",
+    path: "/teams/{teamId}",
+    auth: "member",
+    input: z.object({ teamId: z.string(), name: z.string().trim().min(1).max(120) }),
+    output: TeamWithMembersSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireTeamOrAdmin(context, input.teamId);
+      await context.db
+        .update(teamTable)
+        .set({ name: input.name })
+        .where(eq(teamTable.id, found.id));
+      await appendEvent(context, {
+        kind: "team.updated",
+        subjectType: "team",
+        subjectId: found.id,
+        payload: { from: found.name, to: input.name },
+      });
+      return loadTeam(context.db, found.id);
+    },
+  }),
+
+  delete: defineOperation({
+    name: "teams.delete",
+    summary: "Disband a Team; its Projects keep going without one",
+    method: "DELETE",
+    path: "/teams/{teamId}",
+    auth: "admin",
+    input: z.object({ teamId: z.string() }),
+    output: z.object({ deleted: z.literal(true) }),
+    handler: async ({ input, context }) => {
+      const found = await requireTeam(context, input.teamId);
+      await context.db.delete(teamTable).where(eq(teamTable.id, found.id));
+      await appendEvent(context, {
+        kind: "team.deleted",
+        subjectType: "team",
+        subjectId: found.id,
+        payload: { name: found.name, handle: found.handle },
+      });
+      return { deleted: true as const };
+    },
+  }),
+
+  addMember: defineOperation({
+    name: "teams.addMember",
+    summary: "Put a Member on a Team",
+    method: "POST",
+    path: "/teams/{teamId}/members",
+    auth: "member",
+    input: z.object({ teamId: z.string(), memberId: z.string() }),
+    output: TeamWithMembersSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireTeamOrAdmin(context, input.teamId);
+      const target = await context.db.query.member.findFirst({
+        where: { id: input.memberId, workspaceId: context.workspace.id },
+      });
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "No such Member of this Workspace" });
+      }
+      const already = await context.db.query.teamMember.findFirst({
+        where: { teamId: found.id, memberId: target.id },
+      });
+      if (already) return loadTeam(context.db, found.id);
+
+      await context.db.insert(teamMemberTable).values({ teamId: found.id, memberId: target.id });
+      await appendEvent(context, {
+        kind: "team.member_added",
+        subjectType: "team",
+        subjectId: found.id,
+        payload: { memberId: target.id },
+      });
+      return loadTeam(context.db, found.id);
+    },
+  }),
+
+  removeMember: defineOperation({
+    name: "teams.removeMember",
+    summary: "Take a Member off a Team",
+    method: "DELETE",
+    path: "/teams/{teamId}/members/{memberId}",
+    auth: "member",
+    input: z.object({ teamId: z.string(), memberId: z.string() }),
+    output: TeamWithMembersSchema,
+    handler: async ({ input, context }) => {
+      const found = await requireTeamOrAdmin(context, input.teamId);
+      const already = await context.db.query.teamMember.findFirst({
+        where: { teamId: found.id, memberId: input.memberId },
+      });
+      if (!already) return loadTeam(context.db, found.id);
+
+      await context.db
+        .delete(teamMemberTable)
+        .where(
+          and(eq(teamMemberTable.teamId, found.id), eq(teamMemberTable.memberId, input.memberId)),
+        );
+      await appendEvent(context, {
+        kind: "team.member_removed",
+        subjectType: "team",
+        subjectId: found.id,
+        payload: { memberId: input.memberId },
+      });
+      return loadTeam(context.db, found.id);
+    },
+  }),
+};
+
+export const router = { health, me, workspace, events, members, allowlist, projects, teams };
 export type AppRouter = typeof router;

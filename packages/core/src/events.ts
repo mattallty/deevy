@@ -17,7 +17,15 @@ export type EventKind =
   | "member.suspended"
   | "member.reinstated"
   | "allowlist.rule_added"
-  | "allowlist.rule_removed";
+  | "allowlist.rule_removed"
+  | "project.created"
+  | "project.updated"
+  | "project.archived"
+  | "team.created"
+  | "team.updated"
+  | "team.deleted"
+  | "team.member_added"
+  | "team.member_removed";
 
 export type EventPayload = Record<string, unknown>;
 

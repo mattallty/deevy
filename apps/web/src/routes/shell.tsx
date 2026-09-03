@@ -1,5 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import { FolderKanban, Inbox, Settings, ShieldCheck, Users } from "lucide-react";
+import { FolderKanban, Inbox, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
 import type { ComponentType } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { authClient } from "@/lib/auth.ts";
@@ -15,6 +15,7 @@ interface NavItem {
 const nav: NavItem[] = [
   { to: "/", label: "Projects", icon: FolderKanban },
   { to: "/inbox", label: "Inbox", icon: Inbox, soon: true },
+  { to: "/settings/teams", label: "Teams", icon: UsersRound },
   { to: "/settings/members", label: "Members", icon: Users },
   { to: "/settings/allowlist", label: "Allowlist", icon: ShieldCheck },
 ];

@@ -17,6 +17,21 @@ vi.mock("../src/lib/orpc.ts", async () => {
       add: async () => ({}),
       remove: async () => ({ removed: true }),
     },
+    projects: {
+      list: async () => ({ projects: [] }),
+      get: async () => ({}),
+      create: async () => ({}),
+      update: async () => ({}),
+      archive: async () => ({}),
+    },
+    teams: {
+      list: async () => ({ teams: [] }),
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({ deleted: true }),
+      addMember: async () => ({}),
+      removeMember: async () => ({}),
+    },
   };
   return { client, orpc: createTanstackQueryUtils(client) };
 });
@@ -63,7 +78,7 @@ describe("the app shell", () => {
   it("renders the Projects page at the root", async () => {
     await mountAt("/");
 
-    expect(await screen.findByRole("heading", { name: "Projects" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeTruthy();
   });
 
   it("renders the Allowlist page at /settings/allowlist", async () => {
