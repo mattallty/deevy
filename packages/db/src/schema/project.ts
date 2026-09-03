@@ -93,6 +93,9 @@ export const workflowState = sqliteTable(
     position: integer("position").notNull(),
     isGate: integer("is_gate", { mode: "boolean" }).default(false).notNull(),
     category: text("category", { enum: workflowStateCategories }).notNull(),
+    /** The Document this State asks for, created from its template on entry. */
+    documentName: text("document_name"),
+    documentTemplate: text("document_template"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
   },
   (table) => [index("workflow_state_projectId_position_idx").on(table.projectId, table.position)],

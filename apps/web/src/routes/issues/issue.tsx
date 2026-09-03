@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { GateControls } from "@/components/gate-controls";
+import { IssueDocuments } from "@/components/issue-documents";
 import { IssueTimeline } from "@/components/issue-timeline.tsx";
 import { Markdown } from "@/components/markdown.tsx";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,8 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
       {!editing && !description ? (
         <p className="text-sm text-muted-foreground">No description yet.</p>
       ) : null}
+
+      <IssueDocuments issueKey={key} />
 
       <GateControls
         issueKey={key}

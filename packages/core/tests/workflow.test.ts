@@ -3,7 +3,15 @@ import { defaultWorkflow } from "../src/workflow.ts";
 
 describe("defaultWorkflow", () => {
   it("is the template from PLAN.md: Intent to Done, Gates on all but Build and Done", () => {
-    expect(defaultWorkflow()).toEqual([
+    // The Document each State asks for is slice 8's concern, tested there.
+    expect(
+      defaultWorkflow().map(({ name, position, isGate, category }) => ({
+        name,
+        position,
+        isGate,
+        category,
+      })),
+    ).toEqual([
       { name: "Intent", position: 0, isGate: true, category: "backlog" },
       { name: "Spec", position: 1, isGate: true, category: "active" },
       { name: "Plan", position: 2, isGate: true, category: "active" },

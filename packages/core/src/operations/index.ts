@@ -22,6 +22,7 @@ import {
   nextIssueNumber,
   parseIssueKey,
 } from "../issues.ts";
+import { ensureStateDocument, writeVersion } from "../documents.ts";
 import { createProject, ProjectKeyPattern } from "../projects.ts";
 import {
   assertHuman,
@@ -36,6 +37,8 @@ import {
   EventSchema,
   IssueDetailSchema,
   IssueSummarySchema,
+  DocumentAtVersionSchema,
+  DocumentSchema,
   ProjectWithStatesSchema,
   TeamWithMembersSchema,
   WorkflowStateSchema,
@@ -856,6 +859,28 @@ async function requireAssignee(context: ContextFor<"member">, memberId: string) 
   return found;
 }
 
+/**
+ * Creates the Document the State an Issue just entered asks for, and records
+ * it. Called wherever an Issue enters a State: on create, move, approve and
+ * reject (docs/plans/m1.md).
+ */
+async function openStateDocument(
+  context: ContextFor<"member">,
+  issueId: string,
+  projectId: string,
+  state: { documentName: string | null; documentTemplate: string | null },
+) {
+  const created = await ensureStateDocument(context.db, issueId, state, context.member.id);
+  if (!created) return;
+  await appendEvent(context, {
+    kind: "document.created",
+    subjectType: "issue",
+    subjectId: issueId,
+    projectId,
+    payload: { name: created.name, documentId: created.id },
+  });
+}
+
 /** The Issue, its Project, and that Project's States in order: what a move needs. */
 async function requireIssueForMove(context: ContextFor<"member">, key: string) {
   const { issue, project } = await requireIssue(context, key);
@@ -903,6 +928,9 @@ export const workflow = {
           name: z.string().trim().min(1).max(60),
           isGate: z.boolean().default(false),
           category: z.enum(workflowStateCategories),
+          /** The Document this State asks for on entry, and its starting text. */
+          documentName: z.string().trim().max(60).nullish(),
+          documentTemplate: z.string().max(100_000).nullish(),
         }),
       ),
       deleteStates: z.array(z.string()).default([]),
@@ -963,6 +991,8 @@ export const workflow = {
               position,
               isGate: state.isGate,
               category: state.category,
+              documentName: state.documentName ?? null,
+              documentTemplate: state.documentTemplate ?? null,
             })
             .where(eq(workflowStateTable.id, state.id));
           kept.push(state.id);
@@ -975,6 +1005,8 @@ export const workflow = {
             position,
             isGate: state.isGate,
             category: state.category,
+            documentName: state.documentName ?? null,
+            documentTemplate: state.documentTemplate ?? null,
           });
           kept.push(id);
         }
@@ -1046,6 +1078,7 @@ export const gates = {
         projectId: project.id,
         payload: { state: from.name, to: to.name, note: input.note ?? null },
       });
+      await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },
   }),
@@ -1085,6 +1118,7 @@ export const gates = {
         projectId: project.id,
         payload: { state: from.name, to: to.name, note: input.note ?? null },
       });
+      await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },
   }),
@@ -1145,6 +1179,7 @@ export const issues = {
         projectId: project.id,
         payload: { key: issueKey(project.key, number), title: created.title },
       });
+      await openStateDocument(context, created.id, project.id, first);
       return loadIssue(context, created.id);
     },
   }),
@@ -1234,6 +1269,7 @@ export const issues = {
         projectId: project.id,
         payload: { from: from.name, to: to.name },
       });
+      await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },
   }),
@@ -1333,6 +1369,95 @@ export const issues = {
   }),
 };
 
+/** The Document an operation names on an Issue, or NOT_FOUND. */
+async function requireDocument(context: ContextFor<"member">, issueId: string, name: string) {
+  const found = await context.db.query.document.findFirst({
+    where: { issueId, name },
+  });
+  if (!found) throw new ORPCError("NOT_FOUND", { message: `This Issue has no ${name} Document` });
+  return found;
+}
+
+export const documents = {
+  list: defineOperation({
+    name: "documents.list",
+    summary: "The Documents on an Issue",
+    method: "GET",
+    path: "/issues/{issueKey}/documents",
+    auth: "member",
+    input: z.object({ issueKey: z.string() }),
+    output: z.object({ documents: z.array(DocumentSchema) }),
+    handler: async ({ input, context }) => {
+      const { issue } = await requireIssue(context, input.issueKey);
+      const rows = await context.db.query.document.findMany({
+        where: { issueId: issue.id },
+        orderBy: { createdAt: "asc" },
+      });
+      return { documents: rows };
+    },
+  }),
+
+  get: defineOperation({
+    name: "documents.get",
+    summary: "One Document on an Issue, at its current version or an older one",
+    method: "GET",
+    path: "/issues/{issueKey}/documents/{name}",
+    auth: "member",
+    input: z.object({
+      issueKey: z.string(),
+      name: z.string(),
+      /** Omitted, the current version. */
+      version: z.coerce.number().int().min(1).optional(),
+    }),
+    output: DocumentAtVersionSchema,
+    handler: async ({ input, context }) => {
+      const { issue } = await requireIssue(context, input.issueKey);
+      const found = await requireDocument(context, issue.id, input.name);
+      const version = input.version ?? found.currentVersion;
+      const row = await context.db.query.documentVersion.findFirst({
+        where: { documentId: found.id, version },
+      });
+      if (!row) {
+        throw new ORPCError("NOT_FOUND", { message: `No version ${version} of ${input.name}` });
+      }
+      return { ...found, version: row.version, body: row.body, authorMemberId: row.authorMemberId };
+    },
+  }),
+
+  write: defineOperation({
+    name: "documents.write",
+    summary: "Write a new version of a Document; older ones stay readable",
+    method: "POST",
+    path: "/issues/{issueKey}/documents/{name}",
+    auth: "member",
+    input: z.object({
+      issueKey: z.string(),
+      name: z.string(),
+      body: z.string().max(100_000),
+    }),
+    output: DocumentAtVersionSchema,
+    handler: async ({ input, context }) => {
+      const { issue, project } = await requireIssue(context, input.issueKey);
+      const found = await requireDocument(context, issue.id, input.name);
+      const version = await writeVersion(context.db, found, input.body, context.member.id);
+      await appendEvent(context, {
+        kind: "document.updated",
+        subjectType: "issue",
+        subjectId: issue.id,
+        projectId: project.id,
+        payload: { name: found.name, version },
+      });
+      return {
+        ...found,
+        currentVersion: version,
+        version,
+        body: input.body,
+        authorMemberId: context.member.id,
+      };
+    },
+  }),
+};
+
 export const router = {
   health,
   me,
@@ -1345,5 +1470,6 @@ export const router = {
   issues,
   gates,
   workflow,
+  documents,
 };
 export type AppRouter = typeof router;

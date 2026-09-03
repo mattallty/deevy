@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/lib/orpc";
 
 const categories = ["backlog", "active", "done"] as const;
@@ -17,6 +18,8 @@ interface DraftState {
   name: string;
   isGate: boolean;
   category: Category;
+  documentName: string | null;
+  documentTemplate: string | null;
 }
 
 /**
@@ -39,6 +42,8 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           name: state.name,
           isGate: state.isGate,
           category: state.category as Category,
+          documentName: state.documentName,
+          documentTemplate: state.documentTemplate,
         })),
       );
     }
@@ -124,6 +129,26 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
               />
               <Label htmlFor={`state-gate-${index}`}>Gate</Label>
             </div>
+            <div className="flex w-full flex-col gap-2">
+              <Label htmlFor={`state-document-${index}`}>Document it asks for</Label>
+              <Input
+                id={`state-document-${index}`}
+                value={state.documentName ?? ""}
+                placeholder="intent, spec, plan… or nothing"
+                onChange={(changed) =>
+                  edit(index, { documentName: changed.target.value.trim() || null })
+                }
+              />
+              {state.documentName ? (
+                <Textarea
+                  aria-label={`Template for ${state.name}`}
+                  rows={4}
+                  value={state.documentTemplate ?? ""}
+                  placeholder="## Problem"
+                  onChange={(changed) => edit(index, { documentTemplate: changed.target.value })}
+                />
+              ) : null}
+            </div>
             <div className="flex gap-1 pb-1">
               <Button
                 type="button"
@@ -162,7 +187,16 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           type="button"
           variant="outline"
           onClick={() =>
-            setDraft([...draft, { name: "New State", isGate: false, category: "active" }])
+            setDraft([
+              ...draft,
+              {
+                name: "New State",
+                isGate: false,
+                category: "active",
+                documentName: null,
+                documentTemplate: null,
+              },
+            ])
           }
         >
           Add State
@@ -199,6 +233,8 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 name: state.name.trim(),
                 isGate: state.isGate,
                 category: state.category,
+                documentName: state.documentName,
+                documentTemplate: state.documentTemplate,
               })),
               deleteStates: removed,
               moveIssuesTo,

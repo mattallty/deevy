@@ -46,7 +46,7 @@ describe("issues.move", () => {
     expect(moved.state.name).toBe("Review");
     expect(moved.stateEnteredAt).toBeInstanceOf(Date);
     const page = await client.events.list({ subjectType: "issue", subjectId: moved.id });
-    expect(page.events.at(-1)).toMatchObject({
+    expect(page.events.findLast((e) => e.kind === "issue.moved")).toMatchObject({
       kind: "issue.moved",
       payload: { from: "Build", to: "Review" },
     });
@@ -66,7 +66,7 @@ describe("gates.approve", () => {
       { decision: "approved", note: "Worth doing", stateId: state("Intent").id },
     ]);
     const page = await client.events.list({ subjectType: "issue", subjectId: approved.id });
-    expect(page.events.at(-1)).toMatchObject({
+    expect(page.events.find((e) => e.kind === "gate.approved")).toMatchObject({
       kind: "gate.approved",
       actorMemberId: admin.member.id,
       payload: { state: "Intent" },
@@ -117,7 +117,7 @@ describe("gates.reject", () => {
 
     expect(rejected.state.name).toBe("Intent");
     const page = await client.events.list({ subjectType: "issue", subjectId: rejected.id });
-    expect(page.events.at(-1)).toMatchObject({
+    expect(page.events.findLast((e) => e.kind === "gate.rejected")).toMatchObject({
       kind: "gate.rejected",
       payload: { state: "Spec" },
     });

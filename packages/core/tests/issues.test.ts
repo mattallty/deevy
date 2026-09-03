@@ -45,7 +45,7 @@ describe("issues.create", () => {
     const issue = await client.issues.create({ projectKey: "DEV", title: "Ship it" });
 
     const page = await client.events.list({ subjectType: "issue", subjectId: issue.id });
-    expect(page.events).toMatchObject([
+    expect(page.events.filter((e) => e.kind === "issue.created")).toMatchObject([
       {
         kind: "issue.created",
         actorMemberId: admin.member.id,
@@ -174,7 +174,7 @@ describe("issues.update", () => {
     expect(updated).toMatchObject({ title: "Ship the Event log" });
     expect(updated.description).toContain("Because everything");
     const page = await client.events.list({ subjectType: "issue", subjectId: issue.id });
-    expect(page.events.at(-1)).toMatchObject({
+    expect(page.events.findLast((e) => e.kind === "issue.updated")).toMatchObject({
       kind: "issue.updated",
       payload: { title: { from: "Draft", to: "Ship the Event log" } },
     });
@@ -195,12 +195,8 @@ describe("issues.update", () => {
 
     expect(reassigned.assignee).toMatchObject({ id: bob.member.id });
     const page = await client.events.list({ subjectType: "issue", subjectId: issue.id });
-    expect(page.events.map((e) => e.kind)).toEqual([
-      "issue.created",
-      "issue.assigned",
-      "issue.assigned",
-    ]);
-    expect(page.events.at(-1)).toMatchObject({
+    expect(page.events.filter((e) => e.kind === "issue.assigned")).toHaveLength(2);
+    expect(page.events.findLast((e) => e.kind === "issue.assigned")).toMatchObject({
       payload: { from: admin.member.id, to: bob.member.id },
     });
   });
@@ -227,9 +223,9 @@ describe("issues.update", () => {
 
     expect(child.parent).toMatchObject({ key: "DEV-1" });
     const page = await client.events.list({ subjectType: "issue", subjectId: parent.id });
-    expect(page.events.map((e) => e.kind)).toEqual(["issue.created"]);
+    expect(page.events.map((e) => e.kind)).not.toContain("issue.reparented");
     const childEvents = await client.events.list({ subjectType: "issue", subjectId: child.id });
-    expect(childEvents.events.at(-1)).toMatchObject({
+    expect(childEvents.events.findLast((e) => e.kind === "issue.reparented")).toMatchObject({
       kind: "issue.reparented",
       payload: { from: null, to: parent.id },
     });

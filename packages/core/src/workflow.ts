@@ -12,8 +12,32 @@ import { eq } from "drizzle-orm";
 /** A State as the default template describes it, before it belongs to a Project. */
 export type WorkflowStateTemplate = Pick<
   WorkflowState,
-  "name" | "position" | "isGate" | "category"
+  "name" | "position" | "isGate" | "category" | "documentName" | "documentTemplate"
 >;
+
+/**
+ * The Document templates the playbook asks each of the first three States for
+ * (docs/PLAN.md). They are headings rather than prose, so an Agent and a Human
+ * fill in the same shape.
+ */
+const templates = {
+  intent: [
+    "## Problem",
+    "",
+    "## Proposed outcome",
+    "",
+    "## Affected users and systems",
+    "",
+    "## Constraints",
+    "",
+    "## Open questions",
+    "",
+  ].join("\n"),
+  spec: ["## Requirements", "", "## Design", "", "## Flagged concerns", ""].join("\n"),
+  plan: ["## Files that change", "", "## Order of work", "", "## Tests that prove it", ""].join(
+    "\n",
+  ),
+};
 
 /**
  * The default Workflow every new Project starts with (docs/PLAN.md): Intent,
@@ -26,12 +50,54 @@ export type WorkflowStateTemplate = Pick<
  */
 export function defaultWorkflow(): WorkflowStateTemplate[] {
   return [
-    { name: "Intent", position: 0, isGate: true, category: "backlog" },
-    { name: "Spec", position: 1, isGate: true, category: "active" },
-    { name: "Plan", position: 2, isGate: true, category: "active" },
-    { name: "Build", position: 3, isGate: false, category: "active" },
-    { name: "Review", position: 4, isGate: true, category: "active" },
-    { name: "Done", position: 5, isGate: false, category: "done" },
+    {
+      name: "Intent",
+      position: 0,
+      isGate: true,
+      category: "backlog",
+      documentName: "intent",
+      documentTemplate: templates.intent,
+    },
+    {
+      name: "Spec",
+      position: 1,
+      isGate: true,
+      category: "active",
+      documentName: "spec",
+      documentTemplate: templates.spec,
+    },
+    {
+      name: "Plan",
+      position: 2,
+      isGate: true,
+      category: "active",
+      documentName: "plan",
+      documentTemplate: templates.plan,
+    },
+    {
+      name: "Build",
+      position: 3,
+      isGate: false,
+      category: "active",
+      documentName: null,
+      documentTemplate: null,
+    },
+    {
+      name: "Review",
+      position: 4,
+      isGate: true,
+      category: "active",
+      documentName: null,
+      documentTemplate: null,
+    },
+    {
+      name: "Done",
+      position: 5,
+      isGate: false,
+      category: "done",
+      documentName: null,
+      documentTemplate: null,
+    },
   ];
 }
 

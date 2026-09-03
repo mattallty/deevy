@@ -1,5 +1,7 @@
 import {
   allowlistRule,
+  document,
+  documentVersion,
   event,
   gateDecision,
   issue,
@@ -60,4 +62,14 @@ export const IssueDetailSchema = IssueSummarySchema.extend({
   parent: IssueSummarySchema.nullable(),
   children: z.array(IssueSummarySchema),
   gateDecisions: z.array(GateDecisionSchema),
+});
+
+export const DocumentSchema = createSelectSchema(document);
+export const DocumentVersionSchema = createSelectSchema(documentVersion);
+
+/** A Document read at one version: the row plus that version's body. */
+export const DocumentAtVersionSchema = DocumentSchema.extend({
+  version: z.number().int(),
+  body: z.string(),
+  authorMemberId: z.string().nullable(),
 });

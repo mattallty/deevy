@@ -93,6 +93,27 @@ vi.mock("../src/lib/orpc.ts", async () => {
       },
       reject: async () => stub.issues[0],
     },
+    documents: {
+      list: async () => ({ documents: [] }),
+      get: async () => ({
+        id: "d",
+        name: "intent",
+        currentVersion: 1,
+        issueId: "i1",
+        version: 1,
+        body: "",
+        authorMemberId: null,
+      }),
+      write: async () => ({
+        id: "d",
+        name: "intent",
+        currentVersion: 2,
+        issueId: "i1",
+        version: 2,
+        body: "",
+        authorMemberId: null,
+      }),
+    },
     events: { list: async () => ({ events: [], nextCursor: null }) },
   };
   return { client, orpc: createTanstackQueryUtils(client) };

@@ -1424,6 +1424,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -1437,6 +1449,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -1636,6 +1650,18 @@
                               "done"
                             ]
                           },
+                          "documentName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "documentTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -1649,6 +1675,8 @@
                           "position",
                           "isGate",
                           "category",
+                          "documentName",
+                          "documentTemplate",
                           "createdAt"
                         ],
                         "additionalProperties": false
@@ -1812,6 +1840,18 @@
                               "done"
                             ]
                           },
+                          "documentName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "documentTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -1825,6 +1865,8 @@
                           "position",
                           "isGate",
                           "category",
+                          "documentName",
+                          "documentTemplate",
                           "createdAt"
                         ],
                         "additionalProperties": false
@@ -2019,6 +2061,18 @@
                               "done"
                             ]
                           },
+                          "documentName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "documentTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -2032,6 +2086,8 @@
                           "position",
                           "isGate",
                           "category",
+                          "documentName",
+                          "documentTemplate",
                           "createdAt"
                         ],
                         "additionalProperties": false
@@ -2205,6 +2261,18 @@
                               "done"
                             ]
                           },
+                          "documentName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "documentTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -2218,6 +2286,8 @@
                           "position",
                           "isGate",
                           "category",
+                          "documentName",
+                          "documentTemplate",
                           "createdAt"
                         ],
                         "additionalProperties": false
@@ -3419,6 +3489,18 @@
                             "done"
                           ]
                         },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time",
@@ -3432,6 +3514,8 @@
                         "position",
                         "isGate",
                         "category",
+                        "documentName",
+                        "documentTemplate",
                         "createdAt"
                       ],
                       "additionalProperties": false
@@ -3722,6 +3806,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -3735,6 +3831,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -3988,6 +4086,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -4001,6 +4111,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -4410,6 +4522,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -4423,6 +4547,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -4714,6 +4840,18 @@
                             "done"
                           ]
                         },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time",
@@ -4727,6 +4865,8 @@
                         "position",
                         "isGate",
                         "category",
+                        "documentName",
+                        "documentTemplate",
                         "createdAt"
                       ],
                       "additionalProperties": false
@@ -5017,6 +5157,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -5030,6 +5182,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -5283,6 +5437,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -5296,6 +5462,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -5681,6 +5849,18 @@
                             "done"
                           ]
                         },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time",
@@ -5694,6 +5874,8 @@
                         "position",
                         "isGate",
                         "category",
+                        "documentName",
+                        "documentTemplate",
                         "createdAt"
                       ],
                       "additionalProperties": false
@@ -5984,6 +6166,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -5997,6 +6191,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -6250,6 +6446,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -6263,6 +6471,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -6629,6 +6839,18 @@
                             "done"
                           ]
                         },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time",
@@ -6642,6 +6864,8 @@
                         "position",
                         "isGate",
                         "category",
+                        "documentName",
+                        "documentTemplate",
                         "createdAt"
                       ],
                       "additionalProperties": false
@@ -6932,6 +7156,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -6945,6 +7181,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -7198,6 +7436,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -7211,6 +7461,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -7581,6 +7833,18 @@
                             "done"
                           ]
                         },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time",
@@ -7594,6 +7858,8 @@
                         "position",
                         "isGate",
                         "category",
+                        "documentName",
+                        "documentTemplate",
                         "createdAt"
                       ],
                       "additionalProperties": false
@@ -7884,6 +8150,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -7897,6 +8175,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -8150,6 +8430,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -8163,6 +8455,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -8533,6 +8827,18 @@
                             "done"
                           ]
                         },
+                        "documentName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "documentTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time",
@@ -8546,6 +8852,8 @@
                         "position",
                         "isGate",
                         "category",
+                        "documentName",
+                        "documentTemplate",
                         "createdAt"
                       ],
                       "additionalProperties": false
@@ -8836,6 +9144,18 @@
                                     "done"
                                   ]
                                 },
+                                "documentName": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "documentTemplate": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
                                 "createdAt": {
                                   "type": "string",
                                   "format": "date-time",
@@ -8849,6 +9169,8 @@
                                 "position",
                                 "isGate",
                                 "category",
+                                "documentName",
+                                "documentTemplate",
                                 "createdAt"
                               ],
                               "additionalProperties": false
@@ -9102,6 +9424,18 @@
                                   "done"
                                 ]
                               },
+                              "documentName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "documentTemplate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time",
@@ -9115,6 +9449,8 @@
                               "position",
                               "isGate",
                               "category",
+                              "documentName",
+                              "documentTemplate",
                               "createdAt"
                             ],
                             "additionalProperties": false
@@ -9395,6 +9731,18 @@
                               "done"
                             ]
                           },
+                          "documentName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "documentTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -9408,6 +9756,8 @@
                           "position",
                           "isGate",
                           "category",
+                          "documentName",
+                          "documentTemplate",
                           "createdAt"
                         ],
                         "additionalProperties": false
@@ -9468,6 +9818,28 @@
                             "backlog",
                             "active",
                             "done"
+                          ]
+                        },
+                        "documentName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "documentTemplate": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 100000
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         }
                       },
@@ -9536,6 +9908,18 @@
                               "done"
                             ]
                           },
+                          "documentName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "documentTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time",
@@ -9549,6 +9933,8 @@
                           "position",
                           "isGate",
                           "category",
+                          "documentName",
+                          "documentTemplate",
                           "createdAt"
                         ],
                         "additionalProperties": false
@@ -9557,6 +9943,285 @@
                   },
                   "required": [
                     "states"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issues/{issueKey}/documents": {
+      "get": {
+        "operationId": "documents.list",
+        "summary": "The Documents on an Issue",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "issueKey",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "issueId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "currentVersion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "issueId",
+                          "name",
+                          "currentVersion",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "documents"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issues/{issueKey}/documents/{name}": {
+      "get": {
+        "operationId": "documents.get",
+        "summary": "One Document on an Issue, at its current version or an older one",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "issueKey",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "required": true,
+            "name": "name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "issueId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "body": {
+                      "type": "string"
+                    },
+                    "authorMemberId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "issueId",
+                    "name",
+                    "currentVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "version",
+                    "body",
+                    "authorMemberId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "documents.write",
+        "summary": "Write a new version of a Document; older ones stay readable",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "issueKey",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "required": true,
+            "name": "name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "maxLength": 100000
+                  }
+                },
+                "required": [
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "issueId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "body": {
+                      "type": "string"
+                    },
+                    "authorMemberId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "issueId",
+                    "name",
+                    "currentVersion",
+                    "createdAt",
+                    "updatedAt",
+                    "version",
+                    "body",
+                    "authorMemberId"
                   ],
                   "additionalProperties": false
                 }

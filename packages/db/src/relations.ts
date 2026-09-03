@@ -2,6 +2,7 @@ import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, authRelations, session, user, verification } from "./schema/auth.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
+import { document, documentVersion } from "./schema/document.ts";
 import { gateDecision } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
 import { project, team, teamMember, workflowState } from "./schema/project.ts";
@@ -22,6 +23,8 @@ export const tables = {
   workflowState,
   issue,
   gateDecision,
+  document,
+  documentVersion,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -78,6 +81,19 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     parent: r.one.issue({ from: r.issue.parentId, to: r.issue.id }),
     children: r.many.issue({ from: r.issue.id, to: r.issue.parentId }),
     gateDecisions: r.many.gateDecision({ from: r.issue.id, to: r.gateDecision.issueId }),
+    documents: r.many.document({ from: r.issue.id, to: r.document.issueId }),
+  },
+  document: {
+    issue: r.one.issue({ from: r.document.issueId, to: r.issue.id, optional: false }),
+    versions: r.many.documentVersion({ from: r.document.id, to: r.documentVersion.documentId }),
+  },
+  documentVersion: {
+    document: r.one.document({
+      from: r.documentVersion.documentId,
+      to: r.document.id,
+      optional: false,
+    }),
+    author: r.one.member({ from: r.documentVersion.authorMemberId, to: r.member.id }),
   },
   gateDecision: {
     issue: r.one.issue({ from: r.gateDecision.issueId, to: r.issue.id, optional: false }),
