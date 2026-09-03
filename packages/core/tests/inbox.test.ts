@@ -103,13 +103,33 @@ describe("an Issue arriving in a Gate", () => {
       stateId: states.find((s) => s.name === "Done")!.id,
     });
 
-    // Only the creation into the Intent Gate notified. Approving through Spec
-    // and Plan did not, because docs/plans/m1.md lists issue.created,
-    // issue.moved and gate.rejected as the triggers and not gate.approved:
-    // an Issue can reach the Spec Gate with nobody told. Worth revisiting.
+    // Creation put it in Intent, and two of the three approvals landed it in
+    // Spec and then Plan. Approving Plan reaches Build, and the move reaches
+    // Done; neither is a Gate, so neither says anything.
     expect(
       (await asBob.inbox.list({})).notifications.filter((n) => n.kind === "gate_awaiting"),
-    ).toHaveLength(1);
+    ).toHaveLength(3);
+  });
+
+  it("tells everyone again when an approval carries the Issue into the next Gate", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { asAlice, asBob, asCarol } = await workspace(db);
+    await asAlice.issues.create({ projectKey: "DEV", title: "Ship it" });
+
+    // Intent is approved, so the Issue is now in the Spec Gate and needs a
+    // Human again. Nobody would look otherwise.
+    await asAlice.gates.approve({ key: "DEV-1" });
+
+    for (const client of [asBob, asCarol]) {
+      expect(
+        (await client.inbox.list({})).notifications.filter((n) => n.kind === "gate_awaiting"),
+      ).toHaveLength(2);
+    }
+    // The Human who approved it is not told about the Gate they created.
+    expect(
+      (await asAlice.inbox.list({})).notifications.filter((n) => n.kind === "gate_awaiting"),
+    ).toEqual([]);
   });
 });
 

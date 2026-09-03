@@ -60,10 +60,13 @@ async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
   }
 
   // A Gate is a State an Issue cannot leave without a Human, so arriving in one
-  // is everyone's business until somebody decides.
+  // is everyone's business until somebody decides. That includes arriving by
+  // approval: approving Intent lands the Issue in the Spec Gate, which needs a
+  // Human just as much as the one before it.
   if (
     event.kind === "issue.created" ||
     event.kind === "issue.moved" ||
+    event.kind === "gate.approved" ||
     event.kind === "gate.rejected"
   ) {
     if (event.subjectType !== "issue") return [];
