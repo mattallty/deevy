@@ -15,3 +15,4 @@ export type Workspace = typeof import("./schema/workspace.ts").workspace.$inferS
 export type Member = typeof import("./schema/workspace.ts").member.$inferSelect;
 export type User = typeof import("./schema/auth.ts").user.$inferSelect;
 export type Event = typeof import("./schema/event.ts").event.$inferSelect;
+export type AllowlistRule = typeof import("./schema/allowlist.ts").allowlistRule.$inferSelect;

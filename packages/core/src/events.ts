@@ -10,7 +10,14 @@ import { event, type Db, type Event, type Member, type Workspace } from "@deevy/
  * Dotted `<subject>.<verb>`. The union grows one slice at a time; the payload
  * shape each kind carries is documented by the operation that appends it.
  */
-export type EventKind = "workspace.created" | "member.joined";
+export type EventKind =
+  | "workspace.created"
+  | "member.joined"
+  | "member.role_changed"
+  | "member.suspended"
+  | "member.reinstated"
+  | "allowlist.rule_added"
+  | "allowlist.rule_removed";
 
 export type EventPayload = Record<string, unknown>;
 

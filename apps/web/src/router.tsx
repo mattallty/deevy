@@ -1,0 +1,63 @@
+import {
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+  createMemoryHistory,
+} from "@tanstack/react-router";
+import { ProjectsPage } from "./routes/index.tsx";
+import { AllowlistPage } from "./routes/settings/allowlist.tsx";
+import { MembersPage } from "./routes/settings/members.tsx";
+import { AppShell, type ShellProps } from "./routes/shell.tsx";
+
+/**
+ * Routes are declared in code rather than by file convention, so every page is
+ * a plain exported component the SPA tests can render on its own.
+ */
+const rootRoute = createRootRouteWithContext<ShellProps>()({
+  component: function Root() {
+    return <AppShell {...rootRoute.useRouteContext()} />;
+  },
+});
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: ProjectsPage,
+});
+const membersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/members",
+  component: MembersPage,
+});
+const allowlistRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/allowlist",
+  component: AllowlistPage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, membersRoute, allowlistRoute]);
+
+export interface AppRouterOptions {
+  /** Tests drive the routes without a browser URL bar. */
+  memory?: boolean;
+  initialEntries?: string[];
+}
+
+export function createAppRouter(context: ShellProps, options: AppRouterOptions = {}) {
+  const memory = options.memory || options.initialEntries !== undefined;
+  return createRouter({
+    routeTree,
+    context,
+    ...(memory
+      ? { history: createMemoryHistory({ initialEntries: options.initialEntries ?? ["/"] }) }
+      : {}),
+  });
+}
+
+export type AppRouterInstance = ReturnType<typeof createAppRouter>;
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: AppRouterInstance;
+  }
+}

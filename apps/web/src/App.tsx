@@ -1,21 +1,26 @@
+import { RouterProvider } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { authClient } from "./lib/auth.ts";
-import { orpc } from "./lib/orpc.ts";
+import { useMemo } from "react";
+import { Button } from "@/components/ui/button.tsx";
+import { authClient } from "@/lib/auth.ts";
+import { orpc } from "@/lib/orpc.ts";
+import { createAppRouter } from "@/router.tsx";
 
 export default function App() {
   const { data: session, isPending } = authClient.useSession();
-  if (isPending) return <Shell>Loading…</Shell>;
+  if (isPending) return <Centered>Loading…</Centered>;
   if (!session) return <SignedOut />;
   return <SignedIn />;
 }
 
 export function SignedOut() {
   return (
-    <Shell>
-      <h1>deevy</h1>
-      <p>Project management where Humans and Agents collaborate as peers.</p>
-      <button
-        type="button"
+    <Centered>
+      <h1 className="text-3xl font-semibold">deevy</h1>
+      <p className="text-muted-foreground">
+        Project management where Humans and Agents collaborate as peers.
+      </p>
+      <Button
         onClick={() =>
           authClient.signIn.social({
             provider: "github",
@@ -25,44 +30,56 @@ export function SignedOut() {
         }
       >
         Sign in with GitHub
-      </button>
-    </Shell>
+      </Button>
+    </Centered>
   );
 }
 
 function SignedIn() {
   const me = useQuery(orpc.me.get.queryOptions());
-  if (me.isPending) return <Shell>Loading…</Shell>;
-  if (me.isError) return <Shell>Could not load your profile: {me.error.message}</Shell>;
+  const context = {
+    workspaceName: me.data?.workspace?.name ?? "deevy",
+    memberName: me.data?.user.name ?? "",
+  };
+  // The router is built once; its context is refreshed as `me` resolves.
+  const router = useMemo(() => createAppRouter(context), []);
+  router.update({ context });
+
+  if (me.isPending) return <Centered>Loading…</Centered>;
+  if (me.isError) return <Centered>Could not load your profile: {me.error.message}</Centered>;
+
   const { user, member, workspace } = me.data;
+  if (!workspace || !member) return <NotAMember email={user.email} />;
+  if (member.suspendedAt) return <Suspended email={user.email} />;
+  return <RouterProvider router={router} />;
+}
+
+export function NotAMember({ email }: { email: string }) {
   return (
-    <Shell>
-      <header className="row">
-        <strong>{workspace?.name ?? "deevy"}</strong>
-        <span className="spacer" />
-        <span>{user.name}</span>
-        <button type="button" onClick={() => authClient.signOut()}>
-          Sign out
-        </button>
-      </header>
-      {workspace && member ? (
-        <section>
-          <h1>{workspace.name}</h1>
-          <p>
-            You are a {member.role} of this Workspace. It is empty: Projects and Issues arrive with
-            M1.
-          </p>
-        </section>
-      ) : (
-        <section>
-          <h1>Signed in, not yet a Member</h1>
-          <p>
-            {user.email} is not a Member of this Workspace. Ask an admin for an invitation, or set
-            DEEVY_ADMIN_EMAIL to this address before the first sign-in.
-          </p>
-        </section>
-      )}
-    </Shell>
+    <Centered>
+      <h1 className="text-2xl font-semibold">Signed in, not yet a Member</h1>
+      <p className="text-muted-foreground">
+        {email} is not a Member of this Workspace. Ask an admin to add an allowlist rule that
+        matches your email domain or your GitHub organization, then sign in again.
+      </p>
+      <Button variant="outline" onClick={() => authClient.signOut()}>
+        Sign out
+      </Button>
+    </Centered>
+  );
+}
+
+export function Suspended({ email }: { email: string }) {
+  return (
+    <Centered>
+      <h1 className="text-2xl font-semibold">Your membership is suspended</h1>
+      <p className="text-muted-foreground">
+        {email} is a Member of this Workspace but is suspended. An admin can reinstate you.
+      </p>
+      <Button variant="outline" onClick={() => authClient.signOut()}>
+        Sign out
+      </Button>
+    </Centered>
   );
 }
 
@@ -72,6 +89,10 @@ function home(): string {
   return `${window.location.origin}/`;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="shell">{children}</main>;
+function Centered({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-start justify-center gap-4 p-6">
+      {children}
+    </main>
+  );
 }

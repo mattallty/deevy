@@ -12,7 +12,7 @@ import type { Session } from "../auth.ts";
  * procedures directly, so a forced exit costs adapters, not the domain.
  */
 
-export type AuthRule = "public" | "session" | "member";
+export type AuthRule = "public" | "session" | "member" | "admin";
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface AppContext {
@@ -22,7 +22,7 @@ export interface AppContext {
   workspace: Workspace | null;
 }
 
-export type ContextFor<TAuth extends AuthRule> = TAuth extends "member"
+export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"
   ? AppContext & { session: Session; member: Member; workspace: Workspace }
   : TAuth extends "session"
     ? AppContext & { session: Session }
@@ -65,8 +65,14 @@ function authorize(rule: AuthRule) {
   return base.middleware(async ({ context, next }) => {
     if (rule === "public") return next();
     if (!context.session) throw new ORPCError("UNAUTHORIZED");
-    if (rule === "member" && (!context.member || !context.workspace)) {
+    if (rule === "session") return next();
+    // A suspended Member keeps their row so the SPA can say why, but is no
+    // Member as far as the Workspace is concerned (docs/plans/m1.md).
+    if (!context.member || !context.workspace || context.member.suspendedAt) {
       throw new ORPCError("FORBIDDEN", { message: "Not a Member of this Workspace" });
+    }
+    if (rule === "admin" && context.member.role !== "admin") {
+      throw new ORPCError("FORBIDDEN", { message: "Only an admin of this Workspace can do that" });
     }
     return next();
   });
