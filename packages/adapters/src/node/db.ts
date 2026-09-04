@@ -9,6 +9,12 @@ export interface OpenDatabaseOptions {
   path: string;
   /** Folder holding drizzle-kit's generated migrations (packages/db/drizzle). */
   migrationsFolder: string;
+  /**
+   * Told about every statement drizzle runs, migrations included. deevy's own
+   * budget test counts them with it, because on D1 the number of statements
+   * one request runs is a limit rather than a detail (docs/plans/m3.md).
+   */
+  logger?: { logQuery: (query: string, params: unknown[]) => void };
 }
 
 export interface OpenedDatabase {
@@ -21,7 +27,11 @@ export interface OpenedDatabase {
  * applies pending migrations (ADR-0008). Foreign keys are switched off while
  * migrating because table rebuilds would otherwise cascade-delete children.
  */
-export function openDatabase({ path, migrationsFolder }: OpenDatabaseOptions): OpenedDatabase {
+export function openDatabase({
+  path,
+  migrationsFolder,
+  logger,
+}: OpenDatabaseOptions): OpenedDatabase {
   if (!hasMigrations(migrationsFolder)) {
     throw new Error(
       `no migrations found in ${migrationsFolder}; expected drizzle-kit output (<timestamp>_<name>/migration.sql)`,
@@ -30,7 +40,7 @@ export function openDatabase({ path, migrationsFolder }: OpenDatabaseOptions): O
   const client = new DatabaseSync(path);
   if (path !== ":memory:") client.exec("PRAGMA journal_mode = WAL");
   client.exec("PRAGMA foreign_keys = OFF");
-  const db = drizzle({ client, relations });
+  const db = drizzle({ client, relations, ...(logger ? { logger } : {}) });
   const failure = migrate(db, { migrationsFolder });
   if (failure) throw new Error(`migration failed: ${JSON.stringify(failure)}`);
   client.exec("PRAGMA foreign_keys = ON");
