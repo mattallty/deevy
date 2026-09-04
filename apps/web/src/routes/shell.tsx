@@ -32,6 +32,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { NewIssueButton } from "@/components/new-issue";
 import { useQuery } from "@tanstack/react-query";
 import { useLiveEvents } from "@/lib/live";
 import { orpc } from "@/lib/orpc";
@@ -92,6 +93,10 @@ export function AppShell({ workspaceName, memberName }: ShellProps) {
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <span className="flex-1" />
+          {/* In the header rather than on a Project, so it is one click from
+              anywhere and `c` from anywhere (components/new-issue.tsx). */}
+          <NewIssueButton />
+          <Separator orientation="vertical" className="h-4" />
           <span className="text-sm">{memberName}</span>
           <SignOutButton />
         </header>
