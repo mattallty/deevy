@@ -43,6 +43,11 @@ jobs:
       - name: Validate the Worker bundle
         run: vp run web#check:workers
 
+      # The deployed shape, on workerd: bindings and asset routing included,
+      # which no test of createApp can see. `--local` needs no account.
+      - name: The Worker serves deevy
+        run: vp run web#test:workers
+
       - name: Migration SQL guard
         run: vp run db#check:migrations
 

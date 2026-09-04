@@ -47,6 +47,7 @@ an OAuth App created before this slice asks for the extra scope the next time so
 | `vp run -r test`                 | Tests in every package (Vitest through Vite+).                                                              |
 | `vp run -r build`                | `apps/server/dist/index.mjs` (bundled Node server) and `apps/web/dist` (SPA).                               |
 | `vp run web#build:workers`       | The Cloudflare Worker build (`DEEVY_TARGET=workers`), then `vp run web#check:workers` for a dry-run deploy. |
+| `vp run web#test:workers`        | Boots the built Worker on `wrangler dev --local` against a migrated local D1 and drives it over HTTP.       |
 | `vp run db#generate`             | Generate a migration from `packages/db/src/schema` with drizzle-kit. Then run `vp run db#check:migrations`. |
 | `vp run db#generate:auth`        | Regenerate `packages/db/src/schema/auth.ts` from Better Auth's config. Needs the bootstrap step below.      |
 | `vp run core#snapshot:openapi`   | Regenerate `packages/core/openapi.json`; CI fails when it is stale.                                         |
@@ -118,8 +119,8 @@ Every piece of background work is a bounded function in `packages/core/src/work.
 a LIMIT, one batched UPDATE, never a query per row — reached through the `Cron` and `JobQueue` ports in
 `packages/core/src/jobs.ts`. The Node deployment satisfies `Cron` with `createTimerCron()` from
 `@deevy/adapters/node`, and `apps/server/src/runner.ts` starts the schedule beside `serve()` and stops it on
-SIGINT and SIGTERM. It is deliberately not inside `createApp`, which the Cloudflare Worker calls once per
-request; on Workers the same sweep is driven by a Cron Trigger instead.
+SIGINT and SIGTERM. It is deliberately not inside `createApp`, which builds no timer and owns no schedule; on
+Workers the same sweep is driven by a Cron Trigger instead.
 
 | Variable                       | Default | What it does                                                         |
 | ------------------------------ | ------- | -------------------------------------------------------------------- |

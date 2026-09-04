@@ -20,6 +20,7 @@ export default defineConfig({
       {
         files: [
           "apps/server/**",
+          "apps/web/scripts/**",
           "packages/adapters/src/node/**",
           "packages/db/scripts/**",
           "packages/core/scripts/**",
