@@ -22,6 +22,9 @@ export const me = {
     method: "GET",
     path: "/me",
     auth: "session",
+    // An Agent asking who it is: it names itself nowhere else, and the answer
+    // is about the caller rather than the Workspace.
+    agents: true,
     input: NoInput,
     output: z.object({
       user: UserSchema,

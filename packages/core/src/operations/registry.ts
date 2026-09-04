@@ -83,8 +83,11 @@ export interface OperationMeta {
   mcp?: true;
 }
 
-/** `agents` is unsayable on anything but a `member` operation (ADR-0004). */
-export type AgentAccess<TAuth extends AuthRule> = TAuth extends "member"
+/**
+ * `agents` is sayable on the rungs an Agent could reach, and never on `admin`:
+ * ADR-0004's "never administer" is a compile error rather than a test.
+ */
+export type AgentAccess<TAuth extends AuthRule> = TAuth extends "member" | "session"
   ? { agents?: true }
   : { agents?: never };
 
@@ -136,6 +139,19 @@ function authorize(meta: OperationMeta) {
   return base.middleware(async ({ context, next }) => {
     if (rule === "public") return next();
     if (!context.session) throw new ORPCError("UNAUTHORIZED");
+    // These two are about who is asking, not how much authority the operation
+    // wants, so they are checked for every rule above `public`. Returning at
+    // the `session` rung first would make it a side door: an Agent's key would
+    // reach an operation nobody marked for it, and `sessionOnly` would be
+    // quietly ignored on the rung where a Human's own MCP client shows up.
+    if (context.member?.kind === "agent" && !meta.agents) {
+      throw new ORPCError("FORBIDDEN", { message: "An Agent cannot do that" });
+    }
+    if (meta.sessionOnly && context.principal && context.principal.kind !== "cookie") {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Only a Human signed in to deevy can do that",
+      });
+    }
     if (rule === "session") return next();
     // A suspended Member keeps their row so the SPA can say why, but is no
     // Member as far as the Workspace is concerned (docs/plans/m1.md).
@@ -144,14 +160,6 @@ function authorize(meta: OperationMeta) {
     }
     if (rule === "admin" && context.member.role !== "admin") {
       throw new ORPCError("FORBIDDEN", { message: "Only an admin of this Workspace can do that" });
-    }
-    if (context.member.kind === "agent" && !meta.agents) {
-      throw new ORPCError("FORBIDDEN", { message: "An Agent cannot do that" });
-    }
-    if (meta.sessionOnly && context.principal && context.principal.kind !== "cookie") {
-      throw new ORPCError("FORBIDDEN", {
-        message: "Only a Human signed in to deevy can do that",
-      });
     }
     return next();
   });

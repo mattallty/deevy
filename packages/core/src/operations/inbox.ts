@@ -25,11 +25,16 @@ export const inbox = {
       nextCursor: z.number().int().nullable(),
     }),
     handler: async ({ input, context }) => {
+      // A Notification names an Issue and carries it back in full, so the
+      // inbox is a way into a Project as much as issues.get is. An Agent sees
+      // only what its grants cover; a Human is not scoped (docs/plans/m2.md).
+      const granted = context.grantedProjectIds;
       const rows = await context.db.query.notification.findMany({
         where: {
           recipientMemberId: context.member.id,
           ...(input.unreadOnly ? { readAt: { isNull: true } } : {}),
           ...(input.before === undefined ? {} : { eventId: { lt: input.before } }),
+          ...(granted ? { issue: { projectId: { in: granted } } } : {}),
         },
         with: { event: true, issue: { with: issueWith } },
         orderBy: { eventId: "desc" },

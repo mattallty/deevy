@@ -17,7 +17,7 @@ import type { EventKind } from "./events.ts";
 import { deriveNotifications, issueOf, notificationKindOf } from "./notifications.ts";
 import { openStatuses } from "./runs.ts";
 import { postSlackMessage, slackMessage, type FetchLike, type SlackPayload } from "./slack.ts";
-import { postWebhook } from "./webhooks.ts";
+import { deriveWebhookDeliveriesForMany, postWebhook } from "./webhooks.ts";
 
 /**
  * Background work, expressed the only way ADR-0006 allows: a bounded function
@@ -163,7 +163,8 @@ export async function sweepStaleRuns({
   // sweep is the one writer that is not a request; `run.went_stale` derives no
   // Notification, because a Human hears about silence from the Run's own
   // status; and one `appendEvent` per row would make the sweep's cost grow
-  // with the Workspace, which is the one thing it must not do.
+  // with the Workspace, which is the one thing it must not do. Delivery is
+  // still owed, so it is derived in bulk after the insert.
   const projectOf = new Map(due.map((row) => [row.id, row.projectId]));
   const rows = moved.map(({ id }) => ({
     workspaceId,
@@ -172,9 +173,19 @@ export async function sweepStaleRuns({
     subjectId: id,
     projectId: projectOf.get(id) ?? null,
   }));
+  const written: Array<{ seq: number; kind: EventKind; projectId: string | null }> = [];
   for (let at = 0; at < rows.length; at += eventRowsPerInsert) {
-    await db.insert(eventTable).values(rows.slice(at, at + eventRowsPerInsert));
+    const inserted = await db
+      .insert(eventTable)
+      .values(rows.slice(at, at + eventRowsPerInsert))
+      .returning({ seq: eventTable.seq, kind: eventTable.kind, projectId: eventTable.projectId });
+    written.push(...(inserted as typeof written));
   }
+  await deriveWebhookDeliveriesForMany(
+    db,
+    workspaceId,
+    written.map((row) => ({ ...row, workspaceId })),
+  );
 
   return result;
 }
@@ -333,7 +344,8 @@ export async function sweepSchedules({
   // Written straight to the log rather than through `appendEvent`, for the
   // reasons the stale sweep gives: this is not a request, `run.started` derives
   // no Notification and triggers nothing, and one append per row would make the
-  // pass cost the Workspace instead of the limit.
+  // pass cost the Workspace instead of the limit. What it does still owe is
+  // delivery, which is derived in bulk below rather than skipped.
   const rows = runs.map((run) => ({
     workspaceId,
     kind: "run.started" satisfies EventKind,
@@ -342,9 +354,19 @@ export async function sweepSchedules({
     projectId: run.projectId,
     payload: { issueId: run.issueId, trigger: run.trigger, agentMemberId: run.agentMemberId },
   }));
+  const written: Array<{ seq: number; kind: EventKind; projectId: string | null }> = [];
   for (let at = 0; at < rows.length; at += runStartedRowsPerInsert) {
-    await db.insert(eventTable).values(rows.slice(at, at + runStartedRowsPerInsert));
+    const inserted = await db
+      .insert(eventTable)
+      .values(rows.slice(at, at + runStartedRowsPerInsert))
+      .returning({ seq: eventTable.seq, kind: eventTable.kind, projectId: eventTable.projectId });
+    written.push(...(inserted as typeof written));
   }
+  await deriveWebhookDeliveriesForMany(
+    db,
+    workspaceId,
+    written.map((row) => ({ ...row, workspaceId })),
+  );
 
   // Last, and only once the backlog is drained: an interval that stamped itself
   // before the work was done would skip whatever the limit cut off.

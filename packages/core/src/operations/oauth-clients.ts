@@ -38,6 +38,7 @@ export const oauthClients = {
     method: "GET",
     path: "/oauth-clients",
     auth: "session",
+    sessionOnly: true,
     input: NoInput,
     output: z.object({ clients: z.array(ClientView) }),
     handler: async ({ context }) => {
@@ -67,6 +68,7 @@ export const oauthClients = {
     method: "DELETE",
     path: "/oauth-clients/{clientId}",
     auth: "session",
+    sessionOnly: true,
     input: z.object({ clientId: z.string() }),
     output: z.object({ revoked: z.literal(true) }),
     handler: async ({ input, context }) => {

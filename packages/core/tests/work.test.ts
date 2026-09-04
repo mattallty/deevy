@@ -192,7 +192,9 @@ describe("the stale sweep", () => {
     expect(result).toEqual({ scanned: 50, changed: 50, more: true });
     // One indexed SELECT, one batched UPDATE, and the Events in chunks that
     // stay inside D1's hundred bound parameters per statement.
-    expect(statements).toEqual(["select", "update", "insert", "insert", "insert"]);
+    // The trailing select is the subscriptions this sweep owes delivery to:
+    // one read for the pass, not one per Run (webhooks.ts).
+    expect(statements).toEqual(["select", "update", "insert", "insert", "insert", "select"]);
   });
 
   it("costs what the limit says, not what the table holds", async () => {
@@ -203,7 +205,7 @@ describe("the stale sweep", () => {
     const first = await sweepStaleRuns({ db: counted, workspaceId, limit: 10 });
 
     expect(first).toEqual({ scanned: 10, changed: 10, more: true });
-    expect(statements).toEqual(["select", "update", "insert"]);
+    expect(statements).toEqual(["select", "update", "insert", "select"]);
     // `more` means run it again, never raise the limit: one pass has to fit
     // inside a Cloudflare Cron Trigger's CPU budget.
     let passes = 1;
@@ -342,6 +344,11 @@ describe("the schedule sweep", () => {
       "insert",
       "insert",
       "insert",
+      // The subscriptions this pass owes delivery to. One read for the pass,
+      // and no insert after it because this Workspace has none; with
+      // subscriptions the rows are chunked, so the cost still follows the
+      // limit rather than the table (webhooks.ts).
+      "select",
       "update",
     ]);
   });
@@ -358,7 +365,7 @@ describe("the schedule sweep", () => {
     const first = await sweepSchedules({ db: counted, workspaceId, limit: 10 });
 
     expect(first).toEqual({ due: 1, started: 10, more: true });
-    expect(statements).toEqual(["select", "select", "insert", "insert"]);
+    expect(statements).toEqual(["select", "select", "insert", "insert", "select"]);
     // The Agent is deliberately not stamped while the backlog is short of
     // drained: an interval that marked itself done early would skip whatever
     // the limit cut off. The Runs just started are open, so each pass makes
@@ -499,5 +506,47 @@ describe("remindAboutGates", () => {
     const second = await remindAboutGates({ db, workspaceId: ada.workspace.id, now: due });
     expect(second).toMatchObject({ scanned: 0, changed: 0 });
     expect((await asAda.inbox.list({})).notifications.length).toBe(before + 1);
+  });
+});
+
+describe("Events a sweep writes", () => {
+  it("are owed to a subscription like any other, though the sweep skips appendEvent", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const project = await asAda.projects.create({ name: "deevy", key: "DEV" });
+    const agent = await agentContext(db, { sponsor: ada.member, grants: [project.id] });
+    await asAda.webhooks.create({
+      url: "https://runner.example/deevy",
+      secret: "whsec_the_receiver_holds_this",
+    });
+    await asAda.issues.create({ projectKey: "DEV", title: "Nightly" });
+    await asAda.issues.update({ key: "DEV-1", assigneeMemberId: agent.member.id });
+    await db
+      .update(agentTable)
+      .set({ scheduleMinutes: 60 })
+      .where(eq(agentTable.memberId, agent.member.id));
+
+    // Assigning already opened a Run, and an Agent has one open Run per Issue,
+    // so finish it or the schedule correctly finds nothing to do.
+    const asAgent = createRouterClient(router, { context: agent });
+    const opened = await asAgent.runs.list({ issueKey: "DEV-1" });
+    await asAgent.runs.finish({
+      runId: opened.runs[0]?.id ?? "",
+      status: "completed",
+      summary: "done",
+    });
+
+    const before = (await db.query.delivery.findMany({ where: { target: "webhook" } })).length;
+
+    // The schedule trigger writes run.started straight to the log so its cost
+    // follows its limit. That must not make what it writes undeliverable: an
+    // Agent driven by a webhook would simply never hear about a scheduled Run.
+    const swept = await sweepSchedules({ db, workspaceId: ada.workspace.id });
+    expect(swept.started).toBeGreaterThan(0);
+
+    const after = await db.query.delivery.findMany({ where: { target: "webhook" } });
+    expect(after.length).toBe(before + swept.started);
   });
 });
