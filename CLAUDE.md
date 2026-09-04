@@ -12,6 +12,9 @@ M2 (Agents) is next.
 ## Commands
 
 Everything runs through Vite+ (`vp`), a pnpm workspace. If `vp` is not on PATH, `. ~/.config/vite-plus/env`.
+Install with `vp install`, never bare `pnpm install`: the lockfile is pnpm 11's two-document format and
+`vp` resolves the pnpm that `devEngines` pins, while a stray pnpm 10 on PATH calls the lockfile broken and
+then blocks forever on the prompt to wipe `node_modules`. CI runs `vp install --frozen-lockfile`.
 `vp dev`, `vp build`, `vp test`, `vp check` are built-ins that ignore package.json scripts; `vp run <script>`
 runs scripts, `-r` recursively, `pkg#script` for one package (package names are `web`, `server`, `core`, `db`,
 `adapters`).
