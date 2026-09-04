@@ -16,7 +16,10 @@ vp run --parallel dev
 
 `vp run -r --parallel dev` starts two tasks: the Node server on http://localhost:3000 (rebuilt and restarted by
 `vp pack --watch` on every change) and the Vite dev server on http://localhost:5173, which serves the SPA and
-proxies `/api`, `/rpc`, and `/healthz` to the Node server. Open http://localhost:5173.
+proxies `/api`, `/rpc`, `/healthz`, `/mcp` and `/.well-known` to the Node server. Open
+http://localhost:5173. The last two are there so an MCP client can be pointed at the dev origin: discovery has
+to answer from the same origin as the endpoint it describes, or a client looks for the authorization server in
+the wrong place.
 
 The SQLite file lives at `DEEVY_DATABASE_PATH` (default `./data/deevy.sqlite`, relative to `apps/server`) and
 is created and migrated on start.
@@ -78,6 +81,20 @@ request; on Workers the same sweep is driven by a Cron Trigger instead.
 | ------------------------------ | ------- | -------------------------------------------------------------------- |
 | `DEEVY_RUN_STALE_MINUTES`      | 30      | Silence after which a Run goes `stale`. A later Activity revives it. |
 | `DEEVY_SWEEP_INTERVAL_SECONDS` | 60      | How often the runner looks for silent Runs.                          |
+
+## The MCP endpoint
+
+`POST /mcp` is the third surface (ADR-0005), projected from the same operation registry as the HTTP API. It is
+stateless, so there is nothing to keep warm between requests. To try it against the dev server, create an
+Agent under Settings, Agents, grant it a Project, issue a key, then:
+
+```bash
+claude mcp add --transport http deevy http://localhost:3000/mcp --header "Authorization: Bearer <the key>"
+```
+
+Which operations become tools is opt-in: `mcp: true` in the registry. `vp run core#snapshot:mcp-tools` writes
+`packages/core/mcp-tools.json` and CI fails on a stale one, so the tool set an agent sees cannot drift without
+review, and an oRPC bump that reshapes a schema shows up as a diff.
 
 ## Docker
 
