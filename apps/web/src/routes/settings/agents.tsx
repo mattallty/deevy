@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/table";
 import { orpc } from "@/lib/orpc.ts";
 
+/** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
+function mcpEndpoint(): string {
+  return `${window.location.origin}/mcp`;
+}
+
 /** "1 Project", "3 Projects", or the fact that it can see nothing yet. */
 function grantSummary(count: number): string {
   if (count === 0) return "No Projects";
@@ -37,6 +42,18 @@ export function AgentsPage() {
           Every Agent works under its own identity, with exactly one Human accountable for it.
         </p>
       </header>
+
+      <section aria-label="Connect an Agent" className="flex flex-col gap-2 rounded-md border p-4">
+        <h2 className="text-sm font-medium">Connect an Agent</h2>
+        <p className="text-sm text-muted-foreground">
+          An Agent reaches deevy over MCP with the key its Sponsor issued. The endpoint is
+        </p>
+        <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
+        <p className="text-sm text-muted-foreground">and Claude Code adds it with</p>
+        <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
+          {`claude mcp add --transport http deevy ${mcpEndpoint()} --header "Authorization: Bearer <the key>"`}
+        </code>
+      </section>
 
       <Table>
         <TableHeader>

@@ -80,3 +80,13 @@ describe("the Agents settings page", () => {
     await waitFor(() => expect(within(idle).getByText(/no Projects/i)).toBeTruthy());
   });
 });
+
+describe("connecting an Agent over MCP", () => {
+  it("gives the endpoint and a command to paste, so a Sponsor need not guess", async () => {
+    mount(<AgentsPage />);
+
+    const panel = await screen.findByRole("region", { name: /connect an agent/i });
+    expect(within(panel).getByText(`${window.location.origin}/mcp`)).toBeTruthy();
+    expect(within(panel).getByText(/claude mcp add/i).textContent).toContain("--transport http");
+  });
+});

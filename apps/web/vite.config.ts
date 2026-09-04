@@ -31,6 +31,11 @@ export default defineConfig({
       "/api": "http://localhost:3000",
       "/rpc": "http://localhost:3000",
       "/healthz": "http://localhost:3000",
+      // An MCP client pointed at the dev origin has to reach the server, and
+      // discovery has to answer from the same origin as the endpoint it
+      // describes, or the OAuth dance in slice 7 looks at the wrong server.
+      "/mcp": "http://localhost:3000",
+      "/.well-known": "http://localhost:3000",
     },
   },
   test: {
