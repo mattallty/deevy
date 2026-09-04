@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { issue } from "./issue.ts";
 import { workflowState } from "./project.ts";
 import { member } from "./workspace.ts";
@@ -29,4 +29,26 @@ export const gateDecision = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
   },
   (table) => [index("gate_decision_issueId_idx").on(table.issueId, table.createdAt)],
+);
+
+/**
+ * The Humans a Gate names. Empty means any Human may decide it, which is what
+ * M1 shipped; naming approvers narrows both who may approve and who is asked
+ * (docs/plans/m1.md deferred this to M2, "where Runs make them matter").
+ */
+export const gateApprover = sqliteTable(
+  "gate_approver",
+  {
+    stateId: text("state_id")
+      .notNull()
+      .references(() => workflowState.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => member.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.stateId, table.memberId] }),
+    index("gate_approver_memberId_idx").on(table.memberId),
+  ],
 );

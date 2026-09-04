@@ -11,7 +11,7 @@ import { comment } from "./schema/comment.ts";
 import { notification } from "./schema/notification.ts";
 import { issueLink, repository } from "./schema/repository.ts";
 import { document, documentVersion } from "./schema/document.ts";
-import { gateDecision } from "./schema/gate.ts";
+import { gateApprover, gateDecision } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
 import { issueLabel, label } from "./schema/label.ts";
 import { project, team, teamMember, workflowState } from "./schema/project.ts";
@@ -50,6 +50,7 @@ export const tables = {
   notificationPreference,
   delivery,
   webhookSubscription,
+  gateApprover,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -139,6 +140,14 @@ const appRelations = defineRelationsPart(tables, (r) => ({
   },
   activity: {
     run: r.one.run({ from: r.activity.runId, to: r.run.id, optional: false }),
+  },
+  gateApprover: {
+    state: r.one.workflowState({
+      from: r.gateApprover.stateId,
+      to: r.workflowState.id,
+      optional: false,
+    }),
+    member: r.one.member({ from: r.gateApprover.memberId, to: r.member.id, optional: false }),
   },
   channel: {
     workspace: r.one.workspace({
