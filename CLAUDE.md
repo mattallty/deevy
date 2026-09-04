@@ -7,7 +7,8 @@ vocabulary in [CONTEXT.md](CONTEXT.md) (Member, Human, Agent, Sponsor, Workspace
 code, API names, and UI copy; it lists the words to avoid. Hard-to-reverse choices live in `docs/adr`, the
 milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`, running the image in
 `docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen slices from `docs/plans/m1.md`;
-M2 (Agents) is next.
+M2 (Agents) done, in nine slices from `docs/plans/m2.md`, with a worked agent loop in `docs/agent-loop.md`;
+M3 (Workers) is next.
 
 ## Commands
 

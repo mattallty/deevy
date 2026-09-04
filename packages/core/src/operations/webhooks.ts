@@ -10,6 +10,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation, type ContextFor } from "./registry.ts";
+import { SubscriptionSecret, SubscriptionUrl } from "./shared.ts";
 
 /**
  * Webhook subscriptions: the URLs deevy tells when something happens, which is
@@ -65,13 +66,7 @@ function hostOf(url: string): string | null {
 }
 
 /** An http URL would put deevy's signed POSTs, and the Workspace's Events, on the wire. */
-const SubscriptionUrl = z.url().max(2048).startsWith("https://");
-
-/**
- * Long enough that guessing it is not a way in. It is never read back, so a
- * Human who loses it sets another rather than being shown this one.
- */
-const Secret = z.string().min(16).max(200);
+const Secret = SubscriptionSecret;
 
 /** Exact kinds, or a family: `run.*` is every kind of Event a Run appends (webhooks.ts). */
 const Kinds = z

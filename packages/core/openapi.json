@@ -3066,12 +3066,18 @@
                       {
                         "type": "string",
                         "maxLength": 2048,
-                        "format": "uri"
+                        "format": "uri",
+                        "pattern": "^https:\\/\\/.*"
                       },
                       {
                         "type": "null"
                       }
                     ]
+                  },
+                  "webhookSecret": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 200
                   },
                   "scheduleMinutes": {
                     "anyOf": [

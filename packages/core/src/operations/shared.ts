@@ -403,3 +403,16 @@ export function assertOwnRun(context: ContextFor<"member">, run: Run): void {
     throw new ORPCError("FORBIDDEN", { message: "This Run belongs to another Agent" });
   }
 }
+
+/**
+ * deevy signs what it POSTs, which is worth nothing over cleartext: an Event
+ * body and its signature on the wire is the Workspace on the wire. Every route
+ * that writes a webhook_subscription uses this, so there is no second door.
+ */
+export const SubscriptionUrl = z.url().max(2048).startsWith("https://");
+
+/**
+ * Long enough that guessing it is not a way in. It is never read back, so a
+ * Human who loses it sets another rather than being shown this one.
+ */
+export const SubscriptionSecret = z.string().min(16).max(200);

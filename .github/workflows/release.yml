@@ -1,11 +1,11 @@
 name: Release
 
-# A v0.1.x tag publishes the image. CI's own checks run on main and on pull
-# requests; this workflow re-runs them so a tag can never publish something
-# that does not build.
+# A v0.1.x or v0.2.x tag publishes the image: M1's series and M2's. CI's own
+# checks run on main and on pull requests; this workflow re-runs them so a tag
+# can never publish something that does not build.
 on:
   push:
-    tags: ["v0.1.*"]
+    tags: ["v0.1.*", "v0.2.*"]
 
 permissions:
   contents: read

@@ -379,6 +379,24 @@
     }
   },
   {
+    "name": "runs_get",
+    "operation": "runs.get",
+    "summary": "One Run with its Activity feed in the order it happened",
+    "readOnly": true,
+    "agents": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    }
+  },
+  {
     "name": "runs_list",
     "operation": "runs.list",
     "summary": "Runs on an Issue or by an Agent, newest first, from a cursor",

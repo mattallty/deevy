@@ -21,10 +21,14 @@ and agents, and between agents and agents.
 
 ## Status
 
-M0 scaffold: a Human can sign in with GitHub and see an empty Workspace. The vocabulary is in
-[CONTEXT.md](./CONTEXT.md), the hard-to-reverse decisions in [docs/adr](./docs/adr), the v1 plan in
-[docs/PLAN.md](./docs/PLAN.md), the research that informed them in [docs/research](./docs/research), and how to
-run it in [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md).
+M2 done: a team runs its work in deevy on the Docker image, and an agent loop outside it works an Issue over
+MCP as a Member of its own — reading the Issue, writing the plan Document, stopping at a Gate for a Human, and
+finishing with a Run summary. M3 puts the same thing on Cloudflare Workers.
+
+The vocabulary is in [CONTEXT.md](./CONTEXT.md), the hard-to-reverse decisions in [docs/adr](./docs/adr), the
+v1 plan in [docs/PLAN.md](./docs/PLAN.md), the research that informed them in [docs/research](./docs/research),
+how to run it in [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) and [docs/OPERATIONS.md](./docs/OPERATIONS.md),
+and a worked agent loop in [docs/agent-loop.md](./docs/agent-loop.md).
 
 ## License
 
