@@ -7,14 +7,21 @@
  * own: what it tests is the deployed shape, bindings and asset routing
  * included, which a unit test of anything the Worker calls cannot see.
  *
- * Three phases, three servers, over one build and one D1. The first serves
+ * Four phases, four servers, over one build and one D1. The first serves
  * deevy on a configured origin the request did not arrive on, which is how it
  * proves the bindings reached the app. The second signs a Human in, and a
  * sign-in needs BETTER_AUTH_URL to be the origin the browser is on — so it
  * picks its port first, and takes the stubbed GitHub with it. The third fires
  * the Cron Trigger by hand and watches the background work happen on D1, and
- * it signs in too, because what it reads back it reads over the API.
+ * it signs in too, because what it reads back it reads over the API. The
+ * fourth watches the Event log the way the SPA does, over a stream short
+ * enough to end while the smoke is looking at it.
  */
+import type { AppRouter } from "@deevy/core";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { RouterClient } from "@orpc/server";
+import { STREAM_POLL_MS } from "../src/env.ts";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -404,6 +411,184 @@ async function backgroundWorkOnACronTrigger(origin: string): Promise<void> {
   );
 }
 
+/**
+ * How long a stream lives in the fourth phase. The deployed default is a
+ * minute; this is short enough that a stream reaching its limit is something a
+ * smoke run can wait for, and still several polls long.
+ */
+const streamSeconds = 8;
+
+/** One message an Event stream delivered, narrowed to what this script reads. */
+interface WatchedMessage {
+  type: string;
+  cursor?: number | null;
+  event?: { seq: number; kind: string };
+}
+
+/**
+ * One browser watching the Event log, over the RPC surface and the client the
+ * SPA itself uses: `useLiveEvents` calls exactly this (apps/web/src/lib/live.ts).
+ */
+interface Watcher {
+  /** Every message the stream has delivered, in order. */
+  messages: WatchedMessage[];
+  /** Set when the stream ended of its own accord rather than being cut off. */
+  ended: boolean;
+  /** What the stream threw, if it threw. */
+  failure: unknown;
+  stop(): void;
+}
+
+function watch(origin: string, cookie: string, after?: number): Watcher {
+  const controller = new AbortController();
+  const link = new RPCLink({ origin, url: "/rpc", headers: { cookie } });
+  const client: RouterClient<AppRouter> = createORPCClient(link);
+  const watcher: Watcher = {
+    messages: [],
+    ended: false,
+    failure: undefined,
+    stop: () => {
+      controller.abort();
+    },
+  };
+  void (async () => {
+    const stream = await client.events.subscribe(after === undefined ? {} : { after }, {
+      signal: controller.signal,
+    });
+    for await (const message of stream) watcher.messages.push(message);
+    watcher.ended = true;
+  })().catch((error: unknown) => {
+    watcher.failure = error;
+  });
+  return watcher;
+}
+
+/**
+ * A thrown value as something a failing smoke can be read from. `String` on an
+ * `unknown` is how a stream failure becomes '[object Object]' in the one line
+ * that was supposed to explain it.
+ */
+function describeFailure(value: unknown): string {
+  if (value instanceof Error) return `${value.name}: ${value.message}`;
+  return JSON.stringify(value) ?? "nothing";
+}
+
+/** Waits for something to become true, and says whether it did. */
+async function until(what: () => boolean, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (!what() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return what();
+}
+
+/** The kinds of Event a watcher has been handed, in order. */
+function kindsSeenBy(watcher: Watcher): string[] {
+  return watcher.messages.flatMap((message) => (message.event ? [message.event.kind] : []));
+}
+
+/** One call that has to work for the phase to mean anything. */
+async function must(
+  origin: string,
+  procedure: string,
+  input: unknown,
+  cookie: string,
+): Promise<Record<string, unknown>> {
+  const response = await rpc(origin, procedure, input, cookie);
+  if (response.status !== 200) {
+    throw new Error(`${procedure} was ${String(response.status)}: ${response.body.slice(0, 300)}`);
+  }
+  return (response.output ?? {}) as Record<string, unknown>;
+}
+
+/** Slice 7: the board updates itself on Workers, and a stream that ends says where it got to. */
+async function liveUpdatesInsideAWorkersBudget(origin: string): Promise<void> {
+  const admin = await signIn(origin, adminEmail);
+  if (admin.cookie.length === 0) throw new Error(`the admin could not sign in: ${admin.location}`);
+
+  // An Issue somewhere it can be moved from. The default Workflow opens with
+  // three Gates, and an Issue only leaves a Gate by being approved through it,
+  // so three approvals put it in Build, which is nobody's Gate.
+  const project = await must(origin, "projects/create", { name: "Live", key: "LIV" }, admin.cookie);
+  const states = (project.states ?? []) as Array<{ id: string; name: string }>;
+  const issue = await must(
+    origin,
+    "issues/create",
+    { projectKey: "LIV", title: "Watch me move" },
+    admin.cookie,
+  );
+  const key = String(issue.key);
+  for (const _ of ["Intent", "Spec", "Plan"]) {
+    await must(origin, "gates/approve", { key }, admin.cookie);
+  }
+  const review = states.find((state) => state.name === "Review");
+  if (!review)
+    throw new Error(`the default Workflow has no Review State: ${JSON.stringify(states)}`);
+
+  // Two browsers, both watching, neither told anything by the other.
+  const first = watch(origin, admin.cookie);
+  const second = watch(origin, admin.cookie);
+  const opened = await until(
+    () => first.messages.length > 0 && second.messages.length > 0,
+    streamSeconds * 1000,
+  );
+  if (!opened) {
+    throw new Error(
+      `the streams never opened: ${describeFailure(first.failure ?? second.failure)}`,
+    );
+  }
+
+  await must(origin, "issues/move", { key, stateId: review.id }, admin.cookie);
+  const bothSaw = await until(
+    () => kindsSeenBy(first).includes("issue.moved") && kindsSeenBy(second).includes("issue.moved"),
+    // One poll, and a second one's worth of slack for a loaded machine.
+    2 * STREAM_POLL_MS,
+  );
+  check(
+    "two browsers watching the same Workspace both see an Issue move",
+    bothSaw,
+    `one saw ${kindsSeenBy(first).join(",") || "nothing"} and the other ${kindsSeenBy(second).join(",") || "nothing"}`,
+  );
+
+  // The stream the platform would otherwise cut off ends itself instead, and
+  // the last thing it says is where the next one should start.
+  const endedOnPurpose = await until(() => first.ended, streamSeconds * 1000 + 2 * STREAM_POLL_MS);
+  const last = first.messages.at(-1);
+  check(
+    "a stream past its limit ends itself, signing off with its cursor",
+    endedOnPurpose && last?.type === "heartbeat" && typeof last.cursor === "number",
+    `ended ${String(first.ended)}, last message ${JSON.stringify(last)}${
+      first.failure ? `, failed with ${describeFailure(first.failure)}` : ""
+    }`,
+  );
+  second.stop();
+
+  // What the SPA does next, and the only thing that makes the end invisible:
+  // resume from that cursor, and the Event that happened in between is there.
+  const cursor = typeof last?.cursor === "number" ? last.cursor : 0;
+  const missed = await must(
+    origin,
+    "issues/create",
+    { projectKey: "LIV", title: "Appended while nobody was watching" },
+    admin.cookie,
+  );
+  const resumed = watch(origin, admin.cookie, cursor);
+  const caughtUp = await until(
+    () => kindsSeenBy(resumed).includes("issue.created"),
+    2 * STREAM_POLL_MS,
+  );
+  check(
+    "the stream that follows it resumes from that cursor and misses nothing",
+    // Exactly what the first stream did not deliver: the Event appended after
+    // it ended, and not the move it had already handed over.
+    caughtUp && !kindsSeenBy(resumed).includes("issue.moved"),
+    `${String(missed.key)} was not delivered; from ${String(cursor)} the stream saw ${
+      kindsSeenBy(resumed).join(",") || "nothing"
+    }`,
+  );
+  resumed.stop();
+}
+
 const failures: string[] = [];
 function check(name: string, ok: boolean, detail = ""): void {
   if (ok) console.log(`  ok  ${name}`);
@@ -666,6 +851,28 @@ try {
       },
     },
     backgroundWorkOnACronTrigger,
+  );
+
+  // The Event log as the SPA reads it, on a stream short enough to reach its
+  // limit while the smoke is watching. Its own server for the same reason the
+  // others have theirs: a sign-in needs BETTER_AUTH_URL to name the origin.
+  const livePort = await freePort();
+  await withServer(
+    persistTo,
+    {
+      config: await stubbedGitHub(),
+      port: livePort,
+      vars: {
+        BETTER_AUTH_URL: `http://127.0.0.1:${String(livePort)}`,
+        BETTER_AUTH_SECRET: "smoke-secret-that-is-at-least-32-characters",
+        GITHUB_CLIENT_ID: "stub-client-id",
+        GITHUB_CLIENT_SECRET: "stub-client-secret",
+        DEEVY_ADMIN_EMAIL: adminEmail,
+        DEEVY_WORKSPACE_NAME: "Flippable",
+        DEEVY_STREAM_SECONDS: String(streamSeconds),
+      },
+    },
+    liveUpdatesInsideAWorkersBudget,
   );
 } finally {
   await rm(persistTo, { recursive: true, force: true });

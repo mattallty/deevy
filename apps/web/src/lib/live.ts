@@ -19,6 +19,15 @@ export function useLiveEvents(enabled: boolean) {
     async function run() {
       // Reconnect from the last seq seen, so a drop costs nothing.
       while (!stopped) {
+        // A stream that ends of its own accord is not a failure. On Workers
+        // every stream does: it spends its query budget and signs off with a
+        // heartbeat carrying the cursor it reached, so the next one resumes
+        // exactly and the board is one poll behind rather than two seconds
+        // behind (docs/plans/m3.md slice 7). A stream that ends having said
+        // nothing at all is a different thing — nothing to resume from, and
+        // reconnecting at once would be a hot loop — so it waits like a
+        // failure does.
+        let delivered = 0;
         try {
           const stream = await client.events.subscribe(
             { after: cursor.current },
@@ -26,6 +35,7 @@ export function useLiveEvents(enabled: boolean) {
           );
           for await (const message of stream) {
             if (stopped) return;
+            delivered += 1;
             if (message.type === "heartbeat") {
               cursor.current = message.cursor ?? cursor.current;
               continue;
@@ -33,10 +43,11 @@ export function useLiveEvents(enabled: boolean) {
             cursor.current = message.event.seq;
             await invalidateFor(message.event);
           }
+          if (delivered > 0) continue;
         } catch {
           if (stopped) return;
         }
-        // The stream ended or failed; wait a moment before trying again.
+        // The stream failed, or ended before it said anything; wait a moment.
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }

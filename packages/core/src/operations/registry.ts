@@ -4,6 +4,7 @@ import { openapi } from "@orpc/openapi";
 import { defineMeta, ORPCError, os } from "@orpc/server";
 import { z } from "zod";
 import type { Session } from "../auth.ts";
+import type { LiveOptions } from "../live.ts";
 
 /**
  * The operation registry (ADR-0009). Every API operation is described by this
@@ -43,6 +44,12 @@ export interface AppContext {
    * back into deevy. Absent leaves those links site-relative.
    */
   baseURL?: string;
+  /**
+   * How long an Event stream may run on this runtime, and how often it looks.
+   * The entry decides: a Node process holds a connection for as long as the
+   * browser does, a Worker cannot (docs/plans/m3.md).
+   */
+  live?: LiveOptions;
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"
