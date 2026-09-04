@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Tags,
   Users,
+  Bot,
   UsersRound,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -50,6 +51,7 @@ const settings: NavItem[] = [
   { to: "/settings/labels", label: "Labels", icon: Tags },
   { to: "/settings/repositories", label: "Repositories", icon: GitBranch },
   { to: "/settings/members", label: "Members", icon: Users },
+  { to: "/settings/agents", label: "Agents", icon: Bot },
   { to: "/settings/allowlist", label: "Allowlist", icon: ShieldCheck },
 ];
 

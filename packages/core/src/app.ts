@@ -1,13 +1,16 @@
-import type { Db } from "@deevy/db";
+import { projectGrant, type Db } from "@deevy/db";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferenceHandlerPlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { CORSHandlerPlugin } from "@orpc/server/plugins";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Auth } from "./auth.ts";
 import { generateSpec } from "./openapi.ts";
+import { betterAuthKeys } from "./keys.ts";
+import { resolvePrincipal } from "./principal.ts";
 import { router } from "./operations/index.ts";
 import type { AppContext } from "./operations/registry.ts";
 
@@ -81,14 +84,46 @@ export function createApp({ db, auth, origin = [], onError: report = console.err
 
 export type App = ReturnType<typeof createApp>;
 
-async function buildContext(db: Db, auth: Auth | undefined, headers: Headers): Promise<AppContext> {
-  const session = auth ? await auth.api.getSession({ headers }) : null;
-  if (!session) return { db, session: null, member: null, workspace: null };
+/**
+ * The context every operation sees: how the caller authenticated, the Member
+ * row behind that credential, and, for an Agent, the Projects it may see.
+ */
+export async function buildContext(
+  db: Db,
+  auth: Auth | undefined,
+  headers: Headers,
+): Promise<AppContext> {
+  const { principal, session } = await resolvePrincipal({ auth, headers });
+  // An instance without auth cannot mint keys; apiKeysOf turns that into a
+  // NOT_IMPLEMENTED rather than a caller's mistake (keys.ts).
+  const base = {
+    db,
+    principal,
+    grantedProjectIds: null,
+    ...(auth ? { apiKeys: betterAuthKeys(auth, db) } : {}),
+  };
+  if (!session) return { ...base, session: null, member: null, workspace: null };
   const found = await db.query.member.findFirst({
     where: { userId: session.user.id },
     with: { workspace: true },
   });
-  if (!found) return { db, session, member: null, workspace: null };
+  if (!found) return { ...base, session, member: null, workspace: null };
   const { workspace, ...member } = found;
-  return { db, session, member, workspace };
+  return {
+    ...base,
+    session,
+    member,
+    workspace,
+    // A Human is not scoped in v1, so null means every Project and costs no
+    // query; only an Agent pays for its grants (docs/plans/m2.md).
+    grantedProjectIds: member.kind === "agent" ? await grantedProjectIds(db, member.id) : null,
+  };
+}
+
+async function grantedProjectIds(db: Db, memberId: string): Promise<string[]> {
+  const rows = await db
+    .select({ projectId: projectGrant.projectId })
+    .from(projectGrant)
+    .where(eq(projectGrant.memberId, memberId));
+  return rows.map((row) => row.projectId);
 }

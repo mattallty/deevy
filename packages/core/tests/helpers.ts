@@ -4,6 +4,7 @@ import { agent, member, projectGrant, user, workspace } from "@deevy/db";
 import { openDatabase } from "@deevy/adapters/node";
 import type { Session } from "../src/auth.ts";
 import type { AppContext } from "../src/operations/registry.ts";
+import type { ApiKeys, ApiKeySummary } from "../src/keys.ts";
 
 export const migrationsFolder = new URL("../../db/drizzle", import.meta.url).pathname;
 
@@ -111,4 +112,47 @@ export async function agentContext(
   }
   const row = (await db.query.member.findFirst({ where: { id: context.member.id } })) as Member;
   return { ...contextFor(db, row, context.workspace), grantedProjectIds: options.grants ?? [] };
+}
+
+export interface FakeApiKeys extends ApiKeys {
+  /** Every key this store has minted, plaintext included, for a test to compare against. */
+  issued: Array<{ userId: string; name: string; plaintext: string }>;
+}
+
+/**
+ * A store the `agents.keys.*` operations can talk to while the Better Auth
+ * `apiKey` plugin is not wired in behind the seam (packages/core/src/keys.ts).
+ */
+export function fakeApiKeys(): FakeApiKeys {
+  const rows = new Map<string, ApiKeySummary & { userId: string }>();
+  const issued: FakeApiKeys["issued"] = [];
+  return {
+    issued,
+    async issue({ userId, name }) {
+      const id = `key-${rows.size + 1}`;
+      const plaintext = `deevy_sk_${id}_secret`;
+      const summary = {
+        id,
+        userId,
+        name,
+        start: plaintext.slice(0, 12),
+        createdAt: new Date(),
+        lastRequestAt: null,
+        expiresAt: null,
+        enabled: true,
+      };
+      rows.set(id, summary);
+      issued.push({ userId, name, plaintext });
+      return { ...summary, key: plaintext };
+    },
+    async list({ userId }) {
+      return [...rows.values()].filter((row) => row.userId === userId);
+    },
+    async revoke({ userId, keyId }) {
+      const found = rows.get(keyId);
+      if (!found || found.userId !== userId) return false;
+      rows.delete(keyId);
+      return true;
+    },
+  };
 }

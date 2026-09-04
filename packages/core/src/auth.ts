@@ -1,3 +1,4 @@
+import { apiKey } from "@better-auth/api-key";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { allowlistRule, member, workspace, type Db } from "@deevy/db";
 import { eq } from "drizzle-orm";
@@ -35,6 +36,7 @@ export function createAuth({ db, env }: CreateAuthOptions) {
     trustedOrigins: env.trustedOrigins,
     database: drizzleAdapter(db, { provider: "sqlite" }),
     emailAndPassword: { enabled: false },
+    plugins: apiKeyPlugins(),
     socialProviders: {
       github: {
         clientId: env.github.clientId,
@@ -76,6 +78,43 @@ export function createAuth({ db, env }: CreateAuthOptions) {
       },
     },
   });
+}
+
+/** The prefix every deevy API key carries, and the discriminator resolvePrincipal reads. */
+export const apiKeyPrefix = "deevy_sk_";
+
+/**
+ * How an Agent authenticates (ADR-0007). The plugin's default header is
+ * x-api-key; MCP clients send a bearer, and so does curl, so the key is read
+ * from Authorization instead. Rate limiting is off: it would silently 429 an
+ * agent loop, and rate limits belong at the edge (docs/plans/m2.md). Mirrored
+ * in packages/db/auth.generate.config.ts, which the schema generator reads.
+ */
+export function apiKeyPlugins() {
+  return [
+    apiKey({
+      defaultPrefix: apiKeyPrefix,
+      rateLimit: { enabled: false },
+      customAPIKeyGetter: (ctx) => bearerApiKey(ctx.headers),
+    }),
+  ];
+}
+
+/** The Authorization bearer of a request, whatever kind of credential it is. */
+export function bearerToken(headers: Headers | undefined): string | null {
+  const [scheme, token] = (headers?.get("authorization") ?? "").split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) return null;
+  return token;
+}
+
+/**
+ * The bearer, only when it is a deevy API key. A Human MCP client's OAuth
+ * access token arrives on the same header, and the plugin must not try to look
+ * it up as a key.
+ */
+export function bearerApiKey(headers: Headers | undefined): string | null {
+  const token = bearerToken(headers);
+  return token?.startsWith(apiKeyPrefix) ? token : null;
 }
 
 /**

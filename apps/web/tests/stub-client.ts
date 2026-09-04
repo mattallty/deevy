@@ -4,7 +4,12 @@
  * so the defaults answer everything with something empty and a test overrides
  * only what it asserts on.
  */
-type StubOperation = (input: never) => unknown;
+type StubCall = (input: never) => unknown;
+/**
+ * One operation, or a nested namespace of them: `agents.keys.issue` is two
+ * levels deep, and an override replaces such a namespace whole.
+ */
+type StubOperation = StubCall | Record<string, StubCall>;
 
 export interface StubOverrides {
   [namespace: string]: Record<string, StubOperation> | undefined;
@@ -43,6 +48,24 @@ export function stubClient(overrides: StubOverrides = {}): never {
       updateRole: async () => ({}),
       suspend: async () => ({}),
       reinstate: async () => ({}),
+    },
+    agents: {
+      list: async () => ({ agents: [] }),
+      create: async () => ({}),
+      update: async () => ({}),
+      setSponsor: async () => ({}),
+      suspend: async () => ({}),
+      reinstate: async () => ({}),
+      keys: {
+        list: async () => ({ keys: [] }),
+        issue: async () => ({ id: "stub-key", key: "deevy_sk_stub", name: "stub" }),
+        revoke: async () => ({ revoked: true }),
+      },
+      grants: {
+        list: async () => ({ projects: [] }),
+        add: async () => ({ projects: [] }),
+        remove: async () => ({ projects: [] }),
+      },
     },
     teams: {
       list: async () => ({ teams: [] }),
@@ -123,7 +146,10 @@ export function stubClient(overrides: StubOverrides = {}): never {
     events: {
       list: async () => ({ events: [], nextCursor: null }),
       // Stays open the way the real stream does, so the live hook does not spin.
+      // It never yields on purpose: the test wants a stream that is connected
+      // and silent, which is what the real one looks like between Events.
       subscribe: async () =>
+        // eslint-disable-next-line require-yield
         (async function* () {
           await new Promise(() => {});
         })(),

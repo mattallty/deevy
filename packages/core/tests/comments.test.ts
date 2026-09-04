@@ -51,8 +51,11 @@ describe("comments.create", () => {
     expect(comment.authorMemberId).toBe(admin.member.id);
     const page = await client.events.list({ subjectType: "issue" });
     const created = page.events.findLast((e) => e.kind === "comment.created");
-    const mentioned = (created?.payload as { mentionedMemberIds: string[] }).mentionedMemberIds;
-    expect([...mentioned].sort()).toEqual([bob.member.id, carol.member.id].sort());
+    expect(created).toBeDefined();
+    const mentioned = (created?.payload as { mentionedMemberIds: string[] } | undefined)
+      ?.mentionedMemberIds;
+    expect(mentioned).toBeDefined();
+    expect([...(mentioned ?? [])].sort()).toEqual([bob.member.id, carol.member.id].sort());
   });
 
   it("mentions nobody when no handle matches", async () => {
@@ -64,7 +67,10 @@ describe("comments.create", () => {
 
     const page = await client.events.list({ subjectType: "issue" });
     const created = page.events.findLast((e) => e.kind === "comment.created");
-    expect((created?.payload as { mentionedMemberIds: string[] }).mentionedMemberIds).toEqual([]);
+    expect(created).toBeDefined();
+    expect(
+      (created?.payload as { mentionedMemberIds: string[] } | undefined)?.mentionedMemberIds,
+    ).toEqual([]);
   });
 });
 

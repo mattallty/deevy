@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
 import type { OperationMeta } from "../src/operations/registry.ts";
 import { getOperationMeta } from "../src/operations/registry.ts";
-import { agentContext, memberContext, testDb } from "./helpers.ts";
+import { agentContext, fakeApiKeys, memberContext, testDb } from "./helpers.ts";
 
 /** Every operation in the router, as the registry describes it. */
 function operations(node: unknown, found: OperationMeta[] = []): OperationMeta[] {
@@ -115,5 +115,336 @@ describe("Gate decisions", () => {
     expect(await asAdmin.gates.approve({ key: "DEV-1" })).toMatchObject({
       state: { name: "Spec" },
     });
+  });
+});
+
+describe("agents.create", () => {
+  it("makes the Human who creates an Agent its Sponsor", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    const row = await db.query.member.findFirst({
+      where: { id: created.id },
+      with: { user: true, agent: true },
+    });
+    expect(row).toMatchObject({
+      kind: "agent",
+      handle: "planner",
+      sponsorId: ada.member.id,
+      user: { name: "Planner", kind: "agent" },
+    });
+    expect(row?.agent).toBeTruthy();
+  });
+
+  it("suffixes a handle that a Member or a Team already answers to", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    await asAda.teams.create({ name: "Planner", handle: "planner" });
+
+    const first = await asAda.agents.create({ name: "Planner" });
+    const second = await asAda.agents.create({ name: "Planner" });
+
+    expect([first.handle, second.handle]).toEqual(["planner-2", "planner-3"]);
+    const taken = await db.query.member.findMany({ where: { kind: "agent" } });
+    expect(new Set(taken.map((row) => row.handle)).size).toBe(2);
+  });
+
+  it("appends one agent.created Event with the Agent as its subject", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    const events = await db.query.event.findMany({ orderBy: { seq: "asc" } });
+    expect(events.filter((row) => row.kind === "agent.created")).toMatchObject([
+      {
+        actorMemberId: ada.member.id,
+        subjectType: "member",
+        subjectId: created.id,
+        payload: { handle: "planner", name: "Planner" },
+      },
+    ]);
+  });
+});
+
+describe("agents.list", () => {
+  it("shows every Agent with its Sponsor, its status and its grants", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const dev = await asAda.projects.create({ key: "DEV", name: "deevy" });
+    await asAda.agents.create({ name: "Planner" });
+    const second = await agentContext(db, {
+      sponsor: ada.member,
+      name: "Builder",
+      grants: [dev.id],
+    });
+
+    const { agents } = await asAda.agents.list({});
+
+    expect(agents.map((row) => row.user.name)).toEqual(["Planner", "Builder"]);
+    expect(agents[1]).toMatchObject({
+      id: second.member.id,
+      sponsor: { id: ada.member.id },
+      suspendedAt: null,
+      webhookUrl: null,
+      grantedProjectIds: [dev.id],
+    });
+  });
+});
+
+describe("agents.update", () => {
+  it("lets the Sponsor rename its Agent and set where deevy delivers to it", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    await asAda.agents.update({
+      memberId: created.id,
+      name: "Plan Writer",
+      handle: "plan-writer",
+      webhookUrl: "https://example.test/hook",
+    });
+
+    const row = await db.query.member.findFirst({
+      where: { id: created.id },
+      with: { user: true, agent: true },
+    });
+    expect(row).toMatchObject({
+      handle: "plan-writer",
+      user: { name: "Plan Writer" },
+      agent: { webhookUrl: "https://example.test/hook" },
+    });
+    const kinds = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).map((e) => e.kind);
+    expect(kinds.filter((kind) => kind === "agent.updated")).toEqual(["agent.updated"]);
+  });
+
+  it("refuses a Human who neither sponsors the Agent nor administers the Workspace", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob" });
+    const created = await createRouterClient(router, { context: ada }).agents.create({
+      name: "Planner",
+    });
+
+    const asBob = createRouterClient(router, { context: bob });
+    await expect(asBob.agents.update({ memberId: created.id, name: "Mine" })).rejects.toMatchObject(
+      {
+        code: "FORBIDDEN",
+        message: "Only an Agent's Sponsor or an admin can do that",
+      },
+    );
+  });
+});
+
+describe("agents.setSponsor", () => {
+  it("moves accountability to another Human and says so in the Event log", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob" });
+    const asAda = createRouterClient(router, { context: ada });
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    const moved = await asAda.agents.setSponsor({
+      memberId: created.id,
+      sponsorMemberId: bob.member.id,
+    });
+
+    expect(moved.sponsor).toMatchObject({ id: bob.member.id });
+    const events = await db.query.event.findMany({ orderBy: { seq: "asc" } });
+    expect(events.filter((row) => row.kind === "agent.sponsor_changed")).toMatchObject([
+      { subjectId: created.id, payload: { from: ada.member.id, to: bob.member.id } },
+    ]);
+  });
+
+  it("refuses an ordinary Member, and refuses an Agent as a Sponsor", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob" });
+    const asAda = createRouterClient(router, { context: ada });
+    const created = await asAda.agents.create({ name: "Planner" });
+    const other = await asAda.agents.create({ name: "Builder" });
+
+    await expect(
+      createRouterClient(router, { context: bob }).agents.setSponsor({
+        memberId: created.id,
+        sponsorMemberId: bob.member.id,
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    await expect(
+      asAda.agents.setSponsor({ memberId: created.id, sponsorMemberId: other.id }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST", message: "Only a Human can sponsor an Agent" });
+  });
+});
+
+describe("agents.suspend and agents.reinstate", () => {
+  it("lets the Sponsor stop and restart its own Agent", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob" });
+    const asBob = createRouterClient(router, { context: bob });
+    const created = await asBob.agents.create({ name: "Planner" });
+
+    const suspended = await asBob.agents.suspend({ memberId: created.id });
+    expect(suspended.suspendedAt).toBeInstanceOf(Date);
+    expect(
+      (await db.query.member.findFirst({ where: { id: created.id } }))?.suspendedAt,
+    ).toBeInstanceOf(Date);
+
+    const back = await createRouterClient(router, { context: ada }).agents.reinstate({
+      memberId: created.id,
+    });
+    expect(back.suspendedAt).toBeNull();
+
+    const kinds = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).map((e) => e.kind);
+    expect(
+      kinds.filter((kind) => kind.startsWith("member.susp") || kind === "member.reinstated"),
+    ).toEqual(["member.suspended", "member.reinstated"]);
+  });
+});
+
+describe("the Sponsor cascade", () => {
+  it("suspends the Agents a suspended Sponsor answers for, and brings back only those", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob" });
+    const asAda = createRouterClient(router, { context: ada });
+    const asBob = createRouterClient(router, { context: bob });
+    const planner = await asBob.agents.create({ name: "Planner" });
+    const builder = await asBob.agents.create({ name: "Builder" });
+    await asBob.agents.suspend({ memberId: builder.id });
+
+    await asAda.members.suspend({ memberId: bob.member.id });
+
+    const stopped = await db.query.member.findMany({ where: { kind: "agent" } });
+    expect(stopped.every((row) => row.suspendedAt instanceof Date)).toBe(true);
+    const cascade = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).filter(
+      (row) => row.kind === "member.suspended" && row.subjectId === planner.id,
+    );
+    expect(cascade).toHaveLength(1);
+
+    await asAda.members.reinstate({ memberId: bob.member.id });
+
+    const after = Object.fromEntries(
+      (await db.query.member.findMany({ where: { kind: "agent" } })).map((row) => [
+        row.id,
+        row.suspendedAt,
+      ]),
+    );
+    expect(after[planner.id]).toBeNull();
+    expect(after[builder.id]).toBeInstanceOf(Date);
+  });
+
+  it("lifts a cascaded suspension when someone else takes the Agent on", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob" });
+    const asAda = createRouterClient(router, { context: ada });
+    const planner = await createRouterClient(router, { context: bob }).agents.create({
+      name: "Planner",
+    });
+    await asAda.members.suspend({ memberId: bob.member.id });
+
+    const moved = await asAda.agents.setSponsor({
+      memberId: planner.id,
+      sponsorMemberId: ada.member.id,
+    });
+
+    expect(moved.suspendedAt).toBeNull();
+    expect(
+      (await db.query.member.findFirst({ where: { id: planner.id } }))?.suspendedAt,
+    ).toBeNull();
+  });
+});
+
+describe("agents.keys", () => {
+  it("hands the plaintext key over once, for the Agent's own identity", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const keys = fakeApiKeys();
+    const asAda = createRouterClient(router, { context: { ...ada, apiKeys: keys } });
+    const planner = await asAda.agents.create({ name: "Planner" });
+    const row = await db.query.member.findFirst({ where: { id: planner.id } });
+
+    const issued = await asAda.agents.keys.issue({ memberId: planner.id, name: "laptop" });
+
+    expect(keys.issued).toMatchObject([{ userId: row?.userId, name: "laptop" }]);
+    expect(issued.key).toBe(keys.issued[0]?.plaintext);
+
+    const listed = await asAda.agents.keys.list({ memberId: planner.id });
+    expect(listed.keys).toMatchObject([{ id: issued.id, name: "laptop" }]);
+    expect(JSON.stringify(listed)).not.toContain(issued.key);
+  });
+
+  it("retires a key, and refuses one the Agent never held", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: { ...ada, apiKeys: fakeApiKeys() } });
+    const planner = await asAda.agents.create({ name: "Planner" });
+    const issued = await asAda.agents.keys.issue({ memberId: planner.id, name: "laptop" });
+
+    expect(await asAda.agents.keys.revoke({ memberId: planner.id, keyId: issued.id })).toEqual({
+      revoked: true,
+    });
+    expect((await asAda.agents.keys.list({ memberId: planner.id })).keys).toEqual([]);
+    await expect(
+      asAda.agents.keys.revoke({ memberId: planner.id, keyId: issued.id }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    const kinds = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).map((e) => e.kind);
+    expect(kinds.filter((kind) => kind.startsWith("agent.key"))).toEqual([
+      "agent.key_issued",
+      "agent.key_revoked",
+    ]);
+  });
+});
+
+describe("agents.grants", () => {
+  it("opens a Project to an Agent and closes it again", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const dev = await asAda.projects.create({ key: "DEV", name: "deevy" });
+    const planner = await asAda.agents.create({ name: "Planner" });
+
+    await asAda.agents.grants.add({ memberId: planner.id, projectId: dev.id });
+    expect(
+      await db.query.projectGrant.findFirst({ where: { memberId: planner.id } }),
+    ).toMatchObject({ projectId: dev.id, grantedBy: ada.member.id });
+    expect((await asAda.agents.grants.list({ memberId: planner.id })).projects).toMatchObject([
+      { key: "DEV" },
+    ]);
+
+    await asAda.agents.grants.remove({ memberId: planner.id, projectId: dev.id });
+    expect(
+      await db.query.projectGrant.findFirst({ where: { memberId: planner.id } }),
+    ).toBeUndefined();
+
+    const kinds = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).map((e) => e.kind);
+    expect(kinds.filter((kind) => kind.startsWith("agent.project"))).toEqual([
+      "agent.project_granted",
+      "agent.project_revoked",
+    ]);
   });
 });

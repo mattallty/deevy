@@ -16,6 +16,7 @@ import { TeamsPage } from "./routes/settings/teams.tsx";
 import { WorkspacePage } from "./routes/settings/workspace.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
+import { AgentsPage } from "./routes/settings/agents.tsx";
 import { AppShell, type ShellProps } from "./routes/shell.tsx";
 
 /**
@@ -91,6 +92,11 @@ const membersRoute = createRoute({
   path: "/settings/members",
   component: MembersPage,
 });
+const agentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/agents",
+  component: AgentsPage,
+});
 const allowlistRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/allowlist",
@@ -109,6 +115,7 @@ const routeTree = rootRoute.addChildren([
   labelsRoute,
   repositoriesRoute,
   membersRoute,
+  agentsRoute,
   allowlistRoute,
 ]);
 
