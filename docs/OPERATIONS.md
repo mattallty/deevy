@@ -40,6 +40,30 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
 The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
 created before that will ask for the extra scope at the next sign-in.
 
+## Agents and MCP
+
+deevy never runs an agent (ADR-0003). It gives each Agent an identity and a key, tells it there is work, and
+takes a Run back; something outside deevy does the running.
+
+A Sponsor creates an Agent under Settings, Agents. Creating one makes a Member with `kind = agent` whose
+Sponsor is the Human who created it, and issuing a key shows the key **once**. Grant the Agent the Projects it
+should see: an ungranted Project does not exist to it, and an Agent starts with none.
+
+The MCP endpoint is `POST ${BETTER_AUTH_URL}/mcp`, and the Agent authenticates with its key as a bearer token:
+
+```bash
+claude mcp add --transport http deevy "$DEEVY_URL/mcp" --header "Authorization: Bearer $DEEVY_AGENT_KEY"
+```
+
+It is stateless, so any instance answers any request and nothing has to stick to one process. An
+unauthenticated request answers 401 naming its Protected Resource Metadata, which is how a client knows to
+start an OAuth flow rather than simply failing.
+
+An Agent can do less than a Human by construction: it can read and write Issues, Documents, comments, Labels
+and Links in the Projects it was granted, and drive its own Runs. It can never administer the Workspace,
+manage Members, or approve a Gate, and neither can anything holding a delegated credential — a Gate is decided
+by a Human signed in to deevy, in a browser (ADR-0004).
+
 ## The volume
 
 Everything is in one SQLite file under `/data`. Migrations are applied at startup, so a new image on an old
