@@ -1,6 +1,7 @@
 import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, apikey, authRelations, session, user, verification } from "./schema/auth.ts";
 import { agent, projectGrant } from "./schema/agent.ts";
+import { activity, run } from "./schema/run.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
@@ -39,6 +40,8 @@ export const tables = {
   notification,
   agent,
   projectGrant,
+  run,
+  activity,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -103,6 +106,7 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     children: r.many.issue({ from: r.issue.id, to: r.issue.parentId }),
     gateDecisions: r.many.gateDecision({ from: r.issue.id, to: r.gateDecision.issueId }),
     documents: r.many.document({ from: r.issue.id, to: r.document.issueId }),
+    runs: r.many.run({ from: r.issue.id, to: r.run.issueId }),
     labels: r.many.label({
       from: r.issue.id.through(r.issueLabel.issueId),
       to: r.label.id.through(r.issueLabel.labelId),
@@ -117,6 +121,15 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       optional: false,
     }),
     links: r.many.issueLink({ from: r.repository.id, to: r.issueLink.repositoryId }),
+  },
+  run: {
+    issue: r.one.issue({ from: r.run.issueId, to: r.issue.id, optional: false }),
+    agent: r.one.member({ from: r.run.agentMemberId, to: r.member.id, optional: false }),
+    triggeredBy: r.one.member({ from: r.run.triggeredByMemberId, to: r.member.id }),
+    activities: r.many.activity({ from: r.run.id, to: r.activity.runId }),
+  },
+  activity: {
+    run: r.one.run({ from: r.activity.runId, to: r.run.id, optional: false }),
   },
   issueLink: {
     issue: r.one.issue({ from: r.issueLink.issueId, to: r.issue.id, optional: false }),
