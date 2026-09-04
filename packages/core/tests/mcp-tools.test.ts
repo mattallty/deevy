@@ -48,6 +48,11 @@ describe("the committed tool manifest", () => {
       "labels_list",
       "links_add",
       "runs_finish",
+      // Not in PLAN.md's list, and needed: an Agent whose Run a trigger opened
+      // has no other way to find it, and its inbox is always empty because
+      // Notifications are derived for Humans. Without this the polling
+      // fallback ADR-0003 promises does not work (docs/plans/m2.md, slice 9).
+      "runs_list",
       "runs_post_activity",
       "runs_request_approval",
       "runs_start",

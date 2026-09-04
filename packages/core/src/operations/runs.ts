@@ -365,6 +365,7 @@ export const runs = {
     path: "/runs",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       issueKey: z.string().optional(),
       agentMemberId: z.string().optional(),
@@ -381,7 +382,13 @@ export const runs = {
     handler: async ({ input, context }) => {
       // One of the two indexes carries every query: (issueId, createdAt) or
       // (agentMemberId, status). A Workspace-wide scan is not on offer.
-      if (!input.issueKey && !input.agentMemberId) {
+      //
+      // An Agent asking for nothing in particular means its own Runs, which is
+      // how one with no webhook URL finds its work: it cannot name itself,
+      // because it has no way to learn its own Member id (ADR-0003).
+      const agentMemberId =
+        input.agentMemberId ?? (context.member.kind === "agent" ? context.member.id : undefined);
+      if (!input.issueKey && !agentMemberId) {
         throw new ORPCError("BAD_REQUEST", {
           message: "Say whose Runs you want: an Issue key or an Agent",
         });
@@ -400,9 +407,7 @@ export const runs = {
             eq(projectTable.workspaceId, context.workspace.id),
             granted ? inArray(issueTable.projectId, granted) : undefined,
             onIssue ? eq(runTable.issueId, onIssue.issue.id) : undefined,
-            input.agentMemberId === undefined
-              ? undefined
-              : eq(runTable.agentMemberId, input.agentMemberId),
+            agentMemberId === undefined ? undefined : eq(runTable.agentMemberId, agentMemberId),
             input.status === undefined ? undefined : eq(runTable.status, input.status),
             cursor
               ? or(
