@@ -12,7 +12,8 @@ const server = serve({ fetch: app.fetch, port: env.port }, (info) => {
 });
 
 // The background work runs beside the listener, never inside createApp: the
-// Cloudflare Worker calls createApp per request (apps/server/src/runner.ts).
+// Cloudflare Worker builds one app per isolate and gets its sweep from a Cron
+// Trigger instead (apps/server/src/runner.ts).
 const runner = startRunner({
   db,
   cron: createTimerCron(),

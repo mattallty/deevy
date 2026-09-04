@@ -8,6 +8,7 @@
     "build": "vp build",
     "build:workers": "DEEVY_TARGET=workers vp build",
     "check:workers": "wrangler deploy --dry-run --outdir dist/wrangler-dry-run",
+    "test:workers": "node scripts/smoke-workers.ts",
     "preview": "vp preview",
     "test": "vp test"
   },

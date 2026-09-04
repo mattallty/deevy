@@ -21,23 +21,38 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
 
 ## Environment
 
-| Variable                       | Required | What it does                                                                |
-| ------------------------------ | -------- | --------------------------------------------------------------------------- |
-| `BETTER_AUTH_URL`              | yes      | The public URL. Sign-in callbacks derive from it, so it must match reality. |
-| `BETTER_AUTH_SECRET`           | yes      | At least 32 random characters. Changing it signs everyone out.              |
-| `GITHUB_CLIENT_ID`             | yes      | GitHub OAuth App. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.   |
-| `GITHUB_CLIENT_SECRET`         | yes      | As above.                                                                   |
-| `DEEVY_ADMIN_EMAIL`            | yes      | The first sign-in with this address creates the Workspace and is its admin. |
-| `DEEVY_WORKSPACE_NAME`         | no       | The Workspace's initial name. Renameable later under Settings, Workspace.   |
-| `DEEVY_DATABASE_PATH`          | no       | Defaults to `/data/deevy.sqlite`, inside the volume.                        |
-| `DEEVY_PORT`                   | no       | Defaults to 3000.                                                           |
-| `DEEVY_WEB_ORIGIN`             | no       | Extra browser origin allowed to call the API with cookies. Only for split   |
-|                                |          | deployments; the single container serves the SPA from its own origin.       |
-| `DEEVY_WEB_DIST`               | no       | Directory of the built SPA to serve. The image sets it to `/app/web`;       |
-|                                |          | unset, the server answers the API and serves no pages.                      |
-| `DEEVY_RUN_STALE_MINUTES`      | no       | Silence after which a Run goes `stale`. Defaults to 30. `stale` is          |
-|                                |          | recoverable: the Agent's next Activity puts the Run back to `active`.       |
-| `DEEVY_SWEEP_INTERVAL_SECONDS` | no       | How often the background runner looks for silent Runs. Defaults to 60.      |
+One name per knob on both runtimes: an environment variable on Node, a `var` or a secret on Workers. On
+Workers a secret is `wrangler secret put NAME`, a var is a `vars` entry in `apps/web/wrangler.jsonc`, and
+locally both come from `apps/web/.dev.vars` — copy `apps/web/.dev.vars.example`. wrangler reads it from
+beside `wrangler.jsonc`, so run `wrangler dev` from `apps/web` and let it find its own configuration;
+`.gitignore` keeps the file itself out of the repository. Nothing on the Worker reads `process.env`; the
+bindings arrive with the request.
+
+| Variable                       | Node | Workers            | Default              | Without it                                                                                                                                                      |
+| ------------------------------ | ---- | ------------------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_URL`              | env  | secret             | the request's origin | Sign-in callbacks are wrong, the OAuth server is off, and Slack deliveries wait.                                                                                |
+| `BETTER_AUTH_SECRET`           | env  | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out. |
+| `GITHUB_CLIENT_ID`             | env  | secret             | —                    | Nobody can sign in. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                                                                                     |
+| `GITHUB_CLIENT_SECRET`         | env  | secret             | —                    | As above.                                                                                                                                                       |
+| `DEEVY_ADMIN_EMAIL`            | env  | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                            |
+| `DEEVY_WORKSPACE_NAME`         | env  | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                            |
+| `DEEVY_WEB_ORIGIN`             | env  | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                      |
+| `DEEVY_RUN_STALE_MINUTES`      | env  | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                             |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | env  | var                | 60                   | Nothing: the sweep looks every minute.                                                                                                                          |
+| `DEEVY_GATE_REMINDER_HOURS`    | env  | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                           |
+| `DEEVY_DATABASE_PATH`          | env  | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                  |
+| `DEEVY_PORT`                   | env  | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                   |
+| `DEEVY_WEB_DIST`               | env  | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                             |
+
+The Worker serves the SPA, the API, the reference at `/api/docs` and the MCP challenge. Signing in and the
+background sweep are still Node's alone, so the Worker reads `GITHUB_*`, `DEEVY_ADMIN_EMAIL`,
+`DEEVY_WORKSPACE_NAME` and the three timing knobs and does not yet act on them.
+
+Which paths the Worker answers rather than the asset handler is `assets.run_worker_first` in
+`apps/web/wrangler.jsonc`. It is part of the routing table, not configuration: a path the app mounts that is
+missing from it is answered with the SPA's `index.html` — a 200 with the wrong body — so
+`packages/core/tests/worker-routes.test.ts` asserts the list against the app's own routes, and
+`vp run web#test:workers` drives the built Worker on `wrangler dev --local` to prove it over HTTP.
 
 The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
 created before that will ask for the extra scope at the next sign-in.
