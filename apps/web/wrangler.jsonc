@@ -11,6 +11,12 @@
     {
       "binding": "DB",
       "database_name": "deevy",
+      // drizzle-kit generates, wrangler applies (ADR-0008). These files are the
+      // committed projection of packages/db/drizzle, written by
+      // `vp run db#generate:d1` and diffed by `vp run db#check:migrations`.
+      "migrations_dir": "../../packages/db/migrations",
+      // A placeholder: local D1 never reads it, and a deployment supplies the
+      // real one. Replacing it is part of releasing (docs/OPERATIONS.md).
       "database_id": "00000000-0000-0000-0000-000000000000",
     },
   ],
