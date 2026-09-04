@@ -48,7 +48,14 @@ export type EventKind =
   | "repository.deleted"
   | "issue.link_added"
   | "issue.link_removed"
-  | "workspace.updated";
+  | "workspace.updated"
+  | "agent.created"
+  | "agent.updated"
+  | "agent.key_issued"
+  | "agent.key_revoked"
+  | "agent.sponsor_changed"
+  | "agent.project_granted"
+  | "agent.project_revoked";
 
 export type EventPayload = Record<string, unknown>;
 

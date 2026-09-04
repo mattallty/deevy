@@ -1,5 +1,5 @@
 import { defineRelations, defineRelationsPart } from "drizzle-orm";
-import { account, authRelations, session, user, verification } from "./schema/auth.ts";
+import { account, apikey, authRelations, session, user, verification } from "./schema/auth.ts";
 import { agent, projectGrant } from "./schema/agent.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
@@ -18,6 +18,7 @@ export const tables = {
   session,
   account,
   verification,
+  apikey,
   workspace,
   member,
   event,
@@ -180,6 +181,11 @@ const appRelations = defineRelationsPart(tables, (r) => ({
   event: {
     workspace: r.one.workspace({ from: r.event.workspaceId, to: r.workspace.id, optional: false }),
     actor: r.one.member({ from: r.event.actorMemberId, to: r.member.id }),
+  },
+  // An API key belongs to the Better Auth user its Member is (ADR-0007), so it
+  // reaches the Member through the user rather than through member.id.
+  apikey: {
+    user: r.one.user({ from: r.apikey.referenceId, to: r.user.id, optional: false }),
   },
 }));
 

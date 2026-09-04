@@ -1,0 +1,234 @@
+import { agent as agentTable, member as memberTable, user as userTable, type Db } from "@deevy/db";
+import { inArray } from "drizzle-orm";
+import { z } from "zod";
+import { appendEvent, type EventSource } from "./events.ts";
+import { allocateHandle } from "./handles.ts";
+import { MemberSchema, UserSchema } from "./schemas.ts";
+
+/**
+ * An Agent is a Member like any other (CONTEXT.md): a Better Auth user with
+ * `kind: "agent"`, a `member` row carrying its Sponsor, and one `agent` row for
+ * what only an Agent has. This module holds the writes that keep the three in
+ * step, so an operation reads as the rule it enforces.
+ */
+
+/**
+ * An Agent never signs in, so its Better Auth user has no password and no
+ * account row; the email exists only because the column is unique and not null.
+ * `.invalid` is reserved for names that must never resolve (RFC 2606).
+ */
+export function agentEmail(handle: string, workspaceSlug: string): string {
+  return `${handle}@agents.${workspaceSlug}.invalid`;
+}
+
+export interface CreateAgentInput {
+  db: Db;
+  workspace: { id: string; slug: string };
+  /** The Human who is accountable for it from this moment (CONTEXT.md). */
+  sponsorMemberId: string;
+  name: string;
+  handle?: string | null;
+}
+
+/** Inserts the user, the Member and the Agent row, and returns the Member id. */
+export async function createAgent(input: CreateAgentInput): Promise<string> {
+  const handle = input.handle ?? (await allocateHandle(input.db, input.name));
+  const userId = crypto.randomUUID();
+  const memberId = crypto.randomUUID();
+  await input.db.insert(userTable).values({
+    id: userId,
+    name: input.name,
+    email: agentEmail(handle, input.workspace.slug),
+    kind: "agent",
+  });
+  await input.db.insert(memberTable).values({
+    id: memberId,
+    workspaceId: input.workspace.id,
+    userId,
+    handle,
+    role: "member",
+    kind: "agent",
+    sponsorId: input.sponsorMemberId,
+  });
+  await input.db.insert(agentTable).values({ memberId });
+  return memberId;
+}
+
+/** A Member as the Agent list shows one: the row, the Human behind it, and its Sponsor. */
+export const AgentSchema = MemberSchema.extend({
+  user: UserSchema,
+  sponsor: MemberSchema.extend({ user: UserSchema }).nullable(),
+  webhookUrl: z.string().nullable(),
+  scheduleMinutes: z.number().int().nullable(),
+  /** The Projects it may see; an ungranted one does not exist to it (ADR-0004). */
+  grantedProjectIds: z.array(z.string()),
+});
+
+export type AgentView = z.infer<typeof AgentSchema>;
+
+/** Everything an Agent operation returns beyond the Member row itself. */
+const withAgent = {
+  user: true,
+  agent: true,
+  sponsor: { with: { user: true } },
+  grantedProjects: { columns: { id: true } },
+} as const;
+
+/** Reads one Agent in the shape every Agent operation returns. */
+export async function loadAgent(db: Db, memberId: string): Promise<AgentView | undefined> {
+  const row = await db.query.member.findFirst({
+    where: { id: memberId, kind: "agent" },
+    with: withAgent,
+  });
+  return row ? view(row) : undefined;
+}
+
+/** Reads every Agent of the Workspace, oldest first. */
+export async function listAgents(db: Db, workspaceId: string): Promise<AgentView[]> {
+  const rows = await db.query.member.findMany({
+    where: { workspaceId, kind: "agent" },
+    with: withAgent,
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map(view);
+}
+
+/** The Member row as the query above reads it, before it is flattened. */
+type AgentRow = Omit<AgentView, "webhookUrl" | "scheduleMinutes" | "grantedProjectIds"> & {
+  agent: { webhookUrl: string | null; scheduleMinutes: number | null } | null;
+  grantedProjects: Array<{ id: string }>;
+};
+
+/** An Agent's own row is flattened onto the Member, so a surface reads one thing. */
+function view(row: AgentRow): AgentView {
+  const { agent, grantedProjects, ...member } = row;
+  return {
+    ...member,
+    webhookUrl: agent?.webhookUrl ?? null,
+    scheduleMinutes: agent?.scheduleMinutes ?? null,
+    grantedProjectIds: grantedProjects.map((project) => project.id),
+  };
+}
+
+/**
+ * Members and Teams share one handle namespace (see handles.ts), so a rename
+ * has to look in both before it lands.
+ */
+export async function handleTaken(db: Db, handle: string): Promise<boolean> {
+  const [asMember, asTeam] = await Promise.all([
+    db.query.member.findFirst({ where: { handle }, columns: { id: true } }),
+    db.query.team.findFirst({ where: { handle }, columns: { id: true } }),
+  ]);
+  return Boolean(asMember || asTeam);
+}
+
+/**
+ * A suspended Sponsor suspends the Agents it answers for (docs/PLAN.md). The
+ * cascade marks its Events with the Sponsor it came from, so reinstating that
+ * Human brings back only the Agents the cascade stopped and leaves the ones
+ * their Sponsor stopped on purpose alone.
+ */
+export const CASCADE = "cascadedFrom";
+
+/** The Agents a Sponsor answers for that are still working. */
+export async function cascadeSuspendAgents(
+  source: EventSource,
+  sponsorMemberId: string,
+): Promise<string[]> {
+  const running = await source.db.query.member.findMany({
+    where: { sponsorId: sponsorMemberId, kind: "agent", suspendedAt: { isNull: true } },
+    columns: { id: true },
+  });
+  const ids = running.map((row) => row.id);
+  if (ids.length === 0) return ids;
+
+  await source.db
+    .update(memberTable)
+    .set({ suspendedAt: new Date() })
+    .where(inArray(memberTable.id, ids));
+  for (const id of ids) {
+    await appendEvent(source, {
+      kind: "member.suspended",
+      subjectType: "member",
+      subjectId: id,
+      payload: { [CASCADE]: sponsorMemberId },
+    });
+  }
+  return ids;
+}
+
+/** Reverses that cascade, and only that cascade. */
+export async function cascadeReinstateAgents(
+  source: EventSource,
+  sponsorMemberId: string,
+): Promise<string[]> {
+  const stopped = await source.db.query.member.findMany({
+    where: { sponsorId: sponsorMemberId, kind: "agent", suspendedAt: { isNotNull: true } },
+    columns: { id: true },
+  });
+  const ids = await cascadedOf(
+    source.db,
+    stopped.map((row) => row.id),
+    sponsorMemberId,
+  );
+  if (ids.length === 0) return ids;
+
+  await source.db
+    .update(memberTable)
+    .set({ suspendedAt: null })
+    .where(inArray(memberTable.id, ids));
+  for (const id of ids) {
+    await appendEvent(source, {
+      kind: "member.reinstated",
+      subjectType: "member",
+      subjectId: id,
+      payload: { [CASCADE]: sponsorMemberId },
+    });
+  }
+  return ids;
+}
+
+/**
+ * Of these suspended Agents, the ones whose last suspension was this Sponsor's
+ * cascade. One statement over the Event log, which is the record (ADR-0003),
+ * rather than a column or a query per Agent (docs/plans/m1.md).
+ */
+async function cascadedOf(db: Db, memberIds: string[], sponsorMemberId: string): Promise<string[]> {
+  if (memberIds.length === 0) return [];
+  const rows = await db.query.event.findMany({
+    where: { kind: "member.suspended", subjectType: "member", subjectId: { in: memberIds } },
+    columns: { subjectId: true, payload: true },
+    orderBy: { seq: "desc" },
+  });
+  const latest = new Map<string, Record<string, unknown> | null>();
+  for (const row of rows) {
+    if (!latest.has(row.subjectId)) latest.set(row.subjectId, row.payload);
+  }
+  return memberIds.filter((id) => latest.get(id)?.[CASCADE] === sponsorMemberId);
+}
+
+/**
+ * One Agent's half of cascadeReinstateAgents: it works again if the suspension
+ * it carries came from the Sponsor it is leaving, and stays stopped if its
+ * Sponsor stopped it deliberately.
+ */
+export async function liftCascade(
+  source: EventSource,
+  memberId: string,
+  fromSponsorMemberId: string,
+): Promise<boolean> {
+  const [cascaded] = await cascadedOf(source.db, [memberId], fromSponsorMemberId);
+  if (!cascaded) return false;
+
+  await source.db
+    .update(memberTable)
+    .set({ suspendedAt: null })
+    .where(inArray(memberTable.id, [memberId]));
+  await appendEvent(source, {
+    kind: "member.reinstated",
+    subjectType: "member",
+    subjectId: memberId,
+    payload: { [CASCADE]: fromSponsorMemberId },
+  });
+  return true;
+}

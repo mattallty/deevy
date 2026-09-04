@@ -16,6 +16,7 @@
     "snapshot:openapi": "node scripts/snapshot-openapi.ts"
   },
   "dependencies": {
+    "@better-auth/api-key": "catalog:",
     "@better-auth/drizzle-adapter": "catalog:",
     "@deevy/db": "workspace:*",
     "@orpc/client": "catalog:",

@@ -38,6 +38,9 @@ describe("the app shell", () => {
     expect(within(sidebar).getByRole("link", { name: "Members" }).getAttribute("href")).toBe(
       "/settings/members",
     );
+    expect(within(sidebar).getByRole("link", { name: "Agents" }).getAttribute("href")).toBe(
+      "/settings/agents",
+    );
     expect(within(sidebar).getByRole("link", { name: "Allowlist" }).getAttribute("href")).toBe(
       "/settings/allowlist",
     );

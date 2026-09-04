@@ -19,6 +19,7 @@
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {
+    "@better-auth/api-key": "catalog:",
     "@better-auth/drizzle-adapter": "catalog:",
     "@types/node": "catalog:",
     "auth": "catalog:",
