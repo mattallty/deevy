@@ -10,13 +10,24 @@ Published to `ghcr.io/mattallty/deevy` on every `v0.1.x`, `v0.2.x` and `v0.3.x` 
 `linux/arm64`. Tags are the version (`v0.3.0`) and `latest`. The image carries the bundled Node server, the
 migrations, and the built SPA; it runs the SPA and the API on one port, so there is no separate web container.
 
+**The package is private while deevy is pre-release**, so pulling it needs a GitHub account with access:
+`docker login ghcr.io` with a personal access token carrying `read:packages`. Without one the pull fails with
+`unauthorized` rather than anything that explains itself. Building from source needs no account at all and
+produces the same image — the release workflow runs exactly this command:
+
+```bash
+docker build -f apps/server/Dockerfile -t deevy:local .
+```
+
+Then, with either image:
+
 ```bash
 docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_URL=https://deevy.example.com \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
-  ghcr.io/mattallty/deevy:latest
+  deevy:local   # or ghcr.io/mattallty/deevy:latest once the package is public
 ```
 
 ## The Worker
