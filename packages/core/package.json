@@ -13,12 +13,14 @@
   },
   "scripts": {
     "test": "vp test",
-    "snapshot:openapi": "node scripts/snapshot-openapi.ts"
+    "snapshot:openapi": "node scripts/snapshot-openapi.ts",
+    "snapshot:mcp-tools": "node scripts/snapshot-mcp-tools.ts"
   },
   "dependencies": {
     "@better-auth/api-key": "catalog:",
     "@better-auth/drizzle-adapter": "catalog:",
     "@deevy/db": "workspace:*",
+    "@modelcontextprotocol/server": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",
     "@orpc/openapi": "catalog:",

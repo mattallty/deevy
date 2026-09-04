@@ -69,6 +69,13 @@ export interface OperationMeta {
    * arrived (docs/plans/m2.md).
    */
   sessionOnly?: true;
+  /**
+   * This operation is projected as an MCP tool. Independent of `agents`:
+   * authorization is who may call it, this is which surface carries it. The
+   * list stays curated because a seventy-tool list costs an agent its context
+   * window, and it is snapshotted in CI (ADR-0009, docs/plans/m2.md).
+   */
+  mcp?: true;
 }
 
 /** `agents` is unsayable on anything but a `member` operation (ADR-0004). */
@@ -158,6 +165,7 @@ export function defineOperation<
     auth: def.auth,
     ...(def.agents ? { agents: def.agents } : {}),
     ...(def.sessionOnly ? { sessionOnly: def.sessionOnly } : {}),
+    ...(def.mcp ? { mcp: def.mcp } : {}),
   };
   return base
     .use(authorize(meta))
@@ -186,6 +194,7 @@ export function defineStreamOperation<TAuth extends AuthRule, TInput extends z.Z
     auth: def.auth,
     ...(def.agents ? { agents: def.agents } : {}),
     ...(def.sessionOnly ? { sessionOnly: def.sessionOnly } : {}),
+    ...(def.mcp ? { mcp: def.mcp } : {}),
   };
   return base
     .use(authorize(meta))
