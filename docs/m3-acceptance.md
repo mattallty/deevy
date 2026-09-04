@@ -6,15 +6,31 @@ then runs again on the Docker image built from the same commit. Two deployment s
 claim [ADR-0006](./adr/0006-runtime-agnostic-core-node-first.md) makes, and this walk is the only thing that
 checks it.
 
-**Status: not run.** Everything M3 could prove without an account is proven and green in CI —
-`vp run web#test:workers` drives the built Worker on `wrangler dev --local` through sign-in, the Cron Trigger,
-live streams, both delivery paths, the free-plan configuration shape, and the agent loop itself: an Agent's API
-key over `/mcp`, the plan Document, the URL elicitation at the Plan Gate, the Human's approval over `/rpc`, the
-finished Run with its Link, the inbox and the Event log. `packages/core/tests/milestone.test.ts` walks the same
-loop in process on Node, so both runtimes now have it. What has never happened is the walk below: a real
-Cloudflare account, a real GitHub OAuth App, a Claude Code loop calling a deployed origin over the internet,
-and the container on the far side of the same commit. The milestone is not accepted until somebody executes it
-and records the result here.
+**Status: parts 1 to 5 walked on 2026-09-04, on a free account, from the branch rather than from a tag.
+Part 6, the container, has not been walked.**
+
+What ran. A Worker deployed to `deevy.matthias-etienne.workers.dev` with D1, GitHub sign-in and the Cron
+Trigger; a Workspace bootstrapped by the admin's first sign-in; the `planner` Agent, its Project grant and its
+key; `DEV-1` assigned to it, opening a `pending` Run before any agent woke up. Then a Claude Code loop outside
+deevy, over `/mcp` with nothing but that key: it read the Issue and its intent Document, narrated as it went,
+wrote the spec, stopped at the Spec Gate with a deevy URL, resumed on the Human's ruling, wrote the plan,
+stopped at the Plan Gate, resumed again, and finished `completed` with a summary. Forty-two Events, thirteen
+Activities, three Gate decisions, and the Issue in Build.
+
+What the walk found, which nothing else could have. `runs.requestApproval` failed against a real client. Claude
+Code declares no elicitation capability; the SDK refuses an `input_required` naming `elicitation/create` at
+dispatch, after the tool callback has returned, so the Agent was told its call had failed over work that had
+entirely succeeded and its own instructions then told it to fail the Run. Every test in the milestone declared
+the capability, so the surface had only ever been exercised by a client that could take what it was offered.
+Fixed and covered by a ninth test in `packages/core/tests/elicitation.test.ts`. Three documentation errors went
+with it: a Workspace Event log view that does not exist, an Issues section that does not exist, and a
+`wrangler d1 create` step that is not needed.
+
+What did not run, and is not claimed. Part 6: no `v0.3.0` tag was cut and the container was never walked, so
+ADR-0006's two-shapes claim still rests on CI rather than on a person. `links_add` was never exercised — the
+loop ran from a scratch repository with no remote, so there was no pull request URL to attach, and a summary
+naming two commits attached no evidence. The Cron Trigger was registered and re-registered but no `scheduled`
+invocation was ever observed in `wrangler tail`; whether that is the trigger or the tail is unresolved.
 
 This is a checklist, not documentation. How to deploy is [OPERATIONS.md](./OPERATIONS.md); what the loop does
 and why is [agent-loop.md](./agent-loop.md). Each step below says the command and what it should answer, so a
