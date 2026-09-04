@@ -1,4 +1,5 @@
-import type { LiveOptions } from "@deevy/core";
+import type { AuthEnv, LiveOptions } from "@deevy/core";
+import { fetchClientMetadataResource } from "@deevy/core/cimd";
 import type { createDb } from "@deevy/adapters/workers";
 
 /**
@@ -92,5 +93,26 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
       pollMs: STREAM_POLL_MS,
       maxDurationMs: positive(env.DEEVY_STREAM_SECONDS, defaultStreamSeconds) * 1000,
     },
+  };
+}
+
+/**
+ * The identity configuration this entry hands Better Auth, beside
+ * `apps/server`'s `authEnv` and different in exactly one thing. Node resolves
+ * a Client ID Metadata Document's name and connects to the address it
+ * checked; workerd has no primitive that pins an address while keeping the
+ * name for SNI and certificate validation, so the Worker takes the core's
+ * transport — a shape check with a DNS-over-HTTPS pre-resolution in front of
+ * it — and the residual race is written down instead (docs/OPERATIONS.md).
+ */
+export function workerAuthEnv(env: WorkerEnv): AuthEnv {
+  return {
+    baseURL: env.baseURL,
+    secret: env.secret,
+    trustedOrigins: [env.webOrigin, env.baseURL].filter((o): o is string => Boolean(o)),
+    github: env.github,
+    adminEmail: env.adminEmail,
+    workspaceName: env.workspaceName,
+    fetchClientMetadataResource,
   };
 }

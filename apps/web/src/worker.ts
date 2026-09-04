@@ -1,8 +1,8 @@
 import { createDb } from "@deevy/adapters/workers";
 import type { App } from "@deevy/core/app";
-import { createApp, createAuth, runDueWork, type DueWorkLimits } from "@deevy/core";
+import { createApp, createAuth, runDueWork, type AuthEnv, type DueWorkLimits } from "@deevy/core";
 import type { WorkerBindings, WorkerEnv } from "./env.ts";
-import { readWorkerEnv } from "./env.ts";
+import { readWorkerEnv, workerAuthEnv } from "./env.ts";
 
 /**
  * One app per isolate, not one per request. `createApp` builds the oRPC
@@ -25,6 +25,14 @@ interface Isolate {
   /** The bindings, read once, so the Cron Trigger configures itself like the app. */
   env: WorkerEnv;
   /**
+   * What this isolate handed Better Auth. Kept so the one thing that differs
+   * between the two runtimes is assertable where it is decided rather than
+   * where it is assembled: a test that only checked `workerAuthEnv`'s return
+   * value would stay green through a refactor that inlined the object here and
+   * lost the transport with it (docs/plans/m3.md slice 8).
+   */
+  authEnv: AuthEnv;
+  /**
    * Better Auth starts initialising inside its constructor, and that touches
    * the database. workerd abandons any I/O still in flight when the request
    * that started it returns, so a `$context` left pending by the request that
@@ -41,7 +49,7 @@ interface Isolate {
   ready: Promise<void>;
 }
 
-function isolateFor(bindings: WorkerBindings): Isolate {
+export function isolateFor(bindings: WorkerBindings): Isolate {
   const cached = apps.get(bindings);
   if (cached) return cached;
   const env = readWorkerEnv(bindings);
@@ -49,17 +57,8 @@ function isolateFor(bindings: WorkerBindings): Isolate {
   // The Worker serves the SPA from the same origin, so the only cross-origin
   // caller is a browser on a separately deployed one.
   const origin = [env.webOrigin, env.baseURL].filter((o): o is string => Boolean(o));
-  const auth = createAuth({
-    db,
-    env: {
-      baseURL: env.baseURL,
-      secret: env.secret,
-      trustedOrigins: origin,
-      github: env.github,
-      adminEmail: env.adminEmail,
-      workspaceName: env.workspaceName,
-    },
-  });
+  const authEnv = workerAuthEnv(env);
+  const auth = createAuth({ db, env: authEnv });
   const isolate: Isolate = {
     app: createApp({
       db,
@@ -75,6 +74,7 @@ function isolateFor(bindings: WorkerBindings): Isolate {
     }),
     db,
     env,
+    authEnv,
     ready: auth.$context.then(
       () => undefined,
       () => undefined,

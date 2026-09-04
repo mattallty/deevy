@@ -177,15 +177,34 @@ A client identifies itself in one of two ways, both enabled:
   Anyone who can reach the instance can create a client row; a client is worth nothing until a Human consents
   to it, so the cost of that is rows, not access.
 
-**Known limitation.** Dereferencing a Client ID Metadata Document means fetching a URL an unknown caller
-chose, so the transport is the SSRF boundary. `@better-auth/cimd/node` ships a strict one built on `node:dns`
-and `node:https`, and deevy does not use it: `packages/core` is web-standard only (ADR-0006), and M3's
-Cloudflare Worker has no DNS-resolution primitive to build it on. deevy's own transport
-(`packages/core/src/cimd.ts`) refuses every non-HTTPS scheme, every host that is not publicly routable, and
-every redirect, and bounds the request in time and size — but it cannot pin the resolved address between the
-check and the connection, so a name that resolves public and then private is not caught. The reachable outcome
-is a blind GET from the instance: nothing of the response is returned to the caller. Put the instance behind
-an egress policy if that matters, or pass a stricter transport as `AuthEnv.fetchClientMetadataResource`.
+**How a document is fetched, and what is still weak.** Dereferencing a Client ID Metadata Document means
+fetching a URL an unknown caller chose, so the transport is the SSRF boundary. Both runtimes refuse every
+non-HTTPS scheme, every URL carrying credentials, every host that is not publicly routable by its shape,
+every redirect and every response over 128 KB, and bound the request to five seconds. They differ in one
+thing, and it is the thing that matters — whether the address checked is the address connected to.
+
+| Target      | Transport                   | How a name is checked                                                                  | Residual risk                                                                                                                                               |
+| ----------- | --------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Node**    | `apps/server/src/cimd.ts`   | `node:dns` resolves once; every answer must be publicly routable; the first is pinned. | None of this kind. The connection uses the address that passed, with the name kept for the Host header, TLS SNI and certificate validation.                 |
+| **Workers** | `packages/core/src/cimd.ts` | A resolver is asked over HTTPS for A and AAAA; any private answer refuses the name.    | A name that answers publicly to the resolver and privately to `fetch` a moment later is not caught. `fetch` resolves the name again and nothing can pin it. |
+
+Node's is wired in as `AuthEnv.fetchClientMetadataResource`, the seam the plugin provides for exactly this.
+The Workers pre-resolution asks `https://cloudflare-dns.com/dns-query`; there is no knob for it, and a
+deployment that wants a different resolver passes one to `createClientMetadataFetch`.
+
+The Workers gap is a workerd limitation rather than a choice, and M3 measured both ways out before accepting
+it. `cf.resolveOverride` only redirects to a host proxied on the Worker's own Cloudflare zone, so it says
+nothing about a third party's name. `connect()` from `cloudflare:sockets` can dial a chosen address and still
+validate the certificate against the original name, through an undocumented
+`startTls({ expectedServerHostname })` — which works in `wrangler dev --local` — but deployed Workers block
+outbound TCP to Cloudflare's own IP ranges, and a large share of the internet's CIMD hosts sit behind
+Cloudflare. Local workerd blocks neither those ranges nor loopback, so no test on `wrangler dev --local`
+could tell a working pin from one that fails only in production. Revisit if Cloudflare documents
+`expectedServerHostname` and lifts the IP-range block, or when a Durable Object could hold a socket pool.
+
+Either way the reachable outcome is a blind GET from the instance: nothing of the response is returned to the
+caller. Put the instance behind an egress policy if that matters, or pass a stricter transport as
+`AuthEnv.fetchClientMetadataResource`.
 
 Scopes ride on the token and are enforced by nothing in v1: a Human's MCP client can do whatever that Human
 can, less the one thing below.
