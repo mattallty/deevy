@@ -29,8 +29,15 @@ with it: a Workspace Event log view that does not exist, an Issues section that 
 What did not run, and is not claimed. Part 6: no `v0.3.0` tag was cut and the container was never walked, so
 ADR-0006's two-shapes claim still rests on CI rather than on a person. `links_add` was never exercised — the
 loop ran from a scratch repository with no remote, so there was no pull request URL to attach, and a summary
-naming two commits attached no evidence. The Cron Trigger was registered and re-registered but no `scheduled`
-invocation was ever observed in `wrangler tail`; whether that is the trigger or the tail is unresolved.
+naming two commits attached no evidence.
+
+The Cron Trigger did run, and proving it took a functional test rather than a log. Three `wrangler tail`
+windows over about ten minutes showed request traffic and no `scheduled` invocation at all, which reads exactly
+like a dead schedule. It was not: giving the Agent `scheduleMinutes = 1` produced a Run with
+`trigger = "schedule"` inside two minutes, so the Cron Trigger fired, `runDueWork` ran, and `sweepSchedules`
+found the Agent whose interval had elapsed and opened its Run. `wrangler tail` was not showing scheduled
+invocations; the schedule was never the problem. Anyone verifying a Cron Trigger on a deployment should give
+the sweep something observable to do rather than watch the log for it.
 
 This is a checklist, not documentation. How to deploy is [OPERATIONS.md](./OPERATIONS.md); what the loop does
 and why is [agent-loop.md](./agent-loop.md). Each step below says the command and what it should answer, so a
