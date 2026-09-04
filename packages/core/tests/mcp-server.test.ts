@@ -245,6 +245,25 @@ describe("a tool deevy does not project", () => {
     expect(answer.result).toBeUndefined();
     expect(answer.error?.message).toContain("gates_approve");
   });
+
+  it("refuses labels_delete by name, though an Agent may create a Label", async () => {
+    const { app, key } = await workspaceWithAgent();
+
+    const names = toolNames(await mcp(app, key, "tools/list", {}));
+    expect(names).toContain("labels_create");
+    expect(names).not.toContain("labels_delete");
+
+    // Widening "manage Labels" stopped at creating one: deleting a
+    // Workspace-scoped Label reaches Projects this Agent cannot see, so the
+    // name is not a tool at all rather than a tool that answers with a refusal.
+    const answer = await mcp(app, key, "tools/call", {
+      name: "labels_delete",
+      arguments: { labelId: "whatever" },
+    });
+
+    expect(answer.result).toBeUndefined();
+    expect(answer.error?.message).toContain("labels_delete");
+  });
 });
 
 describe("the tools/list filter", () => {

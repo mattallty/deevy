@@ -87,9 +87,12 @@ One typed core, projected three ways (ADR-0005):
   with TanStack Query (ADR-0009).
 - **MCP server** speaking the 2026-07-28 revision in stateless form through the TypeScript SDK v2 per-request
   handler, serving 2025-era clients through the SDK's legacy stateless mode. Tools are projected from the same
-  oRPC procedures by walking the router and registering each procedure's schemas. v1 tools: list and get Issues, create
-  and update Issues, read and write Documents, comment, manage Labels and Links, list my inbox, start a Run,
-  post Activities, finish a Run, answer or raise an elicitation.
+  oRPC procedures by walking the router and registering each procedure's schemas. The v1 set is twenty tools:
+  `issues_list`, `issues_get`, `issues_create`, `issues_update`, `issues_set_labels`; `documents_get`,
+  `documents_write`; `comments_create`; `labels_list`, `labels_create`; `links_list`, `links_add`,
+  `links_remove`; `inbox_list`; `runs_start`, `runs_list`, `runs_get`, `runs_post_activity`,
+  `runs_request_approval`, `runs_finish`. Renaming or deleting a Label, and ruling on a Gate, stay off it: a
+  Label is Workspace-scoped and a Gate is a Human's to rule on.
 - **Events** delivered as signed webhooks to Agents and to generic subscribers, and consumed internally by the
   SSE stream, the inbox, and Slack.
 
@@ -156,9 +159,10 @@ cannot pin the address it validated, and `AuthEnv.fetchClientMetadataResource` i
 The **`delivery` table lost a uniqueness guard**: slices 5 and 8 merged onto one table with a `target`
 discriminator, and the unique `(subscriptionId, eventSeq)` the plan called for became a plain index. Nothing
 duplicates today, because deliveries are derived one statement per Event, but the guard is gone and Queues
-give a message at-least-once, so M3 is when it starts to matter. And the **v1 tool set does not match the
+give a message at-least-once, so M3 is when it starts to matter. And the **v1 tool set did not match the
 promise above**: "manage Labels and Links" shipped as `labels_list` and `links_add` only, with no create,
-update or remove over MCP. Either widen the surface or narrow the sentence.
+update or remove over MCP. M3 widens the surface rather than narrowing the sentence, to the twenty tools
+listed above.
 
 **M4 Reference runtime.** A documented sample agent runtime (Claude Code headless in a GitHub Action and as a
 local loop) consuming webhooks and the MCP inbox, plus operator docs for both targets.

@@ -34,6 +34,11 @@ export const labels = {
     path: "/labels",
     auth: "member",
     agents: true,
+    // An Agent classifying its own work needs the Label it reaches for to
+    // exist. Creating one is additive; update and delete stay Human-only,
+    // because a Label is Workspace-scoped and changing one reaches Projects
+    // the Agent was never granted (docs/plans/m2.md).
+    mcp: true,
     input: z.object({
       /** Null for a plain Label; an Issue carries at most one Label per scope. */
       scope: z.string().trim().min(1).max(40).nullish(),
