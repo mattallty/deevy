@@ -21,6 +21,7 @@ export type Project = typeof import("./schema/project.ts").project.$inferSelect;
 export type Agent = typeof import("./schema/agent.ts").agent.$inferSelect;
 export type Run = typeof import("./schema/run.ts").run.$inferSelect;
 export type Channel = typeof import("./schema/channel.ts").channel.$inferSelect;
+export type Delivery = typeof import("./schema/delivery.ts").delivery.$inferSelect;
 export type RoutingRule = typeof import("./schema/channel.ts").routingRule.$inferSelect;
 export type NotificationPreference =
   typeof import("./schema/channel.ts").notificationPreference.$inferSelect;
