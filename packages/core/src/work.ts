@@ -1113,3 +1113,163 @@ export async function remindAboutGates({
   }
   return result;
 }
+
+/** Passes one call may take before it leaves the rest for the next one. */
+export const defaultMaxPasses = 5;
+
+/**
+ * The numbers a trigger is allowed to cost. They are arguments rather than a
+ * branch because the two runtimes need different ones: Node drains until there
+ * is nothing left, and a Cron Trigger takes one bounded pass and lets the
+ * platform bring it back (docs/plans/m3.md).
+ */
+export interface DueWorkLimits {
+  /** Silence after which a Run is presumed stale. */
+  silenceMs?: number;
+  /** Silence after which an undecided Gate asks its approvers again. */
+  gateSilenceMs?: number;
+  /** Runs one sweep pass may move. */
+  sweepLimit?: number;
+  /** Messages one delivery pass may send. */
+  deliveryLimit?: number;
+  /** Passes one sweep may take before it leaves the rest for the next call. */
+  maxPasses?: number;
+}
+
+export interface RunDueWorkOptions {
+  db: Db;
+  /** The clock, so a test does not have to wait thirty minutes. */
+  now?: Date;
+  limits?: DueWorkLimits;
+  /**
+   * The public origin of this instance, so a Slack message links back to the
+   * Issue it is about. Without one those deliveries wait in their rows.
+   */
+  baseUrl?: string;
+  /** Aborted when the caller is shutting down. Checked between passes. */
+  signal?: AbortSignal;
+}
+
+/** What one trigger's worth of background work actually did. */
+export interface DueWorkResult {
+  /** Runs moved to `stale`. */
+  staleRuns: number;
+  /** Runs the schedule trigger started. */
+  scheduled: number;
+  /** Messages a Slack Channel accepted. */
+  channelMessages: number;
+  /** Webhook deliveries a subscribed URL accepted. */
+  webhooks: number;
+  /** Gates whose approvers were asked again. */
+  gateReminders: number;
+  /** The signal was aborted, so the passes after that point did not run. */
+  aborted: boolean;
+}
+
+/**
+ * One trigger's worth of deevy's background work: the stale sweep, the
+ * schedule trigger, both delivery loops and the Gate reminder, in that order.
+ *
+ * It lives here rather than beside a scheduler because the two runtimes own
+ * their schedules differently and neither owns this. Node's `startRunner`
+ * brings a timer, a drain loop and a SIGTERM; a Cloudflare Cron Trigger hands
+ * a one-shot `scheduled(controller, env, ctx)` and owns the schedule itself.
+ * Writing a Workers `Cron` would have been a port lying about who holds the
+ * timer, so the pass moved instead and the difference between the runtimes is
+ * `limits` (docs/plans/m3.md).
+ */
+export async function runDueWork({
+  db,
+  now = new Date(),
+  limits = {},
+  baseUrl,
+  signal,
+}: RunDueWorkOptions): Promise<DueWorkResult> {
+  const {
+    silenceMs = defaultSilenceMs,
+    gateSilenceMs = defaultGateSilenceMs,
+    sweepLimit,
+    deliveryLimit,
+    maxPasses = defaultMaxPasses,
+  } = limits;
+  const sweepBound = sweepLimit === undefined ? {} : { limit: sweepLimit };
+  const deliveryBound = deliveryLimit === undefined ? {} : { limit: deliveryLimit };
+
+  const result: DueWorkResult = {
+    staleRuns: 0,
+    scheduled: 0,
+    channelMessages: 0,
+    webhooks: 0,
+    gateReminders: 0,
+    aborted: false,
+  };
+
+  // A self-hosted instance serves one Workspace (CONTEXT.md), and it does not
+  // exist until the first admin signs in, so a fresh deployment sweeps nothing.
+  const workspace = await db.query.workspace.findFirst();
+  if (!workspace) return result;
+  const workspaceId = workspace.id;
+
+  /**
+   * One unit of background work, run until it says it is done or this call has
+   * had enough passes. `more` means the limit was reached: go again rather
+   * than raise it, so one trigger stays bounded whatever the backlog is. On
+   * Workers `maxPasses` is one and the thing that comes back is the platform.
+   */
+  async function drain<T>(pass: () => Promise<T & { more: boolean }>, add: (of: T) => void) {
+    for (let attempt = 0; attempt < maxPasses; attempt += 1) {
+      if (signal?.aborted) {
+        result.aborted = true;
+        return;
+      }
+      const outcome = await pass();
+      add(outcome);
+      if (!outcome.more) return;
+    }
+  }
+
+  await drain(
+    () => sweepStaleRuns({ db, workspaceId, now, silenceMs, ...sweepBound }),
+    (of) => {
+      result.staleRuns += of.changed;
+    },
+  );
+  // The schedule trigger rides the same trigger: one timer on Node, one Cron
+  // Trigger on Cloudflare, and nothing else to configure or forget.
+  await drain(
+    () => sweepSchedules({ db, workspaceId, now, ...sweepBound }),
+    (of) => {
+      result.scheduled += of.started;
+    },
+  );
+  // And so does what is owed to a Channel. Without an origin a Slack message
+  // could not link back to the Issue, so the deliveries wait rather than go
+  // out useless: they are durable rows, and the next trigger with one sends them.
+  if (baseUrl) {
+    await drain(
+      () => deliverDueChannelMessages({ db, workspaceId, baseUrl, now, ...deliveryBound }),
+      (of) => {
+        result.channelMessages += of.delivered;
+      },
+    );
+  }
+  // And what is owed to a subscribed URL, which needs no origin: the body is
+  // the Event itself and carries no link (ADR-0003).
+  await drain(
+    () => deliverDueWebhooks({ db, workspaceId, now, ...deliveryBound }),
+    (of) => {
+      result.webhooks += of.delivered;
+    },
+  );
+  // A Run waiting on a Gate is not silent, so the stale sweep never touches
+  // it; without this a Gate nobody decides holds the Agent's one open Run on
+  // that Issue for ever and nobody is asked again (docs/plans/m2.md).
+  await drain(
+    () => remindAboutGates({ db, workspaceId, now, silenceMs: gateSilenceMs, ...sweepBound }),
+    (of) => {
+      result.gateReminders += of.changed;
+    },
+  );
+
+  return result;
+}

@@ -16,14 +16,16 @@ export interface WorkerBindings {
   DEEVY_ADMIN_EMAIL?: string;
   DEEVY_WORKSPACE_NAME?: string;
   DEEVY_RUN_STALE_MINUTES?: string;
-  DEEVY_SWEEP_INTERVAL_SECONDS?: string;
   DEEVY_GATE_REMINDER_HOURS?: string;
 }
 
 /**
- * `ServerEnv` in `apps/server/src/env.ts` minus what only a filesystem has: no
- * port, no database file, no migrations folder, no built SPA. Same names, same
- * defaults, so the two entries visibly configure one app.
+ * `ServerEnv` in `apps/server/src/env.ts` minus what only a filesystem has —
+ * no port, no database file, no migrations folder, no built SPA — and minus
+ * `DEEVY_SWEEP_INTERVAL_SECONDS`, because on Workers the schedule belongs to
+ * `triggers.crons` in `wrangler.jsonc` and not to deevy (docs/OPERATIONS.md).
+ * Everything left keeps its name and its default, so the two entries visibly
+ * configure one app.
  */
 export interface WorkerEnv {
   baseURL?: string;
@@ -34,8 +36,7 @@ export interface WorkerEnv {
   workspaceName?: string;
   /** Silence after which a Run is presumed stale (docs/plans/m2.md). */
   runStaleMinutes: number;
-  /** How often background work looks for silent Runs. */
-  sweepIntervalSeconds: number;
+  /** Hours a Gate may sit undecided before its approvers are asked again. */
   gateReminderHours: number;
 }
 
@@ -62,7 +63,6 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,
     runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
-    sweepIntervalSeconds: positive(env.DEEVY_SWEEP_INTERVAL_SECONDS, 60),
     gateReminderHours: positive(env.DEEVY_GATE_REMINDER_HOURS, 4),
   };
 }

@@ -7,11 +7,13 @@
  * own: what it tests is the deployed shape, bindings and asset routing
  * included, which a unit test of anything the Worker calls cannot see.
  *
- * Two phases, two servers, over one build and one D1. The first serves deevy
- * on a configured origin the request did not arrive on, which is how it proves
- * the bindings reached the app. The second signs a Human in, and a sign-in
- * needs BETTER_AUTH_URL to be the origin the browser is on — so it picks its
- * port first, and takes the stubbed GitHub with it.
+ * Three phases, three servers, over one build and one D1. The first serves
+ * deevy on a configured origin the request did not arrive on, which is how it
+ * proves the bindings reached the app. The second signs a Human in, and a
+ * sign-in needs BETTER_AUTH_URL to be the origin the browser is on — so it
+ * picks its port first, and takes the stubbed GitHub with it. The third fires
+ * the Cron Trigger by hand and watches the background work happen on D1, and
+ * it signs in too, because what it reads back it reads over the API.
  */
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
@@ -257,6 +259,151 @@ async function rpc(
   };
 }
 
+/** One statement or many, against the local D1 this run persists to. */
+function execute(persistTo: string, sql: string): Promise<void> {
+  return run(wrangler, [
+    "d1",
+    "execute",
+    database,
+    "--local",
+    "--config",
+    config,
+    "--persist-to",
+    persistTo,
+    "--command",
+    sql,
+  ]);
+}
+
+/** The Issue every seeded Run is on, so the phase can ask for them by key. */
+const sweptIssueKey = "SWP-1";
+
+/**
+ * An Agent with `count` Runs that have been silent for 31 minutes, straight
+ * into the tables of the D1 the sign-in phase left behind.
+ *
+ * Seeded rather than driven through the API for two reasons: an Agent has one
+ * open Run per Issue, so sixty of them is not a shape the API will make, and
+ * the server is down while this runs, which keeps one SQLite file to one
+ * writer. The Agent gets no schedule, so the only sweep with anything to do is
+ * the stale one.
+ */
+function seedSilentRuns(persistTo: string, count: number): Promise<void> {
+  const silentFor = 31 * 60 * 1000;
+  const runs = Array.from(
+    { length: count },
+    (_, at) =>
+      `('swept-run-${String(at)}', 'swept-issue', 'swept-member', 'manual', 'active', ` +
+      `cast(unixepoch('subsecond') * 1000 as integer) - ${String(silentFor)})`,
+  ).join(", ");
+  return execute(
+    persistTo,
+    [
+      `INSERT INTO user (id, name, email, kind) VALUES ('swept-user', 'Sweeper', 'sweeper@example.test', 'agent')`,
+      `INSERT INTO member (id, workspace_id, user_id, role, kind) SELECT 'swept-member', id, 'swept-user', 'member', 'agent' FROM workspace LIMIT 1`,
+      `INSERT INTO agent (member_id) VALUES ('swept-member')`,
+      `INSERT INTO project (id, workspace_id, key, name) SELECT 'swept-project', id, 'SWP', 'Sweeping' FROM workspace LIMIT 1`,
+      `INSERT INTO workflow_state (id, project_id, name, position, category) VALUES ('swept-state', 'swept-project', 'Doing', 1, 'active')`,
+      `INSERT INTO issue (id, project_id, number, title, state_id) VALUES ('swept-issue', 'swept-project', 1, 'Ship the thing', 'swept-state')`,
+      `INSERT INTO run (id, issue_id, agent_member_id, trigger, status, last_activity_at) VALUES ${runs}`,
+    ].join("; "),
+  );
+}
+
+/**
+ * Fires one Cron Trigger and waits for it, which is what the response means:
+ * workerd holds the invocation open for `ctx.waitUntil`, so a 200 here is the
+ * pass having finished and an exception in it comes back as a 500.
+ *
+ * `wrangler dev --test-scheduled` advertises `/__scheduled` for this, and on a
+ * Worker that also serves assets it does not work: the path is not in
+ * `assets.run_worker_first` — and must not be, since `createApp` does not
+ * mount it — so the asset handler answers with the SPA's index.html and a 200
+ * that ran nothing. `/cdn-cgi/handler/scheduled` is the route `/__scheduled`
+ * forwards to, and `/cdn-cgi/*` is the platform's, so nothing intercepts it.
+ */
+async function trigger(origin: string): Promise<number> {
+  const fired = await fetch(
+    `${origin}/cdn-cgi/handler/scheduled?cron=${encodeURIComponent("* * * * *")}`,
+  );
+  await fired.text();
+  return fired.status;
+}
+
+/** The status of every Run on the swept Issue, as the API reports them. */
+async function sweptStatuses(origin: string, cookie: string): Promise<string[]> {
+  const listed = await rpc(origin, "runs/list", { issueKey: sweptIssueKey, limit: 200 }, cookie);
+  const runs = (listed.output as { runs?: Array<{ status?: string }> } | null)?.runs;
+  if (!runs) throw new Error(`the Runs could not be read: ${listed.body.slice(0, 300)}`);
+  return runs.map((run) => run.status ?? "");
+}
+
+/** How many Runs the Event log says went stale, and which ones. */
+async function wentStale(origin: string, cookie: string): Promise<string[]> {
+  const listed = await rpc(origin, "events/list", { limit: 500 }, cookie);
+  const events = (listed.output as { events?: Array<{ kind?: string; subjectId?: string }> } | null)
+    ?.events;
+  if (!events) throw new Error(`the Events could not be read: ${listed.body.slice(0, 300)}`);
+  return events.filter((event) => event.kind === "run.went_stale").map((e) => e.subjectId ?? "");
+}
+
+function countOf(statuses: string[], status: string): number {
+  return statuses.filter((each) => each === status).length;
+}
+
+/** Slice 6: the background work, on a Cron Trigger, inside one trigger's budget. */
+async function backgroundWorkOnACronTrigger(origin: string): Promise<void> {
+  const admin = await signIn(origin, adminEmail);
+  if (admin.cookie.length === 0) throw new Error(`the admin could not sign in: ${admin.location}`);
+
+  // A trigger has a CPU budget and a per-invocation query cap, and Cloudflare
+  // brings it back a minute later, so the Worker asks for one pass of twenty
+  // and no more. Sixty due Runs and one trigger states that as a fact.
+  const status = await trigger(origin);
+  const afterOne = await sweptStatuses(origin, admin.cookie);
+  const eventsAfterOne = await wentStale(origin, admin.cookie);
+  check(
+    "one trigger moves one bounded pass of the backlog, and no more",
+    status === 200 && countOf(afterOne, "stale") === 20,
+    `status ${String(status)}, ${String(countOf(afterOne, "stale"))} of ${String(afterOne.length)} stale`,
+  );
+  check(
+    "every Run it moved says so in a run.went_stale Event",
+    eventsAfterOne.length === 20 && new Set(eventsAfterOne).size === 20,
+    `${String(eventsAfterOne.length)} Events, ${String(new Set(eventsAfterOne).size)} distinct`,
+  );
+
+  await trigger(origin);
+  await trigger(origin);
+  const afterThree = await sweptStatuses(origin, admin.cookie);
+  check(
+    "three triggers move all sixty",
+    countOf(afterThree, "stale") === 60,
+    `${String(countOf(afterThree, "stale"))} of ${String(afterThree.length)} stale`,
+  );
+
+  // Nothing is due any more, and a Run already `stale` is never swept twice:
+  // the sweep only ever looks at `pending` and `active`. So the Event log holds
+  // one run.went_stale per seeded Run and the fourth trigger adds none. Counted
+  // as an array either side of that trigger, not only as a set of subjects: a
+  // second Event for a Run already stale would leave the set at sixty, and the
+  // set is what makes the rest of this check readable.
+  const before = await wentStale(origin, admin.cookie);
+  await trigger(origin);
+  const after = await wentStale(origin, admin.cookie);
+  const stale = new Set(after);
+  const seeded = Array.from({ length: 60 }, (_, at) => `swept-run-${String(at)}`);
+  check(
+    "a further trigger changes nothing, and every Run has exactly its own Event",
+    countOf(await sweptStatuses(origin, admin.cookie), "stale") === 60 &&
+      after.length === 60 &&
+      after.length === before.length &&
+      stale.size === 60 &&
+      seeded.every((id) => stale.has(id)),
+    `${String(after.length)} Events after the trigger and ${String(before.length)} before, ${String(stale.size)} distinct for ${String(seeded.filter((id) => stale.has(id)).length)} of the seeded Runs`,
+  );
+}
+
 const failures: string[] = [];
 function check(name: string, ok: boolean, detail = ""): void {
   if (ok) console.log(`  ok  ${name}`);
@@ -497,6 +644,28 @@ try {
       },
     },
     aHumanSignsIn,
+  );
+
+  // The Cron Trigger, on the Workspace the sign-in just created. The rows go
+  // in while nothing is serving, so one SQLite file has one writer, and the
+  // phase reads them back over the API rather than reaching past the Worker.
+  await seedSilentRuns(persistTo, 60);
+  const cronPort = await freePort();
+  await withServer(
+    persistTo,
+    {
+      config: await stubbedGitHub(),
+      port: cronPort,
+      vars: {
+        BETTER_AUTH_URL: `http://127.0.0.1:${String(cronPort)}`,
+        BETTER_AUTH_SECRET: "smoke-secret-that-is-at-least-32-characters",
+        GITHUB_CLIENT_ID: "stub-client-id",
+        GITHUB_CLIENT_SECRET: "stub-client-secret",
+        DEEVY_ADMIN_EMAIL: adminEmail,
+        DEEVY_WORKSPACE_NAME: "Flippable",
+      },
+    },
+    backgroundWorkOnACronTrigger,
   );
 } finally {
   await rm(persistTo, { recursive: true, force: true });
