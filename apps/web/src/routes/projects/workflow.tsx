@@ -22,6 +22,8 @@ interface DraftState {
   documentTemplate: string | null;
   /** The Agent entering this State assigns the Issue to, and starts a Run for. */
   triggerAgentMemberId: string | null;
+  /** The Humans this Gate names. Empty means any Human may decide it. */
+  approverMemberIds: string[];
 }
 
 /**
@@ -33,6 +35,8 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
   // Every Agent in the Workspace, because a State's rule names one of them.
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
+  // And every Member, because a Gate's approvers are Humans among them.
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const [draft, setDraft] = useState<DraftState[] | null>(null);
   const [removed, setRemoved] = useState<string[]>([]);
   const [moveIssuesTo, setMoveIssuesTo] = useState<string | null>(null);
@@ -49,6 +53,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           documentName: state.documentName,
           documentTemplate: state.documentTemplate,
           triggerAgentMemberId: state.triggerAgentMemberId,
+          approverMemberIds: state.approverMemberIds ?? [],
         })),
       );
     }
@@ -71,6 +76,12 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
       <p className="text-destructive">Could not load the Workflow: {workflow.error.message}</p>
     );
   }
+
+  // ADR-0004: an Agent never decides a Gate, so it is never on offer as one of
+  // its approvers. A suspended Human decides nothing either.
+  const humans = (members.data?.members ?? []).filter(
+    (member) => member.kind === "human" && !member.suspendedAt,
+  );
 
   const edit = (at: number, change: Partial<DraftState>) =>
     setDraft(draft.map((state, index) => (index === at ? { ...state, ...change } : state)));
@@ -172,6 +183,34 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 ))}
               </NativeSelect>
             </div>
+            {state.isGate ? (
+              <div className="flex w-full flex-col gap-2">
+                <Label htmlFor={`state-approvers-${index}`}>Approvers for {state.name}</Label>
+                <p className="text-xs text-muted-foreground">
+                  Naming nobody leaves it to any Human, which is the default.
+                </p>
+                <select
+                  id={`state-approvers-${index}`}
+                  multiple
+                  size={Math.min(Math.max(humans.length, 2), 5)}
+                  className="w-full rounded-md border border-input bg-input/20 p-1 text-xs/relaxed outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  value={state.approverMemberIds}
+                  onChange={(changed) =>
+                    edit(index, {
+                      approverMemberIds: [...changed.target.selectedOptions].map(
+                        (option) => option.value,
+                      ),
+                    })
+                  }
+                >
+                  {humans.map((human) => (
+                    <option key={human.id} value={human.id}>
+                      {human.user.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="flex gap-1 pb-1">
               <Button
                 type="button"
@@ -219,6 +258,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 documentName: null,
                 documentTemplate: null,
                 triggerAgentMemberId: null,
+                approverMemberIds: [],
               },
             ])
           }
@@ -260,6 +300,9 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 documentName: state.documentName,
                 documentTemplate: state.documentTemplate,
                 triggerAgentMemberId: state.triggerAgentMemberId,
+                // A State that is not a Gate names nobody, whatever it named
+                // while it was one: the list and the flag never disagree.
+                approverMemberIds: state.isGate ? state.approverMemberIds : [],
               })),
               deleteStates: removed,
               moveIssuesTo,

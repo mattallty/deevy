@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { GateControls } from "@/components/gate-controls";
 import { IssueComments } from "@/components/issue-comments";
 import { IssueDocuments } from "@/components/issue-documents";
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc.ts";
 
 const UNASSIGNED = "unassigned";
@@ -31,6 +32,21 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
   const issue = useQuery(orpc.issues.get.queryOptions({ input: { key: issueKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const [editing, setEditing] = useState(false);
+
+  // `?gate=<stateId>` is what an Agent's URL elicitation hands a Human
+  // (docs/plans/m2.md): the Issue opens with the Gate it is waiting on in
+  // front of them rather than somewhere down the page. A link to a Gate the
+  // Issue has since left highlights nothing, which is the honest answer.
+  const search = useRouterState({ select: (state) => state.location.search }) as Record<
+    string,
+    unknown
+  >;
+  const askedGate = typeof search.gate === "string" ? search.gate : null;
+  const gateFocused = askedGate !== null && askedGate === issue.data?.state.id;
+  const gatePanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (gateFocused) gatePanel.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [gateFocused]);
 
   const update = useMutation(
     orpc.issues.update.mutationOptions({
@@ -98,12 +114,23 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
 
       <IssueDocuments issueKey={key} />
 
-      <GateControls
-        issueKey={key}
-        projectKey={issue.data.project.key}
-        state={state}
-        decisions={gateDecisions}
-      />
+      <div
+        ref={gatePanel}
+        role="group"
+        aria-label={state.isGate ? `${state.name} Gate` : `${state.name} State`}
+        {...(gateFocused ? { "data-focused": "true" } : {})}
+        className={cn(
+          "rounded-lg",
+          gateFocused && "ring-2 ring-primary ring-offset-4 ring-offset-background",
+        )}
+      >
+        <GateControls
+          issueKey={key}
+          projectKey={issue.data.project.key}
+          state={state}
+          decisions={gateDecisions}
+        />
+      </div>
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">Assignee</h2>
@@ -154,7 +181,7 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
         </section>
       ) : null}
 
-      <IssueRuns issueKey={key} />
+      <IssueRuns issueKey={key} decisions={gateDecisions} />
 
       <IssueLinks issueKey={key} />
 

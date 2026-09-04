@@ -155,3 +155,68 @@ describe("a done State", () => {
     expect((await client.issues.list({ projectKey: "DEV", open: true })).issues).toHaveLength(1);
   });
 });
+
+describe("the approvers a Gate names", () => {
+  it("are the only Humans asked when the Issue reaches that Gate", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client, state } = await withIssue(db);
+    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const carol = await memberContext(db, { name: "Carol", email: "carol@flippable.net" });
+    const states = (await client.workflow.get({ projectKey: "DEV" })).states;
+    await client.workflow.update({
+      projectKey: "DEV",
+      states: states.map((current) => ({
+        id: current.id,
+        name: current.name,
+        isGate: current.isGate,
+        category: current.category,
+        approverMemberIds: current.name === "Spec" ? [bob.member.id] : [],
+      })),
+    });
+
+    // Intent names nobody, so approving it tells every other active Human; the
+    // Spec Gate it lands in names Bob, so only Bob is asked to decide it.
+    await client.gates.approve({ key: "DEV-1" });
+
+    const asked = await db.query.notification.findMany({ where: { kind: "gate_awaiting" } });
+    expect(asked.map((row) => row.recipientMemberId)).toEqual([bob.member.id]);
+    expect(asked.map((row) => row.recipientMemberId)).not.toContain(carol.member.id);
+    expect(state("Spec").isGate).toBe(true);
+    expect(admin.member.id).toBeTruthy();
+  });
+
+  it("are the only Humans who may decide it, and every Human again once named none", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withIssue(db);
+    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const asBob = createRouterClient(router, { context: bob });
+    const named = (approverMemberIds: string[]) =>
+      client.workflow.get({ projectKey: "DEV" }).then(({ states }) =>
+        client.workflow.update({
+          projectKey: "DEV",
+          states: states.map((current) => ({
+            id: current.id,
+            name: current.name,
+            isGate: current.isGate,
+            category: current.category,
+            approverMemberIds: current.name === "Intent" ? approverMemberIds : [],
+          })),
+        }),
+      );
+
+    await named([bob.member.id]);
+    // Ada is an admin, and still not one of the Humans this Gate names.
+    await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(client.gates.reject({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    await named([]);
+    expect((await client.gates.approve({ key: "DEV-1" })).state.name).toBe("Spec");
+    expect(asBob).toBeTruthy();
+  });
+});

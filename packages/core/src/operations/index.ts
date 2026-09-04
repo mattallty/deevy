@@ -25,6 +25,7 @@ import { routing } from "./routing.ts";
 import { runs } from "./runs.ts";
 import { health, me } from "./system.ts";
 import { teams } from "./teams.ts";
+import { webhooks } from "./webhooks.ts";
 import { workflow } from "./workflow.ts";
 import { workspace } from "./workspace.ts";
 
@@ -51,6 +52,7 @@ export const router = {
   channels,
   routing,
   preferences,
+  webhooks,
 };
 export type AppRouter = typeof router;
 
@@ -75,6 +77,7 @@ export {
   routing,
   runs,
   teams,
+  webhooks,
   workflow,
   workspace,
 };

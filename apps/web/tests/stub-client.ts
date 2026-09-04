@@ -138,6 +138,14 @@ export function stubClient(overrides: StubOverrides = {}): never {
       list: async () => ({ rules: [] }),
       set: async () => ({ rules: [] }),
     },
+    webhooks: {
+      list: async () => ({ subscriptions: [] }),
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({ deleted: true }),
+      deliveries: async () => ({ deliveries: [] }),
+      redeliver: async () => ({ queued: true }),
+    },
     preferences: {
       get: async () => ({ preferences: [] }),
       set: async () => ({ preferences: [] }),

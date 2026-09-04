@@ -1,11 +1,14 @@
 import { z } from "zod";
 import {
   assertHuman,
+  assertNamedApprover,
   enterState,
+  gateApprovers,
   nextState,
   previousState,
   recordGateDecision,
 } from "../workflow.ts";
+import { resumeGateRuns } from "../runs.ts";
 import { IssueDetailSchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
@@ -36,6 +39,7 @@ export const gates = {
           message: `${from.name} is the last State; there is nowhere to approve it to`,
         });
       }
+      assertNamedApprover(await gateApprovers(context.db, from.id), context.member.id);
 
       await recordGateDecision(context.db, {
         issueId: issue.id,
@@ -52,6 +56,9 @@ export const gates = {
         projectId: project.id,
         payload: { state: from.name, to: to.name, note: input.note ?? null },
       });
+      // Whatever Run stopped at this Gate carries on now, the way a Human's
+      // answer un-blocks an elicitation (docs/plans/m2.md).
+      await resumeGateRuns(context, issue, from.id);
       await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },
@@ -77,6 +84,7 @@ export const gates = {
       // A rejection in the first State keeps the Issue where it is: there is
       // nowhere further back, and the decision is still worth recording.
       const to = previousState(states, from);
+      assertNamedApprover(await gateApprovers(context.db, from.id), context.member.id);
 
       await recordGateDecision(context.db, {
         issueId: issue.id,
@@ -93,6 +101,9 @@ export const gates = {
         projectId: project.id,
         payload: { state: from.name, to: to.name, note: input.note ?? null },
       });
+      // A rejection un-blocks the Run that asked just as an approval does: it
+      // is a decision, and the Agent needs to hear it (docs/plans/m2.md).
+      await resumeGateRuns(context, issue, from.id);
       await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },

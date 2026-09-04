@@ -38,6 +38,11 @@ export interface AppContext {
   grantedProjectIds?: string[] | null;
   /** How the caller authenticated. Absent is treated as a cookie session. */
   principal?: Principal;
+  /**
+   * The public origin of this instance, so a handler can hand a Human a link
+   * back into deevy. Absent leaves those links site-relative.
+   */
+  baseURL?: string;
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"

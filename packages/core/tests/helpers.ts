@@ -36,7 +36,9 @@ export function contextFor(db: Db, member: Member, workspace: Workspace): Member
       kind: member.kind,
     },
   } as unknown as Session;
-  return { db, session, member, workspace };
+  // Every test builds its links from one origin, so a URL an operation hands
+  // back is something a test can write out in full.
+  return { db, session, member, workspace, baseURL: "https://deevy.test" };
 }
 
 export interface MemberContextOptions {

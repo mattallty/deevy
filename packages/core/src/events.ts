@@ -1,6 +1,7 @@
 import { event, type Db, type Event, type Member, type Workspace } from "@deevy/db";
 import { deriveNotifications } from "./notifications.ts";
 import { triggersFor } from "./triggers.ts";
+import { deriveWebhookDeliveries } from "./webhooks.ts";
 
 /**
  * The Event log is the audit trail (docs/PLAN.md): every write appends one
@@ -66,6 +67,13 @@ export type EventKind =
   | "run.failed"
   /** Silence, not a decision: the sweep said so, and an Activity undoes it. */
   | "run.went_stale"
+  /**
+   * A URL that asked to be told, and the one thing that can go wrong with it:
+   * `webhook.exhausted` is deevy admitting it could not deliver (ADR-0003).
+   */
+  | "webhook.subscribed"
+  | "webhook.removed"
+  | "webhook.exhausted"
   /** Where Notifications go: the Channels themselves, and the rules that aim them. */
   | "channel.created"
   | "channel.updated"
@@ -111,6 +119,10 @@ export async function appendEvent(source: EventSource, input: EventInput): Promi
   // Notifications derive from the Event, in the same request and right after
   // it, so nothing else has to remember to tell anyone (docs/plans/m1.md).
   await deriveNotifications(source.db, row);
+  // And so do the deliveries owed to a subscribed URL, in the same tail and
+  // for the same reason: the durable row is what makes a trigger reliable
+  // whether or not anything is running to send it (ADR-0003).
+  await deriveWebhookDeliveries(source.db, row);
   // Triggers derive from the same Event, right after it (docs/plans/m2.md).
   // They write their own rows and hand back the Events those deserve, so this
   // stays the only writer of the log. The recursion that follows is bounded:

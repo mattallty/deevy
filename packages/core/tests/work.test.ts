@@ -3,6 +3,7 @@ import {
   issue as issueTable,
   member as memberTable,
   run as runTable,
+  webhookSubscription as webhookSubscriptionTable,
   type Db,
 } from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
@@ -12,8 +13,10 @@ import { router } from "../src/operations/index.ts";
 import { isOpen } from "../src/runs.ts";
 import { discardingJobQueue } from "../src/jobs.ts";
 import {
+  deliverDueWebhooks,
   dueAgentsQuery,
   dueRunsQuery,
+  dueWebhookDeliveriesQuery,
   scheduledIssuesQuery,
   sweepSchedules,
   sweepStaleRuns,
@@ -38,7 +41,7 @@ async function workspaceWithAgent() {
   const issue = await db.query.issue.findFirst({ where: { projectId: project.id } });
   if (!issue) throw new Error("the Issue was not created");
   const agent = await agentContext(db, { sponsor: admin.member, grants: [project.id] });
-  return { db, workspaceId: admin.workspace.id, project, issue, agent };
+  return { db, admin, workspaceId: admin.workspace.id, project, issue, agent };
 }
 
 type RunStatus = "pending" | "active" | "awaiting_input" | "completed";
@@ -369,5 +372,87 @@ describe("the schedule sweep", () => {
     expect(await db.query.run.findMany()).toHaveLength(50);
     const stamped = await db.query.agent.findFirst({ where: { memberId: agent.member.id } });
     expect(stamped?.scheduleRanAt).not.toBeNull();
+  });
+});
+
+/** A subscription that wants every Event of this Workspace, straight into the table. */
+async function subscribeTo(db: Db, workspaceId: string, kinds: string[] | null = null) {
+  const id = crypto.randomUUID();
+  await db.insert(webhookSubscriptionTable).values({
+    id,
+    workspaceId,
+    url: "https://runtime.example/deevy",
+    secret: "whsec_test",
+    kinds,
+  });
+  return id;
+}
+
+describe("the webhook delivery sweep", () => {
+  it("is answered by the index the deliveries share, and sorts nothing", async () => {
+    const { db, workspaceId } = await workspaceWithAgent();
+    const query = dueWebhookDeliveriesQuery(db, { workspaceId, now: new Date(), limit: 20 });
+
+    const plan = await db.all<{ detail: string }>(sql`EXPLAIN QUERY PLAN ${query.getSQL()}`);
+    const detail = plan.map((step) => step.detail).join("\n");
+
+    expect(detail).toContain("delivery_due_idx");
+    // A sort would visit every due delivery before the LIMIT applied, so one
+    // pass would cost the backlog instead of the limit.
+    expect(detail).not.toContain("TEMP B-TREE");
+    expect(detail).not.toContain("SCAN");
+  });
+
+  it("is claimed by one pass only, because two of them must not POST it twice", async () => {
+    const { db, workspaceId, admin } = await workspaceWithAgent();
+    await subscribeTo(db, workspaceId);
+    const asAdmin = createRouterClient(router, { context: admin });
+    await asAdmin.issues.create({ projectKey: "DEV", title: "First" });
+    await asAdmin.issues.create({ projectKey: "DEV", title: "Second" });
+    const posted: string[] = [];
+    const now = new Date();
+    const pass = () =>
+      deliverDueWebhooks({
+        db,
+        workspaceId,
+        now,
+        fetch: async (_url: string, init: RequestInit) => {
+          posted.push(init.body as string);
+          return new Response("", { status: 200 });
+        },
+      });
+
+    const [first, second] = await Promise.all([pass(), pass()]);
+
+    // Four Events are owed and four POSTs are made, however the two passes
+    // divided them: the claim is what makes that true without a transaction.
+    const owed = (await db.query.delivery.findMany()).filter((row) => row.target === "webhook");
+    expect(owed).toHaveLength(4);
+    expect(first.scanned + second.scanned).toBe(4);
+    expect(first.delivered + second.delivered).toBe(4);
+    expect(posted).toHaveLength(4);
+    expect(owed.every((row) => row.deliveredAt !== null)).toBe(true);
+  });
+
+  it("costs the same handful of statements whatever is owed", async () => {
+    const { db, workspaceId, admin } = await workspaceWithAgent();
+    await subscribeTo(db, workspaceId, ["issue.created"]);
+    const asAdmin = createRouterClient(router, { context: admin });
+    for (let n = 0; n < 20; n += 1) {
+      await asAdmin.issues.create({ projectKey: "DEV", title: `Issue ${n}` });
+    }
+    const { counted, statements } = countingDb(db);
+
+    const result = await deliverDueWebhooks({
+      db: counted,
+      workspaceId,
+      limit: 10,
+      fetch: async () => new Response("", { status: 200 }),
+    });
+
+    expect(result).toMatchObject({ scanned: 10, delivered: 10, more: true });
+    // The due scan, the claim, the two batched lookups the POSTs are rendered
+    // from, and one UPDATE for the ten that landed the same way.
+    expect(statements).toEqual(["select", "update", "select", "select", "update"]);
   });
 });

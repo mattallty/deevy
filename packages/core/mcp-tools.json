@@ -428,6 +428,24 @@
     }
   },
   {
+    "name": "runs_request_approval",
+    "operation": "runs.requestApproval",
+    "summary": "Ask the Humans who decide this Gate to rule on it, and wait for them",
+    "readOnly": false,
+    "agents": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    }
+  },
+  {
     "name": "runs_start",
     "operation": "runs.start",
     "summary": "Begin a Run on an Issue, pending until the Agent posts its first Activity",

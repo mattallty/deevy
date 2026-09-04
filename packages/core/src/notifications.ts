@@ -8,7 +8,8 @@ import {
   type Event,
   type Notification,
 } from "@deevy/db";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { gateApprovers } from "./workflow.ts";
 
 /**
  * Notifications derive from the Event log rather than being written a second
@@ -176,7 +177,18 @@ export function notificationKindOf(event: Event): Notification["kind"] | null {
   if (event.kind === "issue.assigned") return "assignment";
   if (event.kind === "comment.created" || event.kind === "issue.updated") return "mention";
   if (gateEventKinds.has(event.kind)) return "gate_awaiting";
+  // A Run that stopped at a Gate is asking for a decision, not for an answer:
+  // the Event says so by carrying the Gate, and that is what the Human is
+  // being asked for (docs/plans/m2.md).
+  if (gateStateAsked(event)) return "gate_awaiting";
   return runNotificationKinds[event.kind] ?? null;
+}
+
+/** The Gate a `run.awaiting_input` Event is waiting on, when it is waiting on one. */
+function gateStateAsked(event: Event): string | null {
+  if (event.kind !== "run.awaiting_input") return null;
+  const carried = (event.payload as { gateStateId?: unknown } | null)?.gateStateId;
+  return typeof carried === "string" ? carried : null;
 }
 
 async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
@@ -216,20 +228,16 @@ async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
     event.kind === "gate.rejected"
   ) {
     if (event.subjectType !== "issue") return [];
-    if (!(await isInGate(db, event.subjectId))) return [];
-    const humans = await db
-      .select({ id: memberTable.id })
-      .from(memberTable)
-      .where(
-        and(
-          eq(memberTable.workspaceId, event.workspaceId),
-          eq(memberTable.kind, "human"),
-          isNull(memberTable.suspendedAt),
-          event.actorMemberId ? ne(memberTable.id, event.actorMemberId) : undefined,
-        ),
-      );
-    return humans.map((human) => ({ memberId: human.id, kind: "gate_awaiting" as const }));
+    const stateId = await gateStateOf(db, event.subjectId);
+    if (!stateId) return [];
+    return gateRecipients(db, event, stateId);
   }
+
+  // An Agent that reached a Gate mid-Run asks the same Humans the Gate itself
+  // would ask, not the Human behind the Run: the decision is the Gate's to
+  // make (ADR-0004), and the Sponsor may not be one of its approvers.
+  const askedAbout = gateStateAsked(event);
+  if (askedAbout) return gateRecipients(db, event, askedAbout);
 
   // A Run belongs to the Human behind it: the Member that triggered it, or the
   // Sponsor accountable for the Agent when an Agent triggered its own work
@@ -264,14 +272,37 @@ async function humanBehind(db: Db, memberId: string | null): Promise<string | nu
   return found.kind === "human" ? memberId : found.sponsorId;
 }
 
-async function isInGate(db: Db, issueId: string): Promise<boolean> {
+/** The Gate an Issue is sitting in, or none when the State it is in is not one. */
+async function gateStateOf(db: Db, issueId: string): Promise<string | null> {
   const [row] = await db
-    .select({ isGate: workflowState.isGate })
+    .select({ id: workflowState.id, isGate: workflowState.isGate })
     .from(issueTable)
     .innerJoin(workflowState, eq(issueTable.stateId, workflowState.id))
     .where(eq(issueTable.id, issueId))
     .limit(1);
-  return row?.isGate === true;
+  return row?.isGate === true ? row.id : null;
+}
+
+/**
+ * Who is asked to decide one Gate. A Gate that names approvers asks only them;
+ * one that names none asks every active Human, which is what M1 shipped
+ * (schema/gate.ts). The actor is never asked about their own action either way.
+ */
+async function gateRecipients(db: Db, event: Event, stateId: string): Promise<Recipient[]> {
+  const named = await gateApprovers(db, stateId);
+  const humans = await db
+    .select({ id: memberTable.id })
+    .from(memberTable)
+    .where(
+      and(
+        eq(memberTable.workspaceId, event.workspaceId),
+        eq(memberTable.kind, "human"),
+        isNull(memberTable.suspendedAt),
+        event.actorMemberId ? ne(memberTable.id, event.actorMemberId) : undefined,
+        named.length > 0 ? inArray(memberTable.id, named) : undefined,
+      ),
+    );
+  return humans.map((human) => ({ memberId: human.id, kind: "gate_awaiting" as const }));
 }
 
 /** Of the given Members, those still able to act. Suspension silences an inbox. */
