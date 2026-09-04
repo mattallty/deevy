@@ -1,0 +1,46 @@
+import { sql } from "drizzle-orm";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { project } from "./project.ts";
+import { member } from "./workspace.ts";
+
+const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
+
+/**
+ * What an Agent Member carries beyond a Human: where deevy delivers its
+ * triggers, and how often a schedule fires (PLAN.md). One row per Agent; a
+ * Human has none.
+ */
+export const agent = sqliteTable("agent", {
+  memberId: text("member_id")
+    .primaryKey()
+    .references(() => member.id, { onDelete: "cascade" }),
+  /** The Agent polls its inbox over MCP when this is null (ADR-0003). */
+  webhookUrl: text("webhook_url"),
+  webhookSecret: text("webhook_secret"),
+  /** The schedule trigger, in minutes. Null is no schedule. */
+  scheduleMinutes: integer("schedule_minutes"),
+  scheduleRanAt: integer("schedule_ran_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
+});
+
+/**
+ * The Projects an Agent may see. A Human is not scoped in v1, so only Agents
+ * have rows here; an ungranted Project is NOT_FOUND to the Agent (ADR-0004).
+ */
+export const projectGrant = sqliteTable(
+  "project_grant",
+  {
+    memberId: text("member_id")
+      .notNull()
+      .references(() => member.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    grantedBy: text("granted_by").references(() => member.id, { onDelete: "set null" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.memberId, table.projectId] }),
+    index("project_grant_projectId_idx").on(table.projectId),
+  ],
+);

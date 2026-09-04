@@ -454,12 +454,26 @@ const ProjectKeyLookup = z.string().trim().toUpperCase().regex(ProjectKeyPattern
  */
 const QueryFlag = z.union([z.boolean(), z.stringbool()]);
 
+/**
+ * An Agent sees only the Projects it was granted, and an ungranted Project does
+ * not exist to it rather than being forbidden (docs/plans/m2.md). The check sits
+ * here and in requireIssue because those are the two places that already hold
+ * the Project row; a middleware would have to resolve the id a second time.
+ */
+function assertProjectVisible(context: ContextFor<"member">, projectId: string): void {
+  const granted = context.grantedProjectIds;
+  if (granted && !granted.includes(projectId)) {
+    throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+  }
+}
+
 /** The Project an operation names by key, or NOT_FOUND. Scoped to the Workspace. */
 async function requireProject(context: ContextFor<"member">, key: string) {
   const found = await context.db.query.project.findFirst({
     where: { workspaceId: context.workspace.id, key },
   });
   if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+  assertProjectVisible(context, found.id);
   return found;
 }
 
@@ -509,6 +523,7 @@ export const projects = {
     method: "GET",
     path: "/projects",
     auth: "member",
+    agents: true,
     input: z.object({
       /** Archived Projects are left out unless asked for. */
       includeArchived: QueryFlag.default(false),
@@ -519,6 +534,7 @@ export const projects = {
         where: {
           workspaceId: context.workspace.id,
           ...(input.includeArchived ? {} : { archivedAt: { isNull: true } }),
+          ...(context.grantedProjectIds ? { id: { in: context.grantedProjectIds } } : {}),
         },
         with: { states: { orderBy: { position: "asc" } }, team: true },
         orderBy: { createdAt: "asc" },
@@ -533,6 +549,7 @@ export const projects = {
     method: "GET",
     path: "/projects/{key}",
     auth: "member",
+    agents: true,
     input: z.object({ key: ProjectKeyLookup }),
     output: ProjectWithStatesSchema,
     handler: async ({ input, context }) => {
@@ -861,6 +878,7 @@ async function requireIssue(context: ContextFor<"member">, key: string) {
     where: { workspaceId: context.workspace.id, key: parsed.projectKey },
   });
   if (!project) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
+  assertProjectVisible(context, project.id);
   const found = await context.db.query.issue.findFirst({
     where: { projectId: project.id, number: parsed.number },
   });
@@ -1173,6 +1191,7 @@ export const issues = {
     method: "POST",
     path: "/issues",
     auth: "member",
+    agents: true,
     input: z.object({
       projectKey: ProjectKeyLookup,
       title: z.string().trim().min(1).max(300),
@@ -1232,6 +1251,7 @@ export const issues = {
     method: "GET",
     path: "/projects/{projectKey}/issues",
     auth: "member",
+    agents: true,
     input: z.object({
       projectKey: ProjectKeyLookup,
       /** Return Issues numbered above this. Pass back the previous page's nextCursor. */
@@ -1278,6 +1298,7 @@ export const issues = {
     method: "GET",
     path: "/issues/{key}",
     auth: "member",
+    agents: true,
     input: z.object({ key: z.string() }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
@@ -1292,6 +1313,7 @@ export const issues = {
     method: "POST",
     path: "/issues/{key}/move",
     auth: "member",
+    agents: true,
     input: z.object({ key: z.string(), stateId: z.string() }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
@@ -1324,6 +1346,7 @@ export const issues = {
     method: "PUT",
     path: "/issues/{key}/labels",
     auth: "member",
+    agents: true,
     input: z.object({ key: z.string(), labelIds: z.array(z.string()) }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
@@ -1365,6 +1388,7 @@ export const issues = {
     method: "PATCH",
     path: "/issues/{key}",
     auth: "member",
+    agents: true,
     input: z.object({
       key: z.string(),
       title: z.string().trim().min(1).max(300).optional(),
@@ -1498,6 +1522,7 @@ export const labels = {
     method: "GET",
     path: "/labels",
     auth: "member",
+    agents: true,
     input: NoInput,
     output: z.object({ labels: z.array(LabelSchema) }),
     handler: async ({ context }) => {
@@ -1515,6 +1540,7 @@ export const labels = {
     method: "POST",
     path: "/labels",
     auth: "member",
+    agents: true,
     input: z.object({
       /** Null for a plain Label; an Issue carries at most one Label per scope. */
       scope: z.string().trim().min(1).max(40).nullish(),
@@ -1655,6 +1681,7 @@ export const comments = {
     method: "GET",
     path: "/issues/{issueKey}/comments",
     auth: "member",
+    agents: true,
     input: z.object({ issueKey: z.string() }),
     output: z.object({ comments: z.array(CommentWithAuthorSchema) }),
     handler: async ({ input, context }) => {
@@ -1677,6 +1704,7 @@ export const comments = {
     method: "POST",
     path: "/issues/{issueKey}/comments",
     auth: "member",
+    agents: true,
     input: z.object({ issueKey: z.string(), body: z.string().trim().min(1).max(100_000) }),
     output: CommentWithAuthorSchema,
     handler: async ({ input, context }) => {
@@ -1771,6 +1799,7 @@ export const inbox = {
     method: "GET",
     path: "/inbox",
     auth: "member",
+    agents: true,
     input: z.object({
       unreadOnly: QueryFlag.optional(),
       /** Return Notifications older than this id's position. */
@@ -1973,6 +2002,7 @@ export const links = {
     method: "GET",
     path: "/issues/{issueKey}/links",
     auth: "member",
+    agents: true,
     input: z.object({ issueKey: z.string() }),
     output: z.object({ links: z.array(IssueLinkWithRepositorySchema) }),
     handler: async ({ input, context }) => {
@@ -1992,6 +2022,7 @@ export const links = {
     method: "POST",
     path: "/issues/{issueKey}/links",
     auth: "member",
+    agents: true,
     input: z.object({
       issueKey: z.string(),
       url: z.url().max(2000),
@@ -2071,6 +2102,7 @@ export const documents = {
     method: "GET",
     path: "/issues/{issueKey}/documents",
     auth: "member",
+    agents: true,
     input: z.object({ issueKey: z.string() }),
     output: z.object({ documents: z.array(DocumentSchema) }),
     handler: async ({ input, context }) => {
@@ -2089,6 +2121,7 @@ export const documents = {
     method: "GET",
     path: "/issues/{issueKey}/documents/{name}",
     auth: "member",
+    agents: true,
     input: z.object({
       issueKey: z.string(),
       name: z.string(),
@@ -2116,6 +2149,7 @@ export const documents = {
     method: "POST",
     path: "/issues/{issueKey}/documents/{name}",
     auth: "member",
+    agents: true,
     input: z.object({
       issueKey: z.string(),
       name: z.string(),

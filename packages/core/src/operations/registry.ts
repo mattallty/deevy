@@ -20,6 +20,11 @@ export interface AppContext {
   session: Session | null;
   member: Member | null;
   workspace: Workspace | null;
+  /**
+   * The Projects an Agent principal may see, resolved once per request. `null`
+   * means every Project: a Human is not scoped in v1 (docs/plans/m2.md).
+   */
+  grantedProjectIds?: string[] | null;
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"
@@ -35,7 +40,20 @@ export interface OperationMeta {
   method: HttpMethod;
   path: `/${string}`;
   auth: AuthRule;
+  /**
+   * An Agent Member may call this operation, scoped to its granted Projects
+   * (ADR-0004). Default-deny: omitted means Humans only, so an operation added
+   * later is refused to Agents until someone decides otherwise. Only sayable on
+   * a `member` operation, which is how ADR-0004's "never administer" becomes a
+   * compile error rather than a test.
+   */
+  agents?: true;
 }
+
+/** `agents` is unsayable on anything but a `member` operation (ADR-0004). */
+export type AgentAccess<TAuth extends AuthRule> = TAuth extends "member"
+  ? { agents?: true }
+  : { agents?: never };
 
 /**
  * A streaming operation: the same shape, but its handler returns an async
@@ -43,33 +61,32 @@ export interface OperationMeta {
  * third surface of ADR-0005, so it stays inside the registry like the rest
  * (ADR-0009).
  */
-export interface StreamOperationDef<
-  TAuth extends AuthRule,
-  TInput extends AnySchema,
-> extends OperationMeta {
-  auth: TAuth;
-  input: TInput;
-  output: AnySchema;
-  handler: (args: {
-    input: InferSchemaOutput<TInput>;
-    context: ContextFor<TAuth>;
-    signal?: AbortSignal;
-  }) => AsyncGenerator<unknown, void, unknown>;
-}
+export type StreamOperationDef<TAuth extends AuthRule, TInput extends AnySchema> = OperationMeta &
+  AgentAccess<TAuth> & {
+    auth: TAuth;
+    input: TInput;
+    output: AnySchema;
+    handler: (args: {
+      input: InferSchemaOutput<TInput>;
+      context: ContextFor<TAuth>;
+      signal?: AbortSignal;
+    }) => AsyncGenerator<unknown, void, unknown>;
+  };
 
-export interface OperationDef<
+export type OperationDef<
   TAuth extends AuthRule,
   TInput extends AnySchema,
   TOutput extends AnySchema,
-> extends OperationMeta {
-  auth: TAuth;
-  input: TInput;
-  output: TOutput;
-  handler: (args: {
-    input: InferSchemaOutput<TInput>;
-    context: ContextFor<TAuth>;
-  }) => Promise<InferSchemaInput<TOutput>>;
-}
+> = OperationMeta &
+  AgentAccess<TAuth> & {
+    auth: TAuth;
+    input: TInput;
+    output: TOutput;
+    handler: (args: {
+      input: InferSchemaOutput<TInput>;
+      context: ContextFor<TAuth>;
+    }) => Promise<InferSchemaInput<TOutput>>;
+  };
 
 /** Input for operations that take nothing: the RPC link sends undefined, the OpenAPI handler an empty object (GET inputs must be objects). */
 export const NoInput = z.object({}).optional();
@@ -81,7 +98,8 @@ export const [operationMeta, getOperationMeta] = defineMeta(
 
 export const base = os.$context<AppContext>();
 
-function authorize(rule: AuthRule) {
+function authorize(meta: OperationMeta) {
+  const rule = meta.auth;
   return base.middleware(async ({ context, next }) => {
     if (rule === "public") return next();
     if (!context.session) throw new ORPCError("UNAUTHORIZED");
@@ -93,6 +111,9 @@ function authorize(rule: AuthRule) {
     }
     if (rule === "admin" && context.member.role !== "admin") {
       throw new ORPCError("FORBIDDEN", { message: "Only an admin of this Workspace can do that" });
+    }
+    if (context.member.kind === "agent" && !meta.agents) {
+      throw new ORPCError("FORBIDDEN", { message: "An Agent cannot do that" });
     }
     return next();
   });
@@ -109,9 +130,10 @@ export function defineOperation<
     method: def.method,
     path: def.path,
     auth: def.auth,
+    ...(def.agents ? { agents: def.agents } : {}),
   };
   return base
-    .use(authorize(def.auth))
+    .use(authorize(meta))
     .meta(operationMeta(meta))
     .meta(
       openapi({ method: def.method, path: def.path, operationId: def.name, summary: def.summary }),
@@ -135,9 +157,10 @@ export function defineStreamOperation<TAuth extends AuthRule, TInput extends z.Z
     method: def.method,
     path: def.path,
     auth: def.auth,
+    ...(def.agents ? { agents: def.agents } : {}),
   };
   return base
-    .use(authorize(def.auth))
+    .use(authorize(meta))
     .meta(operationMeta(meta))
     .meta(
       openapi({ method: def.method, path: def.path, operationId: def.name, summary: def.summary }),
