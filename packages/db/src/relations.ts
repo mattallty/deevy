@@ -127,6 +127,7 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     agent: r.one.member({ from: r.run.agentMemberId, to: r.member.id, optional: false }),
     triggeredBy: r.one.member({ from: r.run.triggeredByMemberId, to: r.member.id }),
     activities: r.many.activity({ from: r.run.id, to: r.activity.runId }),
+    links: r.many.issueLink({ from: r.run.id, to: r.issueLink.runId }),
   },
   activity: {
     run: r.one.run({ from: r.activity.runId, to: r.run.id, optional: false }),
@@ -134,6 +135,7 @@ const appRelations = defineRelationsPart(tables, (r) => ({
   issueLink: {
     issue: r.one.issue({ from: r.issueLink.issueId, to: r.issue.id, optional: false }),
     repository: r.one.repository({ from: r.issueLink.repositoryId, to: r.repository.id }),
+    run: r.one.run({ from: r.issueLink.runId, to: r.run.id }),
   },
   comment: {
     issue: r.one.issue({ from: r.comment.issueId, to: r.issue.id, optional: false }),

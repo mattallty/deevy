@@ -1,0 +1,179 @@
+import { createTimerCron, openDatabase } from "@deevy/adapters/node";
+import type { Cron } from "@deevy/core";
+import {
+  issue as issueTable,
+  member as memberTable,
+  project as projectTable,
+  run as runTable,
+  user as userTable,
+  workflowState,
+  workspace as workspaceTable,
+  type Db,
+} from "@deevy/db";
+import { afterEach, describe, expect, it } from "vite-plus/test";
+import { startRunner } from "../src/runner.ts";
+
+const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname;
+const MINUTE = 60_000;
+
+const closers: Array<() => void> = [];
+afterEach(() => {
+  for (const close of closers.splice(0)) close();
+});
+
+function emptyDatabase() {
+  const { db, close } = openDatabase({ path: ":memory:", migrationsFolder });
+  closers.push(close);
+  return db;
+}
+
+/** A Workspace with one Agent and one Issue, straight into the tables. */
+async function seedWorkspace(db: Db) {
+  const workspaceId = crypto.randomUUID();
+  await db.insert(workspaceTable).values({ id: workspaceId, name: "deevy", slug: "deevy" });
+  const userId = crypto.randomUUID();
+  await db.insert(userTable).values({ id: userId, name: "Planner", email: "planner@example.com" });
+  const agentMemberId = crypto.randomUUID();
+  await db.insert(memberTable).values({ id: agentMemberId, workspaceId, userId, kind: "agent" });
+  const projectId = crypto.randomUUID();
+  await db.insert(projectTable).values({ id: projectId, workspaceId, key: "DEV", name: "deevy" });
+  const stateId = crypto.randomUUID();
+  await db
+    .insert(workflowState)
+    .values({ id: stateId, projectId, name: "Doing", position: 1, category: "active" });
+  const issueId = crypto.randomUUID();
+  await db
+    .insert(issueTable)
+    .values({ id: issueId, projectId, number: 1, title: "Ship the thing", stateId });
+  return { workspaceId, agentMemberId, issueId };
+}
+
+/** Silent Runs on that Issue, `silentMinutes` since anyone heard from the Agent. */
+async function seedRuns(
+  db: Db,
+  where: { issueId: string; agentMemberId: string },
+  count: number,
+  silentMinutes: number,
+) {
+  await db.insert(runTable).values(
+    Array.from({ length: count }, () => ({
+      id: crypto.randomUUID(),
+      ...where,
+      trigger: "manual" as const,
+      status: "active" as const,
+      lastActivityAt: new Date(Date.now() - silentMinutes * MINUTE),
+    })),
+  );
+}
+
+/** A Cron that never ticks on its own, so a test decides when time passes. */
+function manualCron() {
+  const registered: Array<{ seconds: number; run: (signal: AbortSignal) => Promise<void> }> = [];
+  let stops = 0;
+  const cron: Cron = {
+    every(seconds, run) {
+      registered.push({ seconds, run });
+      return () => {
+        stops += 1;
+      };
+    },
+  };
+  const tick = () => {
+    const first = registered[0];
+    if (!first) throw new Error("the runner registered no schedule");
+    return first.run(new AbortController().signal);
+  };
+  return { cron, registered, tick, stopped: () => stops };
+}
+
+async function statuses(db: Db) {
+  return (await db.query.run.findMany()).map((row) => row.status);
+}
+
+function timeouts() {
+  return process.getActiveResourcesInfo().filter((kind) => kind === "Timeout").length;
+}
+
+describe("the runner", () => {
+  it("registers the sweep at the configured interval and moves silent Runs on a tick", async () => {
+    const db = emptyDatabase();
+    const seed = await seedWorkspace(db);
+    await seedRuns(db, seed, 1, 31);
+    const { cron, registered, tick } = manualCron();
+
+    const runner = startRunner({ db, cron, staleMinutes: 30, sweepIntervalSeconds: 45 });
+    await tick();
+
+    expect(registered[0]?.seconds).toBe(45);
+    expect(await statuses(db)).toEqual(["stale"]);
+    await runner.stop();
+  });
+
+  it("does nothing until the Workspace exists, because it is created on the first sign-in", async () => {
+    const db = emptyDatabase();
+    const { cron, tick } = manualCron();
+
+    const runner = startRunner({ db, cron });
+
+    await expect(tick()).resolves.toBeUndefined();
+    await runner.stop();
+  });
+
+  it("sweeps again while there is more, but only so many times in one tick", async () => {
+    const db = emptyDatabase();
+    const seed = await seedWorkspace(db);
+    await seedRuns(db, seed, 25, 31);
+    const { cron, tick } = manualCron();
+
+    const runner = startRunner({ db, cron, sweepLimit: 10, maxPassesPerTick: 2 });
+    await tick();
+
+    // Two passes of ten: the rest waits for the next tick rather than making
+    // one tick unbounded.
+    expect((await statuses(db)).filter((status) => status === "stale")).toHaveLength(20);
+    await tick();
+    expect((await statuses(db)).filter((status) => status === "stale")).toHaveLength(25);
+    await runner.stop();
+  });
+
+  it("stops only once the sweep in flight has finished", async () => {
+    const db = emptyDatabase();
+    const seed = await seedWorkspace(db);
+    await seedRuns(db, seed, 1, 31);
+    const { cron, tick, stopped } = manualCron();
+    const runner = startRunner({ db, cron });
+
+    const inFlight = tick();
+    await runner.stop();
+
+    expect(await statuses(db)).toEqual(["stale"]);
+    expect(stopped()).toBe(1);
+    await inFlight;
+  });
+
+  it("leaves no timer holding the process open", async () => {
+    const db = emptyDatabase();
+    const seed = await seedWorkspace(db);
+    await seedRuns(db, seed, 1, 31);
+    const before = timeouts();
+
+    const runner = startRunner({
+      db,
+      cron: createTimerCron(),
+      sweepIntervalSeconds: 0.005,
+    });
+    const deadline = Date.now() + 2000;
+    while (!(await statuses(db)).includes("stale")) {
+      if (Date.now() > deadline) throw new Error("the runner never swept");
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    // Nothing the runner started may keep the event loop alive: a process that
+    // will not exit is the failure this test exists to catch.
+    expect(timeouts()).toBe(before);
+
+    await runner.stop();
+    const after = (await db.query.event.findMany()).length;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect((await db.query.event.findMany()).length).toBe(after);
+  });
+});

@@ -21,18 +21,21 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
 
 ## Environment
 
-| Variable               | Required | What it does                                                                |
-| ---------------------- | -------- | --------------------------------------------------------------------------- |
-| `BETTER_AUTH_URL`      | yes      | The public URL. Sign-in callbacks derive from it, so it must match reality. |
-| `BETTER_AUTH_SECRET`   | yes      | At least 32 random characters. Changing it signs everyone out.              |
-| `GITHUB_CLIENT_ID`     | yes      | GitHub OAuth App. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.   |
-| `GITHUB_CLIENT_SECRET` | yes      | As above.                                                                   |
-| `DEEVY_ADMIN_EMAIL`    | yes      | The first sign-in with this address creates the Workspace and is its admin. |
-| `DEEVY_WORKSPACE_NAME` | no       | The Workspace's initial name. Renameable later under Settings, Workspace.   |
-| `DEEVY_DATABASE_PATH`  | no       | Defaults to `/data/deevy.sqlite`, inside the volume.                        |
-| `DEEVY_PORT`           | no       | Defaults to 3000.                                                           |
-| `DEEVY_WEB_ORIGIN`     | no       | Extra browser origin allowed to call the API with cookies. Only for split   |
-|                        |          | deployments; the single container serves the SPA from its own origin.       |
+| Variable                       | Required | What it does                                                                |
+| ------------------------------ | -------- | --------------------------------------------------------------------------- |
+| `BETTER_AUTH_URL`              | yes      | The public URL. Sign-in callbacks derive from it, so it must match reality. |
+| `BETTER_AUTH_SECRET`           | yes      | At least 32 random characters. Changing it signs everyone out.              |
+| `GITHUB_CLIENT_ID`             | yes      | GitHub OAuth App. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.   |
+| `GITHUB_CLIENT_SECRET`         | yes      | As above.                                                                   |
+| `DEEVY_ADMIN_EMAIL`            | yes      | The first sign-in with this address creates the Workspace and is its admin. |
+| `DEEVY_WORKSPACE_NAME`         | no       | The Workspace's initial name. Renameable later under Settings, Workspace.   |
+| `DEEVY_DATABASE_PATH`          | no       | Defaults to `/data/deevy.sqlite`, inside the volume.                        |
+| `DEEVY_PORT`                   | no       | Defaults to 3000.                                                           |
+| `DEEVY_WEB_ORIGIN`             | no       | Extra browser origin allowed to call the API with cookies. Only for split   |
+|                                |          | deployments; the single container serves the SPA from its own origin.       |
+| `DEEVY_RUN_STALE_MINUTES`      | no       | Silence after which a Run goes `stale`. Defaults to 30. `stale` is          |
+|                                |          | recoverable: the Agent's next Activity puts the Run back to `active`.       |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | no       | How often the background runner looks for silent Runs. Defaults to 60.      |
 
 The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
 created before that will ask for the extra scope at the next sign-in.

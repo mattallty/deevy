@@ -6,7 +6,15 @@ import { member } from "./workspace.ts";
 
 const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
 
-export const notificationKinds = ["mention", "assignment", "gate_awaiting"] as const;
+export const notificationKinds = [
+  "mention",
+  "assignment",
+  "gate_awaiting",
+  /** An Agent asked its Run's Human a question, and the Run waits (docs/plans/m2.md). */
+  "run_awaiting_input",
+  /** A Run ended, completed or failed. */
+  "run_finished",
+] as const;
 
 /**
  * A message to a Human derived from Events (CONTEXT.md): a mention, an

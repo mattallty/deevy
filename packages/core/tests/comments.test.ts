@@ -144,8 +144,9 @@ describe("mentions in an Issue description", () => {
 
     const page = await client.events.list({ subjectType: "issue" });
     const updated = page.events.findLast((e) => e.kind === "issue.updated");
-    expect((updated?.payload as { mentionedMemberIds?: string[] }).mentionedMemberIds).toEqual([
-      bob.member.id,
-    ]);
+    expect(updated).toBeDefined();
+    expect(
+      (updated?.payload as { mentionedMemberIds?: string[] } | undefined)?.mentionedMemberIds,
+    ).toEqual([bob.member.id]);
   });
 });

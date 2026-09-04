@@ -17,6 +17,14 @@ export {
   type EventPayload,
   type EventSource,
 } from "./events.ts";
+export {
+  discardingJobQueue,
+  type Cron,
+  type CronStop,
+  type Job,
+  type JobKind,
+  type JobQueue,
+} from "./jobs.ts";
 export { generateSpec } from "./openapi.ts";
 export {
   resolvePrincipal,
@@ -35,3 +43,10 @@ export {
   type Principal,
 } from "./operations/registry.ts";
 export { EventSchema, MemberSchema, UserSchema, WorkspaceSchema } from "./schemas.ts";
+export {
+  defaultSilenceMs,
+  defaultSweepLimit,
+  sweepStaleRuns,
+  type SweepResult,
+  type SweepStaleRunsOptions,
+} from "./work.ts";
