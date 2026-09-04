@@ -307,6 +307,23 @@ describe("runs.requestApproval", () => {
     expect(elicitation?.payload).toMatchObject({ gateStateId: plan.id, url: asked.url });
   });
 
+  it("says a Gate that names nobody is any Human's to decide, not nobody's", async () => {
+    const { db, asAdmin, asAgent } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+
+    const asked = await asAgent.runs.requestApproval({ runId: run.id });
+
+    // The answer says the rule rather than leaving it to be inferred from an
+    // empty list. An Agent reading one saw "nobody was asked" and reported
+    // that the request would sit there for ever; every active Human was in
+    // fact notified (docs/plans/m3.md).
+    expect(asked.approvers).toEqual({ kind: "any_human" });
+    const told = await db.query.notification.findMany({ where: { kind: "gate_awaiting" } });
+    expect(told.length).toBeGreaterThan(0);
+  });
+
   it("asks the Humans the Gate names, and not the Sponsor behind the Run", async () => {
     const { db, admin, asAdmin, asAgent } = await workspaceWithAgent();
     const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
@@ -327,7 +344,7 @@ describe("runs.requestApproval", () => {
 
     const asked = await asAgent.runs.requestApproval({ runId: run.id });
 
-    expect(asked.approverMemberIds).toEqual([bob.member.id]);
+    expect(asked.approvers).toEqual({ kind: "named", memberIds: [bob.member.id] });
     const told = await db.query.notification.findMany({ where: { kind: "gate_awaiting" } });
     // Ada is the Agent's Sponsor and an admin, and is still not asked: the Gate
     // names Bob, and a Gate decides who decides it (ADR-0004).

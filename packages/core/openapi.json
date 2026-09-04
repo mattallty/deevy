@@ -863,11 +863,43 @@
                     "url": {
                       "type": "string"
                     },
-                    "approverMemberIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
+                    "approvers": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "any_human"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "named"
+                            },
+                            "memberIds": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "memberIds"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
                     },
                     "decidedByMemberId": {
                       "type": [
@@ -888,7 +920,7 @@
                     "stateId",
                     "stateName",
                     "url",
-                    "approverMemberIds",
+                    "approvers",
                     "decidedByMemberId",
                     "note"
                   ],
