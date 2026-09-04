@@ -377,17 +377,19 @@ export async function sweepSchedules({
 export const defaultDeliveryLimit = 20;
 
 /**
- * Attempts before a Slack message is given up on. Six with the backoff below
- * spans about an hour and a half, which outlasts a Slack incident but not a
- * webhook URL that has been revoked.
+ * Attempts before a Slack message is given up on. Six, with the backoff below,
+ * spans about a quarter of an hour: long enough to ride out a blip, and a
+ * missed Notification still has the inbox behind it.
  */
 export const maxDeliveryAttempts = 6;
 
 /**
- * A webhook is given up on later than a Slack message: eight attempts spread
- * over most of a day. A room that missed a Notification has the inbox behind
- * it, but an Agent's runtime that misses a trigger simply never starts, and
- * ADR-0003 makes delivering triggers reliably deevy's side of the bargain.
+ * A webhook is given up on later than a Slack message, at eight attempts and
+ * about twenty minutes. That does not outlast a runtime that is down for an
+ * afternoon, and it is not meant to: ADR-0003 pairs retries with polling, and
+ * an Agent that comes back later finds its work with runs.list rather than
+ * waiting to be told again. Widening the window instead would mean holding a
+ * trigger long after it stopped being news.
  */
 export const maxWebhookAttempts = 8;
 

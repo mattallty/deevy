@@ -22,6 +22,8 @@ import {
   grantedProjects,
   reloadAgent,
   requireSponsoredAgent,
+  SubscriptionSecret,
+  SubscriptionUrl,
 } from "./shared.ts";
 
 export const agents = {
@@ -81,7 +83,13 @@ export const agents = {
       name: z.string().trim().min(1).max(80).optional(),
       handle: HandleInput.optional(),
       /** Null clears it: the Agent polls its inbox over MCP instead (ADR-0003). */
-      webhookUrl: z.url().max(2048).nullish(),
+      webhookUrl: SubscriptionUrl.nullish(),
+      /**
+       * The secret deevy signs its deliveries with. Required the first time a
+       * URL is set, because deevy returns no secret by construction and one it
+       * invented would sign with a value the receiver could never hold.
+       */
+      webhookSecret: SubscriptionSecret.optional(),
       /**
        * How often the schedule trigger wakes this Agent on the Issues assigned
        * to it (docs/plans/m2.md). Null is no schedule, which is the default: an
@@ -111,7 +119,13 @@ export const agents = {
         changed.name = input.name;
       }
       if (input.webhookUrl !== undefined) {
-        await setAgentWebhook(context.db, found.id, context.workspace.id, input.webhookUrl ?? null);
+        await setAgentWebhook(
+          context.db,
+          found.id,
+          context.workspace.id,
+          input.webhookUrl ?? null,
+          input.webhookSecret,
+        );
         // The URL is a destination, not a credential, so it is safe in the log;
         // the subscription's secret never is (slice 5).
         changed.webhookUrl = input.webhookUrl ?? null;

@@ -48,6 +48,9 @@ describe("the committed tool manifest", () => {
       "labels_list",
       "links_add",
       "runs_finish",
+      // Without it an Agent cannot read its own Activity feed, so a Human's
+      // answer to a free-form elicitation never reaches the loop that asked.
+      "runs_get",
       // Not in PLAN.md's list, and needed: an Agent whose Run a trigger opened
       // has no other way to find it, and its inbox is always empty because
       // Notifications are derived for Humans. Without this the polling

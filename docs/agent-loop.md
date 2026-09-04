@@ -1,0 +1,147 @@
+# A worked agent loop
+
+deevy never runs an agent (ADR-0003). It gives an Agent an identity, tells it there is work, and takes a Run
+back; the running happens outside. This is one worked example of the outside part: a Claude Code loop that
+picks up an Issue assigned to it, writes the plan Document, stops at the Plan Gate, and carries on once a
+Human approves in deevy.
+
+It is an example, not a product. The reference runtime — Claude Code headless in a GitHub Action and as a
+local loop, with a webhook receiver — is M4. Everything here is configuration and prose you can copy, and
+every tool named is in `packages/core/mcp-tools.json`.
+
+## What the Human sets up first
+
+1. Under **Settings, Agents**, create an Agent. Call it `planner`. The Human who creates it is its Sponsor and
+   is accountable for it.
+2. Grant it the Project it should work in. An Agent starts with no Projects, and one it was not granted does
+   not exist to it — it reads as "No such Project", not as a refusal.
+3. Issue an API key. The plaintext is shown **once**. Put it somewhere the loop can read it as
+   `DEEVY_AGENT_KEY`.
+4. On the Project's workflow, set the Plan State's "assign an Agent on entering" to `planner`, or simply
+   assign an Issue to `planner` by hand. Either is a trigger, and either opens a Run in `pending`.
+
+## The MCP configuration
+
+Claude Code reaches deevy over HTTP, authenticating with the Agent's key as a bearer token. In the loop's
+repository, `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "deevy": {
+      "type": "http",
+      "url": "https://deevy.example.com/mcp",
+      "headers": { "Authorization": "Bearer ${DEEVY_AGENT_KEY}" }
+    }
+  }
+}
+```
+
+`${DEEVY_AGENT_KEY}` is expanded from the environment, so the key itself stays out of the file and out of git.
+The equivalent one-liner, which writes the same entry:
+
+```bash
+claude mcp add --transport http deevy https://deevy.example.com/mcp \
+  --header "Authorization: Bearer $DEEVY_AGENT_KEY"
+```
+
+Tools arrive namespaced: `issues_get` is `mcp__deevy__issues_get` to Claude Code. A headless loop that should
+touch nothing else runs with `--strict-mcp-config` and an explicit allowlist:
+
+```bash
+claude -p "Work your next assigned Issue." \
+  --strict-mcp-config --mcp-config .mcp.json \
+  --allowedTools "mcp__deevy__inbox_list,mcp__deevy__runs_list,mcp__deevy__issues_get,\
+mcp__deevy__documents_get,mcp__deevy__documents_write,mcp__deevy__runs_post_activity,\
+mcp__deevy__runs_request_approval,mcp__deevy__links_add,mcp__deevy__runs_finish"
+```
+
+deevy filters `tools/list` to what this principal may call, so an Agent never sees `gates_approve` — but that
+is display. The refusal is the same one the HTTP API gives, in the same middleware, whichever surface asked
+(ADR-0011).
+
+## The `CLAUDE.md` snippet
+
+This is what tells the loop how to work an Issue. Put it in the loop's repository, not in deevy.
+
+```markdown
+## Working an Issue in deevy
+
+deevy is where this work is tracked. You are a Member there with your own identity: everything you do is
+recorded against you, and a Human — your Sponsor — is accountable for you. Use the `deevy` MCP tools; do not
+call the HTTP API by hand.
+
+Work one Issue at a time, in this order.
+
+1. **Find the work.** `inbox_list` with `unreadOnly: true`. An `assignment` Notification carries the Issue and
+   its key, such as `DEV-42`. Ignore every other kind.
+2. **Find your Run.** `runs_list` with that `issueKey`. The trigger that assigned you already opened a Run in
+   `pending`; its `id` is what every later call needs. Only if there is none, open one with `runs_start`.
+3. **Read before you write.** `issues_get` for the Issue and its State, then `documents_get` for `intent`, and
+   for `spec` when the Issue is past the Spec Gate. The Documents are the brief. The description is a title
+   with more words.
+4. **Narrate as you go.** `runs_post_activity` with `kind: "thought"` for a decision you are about to make and
+   `kind: "action"` for a step you have taken. Keep them short and factual: this feed is what a Human reads to
+   see what you did, and it is the only record of your reasoning. Your first Activity moves the Run to
+   `active`.
+5. **Write the Document the State asks for.** In the Plan State that is `plan`: `documents_write` with
+   `name: "plan"` and a body under the headings the template gives — Files that change, Order of work, Tests
+   that prove it. Writing it again makes a new version; older versions stay readable, so do not paste an old
+   one back to "restore" it.
+6. **Stop at the Gate.** Do not try to move the Issue out of a Gate and do not approve one: you cannot, and
+   failing at it is not a plan. Call `runs_request_approval` with your `runId`. It puts your Run in
+   `awaiting_input`, writes an elicitation carrying a deevy URL, and notifies the Humans who decide that Gate.
+   Calling it again is the same question, not a second one. When a Human has decided, the same call answers
+   `approved` or `rejected` with their note. Rejected means read the note and revise the Document; it does not
+   mean ask again.
+7. **Attach the evidence.** `links_add` with the Run's id and the pull request URL, so what you produced is
+   attributed to the attempt that produced it. Use `comments_create` if a Human needs to be told something in
+   prose; mention them by handle.
+8. **Finish.** `runs_finish` with `status: "completed"` and a summary a Human can act on: what you did, what
+   you decided, and what you recommend. You recommend; a Human approves.
+
+If you cannot go on — a missing Document, a Project you cannot see, a tool that refuses — post
+`runs_post_activity` with `kind: "error"` saying exactly what stopped you, then `runs_finish` with
+`status: "failed"` and the same explanation. A Run left open goes `stale` after thirty minutes of silence,
+which tells a Human nothing about why.
+
+"No such Project" means you were not granted it. Ask your Sponsor in a comment; do not retry.
+```
+
+## What the Human does
+
+They get a Notification the moment the Run stops: an inbox row always, and a Slack message when the Workspace
+routes `gate_awaiting` to a Channel. The Gate decides who is told — the approvers it names, or every active
+Human when it names none — not the Human behind the Run.
+
+The Notification and the elicitation both carry the same link, `/issues/DEV-42?gate=<stateId>`. Opening it
+puts the Human on the Issue page with that Gate focused, next to the plan Document the Agent just wrote and
+the Activity feed that says how it got there. They approve or reject, with a note.
+
+Approving is the one thing that has to happen in deevy, in a browser. A Human's own MCP client holds a valid
+credential for that Human and is still refused: the party that proposes has no route to approve, and a
+delegated credential is not the Human (ADR-0010).
+
+The decision appends a Gate Event, moves the Issue to the next State, and resumes whatever Run stopped at that
+Gate. The loop's next `runs_request_approval` gets `approved` and the ruling arrives in its own feed as a
+`prompt` Activity, which is the same shape a Human's answer to any other elicitation arrives in.
+
+## What it leaves behind
+
+The Event log tells the whole story with the Agent as the actor and the Human one hop away: `run.started`
+carrying the trigger, `run.activity` per Activity, `run.awaiting_input` carrying the Gate, `gate.approved`
+with the deciding Human, `run.completed` with the summary. The Issue carries the Documents at every version
+they passed through, the Links the Run attached, and the Gate decisions with their notes.
+
+## Known edges of this example
+
+- **Reading an answer to an ordinary elicitation.** `runs_request_approval` reports its own outcome, so a Gate
+  needs nothing else. A plain `elicitation` Activity is answered by a Human through the `runs.answer`
+  operation, which lands in the Run's feed — but the feed is read by `runs.get`, and that one is not projected
+  as a tool. A loop that asks free-form questions reads the answer over the HTTP API with the same key
+  (`GET /api/runs/{runId}`), or asks through a Gate instead.
+- **Webhook instead of polling.** An Agent with a registered URL is told rather than asked: the `run.started`
+  delivery carries the Run's id as `subjectId`. It does not carry the Issue key, so the loop still calls
+  `runs_list` to get one. Verifying the signature is in [OPERATIONS.md](./OPERATIONS.md).
+- **One Run per Issue at a time.** `runs_start` on an Issue where this Agent already has an open Run is a
+  conflict, deliberately: two attempts claiming one outcome is not a record of anything.

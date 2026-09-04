@@ -223,6 +223,7 @@ describe("agents.update", () => {
       name: "Plan Writer",
       handle: "plan-writer",
       webhookUrl: "https://example.test/hook",
+      webhookSecret: "whsec_a_secret_the_receiver_holds",
     });
 
     // Read back through the operation rather than the table: where the URL is
@@ -485,6 +486,7 @@ describe("an Agent's own webhook", () => {
     await asAdmin.agents.update({
       memberId: created.id,
       webhookUrl: "https://runner.example/deevy",
+      webhookSecret: "whsec_a_secret_the_receiver_holds",
     });
 
     // Reading it back is the easy half; the half that was broken is whether
@@ -496,5 +498,50 @@ describe("an Agent's own webhook", () => {
 
     const owed = await db.query.delivery.findMany({ where: { target: "webhook" } });
     expect(owed.length).toBeGreaterThan(0);
+  });
+});
+
+describe("setting an Agent's webhook", () => {
+  it("refuses a cleartext URL, which would put signed Events on the wire", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    await expect(
+      asAda.agents.update({
+        memberId: created.id,
+        webhookUrl: "http://runner.example/deevy",
+        webhookSecret: "whsec_test_secret_value",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("takes the secret from the Sponsor, because a generated one nobody can read signs nothing", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    // No secret and no subscription yet: deevy cannot invent one, because the
+    // API returns no secret by construction and the receiver would have
+    // nothing to verify against.
+    await expect(
+      asAda.agents.update({ memberId: created.id, webhookUrl: "https://runner.example/deevy" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    await asAda.agents.update({
+      memberId: created.id,
+      webhookUrl: "https://runner.example/deevy",
+      webhookSecret: "whsec_the_sponsor_knows_this",
+    });
+    expect((await asAda.agents.list({})).agents[0]?.webhookUrl).toBe(
+      "https://runner.example/deevy",
+    );
+    // Changing only the URL later is fine: the secret it already has stands.
+    await asAda.agents.update({ memberId: created.id, webhookUrl: "https://runner.example/v2" });
+    expect((await asAda.agents.list({})).agents[0]?.webhookUrl).toBe("https://runner.example/v2");
   });
 });

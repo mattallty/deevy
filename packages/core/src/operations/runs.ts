@@ -435,6 +435,7 @@ export const runs = {
     path: "/runs/{runId}",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({ runId: z.string() }),
     output: RunDetailSchema,
     handler: async ({ input, context }) => {

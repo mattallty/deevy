@@ -5,6 +5,7 @@ import {
   webhookSubscription,
   type Db,
 } from "@deevy/db";
+import { ORPCError } from "@orpc/server";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { appendEvent, type EventSource } from "./events.ts";
@@ -132,6 +133,7 @@ export async function setAgentWebhook(
   memberId: string,
   workspaceId: string,
   url: string | null,
+  secret?: string,
 ): Promise<void> {
   const existing = await db.query.webhookSubscription.findFirst({ where: { memberId } });
   if (!url) {
@@ -146,18 +148,24 @@ export async function setAgentWebhook(
   if (existing) {
     await db
       .update(webhookSubscription)
-      .set({ url, disabledAt: null })
+      .set({ url, disabledAt: null, ...(secret ? { secret } : {}) })
       .where(eq(webhookSubscription.id, existing.id));
     return;
+  }
+  // deevy never reads a secret back, so it cannot invent one either: a
+  // generated secret would sign every delivery with a value the receiver has
+  // no way to learn, and the signature would be decoration.
+  if (!secret) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Give the secret deevy should sign this Agent's deliveries with",
+    });
   }
   await db.insert(webhookSubscription).values({
     id: crypto.randomUUID(),
     workspaceId,
     memberId,
     url,
-    // Generated here, shown nowhere: a receiver reads it from the Agent's
-    // own configuration, never from deevy's API (slice 5).
-    secret: `whsec_${crypto.randomUUID().replaceAll("-", "")}`,
+    secret,
     createdBy: memberId,
   });
 }
