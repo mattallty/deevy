@@ -20,6 +20,10 @@ export type Team = typeof import("./schema/project.ts").team.$inferSelect;
 export type Project = typeof import("./schema/project.ts").project.$inferSelect;
 export type Agent = typeof import("./schema/agent.ts").agent.$inferSelect;
 export type Run = typeof import("./schema/run.ts").run.$inferSelect;
+export type Channel = typeof import("./schema/channel.ts").channel.$inferSelect;
+export type RoutingRule = typeof import("./schema/channel.ts").routingRule.$inferSelect;
+export type NotificationPreference =
+  typeof import("./schema/channel.ts").notificationPreference.$inferSelect;
 export type Activity = typeof import("./schema/run.ts").activity.$inferSelect;
 export type ProjectGrant = typeof import("./schema/agent.ts").projectGrant.$inferSelect;
 export type WorkflowState = typeof import("./schema/project.ts").workflowState.$inferSelect;

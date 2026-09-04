@@ -96,6 +96,13 @@ export const workflowState = sqliteTable(
     /** The Document this State asks for, created from its template on entry. */
     documentName: text("document_name"),
     documentTemplate: text("document_template"),
+    /**
+     * The workflow rule: entering this State assigns the Issue to this Agent
+     * and starts a Run (PLAN.md's third trigger). Null is no rule.
+     */
+    triggerAgentMemberId: text("trigger_agent_member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
   },
   (table) => [index("workflow_state_projectId_position_idx").on(table.projectId, table.position)],
