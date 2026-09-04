@@ -379,6 +379,44 @@
     }
   },
   {
+    "name": "runs_list",
+    "operation": "runs.list",
+    "summary": "Runs on an Issue or by an Agent, newest first, from a cursor",
+    "readOnly": true,
+    "agents": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issueKey": {
+          "type": "string"
+        },
+        "agentMemberId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "active",
+            "awaiting_input",
+            "completed",
+            "failed",
+            "stale"
+          ]
+        },
+        "before": {
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      }
+    }
+  },
+  {
     "name": "runs_post_activity",
     "operation": "runs.postActivity",
     "summary": "Post one Activity to your Run: a thought, an action, an elicitation, or an error",
