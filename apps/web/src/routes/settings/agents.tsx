@@ -1,4 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
@@ -42,13 +55,14 @@ function grantSummary(count: number): string {
 export function AgentsPage() {
   const queryClient = useQueryClient();
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
-  const update = useMutation(
-    orpc.agents.update.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries();
-      },
-    }),
-  );
+  const [creating, setCreating] = useState(false);
+  const refresh = async () => {
+    await queryClient.invalidateQueries();
+  };
+  const update = useMutation(orpc.agents.update.mutationOptions({ onSuccess: refresh }));
+  const suspend = useMutation(orpc.agents.suspend.mutationOptions({ onSuccess: refresh }));
+  const reinstate = useMutation(orpc.agents.reinstate.mutationOptions({ onSuccess: refresh }));
+  const failed = suspend.error ?? reinstate.error ?? update.error;
 
   if (agents.isPending) return <p className="text-muted-foreground">Loading Agents…</p>;
   if (agents.isError) {
@@ -57,13 +71,19 @@ export function AgentsPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Agents</h1>
-        <p className="text-sm text-muted-foreground">
-          Every Agent works under its own identity, with exactly one Human accountable for it. A
-          schedule wakes an Agent on the Issues assigned to it, whether or not anything happened.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Agents</h1>
+          <p className="text-sm text-muted-foreground">
+            Every Agent works under its own identity, with exactly one Human accountable for it. A
+            schedule wakes an Agent on the Issues assigned to it, whether or not anything happened.
+          </p>
+        </div>
+        <Button onClick={() => setCreating(true)}>New Agent</Button>
       </header>
+
+      <NewAgent open={creating} onOpenChange={setCreating} />
+      {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       <section aria-label="Connect an Agent" className="flex flex-col gap-2 rounded-md border p-4">
         <h2 className="text-sm font-medium">Connect an Agent</h2>
@@ -98,7 +118,13 @@ export function AgentsPage() {
           {agents.data.agents.map((agent) => (
             <TableRow key={agent.id}>
               <TableCell>
-                <span className="font-medium">{agent.user.name}</span>
+                <Link
+                  to="/settings/agents/$memberId"
+                  params={{ memberId: agent.id }}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {agent.user.name}
+                </Link>
                 {agent.handle ? (
                   <span className="text-muted-foreground"> @{agent.handle}</span>
                 ) : null}
@@ -133,11 +159,31 @@ export function AgentsPage() {
                   ))}
                 </NativeSelect>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="flex items-center justify-end gap-2 text-right">
                 {agent.suspendedAt ? (
-                  <Badge variant="outline">Suspended</Badge>
+                  <>
+                    <Badge variant="outline">Suspended</Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={reinstate.isPending}
+                      onClick={() => reinstate.mutate({ memberId: agent.id })}
+                    >
+                      Reinstate
+                    </Button>
+                  </>
                 ) : (
-                  <Badge variant="secondary">Working</Badge>
+                  <>
+                    <Badge variant="secondary">Working</Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={suspend.isPending}
+                      onClick={() => suspend.mutate({ memberId: agent.id })}
+                    >
+                      Suspend
+                    </Button>
+                  </>
                 )}
               </TableCell>
             </TableRow>
@@ -145,5 +191,73 @@ export function AgentsPage() {
         </TableBody>
       </Table>
     </section>
+  );
+}
+
+/**
+ * Creating an Agent makes the Human who did it accountable for it (ADR-0001),
+ * so there is no Sponsor to choose here. The handle is slugged from the name
+ * when it is left out.
+ */
+function NewAgent({ open, onOpenChange }: { open: boolean; onOpenChange: (to: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
+
+  const create = useMutation(
+    orpc.agents.create.mutationOptions({
+      onSuccess: async () => {
+        setName("");
+        setHandle("");
+        onOpenChange(false);
+        await queryClient.invalidateQueries({ queryKey: orpc.agents.key() });
+      },
+    }),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New Agent</DialogTitle>
+          <DialogDescription>
+            You will be its Sponsor. It can see nothing until you grant it a Project, and it cannot
+            reach deevy until you issue it a key.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(submitted) => {
+            submitted.preventDefault();
+            create.mutate({ name: name.trim(), handle: handle.trim() || null });
+          }}
+        >
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="agent-name">Name</Label>
+            <Input
+              id="agent-name"
+              value={name}
+              onChange={(changed) => setName(changed.target.value)}
+              placeholder="Planner"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="agent-handle">Handle</Label>
+            <Input
+              id="agent-handle"
+              value={handle}
+              onChange={(changed) => setHandle(changed.target.value)}
+              placeholder="Left out, it is made from the name"
+            />
+          </div>
+          {create.error ? <p className="text-sm text-destructive">{create.error.message}</p> : null}
+          <DialogFooter>
+            <Button type="submit" disabled={create.isPending || !name.trim()}>
+              Create
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
