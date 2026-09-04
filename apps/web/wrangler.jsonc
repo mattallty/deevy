@@ -19,9 +19,10 @@
       // committed projection of packages/db/drizzle, written by
       // `vp run db#generate:d1` and diffed by `vp run db#check:migrations`.
       "migrations_dir": "../../packages/db/migrations",
-      // A placeholder: local D1 never reads it, and a deployment supplies the
-      // real one. Replacing it is part of releasing (docs/OPERATIONS.md).
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // No database_id on purpose. Wrangler provisions a database of the name
+      // above on the first deploy and remembers which one it is, so a fresh
+      // account needs no `d1 create` and nothing account-specific is committed
+      // to an open-source repository (docs/OPERATIONS.md).
     },
   ],
   // Every minute, the finest Cloudflare offers, which is why

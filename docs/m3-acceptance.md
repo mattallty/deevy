@@ -34,10 +34,11 @@ step that answers something else is where to stop.
 
 ## Part 1 — the Worker, from the tag
 
-1. **Settle the committed configuration, then tag.** Two deployment facts live in `apps/web/wrangler.jsonc`
-   rather than in a secret: the `database_id` from `wrangler d1 create deevy`, and the `vars` block naming
-   `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME`. Neither depends on the origin — everything that does is a
-   secret — so land both on `main` first and the tag needs no editing afterwards:
+1. **Settle the committed configuration, then tag.** One deployment fact lives in `apps/web/wrangler.jsonc`
+   rather than in a secret: the `vars` block naming `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME`. The
+   database needs nothing committed at all — the configuration names it and the first deploy provisions it —
+   and everything that depends on the origin is a secret, so land the `vars` block on `main` first and the tag
+   needs no editing afterwards:
 
    ```bash
    git tag v0.3.0 && git push origin v0.3.0
@@ -48,9 +49,9 @@ step that answers something else is where to stop.
    CI holds a Cloudflare credential.
 
 2. **Check out the tag and deploy it**, unmodified. Follow
-   [Deploying to a free account](./OPERATIONS.md#deploying-to-a-free-account) — its step 3 is already done —
-   through the migrations, the first deploy, the GitHub OAuth App, the secrets, and the deploy that makes them
-   live.
+   [Deploying to a free account](./OPERATIONS.md#deploying-to-a-free-account) end to end: the first deploy,
+   which provisions the database and names the origin, then the migrations, the GitHub OAuth App, the secrets,
+   and the deploy that makes them live.
 
    Expected at the end of it: `git status` is clean on the tag, `/healthz` answers `{"ok":true}` on the
    `workers.dev` origin, and `wrangler tail` shows a `scheduled` invocation once a minute.
@@ -58,8 +59,8 @@ step that answers something else is where to stop.
 3. **The API is the API and the SPA is the SPA.** The one thing that fails silently in production:
 
    ```bash
-   curl -s -o /dev/null -w '%{http_code} %{content_type}\n' https://deevy.<account>.workers.dev/api/issues/DEV-1
-   curl -s https://deevy.<account>.workers.dev/issues/DEV-1 | head -1
+   curl -s -o /dev/null -w '%{http_code} %{content_type}\n' https://deevy.<subdomain>.workers.dev/api/issues/DEV-1
+   curl -s https://deevy.<subdomain>.workers.dev/issues/DEV-1 | head -1
    ```
 
    The first is `401 application/json` — the API refusing an anonymous caller. The second is `<!doctype html>`
@@ -68,19 +69,19 @@ step that answers something else is where to stop.
 4. **The MCP challenge names the deployed origin.**
 
    ```bash
-   curl -sD - -o /dev/null -X POST https://deevy.<account>.workers.dev/mcp \
+   curl -sD - -o /dev/null -X POST https://deevy.<subdomain>.workers.dev/mcp \
      -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
      -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | grep -i www-authenticate
    ```
 
    Expected: a 401 whose `WWW-Authenticate` carries
-   `resource_metadata="https://deevy.<account>.workers.dev/.well-known/oauth-protected-resource/mcp"`. If it
+   `resource_metadata="https://deevy.<subdomain>.workers.dev/.well-known/oauth-protected-resource/mcp"`. If it
    names any other host, `BETTER_AUTH_URL` is not the origin the browser uses and sign-in will mint tokens
    nobody can use.
 
 ## Part 2 — the Workspace, the Agent, and the work
 
-5. **Sign in** at `https://deevy.<account>.workers.dev` with the admin GitHub account. Expected: you land in
+5. **Sign in** at `https://deevy.<subdomain>.workers.dev` with the admin GitHub account. Expected: you land in
    the Workspace as its admin, and Settings, Members lists exactly one Member — you, `admin`, `human`.
 
 6. **Create the Project.** Projects, New: name `deevy`, key `DEV`. Expected: the default Workflow — Intent,
@@ -108,7 +109,7 @@ step that answers something else is where to stop.
 
     ```bash
     export DEEVY_AGENT_KEY=<the key from step 9>
-    claude mcp add --transport http deevy https://deevy.<account>.workers.dev/mcp \
+    claude mcp add --transport http deevy https://deevy.<subdomain>.workers.dev/mcp \
       --header "Authorization: Bearer $DEEVY_AGENT_KEY"
     ```
 
@@ -134,7 +135,7 @@ step that answers something else is where to stop.
     Expected, in deevy, while it runs: the Run moves from `pending` to `active` on its first Activity; the
     Activity feed fills with thoughts and actions; a `plan` Document appears on `DEV-1` at version 1; and the
     Run ends at `awaiting_input` with an elicitation carrying a URL of the form
-    `https://deevy.<account>.workers.dev/issues/DEV-1?gate=<stateId>`.
+    `https://deevy.<subdomain>.workers.dev/issues/DEV-1?gate=<stateId>`.
 
     Expected in the terminal: the loop stops and says it is waiting for a Human. It must not have tried to
     approve the Gate; `gates_approve` is not in its tool list and would be refused if it were (ADR-0011).
