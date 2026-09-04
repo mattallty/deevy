@@ -12,3 +12,4 @@ export * from "./label.ts";
 export * from "./comment.ts";
 export * from "./repository.ts";
 export * from "./notification.ts";
+export * from "./channel.ts";

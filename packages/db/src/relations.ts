@@ -2,6 +2,7 @@ import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, apikey, authRelations, session, user, verification } from "./schema/auth.ts";
 import { agent, projectGrant } from "./schema/agent.ts";
 import { activity, run } from "./schema/run.ts";
+import { channel, notificationPreference, routingRule } from "./schema/channel.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
@@ -42,6 +43,9 @@ export const tables = {
   projectGrant,
   run,
   activity,
+  channel,
+  routingRule,
+  notificationPreference,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -131,6 +135,29 @@ const appRelations = defineRelationsPart(tables, (r) => ({
   },
   activity: {
     run: r.one.run({ from: r.activity.runId, to: r.run.id, optional: false }),
+  },
+  channel: {
+    workspace: r.one.workspace({
+      from: r.channel.workspaceId,
+      to: r.workspace.id,
+      optional: false,
+    }),
+    rules: r.many.routingRule({ from: r.channel.id, to: r.routingRule.channelId }),
+  },
+  routingRule: {
+    channel: r.one.channel({
+      from: r.routingRule.channelId,
+      to: r.channel.id,
+      optional: false,
+    }),
+    project: r.one.project({ from: r.routingRule.projectId, to: r.project.id }),
+  },
+  notificationPreference: {
+    member: r.one.member({
+      from: r.notificationPreference.memberId,
+      to: r.member.id,
+      optional: false,
+    }),
   },
   issueLink: {
     issue: r.one.issue({ from: r.issueLink.issueId, to: r.issue.id, optional: false }),
