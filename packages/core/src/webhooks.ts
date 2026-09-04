@@ -110,6 +110,30 @@ function equal(left: string, right: string): boolean {
  * has a handful, and one multi-row insert.
  */
 export async function deriveWebhookDeliveries(db: Db, event: Event): Promise<void> {
+  await deriveWebhookDeliveriesForMany(db, event.workspaceId, [event]);
+}
+
+/** How many delivery rows one insert carries; D1 caps bound parameters at 100. */
+const deliveryRowsPerInsert = 16;
+
+/**
+ * The same derivation for a batch of Events, so a sweep that writes its Events
+ * straight to the log still owes what a subscription asked for.
+ *
+ * A sweep cannot go through `appendEvent`, because one append per row would
+ * make its cost the Workspace rather than its limit. That made the Events it
+ * writes undeliverable until this existed, which is the kind of thing that
+ * only shows up when one slice adds a step to a tail another slice skips.
+ *
+ * Bounded the same way the sweeps are: one read of the subscriptions, then
+ * chunked inserts.
+ */
+export async function deriveWebhookDeliveriesForMany(
+  db: Db,
+  workspaceId: string,
+  events: Array<Pick<Event, "seq" | "kind" | "projectId" | "workspaceId">>,
+): Promise<number> {
+  if (events.length === 0) return 0;
   const subscriptions = await db
     .select({
       id: webhookSubscription.id,
@@ -118,25 +142,26 @@ export async function deriveWebhookDeliveries(db: Db, event: Event): Promise<voi
     })
     .from(webhookSubscription)
     .where(
-      and(
-        eq(webhookSubscription.workspaceId, event.workspaceId),
-        isNull(webhookSubscription.disabledAt),
-      ),
+      and(eq(webhookSubscription.workspaceId, workspaceId), isNull(webhookSubscription.disabledAt)),
     );
+  if (subscriptions.length === 0) return 0;
 
-  const owed = subscriptions.filter((subscription) => wants(subscription, event));
-  if (owed.length === 0) return;
-
-  await db.insert(delivery).values(
-    owed.map((subscription) => ({
-      id: crypto.randomUUID(),
-      workspaceId: event.workspaceId,
-      target: "webhook" as const,
-      targetId: subscription.id,
-      eventSeq: event.seq,
-      recipientMemberId: null,
-    })),
+  const rows = events.flatMap((event) =>
+    subscriptions
+      .filter((subscription) => wants(subscription, event))
+      .map((subscription) => ({
+        id: crypto.randomUUID(),
+        workspaceId,
+        target: "webhook" as const,
+        targetId: subscription.id,
+        eventSeq: event.seq,
+        recipientMemberId: null,
+      })),
   );
+  for (let at = 0; at < rows.length; at += deliveryRowsPerInsert) {
+    await db.insert(delivery).values(rows.slice(at, at + deliveryRowsPerInsert));
+  }
+  return rows.length;
 }
 
 /**

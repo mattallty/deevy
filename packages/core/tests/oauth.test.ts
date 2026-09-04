@@ -383,7 +383,16 @@ describe("oauthClients", () => {
     const { db, auth, app } = testApp();
     await humanMember(db);
     const { token, clientId } = await mintToken(app, auth, "u1");
-    const bearer = { authorization: `Bearer ${token}` };
+    // Consents are managed in the browser. A client that could list and revoke
+    // them would be able to cut off the Human's other clients, so the token
+    // this very flow minted is refused here (ADR-0010).
+    const viaToken = await app.request("/api/oauth-clients", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(viaToken.status).toBe(403);
+
+    const cookie = Object.fromEntries(await cookieHeaders(auth, "u1"));
+    const bearer = cookie;
 
     const listed = await app.request("/api/oauth-clients", { headers: bearer });
     expect(listed.status).toBe(200);

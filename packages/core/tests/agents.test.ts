@@ -67,6 +67,8 @@ describe("the Agent capability rule", () => {
       "labels.list",
       "links.add",
       "links.list",
+      // Asking who it is, which is how it learns its own Member id.
+      "me.get",
       "projects.get",
       "projects.list",
       // `runs.answer` is not here: an elicitation asks a Human.
@@ -543,5 +545,55 @@ describe("setting an Agent's webhook", () => {
     // Changing only the URL later is fine: the secret it already has stands.
     await asAda.agents.update({ memberId: created.id, webhookUrl: "https://runner.example/v2" });
     expect((await asAda.agents.list({})).agents[0]?.webhookUrl).toBe("https://runner.example/v2");
+  });
+});
+
+describe("the session rung", () => {
+  it("is not a way past the Agent rule or sessionOnly", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const agent = await agentContext(db, { sponsor: ada.member });
+    const asAgent = createRouterClient(router, { context: agent });
+
+    // `session` is a lower rung than `member`, not a side door: an operation
+    // nobody marked for Agents must refuse one however little authority it asks
+    // for. oauthClients.* manages a Human's own MCP client consents.
+    await expect(asAgent.oauthClients.list({})).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    // And a delegated credential held by a Human is refused too, which is what
+    // sessionOnly means and what the session rung was returning before.
+    const viaToken = createRouterClient(router, {
+      context: { ...ada, principal: { kind: "oauth", clientId: "c", scopes: [] } },
+    });
+    await expect(viaToken.oauthClients.revoke({ clientId: "c" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+});
+
+describe("every door into an ungranted Project", () => {
+  it("is shut, not just the ones that happen to call requireProject", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const dev = await asAda.projects.create({ key: "DEV", name: "deevy" });
+    await asAda.projects.create({ key: "OPS", name: "operations" });
+    await asAda.issues.create({ projectKey: "OPS", title: "Rotate the keys" });
+
+    const agent = await agentContext(db, { sponsor: ada.member, grants: [dev.id] });
+    const asAgent = createRouterClient(router, { context: agent });
+
+    // Reading a Project it was never granted tells it the Project's name, its
+    // description, its Team and its whole Workflow.
+    await expect(asAgent.projects.get({ key: "OPS" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+
+    // And the inbox is a door too: a Notification names an Issue, and reading
+    // it back is reading an Issue in a Project the Agent cannot see.
+    await asAda.issues.update({ key: "OPS-1", assigneeMemberId: agent.member.id });
+    expect((await asAgent.inbox.list({})).notifications).toEqual([]);
   });
 });

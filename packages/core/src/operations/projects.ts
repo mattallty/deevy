@@ -53,12 +53,11 @@ export const projects = {
     input: z.object({ key: ProjectKeyLookup }),
     output: ProjectWithStatesSchema,
     handler: async ({ input, context }) => {
-      const found = await context.db.query.project.findFirst({
-        where: { workspaceId: context.workspace.id, key: input.key },
-        with: { states: { orderBy: { position: "asc" } }, team: true },
-      });
-      if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Project" });
-      return found;
+      // Through requireProject rather than a query of its own: the grant check
+      // lives there, and an operation that reads the table directly is how an
+      // ungranted Project becomes readable (docs/plans/m2.md).
+      const found = await requireProject(context, input.key);
+      return loadProject(context.db, found.id);
     },
   }),
 
