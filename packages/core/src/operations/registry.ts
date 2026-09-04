@@ -13,6 +13,17 @@ import type { Session } from "../auth.ts";
  */
 
 export type AuthRule = "public" | "session" | "member" | "admin";
+
+/**
+ * How the caller authenticated. An Agent's API key and a Human MCP client's
+ * OAuth token arrive on the same header at the same endpoint, so the three are
+ * told apart once, in resolvePrincipal, and carried from there (docs/plans/m2.md).
+ */
+export type Principal =
+  | { kind: "anonymous" }
+  | { kind: "cookie" }
+  | { kind: "api_key"; keyId: string }
+  | { kind: "oauth"; clientId: string; scopes: string[] };
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface AppContext {
@@ -25,6 +36,8 @@ export interface AppContext {
    * means every Project: a Human is not scoped in v1 (docs/plans/m2.md).
    */
   grantedProjectIds?: string[] | null;
+  /** How the caller authenticated. Absent is treated as a cookie session. */
+  principal?: Principal;
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"
@@ -48,6 +61,14 @@ export interface OperationMeta {
    * compile error rather than a test.
    */
   agents?: true;
+  /**
+   * Only a cookie session may call this: a Human present in deevy's own UI. A
+   * delegated credential, an Agent's API key or a Human MCP client's OAuth
+   * token, is refused. assertHuman checks the Member's kind, which would let a
+   * Human's own MCP client approve on their behalf; this checks how they
+   * arrived (docs/plans/m2.md).
+   */
+  sessionOnly?: true;
 }
 
 /** `agents` is unsayable on anything but a `member` operation (ADR-0004). */
@@ -115,6 +136,11 @@ function authorize(meta: OperationMeta) {
     if (context.member.kind === "agent" && !meta.agents) {
       throw new ORPCError("FORBIDDEN", { message: "An Agent cannot do that" });
     }
+    if (meta.sessionOnly && context.principal && context.principal.kind !== "cookie") {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Only a Human signed in to deevy can do that",
+      });
+    }
     return next();
   });
 }
@@ -131,6 +157,7 @@ export function defineOperation<
     path: def.path,
     auth: def.auth,
     ...(def.agents ? { agents: def.agents } : {}),
+    ...(def.sessionOnly ? { sessionOnly: def.sessionOnly } : {}),
   };
   return base
     .use(authorize(meta))
@@ -158,6 +185,7 @@ export function defineStreamOperation<TAuth extends AuthRule, TInput extends z.Z
     path: def.path,
     auth: def.auth,
     ...(def.agents ? { agents: def.agents } : {}),
+    ...(def.sessionOnly ? { sessionOnly: def.sessionOnly } : {}),
   };
   return base
     .use(authorize(meta))

@@ -95,3 +95,25 @@ describe("Project grants", () => {
     });
   });
 });
+
+describe("Gate decisions", () => {
+  it("refuses a delegated credential, so approval happens in deevy's UI", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAdmin = createRouterClient(router, { context: admin });
+    await asAdmin.projects.create({ key: "DEV", name: "deevy" });
+    await asAdmin.issues.create({ projectKey: "DEV", title: "Gated" });
+
+    const viaKey = createRouterClient(router, {
+      context: { ...admin, principal: { kind: "api_key", keyId: "k1" } },
+    });
+    await expect(viaKey.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    expect(await asAdmin.gates.approve({ key: "DEV-1" })).toMatchObject({
+      state: { name: "Spec" },
+    });
+  });
+});
