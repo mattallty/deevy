@@ -6,17 +6,16 @@ import { member } from "./workspace.ts";
 const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
 
 /**
- * What an Agent Member carries beyond a Human: where deevy delivers its
- * triggers, and how often a schedule fires (PLAN.md). One row per Agent; a
- * Human has none.
+ * What an Agent Member carries beyond a Human: how often its schedule fires
+ * (PLAN.md). One row per Agent; a Human has none.
  */
 export const agent = sqliteTable("agent", {
   memberId: text("member_id")
     .primaryKey()
     .references(() => member.id, { onDelete: "cascade" }),
-  /** The Agent polls its inbox over MCP when this is null (ADR-0003). */
-  webhookUrl: text("webhook_url"),
-  webhookSecret: text("webhook_secret"),
+  // Where deevy delivers to lives on the Agent's webhook_subscription, not
+  // here: that is the row delivery reads, and a second copy is how the URL
+  // came to read back as saved while nothing was ever sent (docs/plans/m2.md).
   /** The schedule trigger, in minutes. Null is no schedule. */
   scheduleMinutes: integer("schedule_minutes"),
   scheduleRanAt: integer("schedule_ran_at", { mode: "timestamp_ms" }),

@@ -1,5 +1,11 @@
-import { agent as agentTable, member as memberTable, user as userTable, type Db } from "@deevy/db";
-import { inArray } from "drizzle-orm";
+import {
+  agent as agentTable,
+  member as memberTable,
+  user as userTable,
+  webhookSubscription,
+  type Db,
+} from "@deevy/db";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { appendEvent, type EventSource } from "./events.ts";
 import { allocateHandle } from "./handles.ts";
@@ -72,6 +78,10 @@ const withAgent = {
   agent: true,
   sponsor: { with: { user: true } },
   grantedProjects: { columns: { id: true } },
+  // The URL lives on the subscription, because that is the row delivery reads.
+  // Keeping a second copy on the Agent is how it came to be shown as saved
+  // while nothing was ever sent to it (docs/plans/m2.md).
+  subscriptions: { columns: { url: true, disabledAt: true } },
 } as const;
 
 /** Reads one Agent in the shape every Agent operation returns. */
@@ -95,19 +105,61 @@ export async function listAgents(db: Db, workspaceId: string): Promise<AgentView
 
 /** The Member row as the query above reads it, before it is flattened. */
 type AgentRow = Omit<AgentView, "webhookUrl" | "scheduleMinutes" | "grantedProjectIds"> & {
-  agent: { webhookUrl: string | null; scheduleMinutes: number | null } | null;
+  agent: { scheduleMinutes: number | null } | null;
   grantedProjects: Array<{ id: string }>;
+  subscriptions: Array<{ url: string; disabledAt: Date | null }>;
 };
 
 /** An Agent's own row is flattened onto the Member, so a surface reads one thing. */
 function view(row: AgentRow): AgentView {
-  const { agent, grantedProjects, ...member } = row;
+  const { agent, grantedProjects, subscriptions, ...member } = row;
   return {
     ...member,
-    webhookUrl: agent?.webhookUrl ?? null,
+    webhookUrl: subscriptions.find((row) => !row.disabledAt)?.url ?? null,
     scheduleMinutes: agent?.scheduleMinutes ?? null,
     grantedProjectIds: grantedProjects.map((project) => project.id),
   };
+}
+
+/**
+ * Points an Agent's deliveries at a URL, or stops them when it is null. The
+ * Agent's own subscription is the one row delivery reads, so setting the URL
+ * here and having deevy deliver to it are the same act rather than two that
+ * can disagree (docs/plans/m2.md).
+ */
+export async function setAgentWebhook(
+  db: Db,
+  memberId: string,
+  workspaceId: string,
+  url: string | null,
+): Promise<void> {
+  const existing = await db.query.webhookSubscription.findFirst({ where: { memberId } });
+  if (!url) {
+    if (existing) {
+      await db
+        .update(webhookSubscription)
+        .set({ disabledAt: new Date() })
+        .where(eq(webhookSubscription.id, existing.id));
+    }
+    return;
+  }
+  if (existing) {
+    await db
+      .update(webhookSubscription)
+      .set({ url, disabledAt: null })
+      .where(eq(webhookSubscription.id, existing.id));
+    return;
+  }
+  await db.insert(webhookSubscription).values({
+    id: crypto.randomUUID(),
+    workspaceId,
+    memberId,
+    url,
+    // Generated here, shown nowhere: a receiver reads it from the Agent's
+    // own configuration, never from deevy's API (slice 5).
+    secret: `whsec_${crypto.randomUUID().replaceAll("-", "")}`,
+    createdBy: memberId,
+  });
 }
 
 /**
