@@ -1,5 +1,6 @@
 import type { Db, Member, Workspace } from "@deevy/db";
-import { member, user, workspace } from "@deevy/db";
+import { eq } from "drizzle-orm";
+import { agent, member, projectGrant, user, workspace } from "@deevy/db";
 import { openDatabase } from "@deevy/adapters/node";
 import type { Session } from "../src/auth.ts";
 import type { AppContext } from "../src/operations/registry.ts";
@@ -76,4 +77,38 @@ export async function memberContext(
   const row = (await db.query.member.findFirst({ where: { id: memberId } })) as Member;
 
   return contextFor(db, row, ws);
+}
+
+export interface AgentContextOptions extends MemberContextOptions {
+  /** The Human accountable for this Agent (ADR-0001). */
+  sponsor?: Member;
+  /** The Projects it may see. Absent means none, which is the safe default. */
+  grants?: string[];
+}
+
+/**
+ * An Agent Member with a Sponsor and its Project grants, and the context an
+ * operation sees when its API key authenticated the request.
+ */
+export async function agentContext(
+  db: Db,
+  options: AgentContextOptions = {},
+): Promise<MemberContext> {
+  const context = await memberContext(db, {
+    ...options,
+    kind: "agent",
+    name: options.name ?? "Planner",
+  });
+  await db.insert(agent).values({ memberId: context.member.id });
+  if (options.sponsor) {
+    await db
+      .update(member)
+      .set({ sponsorId: options.sponsor.id })
+      .where(eq(member.id, context.member.id));
+  }
+  for (const projectId of options.grants ?? []) {
+    await db.insert(projectGrant).values({ memberId: context.member.id, projectId });
+  }
+  const row = (await db.query.member.findFirst({ where: { id: context.member.id } })) as Member;
+  return { ...contextFor(db, row, context.workspace), grantedProjectIds: options.grants ?? [] };
 }

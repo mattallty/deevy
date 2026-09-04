@@ -1,5 +1,6 @@
 import { defineRelations, defineRelationsPart } from "drizzle-orm";
 import { account, authRelations, session, user, verification } from "./schema/auth.ts";
+import { agent, projectGrant } from "./schema/agent.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
@@ -35,6 +36,8 @@ export const tables = {
   repository,
   issueLink,
   notification,
+  agent,
+  projectGrant,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -54,6 +57,11 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     workspace: r.one.workspace({ from: r.member.workspaceId, to: r.workspace.id, optional: false }),
     user: r.one.user({ from: r.member.userId, to: r.user.id, optional: false }),
     sponsor: r.one.member({ from: r.member.sponsorId, to: r.member.id }),
+    agent: r.one.agent({ from: r.member.id, to: r.agent.memberId }),
+    grantedProjects: r.many.project({
+      from: r.member.id.through(r.projectGrant.memberId),
+      to: r.project.id.through(r.projectGrant.projectId),
+    }),
     teams: r.many.team({
       from: r.member.id.through(r.teamMember.memberId),
       to: r.team.id.through(r.teamMember.teamId),
