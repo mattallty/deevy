@@ -51,9 +51,10 @@ touch nothing else runs with `--strict-mcp-config` and an explicit allowlist:
 ```bash
 claude -p "Work your next assigned Issue." \
   --strict-mcp-config --mcp-config .mcp.json \
-  --allowedTools "mcp__deevy__inbox_list,mcp__deevy__runs_list,mcp__deevy__issues_get,\
-mcp__deevy__documents_get,mcp__deevy__documents_write,mcp__deevy__runs_post_activity,\
-mcp__deevy__runs_request_approval,mcp__deevy__links_add,mcp__deevy__runs_finish"
+  --allowedTools "mcp__deevy__inbox_list,mcp__deevy__runs_list,mcp__deevy__runs_get,\
+mcp__deevy__issues_get,mcp__deevy__documents_get,mcp__deevy__documents_write,\
+mcp__deevy__runs_post_activity,mcp__deevy__runs_request_approval,mcp__deevy__links_add,\
+mcp__deevy__comments_create,mcp__deevy__runs_finish"
 ```
 
 deevy filters `tools/list` to what this principal may call, so an Agent never sees `gates_approve` — but that
@@ -74,20 +75,32 @@ call the HTTP API by hand.
 Work one Issue at a time, in this order.
 
 1. **Find the work.** `inbox_list` with `unreadOnly: true`. An `assignment` Notification carries the Issue and
-   its key, such as `DEV-42`. Ignore every other kind.
+   its key, such as `DEV-42`. Ignore every other kind. `runs_list` with no arguments is the other way in, and
+   the one that still works when the inbox has been read: it answers with your own Runs, since you have no way
+   to learn your own Member id.
 2. **Find your Run.** `runs_list` with that `issueKey`. The trigger that assigned you already opened a Run in
-   `pending`; its `id` is what every later call needs. Only if there is none, open one with `runs_start`.
+   `pending`; its `id` is what every later call needs. A Run that is `completed` or `failed` is not it: those
+   are finished attempts, and an Issue still assigned to you that is not in a `done` State is still yours to
+   work whatever happened on an earlier try. If every Run there is finished, open a new one with `runs_start`.
+   That is not a duplicate — the rule is one _open_ Run per Issue and Agent, and a finished one is not open.
 3. **Read before you write.** `issues_get` for the Issue and its State, then `documents_get` for `intent`, and
    for `spec` when the Issue is past the Spec Gate. The Documents are the brief. The description is a title
-   with more words.
+   with more words. Read the Document this State asks for as well, because it may already be written — see
+   step 5.
 4. **Narrate as you go.** `runs_post_activity` with `kind: "thought"` for a decision you are about to make and
    `kind: "action"` for a step you have taken. Keep them short and factual: this feed is what a Human reads to
    see what you did, and it is the only record of your reasoning. Your first Activity moves the Run to
    `active`.
-5. **Write the Document the State asks for.** In the Plan State that is `plan`: `documents_write` with
-   `name: "plan"` and a body under the headings the template gives — Files that change, Order of work, Tests
-   that prove it. Writing it again makes a new version; older versions stay readable, so do not paste an old
-   one back to "restore" it.
+5. **Write the Document the State asks for**, unless it is already written. In the Plan State that is `plan`:
+   `documents_write` with `name: "plan"` and a body under the headings the template gives — Files that change,
+   Order of work, Tests that prove it. Writing it again makes a new version; older versions stay readable, so
+   do not paste an old one back to "restore" it.
+
+   A Document that already says what this State needs is done work, not a reason to stop. An Issue sitting in
+   a Gate with its Document written and nobody asked to rule on it is the most common thing you will find, and
+   it is waiting on step 6, not on you. Rewriting it to have something to do is worse than going straight to
+   the Gate.
+
 6. **Stop at the Gate.** Do not try to move the Issue out of a Gate and do not approve one: you cannot, and
    failing at it is not a plan. Call `runs_request_approval` with your `runId`. It puts your Run in
    `awaiting_input`, writes an elicitation carrying a deevy URL, and notifies the Humans who decide that Gate.
@@ -100,10 +113,20 @@ Work one Issue at a time, in this order.
 8. **Finish.** `runs_finish` with `status: "completed"` and a summary a Human can act on: what you did, what
    you decided, and what you recommend. You recommend; a Human approves.
 
+Do not decide there is nothing to do while an Issue is assigned to you and is not in a `done` State. There
+almost always is, and it is one of three things: a Document to write, a Gate to ask about, or a rejection to
+read and act on. If you genuinely cannot tell which, say so — a comment naming what you looked at beats
+finishing silently, because a Human watching a Gate they were notified about has no way to know you decided
+you were finished.
+
 If you cannot go on — a missing Document, a Project you cannot see, a tool that refuses — post
 `runs_post_activity` with `kind: "error"` saying exactly what stopped you, then `runs_finish` with
 `status: "failed"` and the same explanation. A Run left open goes `stale` after thirty minutes of silence,
 which tells a Human nothing about why.
+
+A tool that refuses is not always work that failed. deevy writes before it answers, so a call that errors may
+already have done what it said: check with `runs_get` before you report a failure, and say what you found. A
+Run failed over work that succeeded is the worst record you can leave.
 
 "No such Project" means you were not granted it. Ask your Sponsor in a comment; do not retry.
 ```
