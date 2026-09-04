@@ -1,6 +1,7 @@
 import { createTimerCron, openDatabase } from "@deevy/adapters/node";
 import type { Cron } from "@deevy/core";
 import {
+  agent as agentTable,
   issue as issueTable,
   member as memberTable,
   project as projectTable,
@@ -27,14 +28,24 @@ function emptyDatabase() {
   return db;
 }
 
+interface SeedOptions {
+  /** The Agent's schedule trigger, in minutes. Absent is no schedule. */
+  scheduleMinutes?: number;
+  /** Whether the Issue is assigned to that Agent. */
+  assigned?: boolean;
+}
+
 /** A Workspace with one Agent and one Issue, straight into the tables. */
-async function seedWorkspace(db: Db) {
+async function seedWorkspace(db: Db, options: SeedOptions = {}) {
   const workspaceId = crypto.randomUUID();
   await db.insert(workspaceTable).values({ id: workspaceId, name: "deevy", slug: "deevy" });
   const userId = crypto.randomUUID();
   await db.insert(userTable).values({ id: userId, name: "Planner", email: "planner@example.com" });
   const agentMemberId = crypto.randomUUID();
   await db.insert(memberTable).values({ id: agentMemberId, workspaceId, userId, kind: "agent" });
+  await db
+    .insert(agentTable)
+    .values({ memberId: agentMemberId, scheduleMinutes: options.scheduleMinutes ?? null });
   const projectId = crypto.randomUUID();
   await db.insert(projectTable).values({ id: projectId, workspaceId, key: "DEV", name: "deevy" });
   const stateId = crypto.randomUUID();
@@ -42,9 +53,14 @@ async function seedWorkspace(db: Db) {
     .insert(workflowState)
     .values({ id: stateId, projectId, name: "Doing", position: 1, category: "active" });
   const issueId = crypto.randomUUID();
-  await db
-    .insert(issueTable)
-    .values({ id: issueId, projectId, number: 1, title: "Ship the thing", stateId });
+  await db.insert(issueTable).values({
+    id: issueId,
+    projectId,
+    number: 1,
+    title: "Ship the thing",
+    stateId,
+    assigneeMemberId: options.assigned ? agentMemberId : null,
+  });
   return { workspaceId, agentMemberId, issueId };
 }
 
@@ -133,6 +149,23 @@ describe("the runner", () => {
     expect((await statuses(db)).filter((status) => status === "stale")).toHaveLength(20);
     await tick();
     expect((await statuses(db)).filter((status) => status === "stale")).toHaveLength(25);
+    await runner.stop();
+  });
+
+  it("runs the schedule sweep on the same tick as the stale sweep", async () => {
+    const db = emptyDatabase();
+    await seedWorkspace(db, { scheduleMinutes: 60, assigned: true });
+    const { cron, registered, tick } = manualCron();
+
+    const runner = startRunner({ db, cron });
+    await tick();
+
+    // One Cron for all of deevy's background work: a second schedule would be
+    // a second thing to configure and a second thing to forget.
+    expect(registered).toHaveLength(1);
+    const runs = await db.query.run.findMany();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ trigger: "schedule", status: "pending" });
     await runner.stop();
   });
 

@@ -1,7 +1,10 @@
 import { createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
-import { memberContext, testDb, type MemberContext } from "./helpers.ts";
+import type { WorkflowState } from "@deevy/db";
+import { agentContext, memberContext, testDb, type MemberContext } from "./helpers.ts";
+
+type WorkflowStateView = Pick<WorkflowState, "id" | "name" | "isGate" | "category">;
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -121,5 +124,61 @@ describe("workflow.update", () => {
     await expect(client.workflow.update({ projectKey: "DEV", states: [] })).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
+  });
+});
+
+describe("the State rule on a Workflow", () => {
+  it("names the Agent entering a State assigns the Issue to, and clears it again", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client } = await withProject(db);
+    const agent = await agentContext(db, { sponsor: admin.member });
+
+    const asGiven = (states: WorkflowStateView[], triggerAgentMemberId: string | null) =>
+      states.map((current) => ({
+        id: current.id,
+        name: current.name,
+        isGate: current.isGate,
+        category: current.category,
+        triggerAgentMemberId: current.name === "Plan" ? triggerAgentMemberId : null,
+      }));
+
+    const original = (await client.workflow.get({ projectKey: "DEV" })).states;
+    const named = await client.workflow.update({
+      projectKey: "DEV",
+      states: asGiven(original, agent.member.id),
+    });
+    expect(named.states.find((s) => s.name === "Plan")?.triggerAgentMemberId).toBe(agent.member.id);
+    // Every other State is left without a rule, not left as it was.
+    expect(named.states.filter((s) => s.triggerAgentMemberId).map((s) => s.name)).toEqual(["Plan"]);
+
+    const cleared = await client.workflow.update({
+      projectKey: "DEV",
+      states: asGiven(named.states, null),
+    });
+    expect(cleared.states.every((s) => s.triggerAgentMemberId === null)).toBe(true);
+  });
+
+  it("refuses a rule naming anything but an Agent of this Workspace", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client } = await withProject(db);
+    const states = (await client.workflow.get({ projectKey: "DEV" })).states;
+    const given = (triggerAgentMemberId: string) =>
+      states.map((current) => ({
+        id: current.id,
+        name: current.name,
+        isGate: current.isGate,
+        category: current.category,
+        ...(current.name === "Plan" ? { triggerAgentMemberId } : {}),
+      }));
+
+    // A Human is not something a State can trigger: only an Agent runs.
+    await expect(
+      client.workflow.update({ projectKey: "DEV", states: given(admin.member.id) }),
+    ).rejects.toThrow(/Agent/);
+    await expect(
+      client.workflow.update({ projectKey: "DEV", states: given("nobody") }),
+    ).rejects.toThrow(/Agent/);
   });
 });

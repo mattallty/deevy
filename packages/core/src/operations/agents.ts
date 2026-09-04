@@ -71,7 +71,7 @@ export const agents = {
 
   update: defineOperation({
     name: "agents.update",
-    summary: "Change an Agent's name, handle, or the URL deevy delivers its triggers to",
+    summary: "Change an Agent's name, handle, delivery URL, or schedule",
     method: "PATCH",
     path: "/agents/{memberId}",
     auth: "member",
@@ -81,6 +81,12 @@ export const agents = {
       handle: HandleInput.optional(),
       /** Null clears it: the Agent polls its inbox over MCP instead (ADR-0003). */
       webhookUrl: z.url().max(2048).nullish(),
+      /**
+       * How often the schedule trigger wakes this Agent on the Issues assigned
+       * to it (docs/plans/m2.md). Null is no schedule, which is the default: an
+       * Agent that only reacts.
+       */
+      scheduleMinutes: z.number().int().min(1).max(10_080).nullish(),
     }),
     output: AgentSchema,
     handler: async ({ input, context }) => {
@@ -103,12 +109,19 @@ export const agents = {
           .where(eq(userTable.id, found.userId));
         changed.name = input.name;
       }
+      // Both of these live on the `agent` row, so they are one statement even
+      // when a Sponsor changes both at once.
+      const onAgent: { webhookUrl?: string | null; scheduleMinutes?: number | null } = {};
       if (input.webhookUrl !== undefined) {
-        await context.db
-          .update(agentTable)
-          .set({ webhookUrl: input.webhookUrl ?? null })
-          .where(eq(agentTable.memberId, found.id));
+        onAgent.webhookUrl = input.webhookUrl ?? null;
         changed.webhookUrl = input.webhookUrl ?? null;
+      }
+      if (input.scheduleMinutes !== undefined) {
+        onAgent.scheduleMinutes = input.scheduleMinutes ?? null;
+        changed.scheduleMinutes = input.scheduleMinutes ?? null;
+      }
+      if (Object.keys(onAgent).length > 0) {
+        await context.db.update(agentTable).set(onAgent).where(eq(agentTable.memberId, found.id));
       }
 
       await appendEvent(context, {

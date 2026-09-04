@@ -20,6 +20,8 @@ interface DraftState {
   category: Category;
   documentName: string | null;
   documentTemplate: string | null;
+  /** The Agent entering this State assigns the Issue to, and starts a Run for. */
+  triggerAgentMemberId: string | null;
 }
 
 /**
@@ -29,6 +31,8 @@ interface DraftState {
 export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
+  // Every Agent in the Workspace, because a State's rule names one of them.
+  const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
   const [draft, setDraft] = useState<DraftState[] | null>(null);
   const [removed, setRemoved] = useState<string[]>([]);
   const [moveIssuesTo, setMoveIssuesTo] = useState<string | null>(null);
@@ -44,6 +48,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           category: state.category as Category,
           documentName: state.documentName,
           documentTemplate: state.documentTemplate,
+          triggerAgentMemberId: state.triggerAgentMemberId,
         })),
       );
     }
@@ -89,7 +94,8 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
         <h1 className="text-2xl font-semibold">Workflow</h1>
         <p className="text-sm text-muted-foreground">
           The States {projectKey} Issues move through, in order. A Gate is one an Issue cannot leave
-          without a Human&apos;s approval.
+          without a Human&apos;s approval, and a State that names an Agent hands it the Issue and
+          starts a Run the moment one arrives.
         </p>
       </header>
 
@@ -149,6 +155,23 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 />
               ) : null}
             </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`state-agent-${index}`}>Assign an Agent on entering</Label>
+              <NativeSelect
+                id={`state-agent-${index}`}
+                value={state.triggerAgentMemberId ?? ""}
+                onChange={(changed) =>
+                  edit(index, { triggerAgentMemberId: changed.target.value || null })
+                }
+              >
+                <option value="">Nobody</option>
+                {(agents.data?.agents ?? []).map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.user.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
             <div className="flex gap-1 pb-1">
               <Button
                 type="button"
@@ -195,6 +218,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 category: "active",
                 documentName: null,
                 documentTemplate: null,
+                triggerAgentMemberId: null,
               },
             ])
           }
@@ -235,6 +259,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 category: state.category,
                 documentName: state.documentName,
                 documentTemplate: state.documentTemplate,
+                triggerAgentMemberId: state.triggerAgentMemberId,
               })),
               deleteStates: removed,
               moveIssuesTo,

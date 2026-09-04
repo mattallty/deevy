@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   Table,
   TableBody,
@@ -15,6 +16,18 @@ function mcpEndpoint(): string {
   return `${window.location.origin}/mcp`;
 }
 
+/**
+ * The intervals a schedule offers. Anything finer than a quarter of an hour is
+ * a poll, not a schedule, and the sweep only runs once a minute anyway.
+ */
+const intervals = [
+  { minutes: 15, label: "Every 15 minutes" },
+  { minutes: 30, label: "Every 30 minutes" },
+  { minutes: 60, label: "Hourly" },
+  { minutes: 240, label: "Every 4 hours" },
+  { minutes: 1440, label: "Daily" },
+];
+
 /** "1 Project", "3 Projects", or the fact that it can see nothing yet. */
 function grantSummary(count: number): string {
   if (count === 0) return "No Projects";
@@ -27,7 +40,15 @@ function grantSummary(count: number): string {
  * thing worth showing next to its Sponsor.
  */
 export function AgentsPage() {
+  const queryClient = useQueryClient();
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
+  const update = useMutation(
+    orpc.agents.update.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries();
+      },
+    }),
+  );
 
   if (agents.isPending) return <p className="text-muted-foreground">Loading Agents…</p>;
   if (agents.isError) {
@@ -39,7 +60,8 @@ export function AgentsPage() {
       <header>
         <h1 className="text-2xl font-semibold">Agents</h1>
         <p className="text-sm text-muted-foreground">
-          Every Agent works under its own identity, with exactly one Human accountable for it.
+          Every Agent works under its own identity, with exactly one Human accountable for it. A
+          schedule wakes an Agent on the Issues assigned to it, whether or not anything happened.
         </p>
       </header>
 
@@ -61,13 +83,14 @@ export function AgentsPage() {
             <TableHead>Agent</TableHead>
             <TableHead>Sponsor</TableHead>
             <TableHead>Can see</TableHead>
+            <TableHead>Schedule</TableHead>
             <TableHead className="text-right">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {agents.data.agents.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-muted-foreground">
+              <TableCell colSpan={5} className="text-muted-foreground">
                 No Agents yet. Create one to give it an identity and an API key.
               </TableCell>
             </TableRow>
@@ -89,6 +112,26 @@ export function AgentsPage() {
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {grantSummary(agent.grantedProjectIds.length)}
+              </TableCell>
+              <TableCell>
+                <NativeSelect
+                  aria-label={`Schedule for ${agent.user.name}`}
+                  value={agent.scheduleMinutes ?? ""}
+                  disabled={update.isPending}
+                  onChange={(changed) =>
+                    update.mutate({
+                      memberId: agent.id,
+                      scheduleMinutes: changed.target.value ? Number(changed.target.value) : null,
+                    })
+                  }
+                >
+                  <option value="">Never</option>
+                  {intervals.map((interval) => (
+                    <option key={interval.minutes} value={interval.minutes}>
+                      {interval.label}
+                    </option>
+                  ))}
+                </NativeSelect>
               </TableCell>
               <TableCell className="text-right">
                 {agent.suspendedAt ? (

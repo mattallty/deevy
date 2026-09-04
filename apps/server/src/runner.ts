@@ -1,4 +1,4 @@
-import { sweepStaleRuns, type Cron } from "@deevy/core";
+import { deliverDueChannelMessages, sweepSchedules, sweepStaleRuns, type Cron } from "@deevy/core";
 import type { Db } from "@deevy/db";
 
 /**
@@ -22,6 +22,13 @@ export interface RunnerOptions {
   sweepLimit?: number;
   /** Passes one tick may take before it leaves the rest for the next tick. */
   maxPassesPerTick?: number;
+  /**
+   * The public origin of this instance, so a Slack message links back to the
+   * Issue it is about. `BETTER_AUTH_URL`.
+   */
+  baseUrl?: string;
+  /** Messages to a Channel one delivery pass may send. */
+  deliveryLimit?: number;
 }
 
 export interface Runner {
@@ -36,26 +43,45 @@ export function startRunner({
   sweepIntervalSeconds = 60,
   sweepLimit,
   maxPassesPerTick = 5,
+  baseUrl,
+  deliveryLimit,
 }: RunnerOptions): Runner {
   const silenceMs = staleMinutes * 60_000;
+
+  const limit = sweepLimit === undefined ? {} : { limit: sweepLimit };
+  const deliveries = deliveryLimit === undefined ? {} : { limit: deliveryLimit };
+
+  /**
+   * One unit of background work, run until it says it is done or the tick has
+   * had enough passes. `more` means the limit was reached: go again rather than
+   * raise it, so one tick stays bounded whatever the backlog is.
+   */
+  async function drain(signal: AbortSignal, pass: () => Promise<{ more: boolean }>): Promise<void> {
+    for (let attempt = 0; attempt < maxPassesPerTick; attempt += 1) {
+      if (signal.aborted) return;
+      const { more } = await pass();
+      if (!more) return;
+    }
+  }
 
   async function sweep(signal: AbortSignal): Promise<void> {
     // A self-hosted instance serves one Workspace (CONTEXT.md), and it does not
     // exist until the first admin signs in, so a fresh container sweeps nothing.
     const workspace = await db.query.workspace.findFirst();
     if (!workspace) return;
+    const workspaceId = workspace.id;
 
-    for (let pass = 0; pass < maxPassesPerTick; pass += 1) {
-      if (signal.aborted) return;
-      const { more } = await sweepStaleRuns({
-        db,
-        workspaceId: workspace.id,
-        silenceMs,
-        ...(sweepLimit === undefined ? {} : { limit: sweepLimit }),
-      });
-      // `more` means the limit was reached: go again rather than raise it, and
-      // stop after so many passes so one tick stays bounded.
-      if (!more) return;
+    await drain(signal, () => sweepStaleRuns({ db, workspaceId, silenceMs, ...limit }));
+    // The schedule trigger rides the same Cron: one timer on Node, one Cron
+    // Trigger on Cloudflare, and nothing else to configure or forget.
+    await drain(signal, () => sweepSchedules({ db, workspaceId, ...limit }));
+    // And so does what is owed to a Channel. Without an origin a Slack message
+    // could not link back to the Issue, so the deliveries wait rather than go
+    // out useless: they are durable rows, and the next tick with one sends them.
+    if (baseUrl) {
+      await drain(signal, () =>
+        deliverDueChannelMessages({ db, workspaceId, baseUrl, ...deliveries }),
+      );
     }
   }
 

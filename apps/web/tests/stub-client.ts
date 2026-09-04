@@ -127,6 +127,21 @@ export function stubClient(overrides: StubOverrides = {}): never {
       markRead: async () => ({ read: 0 }),
       markAllRead: async () => ({ read: 0 }),
     },
+    channels: {
+      list: async () => ({ channels: [] }),
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({ deleted: true }),
+      test: async () => ({ delivered: true, status: 200, error: null }),
+    },
+    routing: {
+      list: async () => ({ rules: [] }),
+      set: async () => ({ rules: [] }),
+    },
+    preferences: {
+      get: async () => ({ preferences: [] }),
+      set: async () => ({ preferences: [] }),
+    },
     repositories: {
       list: async () => ({ repositories: [] }),
       create: async () => ({}),

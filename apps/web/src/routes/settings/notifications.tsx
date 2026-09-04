@@ -1,0 +1,120 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { orpc } from "@/lib/orpc";
+
+/** What each kind of Notification is called on this page, in CONTEXT.md's words. */
+const labels: Record<string, string> = {
+  mention: "Mention",
+  assignment: "Assignment",
+  gate_awaiting: "Gate awaiting",
+  run_awaiting_input: "Run awaiting input",
+  run_finished: "Run finished",
+};
+
+interface Preference {
+  kind: string;
+  inbox: boolean;
+  slack: boolean;
+}
+
+/**
+ * One Human's own matrix: every kind of Notification against the Channels it
+ * can reach them in. Nobody sets anyone else's, so this page needs no Member
+ * picker (packages/core/src/operations/preferences.ts).
+ */
+export function NotificationsPage() {
+  const queryClient = useQueryClient();
+  const preferences = useQuery(orpc.preferences.get.queryOptions({ input: {} }));
+  const [draft, setDraft] = useState<Preference[]>([]);
+
+  useEffect(() => {
+    if (preferences.data) setDraft(preferences.data.preferences);
+  }, [preferences.data]);
+
+  const save = useMutation(
+    orpc.preferences.set.mutationOptions({
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.preferences.key() }),
+    }),
+  );
+
+  const toggle = (kind: string, where: "inbox" | "slack") =>
+    setDraft((current) =>
+      current.map((row) => (row.kind === kind ? { ...row, [where]: !row[where] } : row)),
+    );
+
+  return (
+    <section className="flex flex-col gap-4">
+      <header>
+        <h1 className="text-2xl font-semibold">Notifications</h1>
+        <p className="text-sm text-muted-foreground">
+          What reaches you, and where. Slack only arrives for the Channels this Workspace routes a
+          kind to; turning it off here stops it either way.
+        </p>
+      </header>
+
+      {preferences.isPending ? <Skeleton className="h-48 w-full" /> : null}
+      {save.error ? <p className="text-sm text-destructive">{save.error.message}</p> : null}
+
+      {draft.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Notification</TableHead>
+              <TableHead className="w-24 text-center">Inbox</TableHead>
+              <TableHead className="w-24 text-center">Slack</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {draft.map((row) => (
+              <TableRow key={row.kind}>
+                <TableCell className="font-medium">{labels[row.kind] ?? row.kind}</TableCell>
+                <TableCell className="text-center">
+                  <Checkbox
+                    aria-label={`${labels[row.kind] ?? row.kind} in the inbox`}
+                    checked={row.inbox}
+                    onCheckedChange={() => toggle(row.kind, "inbox")}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <Checkbox
+                    aria-label={`${labels[row.kind] ?? row.kind} in Slack`}
+                    checked={row.slack}
+                    onCheckedChange={() => toggle(row.kind, "slack")}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+
+      <div>
+        <Button
+          disabled={save.isPending || draft.length === 0}
+          onClick={() =>
+            save.mutate({
+              preferences: draft.map((row) => ({
+                kind: row.kind as "mention",
+                inbox: row.inbox,
+                slack: row.slack,
+              })),
+            })
+          }
+        >
+          Save
+        </Button>
+      </div>
+    </section>
+  );
+}

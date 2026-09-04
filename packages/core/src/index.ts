@@ -45,9 +45,24 @@ export {
 } from "./operations/registry.ts";
 export { EventSchema, MemberSchema, UserSchema, WorkspaceSchema } from "./schemas.ts";
 export {
+  issueUrl,
+  postSlackMessage,
+  slackMessage,
+  type FetchLike,
+  type SlackPayload,
+} from "./slack.ts";
+export {
+  defaultDeliveryLimit,
   defaultSilenceMs,
   defaultSweepLimit,
+  deliverDueChannelMessages,
+  maxDeliveryAttempts,
+  sweepSchedules,
   sweepStaleRuns,
+  type DeliverDueChannelMessagesOptions,
+  type DeliveryResult,
+  type ScheduleSweepResult,
   type SweepResult,
+  type SweepSchedulesOptions,
   type SweepStaleRunsOptions,
 } from "./work.ts";

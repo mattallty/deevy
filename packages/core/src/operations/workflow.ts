@@ -9,7 +9,30 @@ import { WorkflowStateSchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
+import type { ContextFor } from "./registry.ts";
 import { ProjectKeyLookup, requireProject, requireProjectOrAdmin } from "./shared.ts";
+
+/**
+ * Only an Agent of this Workspace can be the Agent a State's rule names: the
+ * rule starts a Run, and a Human does not run. One query for every State named,
+ * because a Workflow is rewritten whole.
+ */
+async function assertAgents(
+  context: ContextFor<"member">,
+  states: Array<{ triggerAgentMemberId?: string | null | undefined }>,
+): Promise<void> {
+  const named = [...new Set(states.map((state) => state.triggerAgentMemberId).filter(Boolean))];
+  if (named.length === 0) return;
+  const agents = await context.db.query.member.findMany({
+    where: { id: { in: named as string[] }, workspaceId: context.workspace.id, kind: "agent" },
+    columns: { id: true },
+  });
+  if (agents.length !== named.length) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "A State can only be assigned to an Agent of this Workspace",
+    });
+  }
+}
 
 export const workflow = {
   get: defineOperation({
@@ -49,6 +72,11 @@ export const workflow = {
           /** The Document this State asks for on entry, and its starting text. */
           documentName: z.string().trim().max(60).nullish(),
           documentTemplate: z.string().max(100_000).nullish(),
+          /**
+           * The rule: entering this State assigns the Issue to this Agent and
+           * starts a Run (docs/plans/m2.md). Null, or left out, is no rule.
+           */
+          triggerAgentMemberId: z.string().nullish(),
         }),
       ),
       deleteStates: z.array(z.string()).default([]),
@@ -72,6 +100,8 @@ export const workflow = {
           });
         }
       }
+
+      await assertAgents(context, input.states);
 
       const doomed = input.deleteStates.filter((id) => known.has(id));
       if (doomed.length > 0) {
@@ -111,6 +141,7 @@ export const workflow = {
               category: state.category,
               documentName: state.documentName ?? null,
               documentTemplate: state.documentTemplate ?? null,
+              triggerAgentMemberId: state.triggerAgentMemberId ?? null,
             })
             .where(eq(workflowStateTable.id, state.id));
           kept.push(state.id);
@@ -125,6 +156,7 @@ export const workflow = {
             category: state.category,
             documentName: state.documentName ?? null,
             documentTemplate: state.documentTemplate ?? null,
+            triggerAgentMemberId: state.triggerAgentMemberId ?? null,
           });
           kept.push(id);
         }

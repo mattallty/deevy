@@ -1,4 +1,5 @@
-import { run as runTable, type Db, type Event, type Run } from "@deevy/db";
+import { issue as issueTable, run as runTable, type Db, type Event, type Run } from "@deevy/db";
+import { eq } from "drizzle-orm";
 import type { EventInput } from "./events.ts";
 import { openRunFor } from "./runs.ts";
 
@@ -18,33 +19,114 @@ export async function triggersFor(db: Db, event: Event): Promise<EventInput[]> {
   // A Run is not a reason to start a Run. This is the first line of the
   // recursion guard; the open-Run rule below is the second.
   if (event.kind.startsWith("run.")) return [];
+  if (event.subjectType !== "issue") return [];
 
-  if (event.kind === "issue.assigned" && event.subjectType === "issue") {
+  if (event.kind === "issue.assigned") {
     const payload = (event.payload ?? {}) as { to?: unknown };
     const assignee = typeof payload.to === "string" ? payload.to : null;
-    if (!assignee || !(await isWorkingAgent(db, assignee, event.workspaceId))) return [];
-    const started = await startRun(db, {
-      issueId: event.subjectId,
-      agentMemberId: assignee,
-      triggeredByMemberId: event.actorMemberId,
-      trigger: "assignment",
-    });
-    return started ? [runStartedEvent(started, event.projectId)] : [];
+    return startRuns(db, event, assignee ? [assignee] : [], "assignment");
+  }
+
+  if (event.kind === "comment.created") {
+    const payload = (event.payload ?? {}) as { mentionedMemberIds?: unknown };
+    const mentioned = Array.isArray(payload.mentionedMemberIds)
+      ? payload.mentionedMemberIds.filter((id): id is string => typeof id === "string")
+      : [];
+    return startRuns(db, event, mentioned, "mention");
+  }
+
+  // Where the Issue ended up, not how it got there: a State's rule fires on
+  // every arrival, including arriving by a Human's decision on a Gate. This is
+  // the same set of kinds `gate_awaiting` watches in notifications.ts, for the
+  // same reason.
+  if (
+    event.kind === "issue.created" ||
+    event.kind === "issue.moved" ||
+    event.kind === "gate.approved" ||
+    event.kind === "gate.rejected"
+  ) {
+    return stateRule(db, event);
   }
 
   return [];
 }
 
 /**
- * A Run is work for an Agent that can still do it: a Human is not triggered,
- * and a suspended Member does nothing (docs/PLAN.md's Sponsor cascade).
+ * Entering a State that names an Agent makes that Agent the Assignee and starts
+ * a Run (PLAN.md's third trigger). The assignment is announced after the Run
+ * exists, never before: the `issue.assigned` Event goes through this same tail,
+ * and finding the Run already open is what stops it starting a second one.
  */
-async function isWorkingAgent(db: Db, memberId: string, workspaceId: string): Promise<boolean> {
-  const found = await db.query.member.findFirst({
-    where: { id: memberId, workspaceId, kind: "agent", suspendedAt: { isNull: true } },
+async function stateRule(db: Db, event: Event): Promise<EventInput[]> {
+  const found = await db.query.issue.findFirst({
+    where: { id: event.subjectId },
+    columns: { id: true, assigneeMemberId: true },
+    with: { state: { columns: { triggerAgentMemberId: true } } },
+  });
+  const named = found?.state.triggerAgentMemberId;
+  if (!found || !named) return [];
+  const [agentMemberId] = await workingAgents(db, [named], event.workspaceId);
+  if (!agentMemberId) return [];
+
+  const events = await startRuns(db, event, [agentMemberId], "state_rule");
+  if (found.assigneeMemberId === agentMemberId) return events;
+
+  await db
+    .update(issueTable)
+    .set({ assigneeMemberId: agentMemberId, updatedAt: new Date() })
+    .where(eq(issueTable.id, found.id));
+  events.push({
+    kind: "issue.assigned",
+    subjectType: "issue",
+    subjectId: found.id,
+    projectId: event.projectId,
+    payload: { from: found.assigneeMemberId, to: agentMemberId, byStateRule: true },
+  });
+  return events;
+}
+
+/**
+ * Starts one Run per Agent among the candidates and hands back the Events they
+ * deserve. Candidates are whoever the rule named; which of them is an Agent
+ * that can still work is this function's business, in one query rather than
+ * one per name.
+ */
+async function startRuns(
+  db: Db,
+  event: Event,
+  candidates: string[],
+  trigger: Run["trigger"],
+): Promise<EventInput[]> {
+  const events: EventInput[] = [];
+  for (const agentMemberId of await workingAgents(db, candidates, event.workspaceId)) {
+    const started = await startRun(db, {
+      issueId: event.subjectId,
+      agentMemberId,
+      triggeredByMemberId: event.actorMemberId,
+      trigger,
+    });
+    if (started) events.push(runStartedEvent(started, event.projectId));
+  }
+  return events;
+}
+
+/**
+ * Of the Members named, those a Run is work for: a Human is not triggered, and
+ * a suspended Member does nothing (docs/PLAN.md's Sponsor cascade). One query,
+ * because a mention can name a whole Team.
+ */
+async function workingAgents(db: Db, memberIds: string[], workspaceId: string): Promise<string[]> {
+  if (memberIds.length === 0) return [];
+  const rows = await db.query.member.findMany({
+    where: {
+      id: { in: memberIds },
+      workspaceId,
+      kind: "agent",
+      suspendedAt: { isNull: true },
+    },
     columns: { id: true },
   });
-  return Boolean(found);
+  return rows.map((row) => row.id);
 }
 
 interface StartRunInput {
