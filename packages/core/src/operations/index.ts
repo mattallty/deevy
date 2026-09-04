@@ -5,6 +5,7 @@ import {
   allowlistRule as allowlistRuleTable,
   event as eventTable,
   member as memberTable,
+  run as runTable,
   user as userTable,
 } from "@deevy/db";
 import {
@@ -81,9 +82,11 @@ import {
 } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
+import { RunSchema } from "../runs.ts";
 import { eventIterator } from "@orpc/server";
 import { subscribeToEvents } from "../live.ts";
 import { NoInput, defineOperation, defineStreamOperation } from "./registry.ts";
+import type { Run } from "@deevy/db";
 import type { ContextFor } from "./registry.ts";
 
 /** The Member an admin operation names, or NOT_FOUND. Scoped to the Workspace. */
@@ -2583,7 +2586,63 @@ export const documents = {
   }),
 };
 
+/** The Run an operation names, with the Issue key every surface shows. */
+function runView(row: Run, issueKey: string) {
+  return {
+    id: row.id,
+    issueKey,
+    agentMemberId: row.agentMemberId,
+    triggeredByMemberId: row.triggeredByMemberId,
+    trigger: row.trigger,
+    status: row.status,
+    summary: row.summary,
+    startedAt: row.startedAt,
+    lastActivityAt: row.lastActivityAt,
+    finishedAt: row.finishedAt,
+    createdAt: row.createdAt,
+  };
+}
+
+export const runs = {
+  start: defineOperation({
+    name: "runs.start",
+    summary: "Begin a Run on an Issue, pending until the Agent posts its first Activity",
+    method: "POST",
+    path: "/issues/{issueKey}/runs",
+    auth: "member",
+    agents: true,
+    input: z.object({ issueKey: z.string() }),
+    output: RunSchema,
+    handler: async ({ input, context }) => {
+      const { issue, project } = await requireIssue(context, input.issueKey);
+      // An Agent runs as itself; a Human starting one by hand has to say for
+      // which Agent, which arrives with the triggers in slice 4.
+      if (context.member.kind !== "agent") {
+        throw new ORPCError("BAD_REQUEST", { message: "Only an Agent can start its own Run" });
+      }
+      const id = crypto.randomUUID();
+      await context.db.insert(runTable).values({
+        id,
+        issueId: issue.id,
+        agentMemberId: context.member.id,
+        triggeredByMemberId: context.member.id,
+        trigger: "manual",
+      });
+      const row = (await context.db.query.run.findFirst({ where: { id } })) as Run;
+      await appendEvent(context, {
+        kind: "run.started",
+        subjectType: "run",
+        subjectId: id,
+        projectId: project.id,
+        payload: { issueId: issue.id, trigger: row.trigger, agentMemberId: context.member.id },
+      });
+      return runView(row, input.issueKey);
+    },
+  }),
+};
+
 export const router = {
+  runs,
   health,
   me,
   workspace,

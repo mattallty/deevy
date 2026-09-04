@@ -4,6 +4,7 @@ export * from "./event.ts";
 export * from "./allowlist.ts";
 export * from "./project.ts";
 export * from "./agent.ts";
+export * from "./run.ts";
 export * from "./issue.ts";
 export * from "./gate.ts";
 export * from "./document.ts";

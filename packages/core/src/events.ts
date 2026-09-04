@@ -55,7 +55,16 @@ export type EventKind =
   | "agent.key_revoked"
   | "agent.sponsor_changed"
   | "agent.project_granted"
-  | "agent.project_revoked";
+  | "agent.project_revoked"
+  /** A Run and what the Agent does inside it (docs/plans/m2.md). */
+  | "run.started"
+  | "run.activity"
+  | "run.awaiting_input"
+  | "run.answered"
+  | "run.completed"
+  | "run.failed"
+  /** Silence, not a decision: the sweep said so, and an Activity undoes it. */
+  | "run.went_stale";
 
 export type EventPayload = Record<string, unknown>;
 

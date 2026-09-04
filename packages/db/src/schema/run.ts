@@ -1,0 +1,72 @@
+import { sql } from "drizzle-orm";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { issue } from "./issue.ts";
+import { member } from "./workspace.ts";
+
+const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
+
+/** What made deevy ask an Agent to work (PLAN.md's four triggers, plus by hand). */
+export const runTriggers = ["assignment", "mention", "state_rule", "schedule", "manual"] as const;
+
+/**
+ * The shape Linear and Plane converged on, so an existing agent ports with a
+ * thin adapter (docs/plans/m2.md). `stale` is recoverable, never terminal.
+ */
+export const runStatuses = [
+  "pending",
+  "active",
+  "awaiting_input",
+  "completed",
+  "failed",
+  "stale",
+] as const;
+
+/** One attempt by one Agent on one Issue (CONTEXT.md). */
+export const run = sqliteTable(
+  "run",
+  {
+    id: text("id").primaryKey(),
+    issueId: text("issue_id")
+      .notNull()
+      .references(() => issue.id, { onDelete: "cascade" }),
+    agentMemberId: text("agent_member_id")
+      .notNull()
+      .references(() => member.id, { onDelete: "cascade" }),
+    /** The Member that triggered it: the accountable Human is one hop away. */
+    triggeredByMemberId: text("triggered_by_member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    trigger: text("trigger", { enum: runTriggers }).notNull(),
+    status: text("status", { enum: runStatuses }).notNull().default("pending"),
+    summary: text("summary"),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }),
+    /** What the stale sweep reads; set on create and by every Activity. */
+    lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" }).default(now).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
+  },
+  (table) => [
+    index("run_issueId_idx").on(table.issueId, table.createdAt),
+    index("run_agent_status_idx").on(table.agentMemberId, table.status),
+    /** The sweep's one indexed scan: open Runs ordered by silence. */
+    index("run_status_lastActivityAt_idx").on(table.status, table.lastActivityAt),
+  ],
+);
+
+export const activityKinds = ["thought", "action", "elicitation", "response", "error"] as const;
+
+/** One entry an Agent posts to its Run while working (CONTEXT.md). */
+export const activity = sqliteTable(
+  "activity",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => run.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: activityKinds }).notNull(),
+    body: text("body").notNull(),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown>>(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
+  },
+  (table) => [index("activity_runId_idx").on(table.runId, table.createdAt)],
+);
