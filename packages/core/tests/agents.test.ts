@@ -225,14 +225,13 @@ describe("agents.update", () => {
       webhookUrl: "https://example.test/hook",
     });
 
-    const row = await db.query.member.findFirst({
-      where: { id: created.id },
-      with: { user: true, agent: true },
-    });
-    expect(row).toMatchObject({
+    // Read back through the operation rather than the table: where the URL is
+    // stored is this slice's business, and an assertion on the row would break
+    // when it moves even though the Sponsor still sees what they set.
+    expect((await asAda.agents.list({})).agents[0]).toMatchObject({
       handle: "plan-writer",
       user: { name: "Plan Writer" },
-      agent: { webhookUrl: "https://example.test/hook" },
+      webhookUrl: "https://example.test/hook",
     });
     const kinds = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).map((e) => e.kind);
     expect(kinds.filter((kind) => kind === "agent.updated")).toEqual(["agent.updated"]);
@@ -471,5 +470,31 @@ describe("agents.grants", () => {
       "agent.project_granted",
       "agent.project_revoked",
     ]);
+  });
+});
+
+describe("an Agent's own webhook", () => {
+  it("is the subscription deevy actually delivers to, not a field that goes nowhere", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAdmin = createRouterClient(router, { context: admin });
+    const project = await asAdmin.projects.create({ key: "DEV", name: "deevy" });
+    const created = await asAdmin.agents.create({ name: "Planner" });
+
+    await asAdmin.agents.update({
+      memberId: created.id,
+      webhookUrl: "https://runner.example/deevy",
+    });
+
+    // Reading it back is the easy half; the half that was broken is whether
+    // anything is owed to that URL once something happens.
+    expect((await asAdmin.agents.list({})).agents[0]?.webhookUrl).toBe(
+      "https://runner.example/deevy",
+    );
+    await asAdmin.issues.create({ projectKey: "DEV", title: "Something to hear about" });
+
+    const owed = await db.query.delivery.findMany({ where: { target: "webhook" } });
+    expect(owed.length).toBeGreaterThan(0);
   });
 });

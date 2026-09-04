@@ -71,6 +71,10 @@ const appRelations = defineRelationsPart(tables, (r) => ({
     user: r.one.user({ from: r.member.userId, to: r.user.id, optional: false }),
     sponsor: r.one.member({ from: r.member.sponsorId, to: r.member.id }),
     agent: r.one.agent({ from: r.member.id, to: r.agent.memberId }),
+    subscriptions: r.many.webhookSubscription({
+      from: r.member.id,
+      to: r.webhookSubscription.memberId,
+    }),
     grantedProjects: r.many.project({
       from: r.member.id.through(r.projectGrant.memberId),
       to: r.project.id.through(r.projectGrant.projectId),

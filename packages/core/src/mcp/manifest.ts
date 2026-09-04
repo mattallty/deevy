@@ -21,7 +21,7 @@ export async function toolManifest(): Promise<ToolManifestEntry[]> {
   const converter = new ZodToJsonSchemaConverter();
   const entries: ToolManifestEntry[] = [];
   for (const tool of projectTools(router)) {
-    const [inputSchema] = await converter.convert(tool.inputSchema as never, "input");
+    const [inputSchema] = converter.convert(tool.inputSchema as never, "input");
     entries.push({
       name: tool.name,
       operation: tool.operation,

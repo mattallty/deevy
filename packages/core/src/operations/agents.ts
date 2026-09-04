@@ -9,6 +9,7 @@ import {
   liftCascade,
   listAgents,
   loadAgent,
+  setAgentWebhook,
 } from "../agents.ts";
 import { ApiKeySummarySchema, IssuedKeySchema, apiKeysOf } from "../keys.ts";
 import { ProjectSchema } from "../schemas.ts";
@@ -109,13 +110,13 @@ export const agents = {
           .where(eq(userTable.id, found.userId));
         changed.name = input.name;
       }
-      // Both of these live on the `agent` row, so they are one statement even
-      // when a Sponsor changes both at once.
-      const onAgent: { webhookUrl?: string | null; scheduleMinutes?: number | null } = {};
       if (input.webhookUrl !== undefined) {
-        onAgent.webhookUrl = input.webhookUrl ?? null;
+        await setAgentWebhook(context.db, found.id, context.workspace.id, input.webhookUrl ?? null);
+        // The URL is a destination, not a credential, so it is safe in the log;
+        // the subscription's secret never is (slice 5).
         changed.webhookUrl = input.webhookUrl ?? null;
       }
+      const onAgent: { scheduleMinutes?: number | null } = {};
       if (input.scheduleMinutes !== undefined) {
         onAgent.scheduleMinutes = input.scheduleMinutes ?? null;
         changed.scheduleMinutes = input.scheduleMinutes ?? null;
