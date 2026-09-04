@@ -1106,6 +1106,7 @@ export const gates = {
     method: "POST",
     path: "/issues/{key}/gate/approve",
     auth: "member",
+    sessionOnly: true,
     input: z.object({ key: z.string(), note: z.string().max(4000).nullish() }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
@@ -1149,6 +1150,7 @@ export const gates = {
     method: "POST",
     path: "/issues/{key}/gate/reject",
     auth: "member",
+    sessionOnly: true,
     input: z.object({ key: z.string(), note: z.string().max(4000).nullish() }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
