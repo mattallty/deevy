@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 deevy is project management where Humans and Agents collaborate as peers on the same Issues. Use the
 vocabulary in [CONTEXT.md](CONTEXT.md) (Member, Human, Agent, Sponsor, Workspace, Issue, Gate, Run, Event) in
 code, API names, and UI copy; it lists the words to avoid. Hard-to-reverse choices live in `docs/adr`, the
-milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`, running the image in
-`docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen slices from `docs/plans/m1.md`;
-M2 (Agents) done, in nine slices from `docs/plans/m2.md`, with a worked agent loop in `docs/agent-loop.md`;
-M3 (Workers) is next.
+milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`, running the image and the
+Worker in `docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen slices from
+`docs/plans/m1.md`; M2 (Agents) done, in nine slices from `docs/plans/m2.md`, with a worked agent loop in
+`docs/agent-loop.md`; M3 (Workers) built in ten slices from `docs/plans/m3.md`, its end-to-end walk written up
+in `docs/m3-acceptance.md` and **not yet run against a Cloudflare account**; M4 (Reference runtime) is next.
 
 ## Commands
 
@@ -27,7 +28,9 @@ runs scripts, `-r` recursively, `pkg#script` for one package (package names are 
   `-t "name substring"`. Tests import from `vite-plus/test`, not `vitest`.
 - `vp run -r --parallel dev`: Node server on 3000 (rebuilt and restarted by `vp pack --watch`) plus the SPA
   on 5173 proxying `/api`, `/rpc`, `/healthz`. Needs a `.env` (copy `.env.example`).
-- `vp run -r build`, `vp run web#build:workers` then `vp run web#check:workers` (wrangler dry run).
+- `vp run -r build`, `vp run web#build:workers` then `vp run web#check:workers` (wrangler dry run). In that
+  order: the check dry-runs `apps/web/dist/deevy/wrangler.json`, which the build writes, and the committed
+  `wrangler.jsonc` is a source that wrangler will not deploy on its own.
 - Schema change: edit `packages/db/src/schema`, `vp run db#generate`, then hand-patch `NOT NULL` onto every
   `text PRIMARY KEY` in the new `migration.sql` (drizzle-kit rc regression) and run `vp run db#check:migrations`.
 - API change: `vp run core#snapshot:openapi` and commit `packages/core/openapi.json`; CI fails on a stale snapshot.
@@ -82,7 +85,8 @@ startup (`openDatabase`) or by `wrangler d1 migrations apply`, never by `drizzle
 
 **Builds**: `vp pack` bundles every dependency into `apps/server/dist/index.mjs` and copies the migrations next
 to it, so the Docker runtime image carries `dist/` and the SPA only. `apps/web` builds the Worker only when
-`DEEVY_TARGET=workers`.
+`DEEVY_TARGET=workers`, emitting `dist/deevy` (the bundle plus the `wrangler.json` a deploy uploads) beside
+`dist/client` (the SPA those assets are). A deploy uses that generated configuration, never `src/worker.ts`.
 
 ## Dependencies
 

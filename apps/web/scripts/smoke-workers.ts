@@ -8,18 +8,26 @@
  * asset routing included, which a unit test of anything the Worker calls
  * cannot see.
  *
- * Six phases, six servers, over one build and one D1. The first serves deevy
- * on a configured origin the request did not arrive on, which is how it proves
- * the bindings reached the app. The second signs a Human in, and a sign-in
- * needs BETTER_AUTH_URL to be the origin the browser is on — so it picks its
- * port first, and takes the stubbed GitHub with it. The third fires the Cron
- * Trigger by hand and watches the background work happen on D1, and it signs
- * in too, because what it reads back it reads over the API. The fourth watches
- * the Event log the way the SPA does, over a stream short enough to end while
- * the smoke is looking at it. The fifth adds the queue binding an account with
- * Queues has, and the sixth takes it away again — the same webhook, delivered
- * by the Cron path alone, which is what makes the binding optional
+ * Seven phases, seven servers, over one build and one D1. The first serves
+ * deevy on a configured origin the request did not arrive on, which is how it
+ * proves the bindings reached the app. The second signs a Human in, and a
+ * sign-in needs BETTER_AUTH_URL to be the origin the browser is on — so it
+ * picks its port first, and takes the stubbed GitHub with it. The third fires
+ * the Cron Trigger by hand and watches the background work happen on D1, and
+ * it signs in too, because what it reads back it reads over the API. The
+ * fourth watches the Event log the way the SPA does, over a stream short
+ * enough to end while the smoke is looking at it. The fifth is the milestone
+ * itself: a Claude Code loop working an assigned Issue over /mcp with an
+ * Agent's API key, and a Human deciding its Gate over /rpc
+ * (docs/plans/m3.md slice 10). The sixth adds the queue binding an account
+ * with Queues has, and the seventh takes it away again — the same webhook,
+ * delivered by the Cron path alone, which is what makes the binding optional
  * (docs/plans/m3.md slice 9).
+ *
+ * Two checks with no server at all close it: that the shape a free account
+ * deploys passes a dry run, and that the file the dry run validates is the one
+ * the build emitted rather than the one in the repository
+ * (docs/plans/m3.md slice 10).
  */
 import type { AppRouter } from "@deevy/core";
 import { createORPCClient } from "@orpc/client";
@@ -651,6 +659,331 @@ async function liveUpdatesInsideAWorkersBudget(origin: string): Promise<void> {
   resumed.stop();
 }
 
+/** The protocol revision the loop speaks, and the one URL elicitation needs. */
+const mcpProtocolVersion = "2026-07-28";
+
+/**
+ * What a client says about itself on every call. URL elicitation is negotiated
+ * per request, so a client that does not declare it is refused rather than
+ * handed a link it cannot open.
+ */
+const mcpEnvelope = {
+  "io.modelcontextprotocol/protocolVersion": mcpProtocolVersion,
+  "io.modelcontextprotocol/clientCapabilities": { elicitation: { url: {} } },
+  "io.modelcontextprotocol/clientInfo": { name: "claude-code", version: "0" },
+};
+
+/** One tool call's answer, narrowed to what this script reads. */
+interface ToolAnswer {
+  result?: Record<string, unknown>;
+  error?: { code: number; message: string };
+}
+
+/**
+ * One tool call over the deployed `/mcp` surface, carrying nothing but an
+ * Agent's API key — which is all a Claude Code loop running outside deevy has.
+ * The same request `packages/core/tests/milestone.test.ts` makes in process,
+ * made over HTTP against workerd instead.
+ */
+async function tool(
+  origin: string,
+  key: string,
+  name: string,
+  args: Record<string, unknown>,
+  requestState?: string,
+): Promise<ToolAnswer> {
+  const response = await fetch(`${origin}/mcp`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": mcpProtocolVersion,
+      "mcp-method": "tools/call",
+      "mcp-name": name,
+      authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: {
+        name,
+        arguments: args,
+        ...(requestState
+          ? { requestState, inputResponses: { approval: { action: "accept" } } }
+          : {}),
+        _meta: mcpEnvelope,
+      },
+    }),
+  });
+  const body = await response.text();
+  if (response.status !== 200) {
+    throw new Error(`${name} was ${String(response.status)}: ${body.slice(0, 300)}`);
+  }
+  return JSON.parse(body) as ToolAnswer;
+}
+
+/** What a tool call returned, or the reason it is worth stopping over. */
+function structured(name: string, answer: ToolAnswer): Record<string, unknown> {
+  if (answer.error) throw new Error(`${name} failed: ${JSON.stringify(answer.error)}`);
+  if (answer.result?.isError) {
+    throw new Error(`${name} refused: ${JSON.stringify(answer.result.content)}`);
+  }
+  return (answer.result?.structuredContent ?? {}) as Record<string, unknown>;
+}
+
+/**
+ * Slice 10: the milestone's own scenario, on workerd.
+ *
+ * `packages/core/tests/milestone.test.ts` walks this loop in process against
+ * `node:sqlite`, which proves the core and says nothing about the runtime M3
+ * is about. This is the same walk over HTTP against the built Worker on a
+ * local D1: everything the loop does goes over `/mcp` with an Agent's API key
+ * and nothing else, everything the Human does goes over `/rpc` with a session
+ * cookie the Worker minted, and the two halves meet only where they would in
+ * production (docs/plans/m3.md slice 10, docs/m3-acceptance.md).
+ */
+async function theAgentLoopOnWorkerd(origin: string): Promise<void> {
+  const admin = await signIn(origin, adminEmail);
+  if (admin.cookie.length === 0) throw new Error(`the admin could not sign in: ${admin.location}`);
+  const cookie = admin.cookie;
+
+  // A browser left open on the board before any of this happens, and never
+  // reloaded: what the Human is looking at while the loop works.
+  const board = watch(origin, cookie);
+  await until(() => board.messages.length > 0, 2 * STREAM_POLL_MS);
+
+  // What an admin does on a fresh instance, all of it over the surface the SPA
+  // calls: a Project, an Agent, the grant that makes the Project exist to it,
+  // and a key that is shown exactly once.
+  const project = await must(origin, "projects/create", { name: "Planning", key: "PLN" }, cookie);
+  const planner = await must(origin, "agents/create", { name: "Planner" }, cookie);
+  const plannerId = String(planner.id);
+  await must(origin, "agents/grants/add", { memberId: plannerId, projectId: project.id }, cookie);
+  const issued = await must(
+    origin,
+    "agents/keys/issue",
+    { memberId: plannerId, name: "ci" },
+    cookie,
+  );
+  const key = String(issued.key);
+
+  // Assigning to the Agent is the trigger: a Run exists before the loop wakes.
+  // The two approvals are the Human's, and they put the Issue in the Plan Gate
+  // — the one the loop is about to reach.
+  const issue = await must(
+    origin,
+    "issues/create",
+    { projectKey: "PLN", title: "Ship M3" },
+    cookie,
+  );
+  const issueKey = String(issue.key);
+  await must(origin, "issues/update", { key: issueKey, assigneeMemberId: plannerId }, cookie);
+  await must(origin, "gates/approve", { key: issueKey }, cookie);
+  await must(origin, "gates/approve", { key: issueKey }, cookie);
+
+  const triggered = (await must(origin, "runs/list", { issueKey }, cookie)).runs as Array<{
+    id: string;
+    trigger: string;
+    status: string;
+  }>;
+
+  // From here everything is the loop, over MCP, with nothing but its key.
+  const mine = structured("runs_list", await tool(origin, key, "runs_list", { status: "pending" }))
+    .runs as Array<{ id: string; issueKey: string }>;
+  check(
+    "an assignment opens a Run, and an Agent's API key alone finds it over /mcp",
+    triggered.length === 1 &&
+      triggered[0]?.trigger === "assignment" &&
+      triggered[0]?.status === "pending" &&
+      mine.length === 1 &&
+      mine[0]?.id === triggered[0]?.id &&
+      mine[0]?.issueKey === issueKey,
+    `the Human sees ${JSON.stringify(triggered)}, the Agent ${JSON.stringify(mine)}`,
+  );
+
+  const read = structured("issues_get", await tool(origin, key, "issues_get", { key: issueKey }));
+  check(
+    "the Issue the loop picks up is the assigned one, waiting at the Plan Gate",
+    read.key === issueKey && (read.state as { name?: string } | undefined)?.name === "Plan",
+    `it read ${JSON.stringify({ key: read.key, state: read.state })}`,
+  );
+
+  const runId = String(triggered[0]?.id ?? "");
+
+  await tool(origin, key, "runs_post_activity", {
+    runId,
+    kind: "thought",
+    body: "Reading the intent",
+  });
+  const intent = structured(
+    "documents_get",
+    await tool(origin, key, "documents_get", { issueKey, name: "intent" }),
+  );
+  await tool(origin, key, "documents_write", {
+    issueKey,
+    name: "plan",
+    body: "## Files that change\n- packages/core\n",
+  });
+
+  // What the Human sees of that work afterwards, over /rpc: the narration on
+  // the Run's feed and the Document on the Issue.
+  const feed = (await must(origin, "runs/get", { runId }, cookie)).activities as Array<{
+    kind: string;
+    body: string;
+  }>;
+  const plan = await must(origin, "documents/get", { issueKey, name: "plan" }, cookie);
+  check(
+    "it reads the intent, narrates the work, and writes a plan the Human can read",
+    String(intent.body).includes("## Problem") &&
+      feed.some((one) => one.kind === "thought" && one.body === "Reading the intent") &&
+      String(plan.body).includes("- packages/core"),
+    `the intent is ${JSON.stringify(String(intent.body).slice(0, 40))}, the feed ${JSON.stringify(
+      feed.map((one) => [one.kind, one.body]),
+    )} and the plan ${JSON.stringify(plan.body)}`,
+  );
+
+  // It reaches the Plan Gate and asks. The Run stops, and the link it hands
+  // back is for a Human to open — the Issue's own page, with that Gate in
+  // focus. Which Gate that is comes from the Human's view of the Workflow, so
+  // the two halves of the link are named by different surfaces.
+  const asked = (await tool(origin, key, "runs_request_approval", { runId })).result as {
+    resultType?: string;
+    requestState?: string;
+    inputRequests?: { approval?: { params?: { url?: string; mode?: string } } };
+  };
+  const planGate = ((project.states ?? []) as Array<{ id: string; name: string }>).find(
+    (state) => state.name === "Plan",
+  );
+  const waiting = await must(origin, "runs/get", { runId }, cookie);
+  check(
+    "at the Plan Gate it raises a URL elicitation, and the Run stops to wait",
+    asked.resultType === "input_required" &&
+      asked.inputRequests?.approval?.params?.mode === "url" &&
+      asked.inputRequests.approval.params.url ===
+        `${origin}/issues/${issueKey}?gate=${String(planGate?.id)}` &&
+      waiting.status === "awaiting_input",
+    `it answered ${JSON.stringify(asked)}, the Plan Gate is ${String(planGate?.id)}, and the Run is ${String(waiting.status)}`,
+  );
+
+  // The Human opens that link and approves. The loop retries the same call,
+  // carrying back the state it was given, and is told the ruling.
+  await must(origin, "gates/approve", { key: issueKey, note: "Looks right" }, cookie);
+  const answered = structured(
+    "runs_request_approval",
+    await tool(origin, key, "runs_request_approval", { runId }, asked.requestState),
+  );
+  const carriedOn = await must(origin, "runs/get", { runId }, cookie);
+  check(
+    "the Human approves, and the call the loop retries comes back approved",
+    answered.status === "approved" &&
+      answered.note === "Looks right" &&
+      carriedOn.status === "active",
+    `the loop was told ${JSON.stringify(answered)} and the Run is ${String(carriedOn.status)}`,
+  );
+
+  // It carries on, attaches the pull request it opened, and finishes.
+  await tool(origin, key, "links_add", {
+    issueKey,
+    url: "https://github.com/mattallty/deevy/pull/12",
+    runId,
+  });
+  const finished = structured(
+    "runs_finish",
+    await tool(origin, key, "runs_finish", { runId, status: "completed", summary: "Planned it" }),
+  );
+
+  // What the Human is left with: a finished Run, the evidence attached to the
+  // Issue, and the Issue itself past the Gate it was waiting at.
+  const done = await must(origin, "runs/get", { runId }, cookie);
+  const links = (await must(origin, "links/list", { issueKey }, cookie)).links as Array<
+    Record<string, unknown>
+  >;
+  const moved = await must(origin, "issues/get", { key: issueKey }, cookie);
+  check(
+    "it finishes the Run with a summary and a pull request Link, and the Issue moves on",
+    finished.status === "completed" &&
+      finished.summary === "Planned it" &&
+      done.status === "completed" &&
+      done.summary === "Planned it" &&
+      links.length === 1 &&
+      links[0]?.kind === "pull_request" &&
+      links[0]?.ref === "12" &&
+      (moved.state as { name?: string } | undefined)?.name === "Build",
+    `the loop was told ${JSON.stringify(finished)}, the Human sees ${JSON.stringify({ status: done.status, summary: done.summary })}, the Links are ${JSON.stringify(links)} and the Issue is in ${JSON.stringify(moved.state)}`,
+  );
+
+  const inbox = (await must(origin, "inbox/list", {}, cookie)).notifications as Array<{
+    kind: string;
+    event?: { subjectId?: string };
+  }>;
+  check(
+    "the Human's inbox holds the run_finished Notification for that Run",
+    inbox.some((row) => row.kind === "run_finished" && row.event?.subjectId === runId),
+    `the inbox holds ${JSON.stringify(inbox.map((row) => [row.kind, row.event?.subjectId]))}`,
+  );
+
+  // And the Event log tells the whole story. The kinds are the ones the same
+  // walk records on Node (packages/core/tests/milestone.test.ts), so a runtime
+  // that quietly dropped one would say so here.
+  const me = await must(origin, "me/get", undefined, cookie);
+  const adminMemberId = String((me.member as { id?: string } | null)?.id);
+  const log = (
+    await must(origin, "events/list", { subjectType: "run", subjectId: runId, limit: 200 }, cookie)
+  ).events as Array<{ kind: string; actorMemberId: string | null }>;
+  // Accountability reads straight off the log: the Agent narrated its own
+  // work, and the two Events it could not cause itself carry the Human who
+  // did — the admin assigned the Issue, which started the Run, and the admin
+  // decided the Gate.
+  const humansTurn = ["run.started", "run.answered"];
+  const actors = log.map((row) => [
+    row.kind,
+    row.actorMemberId === adminMemberId
+      ? "the Human"
+      : row.actorMemberId === plannerId
+        ? "the Agent"
+        : String(row.actorMemberId),
+  ]);
+  check(
+    "the Event log tells the whole story, with the Agent as actor and the Human one hop away",
+    log.map((row) => row.kind).join(",") ===
+      [
+        "run.started",
+        "run.activity",
+        "run.activity",
+        "run.awaiting_input",
+        "run.answered",
+        "run.activity",
+        "run.completed",
+      ].join(",") &&
+      log.every(
+        (row) => row.actorMemberId === (humansTurn.includes(row.kind) ? adminMemberId : plannerId),
+      ),
+    `the log reads ${JSON.stringify(actors)}`,
+  );
+
+  // And the board updated itself while all of that happened. The three Events
+  // are the ones a Human watching would care about: the Run stopping to ask,
+  // the Gate they then decided, and the Run finishing. An approval carries the
+  // Issue out of the Gate itself, so `gate.approved` is the move — there is no
+  // second `issue.moved` behind it.
+  const followed = await until(
+    () =>
+      ["run.awaiting_input", "gate.approved", "run.completed"].every((kind) =>
+        kindsSeenBy(board).includes(kind),
+      ),
+    3 * STREAM_POLL_MS,
+  );
+  board.stop();
+  check(
+    "a board opened before the loop began follows it without anyone reloading",
+    followed,
+    `it was handed ${kindsSeenBy(board).join(",") || "nothing"}${
+      board.failure ? `, and failed with ${describeFailure(board.failure)}` : ""
+    }`,
+  );
+}
+
 /** One POST a subscribed URL was given, narrowed to what this script reads. */
 interface Received {
   path: string;
@@ -870,17 +1203,35 @@ async function theCronPathAlone(origin: string, far: Receiver): Promise<void> {
 }
 
 /**
- * The shape a free account can deploy: the committed configuration, which
- * names no queue, through the dry run that is that file's typecheck
+ * The shape a free account can deploy: the configuration a deploy uploads,
+ * which names no queue, through the dry run that is that file's typecheck
  * (docs/plans/m3.md, convention 17).
+ *
+ * Read off the built file rather than the committed one, because the built
+ * file is what goes up — and asked of the producer and consumer lists rather
+ * than of the `queues` key, because the Cloudflare plugin normalises what it
+ * emits: a configuration naming no queue at all still has a `queues` key with
+ * two empty lists in it. It is the lists that decide whether a deploy asks a
+ * free account for a paid feature, and `wrangler deploy --dry-run` never
+ * contacts the account, so nothing else here would notice one appearing.
  */
 async function deploysWithoutAQueueBlock(): Promise<void> {
   const committed = await readFile(join(here, "../wrangler.jsonc"), "utf8");
+  const uploaded = JSON.parse(await readFile(config, "utf8")) as BuiltConfig;
+  const producers = uploaded.queues?.producers ?? [];
+  const consumers = uploaded.queues?.consumers ?? [];
   let ok = true;
   try {
     await run(
       wrangler,
-      ["deploy", "--dry-run", "--outdir", join(here, "../dist/wrangler-dry-run-smoke")],
+      [
+        "deploy",
+        "--dry-run",
+        "--config",
+        config,
+        "--outdir",
+        join(here, "../dist/wrangler-dry-run-smoke"),
+      ],
       { cwd: join(here, "..") },
     );
   } catch {
@@ -888,8 +1239,85 @@ async function deploysWithoutAQueueBlock(): Promise<void> {
   }
   check(
     "wrangler deploy --dry-run succeeds on a configuration with no queue block",
-    ok && !committed.includes('"queues"'),
-    ok ? "the committed wrangler.jsonc names a queue" : "the dry run failed",
+    ok && producers.length === 0 && consumers.length === 0 && !committed.includes('"queues"'),
+    `the dry run ${ok ? "passed" : "failed"}, and the configuration it validated names ${String(
+      producers.length,
+    )} queue producers and ${String(consumers.length)} consumers${
+      committed.includes('"queues"') ? ", and the committed wrangler.jsonc names a queue" : ""
+    }`,
+  );
+}
+
+/** Whatever `dist/deevy/wrangler.json` says, as far as this script reads it. */
+interface BuiltConfig {
+  main?: string;
+  assets?: { directory?: string };
+  /** Normalised by the Cloudflare plugin: present and empty when nothing is queued. */
+  queues?: { producers?: unknown[]; consumers?: unknown[] };
+}
+
+/** A file that exists and has something in it, or nothing. */
+async function contentsOf(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Slice 10: the artifact a deploy uploads is the artifact the build emitted.
+ *
+ * `wrangler deploy` from apps/web does not upload the committed
+ * `wrangler.jsonc`. The Cloudflare plugin writes `.wrangler/deploy/config.json`
+ * beside it pointing at `dist/deevy/wrangler.json`, and that file — the built
+ * bundle, the built SPA, the routing table copied across — is what goes up.
+ * The committed one could not be deployed on its own at all, because the plugin
+ * is what supplies `assets.directory`.
+ *
+ * So the dry run that is the configuration's typecheck has to name the built
+ * file rather than trust a redirect nothing tracks: `.wrangler` is gitignored
+ * local state, and a check that passes only because the last build happened to
+ * leave the right note behind proves nothing about what ships. This phase takes
+ * the note away and asks the check to stand on its own.
+ */
+async function theDeployArtifactIsPinned(): Promise<void> {
+  const built = JSON.parse(await readFile(config, "utf8")) as BuiltConfig;
+  const source = await readFile(join(here, "../wrangler.jsonc"), "utf8");
+  const bundle = built.main ? await contentsOf(join(here, "../dist/deevy", built.main)) : null;
+  const spa = built.assets?.directory
+    ? await contentsOf(join(here, "../dist/deevy", built.assets.directory, "index.html"))
+    : null;
+  check(
+    "the configuration a deploy uploads is the built Worker and the built SPA",
+    // The source names an entry the build compiles and an assets block with no
+    // directory; the artifact names neither.
+    source.includes('"main": "src/worker.ts"') &&
+      built.main !== "src/worker.ts" &&
+      (bundle?.length ?? 0) > 0 &&
+      (spa?.includes('<div id="root"') ?? false),
+    `main ${String(built.main)} (${String(bundle?.length ?? 0)} bytes), assets ${String(
+      built.assets?.directory,
+    )} (${spa === null ? "no index.html" : "index.html"})`,
+  );
+
+  // Taking the note away is the only way to ask the question. It goes back
+  // afterwards, because a developer's own `wrangler dev` follows it too.
+  const redirect = join(here, "../.wrangler/deploy/config.json");
+  const note = await contentsOf(redirect);
+  await rm(redirect, { force: true });
+  let ok = true;
+  try {
+    await run(vp, ["run", "check:workers"], { cwd: join(here, "..") });
+  } catch {
+    ok = false;
+  } finally {
+    if (note !== null) await writeFile(redirect, note);
+  }
+  check(
+    "check:workers validates that artifact by name, not by the redirect a build left behind",
+    ok,
+    "the dry run could not find the configuration it was meant to check",
   );
 }
 
@@ -1179,6 +1607,29 @@ try {
     liveUpdatesInsideAWorkersBudget,
   );
 
+  // The milestone itself, on the runtime the milestone is about: a loop
+  // outside deevy working an assigned Issue over /mcp with an Agent's API key,
+  // and a Human deciding its Gate over /rpc. Its own server for the reason the
+  // others have theirs — the elicitation hands back a link built from
+  // BETTER_AUTH_URL, and a Human has to be able to open it.
+  const loopPort = await freePort();
+  await withServer(
+    persistTo,
+    {
+      config: await stubbedOutside(),
+      port: loopPort,
+      vars: {
+        BETTER_AUTH_URL: `http://127.0.0.1:${String(loopPort)}`,
+        BETTER_AUTH_SECRET: "smoke-secret-that-is-at-least-32-characters",
+        GITHUB_CLIENT_ID: "stub-client-id",
+        GITHUB_CLIENT_SECRET: "stub-client-secret",
+        DEEVY_ADMIN_EMAIL: adminEmail,
+        DEEVY_WORKSPACE_NAME: "Flippable",
+      },
+    },
+    theAgentLoopOnWorkerd,
+  );
+
   // Slice 9, in two halves that differ only in whether the account has Queues.
   // One receiver serves both, so the counts each phase asserts are the same
   // server's, and the second half is subscribed to a path the first never used.
@@ -1227,6 +1678,7 @@ try {
   }
 
   await deploysWithoutAQueueBlock();
+  await theDeployArtifactIsPinned();
 } finally {
   await rm(persistTo, { recursive: true, force: true });
 }

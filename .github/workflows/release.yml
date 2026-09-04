@@ -1,11 +1,15 @@
 name: Release
 
-# A v0.1.x or v0.2.x tag publishes the image: M1's series and M2's. CI's own
-# checks run on main and on pull requests; this workflow re-runs them so a tag
-# can never publish something that does not build.
+# A v0.1.x, v0.2.x or v0.3.x tag publishes the image: M1's series, M2's and
+# M3's. CI's own checks run on main and on pull requests; this workflow re-runs
+# them so a tag can never publish something that does not build.
+#
+# It publishes the image and nothing else. The Cloudflare Worker built from the
+# same commit is deployed by hand (docs/OPERATIONS.md), because uploading one
+# needs an account credential this repository does not hold.
 on:
   push:
-    tags: ["v0.1.*", "v0.2.*"]
+    tags: ["v0.1.*", "v0.2.*", "v0.3.*"]
 
 permissions:
   contents: read

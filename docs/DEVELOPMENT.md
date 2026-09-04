@@ -41,17 +41,17 @@ an OAuth App created before this slice asks for the extra scope the next time so
 
 ## Everyday commands
 
-| Command                          | What it does                                                                                                |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `vp check`                       | Format, lint, and typecheck the whole tree (`--fix` to apply formatting).                                   |
-| `vp run -r test`                 | Tests in every package (Vitest through Vite+).                                                              |
-| `vp run -r build`                | `apps/server/dist/index.mjs` (bundled Node server) and `apps/web/dist` (SPA).                               |
-| `vp run web#build:workers`       | The Cloudflare Worker build (`DEEVY_TARGET=workers`), then `vp run web#check:workers` for a dry-run deploy. |
-| `vp run web#test:workers`        | Boots the built Worker on `wrangler dev --local` against a migrated local D1 and drives it over HTTP.       |
-| `vp run db#generate`             | Generate a migration from `packages/db/src/schema` with drizzle-kit. Then run `vp run db#check:migrations`. |
-| `vp run db#generate:auth`        | Regenerate `packages/db/src/schema/auth.ts` from Better Auth's config. Needs the bootstrap step below.      |
-| `vp run core#snapshot:openapi`   | Regenerate `packages/core/openapi.json`; CI fails when it is stale.                                         |
-| `vp run core#snapshot:mcp-tools` | Regenerate `packages/core/mcp-tools.json`; CI fails when it is stale.                                       |
+| Command                          | What it does                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `vp check`                       | Format, lint, and typecheck the whole tree (`--fix` to apply formatting).                                     |
+| `vp run -r test`                 | Tests in every package (Vitest through Vite+).                                                                |
+| `vp run -r build`                | `apps/server/dist/index.mjs` (bundled Node server) and `apps/web/dist` (SPA).                                 |
+| `vp run web#build:workers`       | The Cloudflare Worker build (`DEEVY_TARGET=workers`); `vp run web#check:workers` then dry-runs what it wrote. |
+| `vp run web#test:workers`        | Boots the built Worker on `wrangler dev --local` against a migrated local D1 and drives it over HTTP.         |
+| `vp run db#generate`             | Generate a migration from `packages/db/src/schema` with drizzle-kit. Then run `vp run db#check:migrations`.   |
+| `vp run db#generate:auth`        | Regenerate `packages/db/src/schema/auth.ts` from Better Auth's config. Needs the bootstrap step below.        |
+| `vp run core#snapshot:openapi`   | Regenerate `packages/core/openapi.json`; CI fails when it is stale.                                           |
+| `vp run core#snapshot:mcp-tools` | Regenerate `packages/core/mcp-tools.json`; CI fails when it is stale.                                         |
 
 The HTTP surface is documented at http://localhost:3000/api/docs while the server runs; the raw document is at
 `/api/spec.json`.
@@ -121,8 +121,9 @@ whole of one trigger. Both deployments call it and neither owns it. Node satisfi
 `packages/core/src/jobs.ts` with `createTimerCron()` from `@deevy/adapters/node`, and
 `apps/server/src/runner.ts` starts that schedule beside `serve()`, drains while a pass says there is more, and
 stops it on SIGINT and SIGTERM. Cloudflare owns its own schedule, so `apps/web/src/worker.ts` has a
-`scheduled` handler instead of a `Cron`, and it asks for one tighter pass per trigger. Neither lives inside
-`createApp`, which builds no timer and owns no schedule.
+`scheduled` handler instead of a `Cron`, and it asks for one tighter pass per trigger — which is why there is
+no Workers cron adapter at all (ADR-0012). Neither lives inside `createApp`, which builds no timer and owns
+no schedule.
 
 | Variable                       | Default | What it does                                                                       |
 | ------------------------------ | ------- | ---------------------------------------------------------------------------------- |
