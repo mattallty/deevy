@@ -14,3 +14,4 @@ export * from "./repository.ts";
 export * from "./notification.ts";
 export * from "./channel.ts";
 export * from "./delivery.ts";
+export * from "./webhook.ts";
