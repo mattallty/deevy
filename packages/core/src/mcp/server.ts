@@ -1,0 +1,203 @@
+import type { Db } from "@deevy/db";
+import type {
+  CallToolResult,
+  ListToolsResult,
+  StandardSchemaWithJSON,
+} from "@modelcontextprotocol/server";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
+import { call } from "@orpc/server";
+import type { Auth } from "../auth.ts";
+import { buildContext } from "../app.ts";
+import { router } from "../operations/index.ts";
+import type { AppContext } from "../operations/registry.ts";
+import { toolError } from "./errors.ts";
+import type { ToolDescriptor } from "./tools.ts";
+import { projectTools } from "./tools.ts";
+
+export interface DeevyMcpOptions {
+  db: Db;
+  /** Absent only in the Workers smoke build, which has no auth yet: every call is then 401. */
+  auth?: Auth;
+  /**
+   * The public origin of this instance, for the RFC 9728 challenge. The
+   * request's own origin is used when it is absent, which is right in
+   * development and wrong behind a proxy that rewrites the host.
+   */
+  baseURL?: string;
+  /** Called with anything a tool call raised that the caller is not told about. */
+  onError?: (error: unknown) => void;
+}
+
+/** The MCP surface: one fetch, mounted at /mcp (ADR-0005). */
+export interface DeevyMcp {
+  fetch: (request: Request) => Promise<Response>;
+}
+
+/** Where the request's AppContext rides to the tool callback: the SDK's own pass-through. */
+const contextKey = "io.deevy/context";
+
+/**
+ * deevy's MCP server, the second of ADR-0005's three surfaces. There are no
+ * protocol sessions: the SDK builds a fresh McpServer per request from the
+ * factory, so any instance answers any request, which is what the Workers
+ * target requires (ADR-0006). Every tool call goes through the same procedure
+ * the REST route calls, so authorization happens once and in one place.
+ */
+export function createDeevyMcp({
+  db,
+  auth,
+  baseURL,
+  onError: report = () => {},
+}: DeevyMcpOptions): DeevyMcp {
+  const tools = projectTools(router);
+  const handler = createMcpHandler(
+    (mcpRequest) => serverFor(tools, contextOf(mcpRequest.authInfo), report),
+    { responseMode: "auto", legacy: "stateless", onerror: report },
+  );
+
+  return {
+    async fetch(request) {
+      const context = await buildContext(db, auth, request.headers);
+      // No credential at all is an authentication answer, not a tool error:
+      // the challenge is what starts the OAuth dance.
+      if (!context.session) return challenge(request, baseURL);
+      return handler.fetch(request, {
+        authInfo: {
+          // The SDK's AuthInfo is a pass-through envelope; deevy's own answer
+          // to "who is calling" is the Principal already inside the context.
+          token: "",
+          clientId: context.principal?.kind ?? "cookie",
+          scopes: [],
+          extra: { [contextKey]: context },
+        },
+      });
+    },
+  };
+}
+
+/** The AppContext this request resolved to, put there by `fetch` above. */
+function contextOf(authInfo: { extra?: Record<string, unknown> } | undefined): AppContext {
+  const found = authInfo?.extra?.[contextKey];
+  if (!found) throw new Error("createDeevyMcp: the request reached MCP with no deevy context");
+  return found as AppContext;
+}
+
+/**
+ * One request's server. Every projected tool is registered for every caller:
+ * what a caller may do is decided by `authorize()` inside the procedure, never
+ * by which tools were registered. `tools/list` is then narrowed to what this
+ * caller could plausibly use, which is a courtesy to the model's context
+ * window and nothing more (docs/plans/m2.md).
+ */
+function serverFor(
+  tools: ToolDescriptor[],
+  context: AppContext,
+  report: (error: unknown) => void,
+): McpServer {
+  const server = new McpServer({ name: "deevy", version: "0.0.0" });
+  for (const tool of tools) {
+    server.registerTool(
+      tool.name,
+      {
+        description: tool.summary,
+        inputSchema: tool.inputSchema as StandardSchemaWithJSON,
+        annotations: { readOnlyHint: tool.readOnly },
+      },
+      (input: unknown) => runTool(tool, input, context, report),
+    );
+  }
+
+  // Display only. The tools left out here stay callable, and are refused, or
+  // not, by exactly the same middleware as every other surface (ADR-0005).
+  const visible = visibleTools(tools, context);
+  server.server.setRequestHandler("tools/list", () => ({
+    tools: visible.map((tool) => ({
+      name: tool.name,
+      description: tool.summary,
+      inputSchema: inputSchemaJson(server, tool),
+      annotations: { readOnlyHint: tool.readOnly },
+    })),
+  }));
+  return server;
+}
+
+type AdvertisedSchema = ListToolsResult["tools"][number]["inputSchema"];
+
+/**
+ * The JSON Schema `tools/list` advertises for a tool. The McpServer memoises
+ * this conversion at registration, so asking it keeps the schema a client is
+ * shown and the schema its arguments are validated against one and the same.
+ * It is the only McpServer internal this file reaches for; a rename breaks the
+ * build here and nowhere else, the way `schemasOf` isolates oRPC's
+ * (mcp/tools.ts).
+ */
+function inputSchemaJson(server: McpServer, tool: ToolDescriptor): AdvertisedSchema {
+  const converted = server.toolInputSchemaJson(tool.name);
+  return (converted ?? { type: "object", properties: {} }) as AdvertisedSchema;
+}
+
+/**
+ * What this caller is offered. An Agent is not shown the tools it is refused,
+ * and a caller who is no Member of this Workspace is offered nothing, because
+ * a seventy-tool list it cannot call costs it its context window for nothing.
+ */
+export function visibleTools(tools: ToolDescriptor[], context: AppContext): ToolDescriptor[] {
+  const member = context.member;
+  if (!member || !context.workspace || member.suspendedAt) return [];
+  return member.kind === "agent" ? tools.filter((tool) => tool.agents) : tools;
+}
+
+/** One tool call, which is one call of the very same procedure /api and /rpc call. */
+async function runTool(
+  tool: ToolDescriptor,
+  input: unknown,
+  context: AppContext,
+  report: (error: unknown) => void,
+): Promise<CallToolResult> {
+  try {
+    const output = await call(tool.procedure, input, { context });
+    // Dates and the like become what the wire carries before the model reads
+    // them, so the text and the structured content cannot disagree.
+    const json = JSON.parse(JSON.stringify(output ?? null)) as unknown;
+    return {
+      content: [{ type: "text", text: JSON.stringify(json, null, 2) }],
+      ...(isPlainObject(json) ? { structuredContent: json } : {}),
+    };
+  } catch (error) {
+    return toolError(error, report);
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Where the MCP endpoint is mounted. RFC 9728 builds its metadata URL from it. */
+export const MCP_PATH = "/mcp";
+
+/**
+ * RFC 9728: a 401 naming where the Protected Resource Metadata lives is what
+ * makes an MCP client start the OAuth dance rather than simply fail.
+ */
+function challenge(request: Request, baseURL?: string): Response {
+  const base = (baseURL ?? new URL(request.url).origin).replace(/\/+$/, "");
+  // RFC 9728 forms the metadata URL by inserting the well-known segment
+  // between the host and the resource's own path, so a resource at /mcp is
+  // described at /.well-known/oauth-protected-resource/mcp. A client that
+  // derives the URL instead of reading this header looks there, so slice 7
+  // has to serve the document at this exact path.
+  const metadata = `${base}/.well-known/oauth-protected-resource${MCP_PATH}`;
+  return new Response(
+    JSON.stringify({
+      error: "invalid_token",
+      error_description: "This MCP endpoint needs an Agent's API key or an access token",
+    }),
+    {
+      status: 401,
+      headers: {
+        "content-type": "application/json",
+        "www-authenticate": `Bearer resource_metadata="${metadata}"`,
+      },
+    },
+  );
+}
