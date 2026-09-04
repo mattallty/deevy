@@ -1,6 +1,7 @@
 import type { Db, Member, Workspace } from "@deevy/db";
 import { eq } from "drizzle-orm";
 import { agent, member, projectGrant, user, workspace } from "@deevy/db";
+import type { OpenedDatabase } from "@deevy/adapters/node";
 import { openDatabase } from "@deevy/adapters/node";
 import type { Session } from "../src/auth.ts";
 import type { AppContext } from "../src/operations/registry.ts";
@@ -10,6 +11,33 @@ export const migrationsFolder = new URL("../../db/drizzle", import.meta.url).pat
 
 export function testDb() {
   return openDatabase({ path: ":memory:", migrationsFolder });
+}
+
+export interface CountingDatabase extends OpenedDatabase {
+  /** Every statement drizzle has run since the array was last emptied, in order. */
+  statements: string[];
+}
+
+/**
+ * A database that says what it was asked to do. On D1 the number of statements
+ * one request runs is a limit rather than a detail, so the budget for a write
+ * is a test with a number in it rather than a note in a document
+ * (docs/plans/m3.md). Migrations run before the array is handed over, so what
+ * a test empties and reads back is its own work and nothing else.
+ */
+export function countingDb(): CountingDatabase {
+  const statements: string[] = [];
+  const opened = openDatabase({
+    path: ":memory:",
+    migrationsFolder,
+    logger: {
+      logQuery: (query) => {
+        statements.push(query);
+      },
+    },
+  });
+  statements.length = 0;
+  return { ...opened, statements };
 }
 
 /** An AppContext whose caller is a Member of the Workspace, for createRouterClient. */

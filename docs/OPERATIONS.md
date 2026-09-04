@@ -44,9 +44,10 @@ bindings arrive with the request.
 | `DEEVY_PORT`                   | env  | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                   |
 | `DEEVY_WEB_DIST`               | env  | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                             |
 
-The Worker serves the SPA, the API, the reference at `/api/docs` and the MCP challenge. Signing in and the
-background sweep are still Node's alone, so the Worker reads `GITHUB_*`, `DEEVY_ADMIN_EMAIL`,
-`DEEVY_WORKSPACE_NAME` and the three timing knobs and does not yet act on them.
+The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
+signing in: `BETTER_AUTH_*`, `GITHUB_*`, `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME` do on Workers exactly
+what they do on Node, bootstrap and allowlist included. The background sweep is still Node's alone, so the
+Worker reads the three timing knobs and does not yet act on them.
 
 Which paths the Worker answers rather than the asset handler is `assets.run_worker_first` in
 `apps/web/wrangler.jsonc`. It is part of the routing table, not configuration: a path the app mounts that is
@@ -56,6 +57,28 @@ missing from it is answered with the SPA's `index.html` — a 200 with the wrong
 
 The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
 created before that will ask for the extra scope at the next sign-in.
+
+### Signing in, and the origin `BETTER_AUTH_URL` names
+
+`BETTER_AUTH_URL` has to be the origin the browser actually visits, character for character. Better Auth
+builds the OAuth callback from it and sets the session cookie for it, and `packages/core/src/auth.ts` pins
+the token issuer and the RFC 8707 resource identifier to it as well. A value naming a host nobody visits
+therefore mints tokens bound to that host and a cookie the browser never sends back — and it cannot be
+guessed from the request instead, because then a caller would choose the audience of the tokens deevy signs.
+
+The GitHub OAuth App's Authorization callback URL follows from it:
+
+| Where deevy runs          | `BETTER_AUTH_URL`                     | Authorization callback URL                                     |
+| ------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| `wrangler dev --local`    | `http://localhost:8787`               | `http://localhost:8787/api/auth/callback/github`               |
+| a `workers.dev` subdomain | `https://deevy.<account>.workers.dev` | `https://deevy.<account>.workers.dev/api/auth/callback/github` |
+| a custom domain           | `https://deevy.example.com`           | `https://deevy.example.com/api/auth/callback/github`           |
+| the Docker image          | `https://deevy.example.com`           | `https://deevy.example.com/api/auth/callback/github`           |
+
+A GitHub OAuth App holds one callback URL, so a Worker reachable both on its `workers.dev` subdomain and on a
+custom domain needs an App for each, or a decision that sign-in happens on one of them. Move between origins
+by changing `wrangler secret put BETTER_AUTH_URL` and the App's callback together: either one alone leaves
+sign-in refused by GitHub or the session cookie set for an origin nobody is on.
 
 ## Agents and MCP
 
