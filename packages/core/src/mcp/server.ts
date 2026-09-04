@@ -17,6 +17,7 @@ import type { GateElicitation } from "./elicitation.ts";
 import {
   createGateElicitation,
   elicitationKey,
+  canElicitUrl,
   gateApprovalOperation,
   pendingGateApproval,
   principalId,
@@ -210,7 +211,11 @@ async function runTool(
     // decision row rather than anything the client carried back.
     if (tool.operation === gateApprovalOperation) {
       const waiting = pendingGateApproval(output);
-      if (waiting) return elicitation.ask(waiting, ctx);
+      // Only to a client that can take one: the answer already carries the URL,
+      // and offering an elicitation to a client that declared none is refused
+      // by the SDK after this returns, turning work that succeeded into an
+      // error (elicitation.ts, canElicitUrl).
+      if (waiting && canElicitUrl(ctx)) return elicitation.ask(waiting, ctx);
     }
     // Dates and the like become what the wire carries before the model reads
     // them, so the text and the structured content cannot disagree.

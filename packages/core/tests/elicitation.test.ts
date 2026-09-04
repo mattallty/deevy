@@ -103,6 +103,72 @@ async function agentAtAGate() {
   };
 }
 
+/**
+ * The same request from a client that declares no elicitation capability, which
+ * is what Claude Code sends. Found by walking docs/m3-acceptance.md against a
+ * deployed instance: every test above declares `elicitation`, so nothing ever
+ * exercised the client the walk actually used.
+ */
+async function mcpWithoutElicitation(
+  app: App,
+  key: string,
+  params: Record<string, unknown>,
+): Promise<JsonRpcAnswer> {
+  const res = await app.request("/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": modern,
+      "mcp-method": "tools/call",
+      ...(typeof params.name === "string" ? { "mcp-name": params.name } : {}),
+      authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: {
+        ...params,
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": modern,
+          "io.modelcontextprotocol/clientCapabilities": {},
+          "io.modelcontextprotocol/clientInfo": { name: "no-elicitation", version: "0" },
+        },
+      },
+    }),
+  });
+  if (res.status !== 200) throw new Error(`${res.status} ${await res.text()}`);
+  return (await res.json()) as JsonRpcAnswer;
+}
+
+describe("an Agent whose client cannot be elicited", () => {
+  it("still gets the Gate's URL, as an ordinary answer rather than an error", async () => {
+    const { app, key, run, plan, asAgent } = await agentAtAGate();
+
+    const answer = await mcpWithoutElicitation(app, key, {
+      name: "runs_request_approval",
+      arguments: { runId: run.id },
+    });
+
+    // Not an error, and not an input_required the client cannot honour: the
+    // same structured answer a polling Agent gets, carrying the URL a Human
+    // has to open (docs/plans/m2.md slice 6).
+    expect(answer.result?.isError).not.toBe(true);
+    expect(answer.result?.structuredContent).toMatchObject({
+      status: "awaiting",
+      url: `${baseURL}/issues/DEV-1?gate=${plan.id}`,
+      stateName: "Plan",
+    });
+
+    // And the durable half happened exactly once, as it always did: the Run is
+    // waiting and the feed holds the one elicitation carrying the URL.
+    const feed = await asAgent.runs.get({ runId: run.id });
+    expect(feed.status).toBe("awaiting_input");
+    expect(feed.activities.filter((row) => row.kind === "elicitation")).toHaveLength(1);
+  });
+});
+
 describe("an Agent that reaches a Gate over MCP", () => {
   it("is asked to send its Human to a deevy URL, and told nothing has been decided", async () => {
     const { app, key, run, plan } = await agentAtAGate();
