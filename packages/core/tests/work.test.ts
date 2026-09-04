@@ -479,7 +479,11 @@ describe("remindAboutGates", () => {
 
     const run = await asAgent.runs.start({ issueKey: "DEV-1" });
     await asAgent.runs.requestApproval({ runId: run.id });
+    // Ada has seen the Gate and moved on without deciding it, which is the
+    // whole reason the reminder exists.
+    await asAda.inbox.markAllRead({});
     const before = (await asAda.inbox.list({})).notifications.length;
+    expect(await asAda.inbox.unreadCount({})).toMatchObject({ unread: 0 });
 
     // Nothing has been decided and nobody has looked. A Run waiting on a Human
     // is not stale, so the stale sweep leaves it alone for ever; without a
@@ -492,12 +496,18 @@ describe("remindAboutGates", () => {
       silenceMs: 4 * 60 * 60 * 1000,
     });
     expect(quiet).toMatchObject({ scanned: 0, changed: 0 });
-    expect((await asAda.inbox.list({})).notifications.length).toBe(before);
+    expect(await asAda.inbox.unreadCount({})).toMatchObject({ unread: 0 });
 
+    // "A Gate reminder past its silence window brings the approver's existing
+    // Notification back unread rather than writing a second one" — m3 slice 2.
+    // Which is why this counts unread rows rather than inbox rows: one row per
+    // Member per kind per Event is the schema's invariant now, so the reminder
+    // has nowhere to put a second copy and never wanted one.
     const due = new Date(Date.now() + 5 * 60 * 60 * 1000);
     const first = await remindAboutGates({ db, workspaceId: ada.workspace.id, now: due });
     expect(first).toMatchObject({ scanned: 1, changed: 1 });
-    expect((await asAda.inbox.list({})).notifications.length).toBe(before + 1);
+    expect(await asAda.inbox.unreadCount({})).toMatchObject({ unread: 1 });
+    expect((await asAda.inbox.list({})).notifications.length).toBe(before);
     expect(
       (await createRouterClient(router, { context: bob }).inbox.list({})).notifications[0],
     ).toMatchObject({ kind: "gate_awaiting" });
@@ -505,7 +515,7 @@ describe("remindAboutGates", () => {
     // Reminding is not nagging: the same round does not ask twice.
     const second = await remindAboutGates({ db, workspaceId: ada.workspace.id, now: due });
     expect(second).toMatchObject({ scanned: 0, changed: 0 });
-    expect((await asAda.inbox.list({})).notifications.length).toBe(before + 1);
+    expect((await asAda.inbox.list({})).notifications.length).toBe(before);
   });
 });
 

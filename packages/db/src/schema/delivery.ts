@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { event } from "./event.ts";
 import { member, workspace } from "./workspace.ts";
 
@@ -52,5 +52,12 @@ export const delivery = sqliteTable(
     /** The sweep's one scan: what is owed and due. Read in this order, no sort. */
     index("delivery_due_idx").on(table.deliveredAt, table.nextAttemptAt),
     index("delivery_target_idx").on(table.targetId, table.eventSeq),
+    /**
+     * One outbound attempt owed per destination per Event (docs/plans/m3.md).
+     * The derivation is the only writer, but the invariant belongs here: a
+     * derivation that runs twice — a retried request, a queue message
+     * delivered again — must not owe a destination the same Event twice.
+     */
+    uniqueIndex("delivery_event_uidx").on(table.target, table.targetId, table.eventSeq),
   ],
 );

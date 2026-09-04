@@ -24,22 +24,31 @@ import { gateApprovers } from "./workflow.ts";
  * turning Slack off changes where a Human hears about something and never
  * whether it concerns them.
  *
- * One inbox row per recipient per Event. The actor is never told about their
- * own action, and a suspended Member is told nothing at all.
+ * One inbox row per recipient per kind per Event, and one message per Channel
+ * per Event, both of them the unique indexes' invariant rather than this
+ * function's care (docs/plans/m3.md). The actor is never told about their own
+ * action, and a suspended Member is told nothing at all.
  */
 export async function deriveNotifications(db: Db, event: Event): Promise<void> {
   const { inbox, slack } = await routeEvent(db, event);
 
   if (inbox.length > 0) {
-    await db.insert(notificationTable).values(
-      inbox.map(({ memberId, kind }) => ({
-        id: crypto.randomUUID(),
-        recipientMemberId: memberId,
-        kind,
-        eventId: event.seq,
-        issueId: issueOf(event),
-      })),
-    );
+    // One row per recipient per kind per Event, which the unique index makes
+    // true rather than this being the only caller careful enough to keep it
+    // (docs/plans/m3.md): running this a second time for the same Event owes
+    // nobody a second inbox row.
+    await db
+      .insert(notificationTable)
+      .values(
+        inbox.map(({ memberId, kind }) => ({
+          id: crypto.randomUUID(),
+          recipientMemberId: memberId,
+          kind,
+          eventId: event.seq,
+          issueId: issueOf(event),
+        })),
+      )
+      .onConflictDoNothing();
   }
 
   // The delivery row is the record that a message is owed, and the only one
@@ -48,15 +57,18 @@ export async function deriveNotifications(db: Db, event: Event): Promise<void> {
   // with no recipient, because an incoming webhook posts to a room and three
   // Humans concerned by one Event are not three messages in it.
   if (slack.length > 0) {
-    await db.insert(deliveryTable).values(
-      slack.map(({ channelId }) => ({
-        id: crypto.randomUUID(),
-        workspaceId: event.workspaceId,
-        target: "slack" as const,
-        targetId: channelId,
-        eventSeq: event.seq,
-      })),
-    );
+    await db
+      .insert(deliveryTable)
+      .values(
+        slack.map(({ channelId }) => ({
+          id: crypto.randomUUID(),
+          workspaceId: event.workspaceId,
+          target: "slack" as const,
+          targetId: channelId,
+          eventSeq: event.seq,
+        })),
+      )
+      .onConflictDoNothing();
   }
 }
 
