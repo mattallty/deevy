@@ -1,9 +1,13 @@
 import { apiKey } from "@better-auth/api-key";
+import { cimd } from "@better-auth/cimd";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+import { mcp } from "@better-auth/mcp";
 import { allowlistRule, member, workspace, type Db } from "@deevy/db";
 import { eq } from "drizzle-orm";
 import { allocateHandle, slugify } from "./handles.ts";
 import { betterAuth } from "better-auth";
+import { jwt } from "better-auth/plugins";
+import { fetchClientMetadataResource, type MetadataResourceFetch } from "./cimd.ts";
 import { appendEvent } from "./events.ts";
 
 export interface AuthEnv {
@@ -17,6 +21,12 @@ export interface AuthEnv {
   /** The first sign-in with this email creates the Workspace and becomes admin. */
   adminEmail?: string;
   workspaceName?: string;
+  /**
+   * How a Client ID Metadata Document is dereferenced. Defaults to the
+   * web-standard transport in `cimd.ts`; a deployment that can pin a resolved
+   * address supplies a stricter one here.
+   */
+  fetchClientMetadataResource?: MetadataResourceFetch;
 }
 
 export interface CreateAuthOptions {
@@ -29,14 +39,14 @@ export interface CreateAuthOptions {
  * Member is a Better Auth user; deevy keeps its own workspace and member tables.
  */
 export function createAuth({ db, env }: CreateAuthOptions) {
-  return betterAuth({
+  const auth = betterAuth({
     baseURL: env.baseURL,
     secret: env.secret,
-    basePath: "/api/auth",
+    basePath: AUTH_BASE_PATH,
     trustedOrigins: env.trustedOrigins,
     database: drizzleAdapter(db, { provider: "sqlite" }),
     emailAndPassword: { enabled: false },
-    plugins: apiKeyPlugins(),
+    plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env)],
     socialProviders: {
       github: {
         clientId: env.github.clientId,
@@ -78,6 +88,14 @@ export function createAuth({ db, env }: CreateAuthOptions) {
       },
     },
   });
+  // Better Auth starts initialising the moment it is constructed, and the
+  // OAuth provider seeds its resource rows there, so the context is a promise
+  // that touches the database before anyone has awaited it. This handler only
+  // marks that promise as observed: every real `await auth.$context` still
+  // sees a failure, but a caller that builds an instance and never uses it
+  // does not turn one into an unhandled rejection.
+  void auth.$context.catch(() => {});
+  return auth;
 }
 
 /** The prefix every deevy API key carries, and the discriminator resolvePrincipal reads. */
@@ -96,6 +114,60 @@ export function apiKeyPlugins() {
       defaultPrefix: apiKeyPrefix,
       rateLimit: { enabled: false },
       customAPIKeyGetter: (ctx) => bearerApiKey(ctx.headers),
+    }),
+  ];
+}
+
+/** Where the MCP endpoint is mounted. RFC 8707 and RFC 9728 both build on it. */
+export const MCP_PATH = "/mcp";
+
+/** Where Better Auth's own routes are mounted, and so where `/jwks` lives. */
+export const AUTH_BASE_PATH = "/api/auth";
+
+/** The SPA route the OAuth provider sends a Human to for consent. */
+export const CONSENT_PATH = "/consent";
+
+/**
+ * deevy as an OAuth 2.1 authorization server for a Human's own MCP client
+ * (ADR-0007, docs/plans/m2.md). `mcp()` *is* the provider, so no separate
+ * `oauthProvider` sits beside it, and `jwt()` supplies the signing keys the
+ * access tokens and the JWKS come from.
+ *
+ * The issuer is pinned to the instance origin rather than left to default to
+ * Better Auth's base path. RFC 8414 builds a metadata URL by inserting the
+ * well-known segment after the issuer's host, so an issuer of `…/api/auth`
+ * would publish the document at `/.well-known/oauth-authorization-server/api/auth`
+ * and nowhere a client looking at the origin would find it.
+ *
+ * Nothing is enabled without a configured `baseURL`: a resource identifier is
+ * an absolute URL (RFC 8707) and guessing it per request would mint tokens
+ * bound to whatever host the caller sent (docs/OPERATIONS.md).
+ *
+ * Mirrored in packages/db/auth.generate.config.ts, which the schema generator
+ * reads; only the plugin list shapes the schema, and `cimd()` adds no tables.
+ */
+export function oauthServerPlugins(env: AuthEnv) {
+  const baseURL = env.baseURL?.replace(/\/+$/, "");
+  if (!baseURL) return [];
+  return [
+    jwt({ jwt: { issuer: baseURL } }),
+    mcp({
+      loginPage: "/",
+      consentPage: CONSENT_PATH,
+      // RFC 8707: every token this server mints is bound to this audience, and
+      // one minted for anything else is refused at /mcp (principal.ts).
+      resource: `${baseURL}${MCP_PATH}`,
+      // MCP 2026-07-28 prefers a Client ID Metadata Document and deprecates
+      // dynamic registration, but the clients that only speak DCR are the ones
+      // deevy cannot ask to change, so both stay open.
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+    }),
+    cimd({
+      fetchClientMetadataResource: env.fetchClientMetadataResource ?? fetchClientMetadataResource,
+      // The revision pins CIMD draft-00, which the profile enforces on top of
+      // the plugin's generic draft-02 validation.
+      metadataProfile: "mcp-2026-07-28",
     }),
   ];
 }

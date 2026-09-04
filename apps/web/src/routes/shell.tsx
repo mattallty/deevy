@@ -10,6 +10,7 @@ import {
   Tags,
   Users,
   Bot,
+  Plug,
   UsersRound,
   Webhook,
 } from "lucide-react";
@@ -58,6 +59,7 @@ const settings: NavItem[] = [
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/members", label: "Members", icon: Users },
   { to: "/settings/agents", label: "Agents", icon: Bot },
+  { to: "/settings/mcp-clients", label: "MCP clients", icon: Plug },
   { to: "/settings/allowlist", label: "Allowlist", icon: ShieldCheck },
 ];
 
