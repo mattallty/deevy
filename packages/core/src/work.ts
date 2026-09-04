@@ -5,6 +5,7 @@ import {
   event as eventTable,
   issue as issueTable,
   member as memberTable,
+  notification as notificationTable,
   project as projectTable,
   run as runTable,
   webhookSubscription as webhookSubscriptionTable,
@@ -509,6 +510,12 @@ interface Claimed {
  * have (ADR-0006): the UPDATE re-checks the lock it read, and only the ids it
  * returns are sent, so two passes claim disjoint sets and no destination hears
  * the same Event twice.
+ *
+ * It also refuses to claim a delivery that has already landed, which is what
+ * makes sending one provably idempotent rather than idempotent because the due
+ * scan happens to filter it out (docs/plans/m3.md): a caller that names a row
+ * directly — a queue message delivered twice, a Redeliver that raced a tick —
+ * gets nothing back and so makes no request.
  */
 async function claimDeliveries(db: Db, ids: string[], now: Date): Promise<Claimed[]> {
   return db
@@ -517,6 +524,7 @@ async function claimDeliveries(db: Db, ids: string[], now: Date): Promise<Claime
     .where(
       and(
         inArray(deliveryTable.id, ids),
+        isNull(deliveryTable.deliveredAt),
         or(isNull(deliveryTable.lockedUntil), lt(deliveryTable.lockedUntil, now)),
       ),
     )
@@ -1052,8 +1060,14 @@ export function waitingOnGatesQuery(
  * Gate already produced once. It moves no Run and appends no Event: nothing has
  * happened in the Workspace, someone simply has not looked yet.
  *
+ * Which is why asking again is that Notification coming back unread rather
+ * than a second copy of it. One inbox row per Member per kind per Event is the
+ * schema's invariant (docs/plans/m3.md), and a second copy was never what a
+ * reminder meant: the ask is the same ask, and the Human has still not made it.
+ *
  * Bounded like every other sweep: one indexed scan with a limit, then the
- * Events those Runs already wrote, then one insert.
+ * Events those Runs already wrote, then the derivation and one update for each
+ * of them.
  */
 export async function remindAboutGates({
   db,
@@ -1085,7 +1099,16 @@ export async function remindAboutGates({
     // Touching the Run is what stops this asking twice in the same round, and
     // it is honest: someone was told just now.
     await db.update(runTable).set({ lastActivityAt: now }).where(eq(runTable.id, event.subjectId));
+    // The derivation still runs, because an approver added since the Gate was
+    // reached has no row yet and is owed one; for everyone else the unique
+    // index makes it a no-op and the unread flag is what asks them again. A
+    // Slack room owed a message for that Event keeps the one it was owed, for
+    // the same reason (docs/plans/m3.md, slice 2).
     await deriveNotifications(db, event);
+    await db
+      .update(notificationTable)
+      .set({ readAt: null })
+      .where(eq(notificationTable.eventId, event.seq));
     result.changed += 1;
   }
   return result;

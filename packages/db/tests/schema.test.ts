@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { drizzle } from "drizzle-orm/node-sqlite";
 import { migrate } from "drizzle-orm/node-sqlite/migrator";
 import { describe, expect, it } from "vite-plus/test";
-import { member, relations, user, workspace } from "../src/index.ts";
+import { event, member, notification, relations, user, workspace } from "../src/index.ts";
 
 const migrationsFolder = new URL("../drizzle", import.meta.url).pathname;
 
@@ -41,5 +41,55 @@ describe("schema", () => {
     await expect(
       db.insert(member).values({ id: "m2", workspaceId: "w1", userId: "u1" }),
     ).rejects.toThrow();
+  });
+});
+
+/**
+ * At most one inbox row per Member per kind per Event (docs/plans/m3.md). The
+ * key has to carry the kind: one Event can owe the same Human two different
+ * things, and a key of Member and Event alone would silently drop the second.
+ */
+describe("what a Member may be owed for one Event", () => {
+  async function workspaceWithEvent() {
+    const db = openTestDb();
+    await db.insert(user).values({ id: "u1", name: "Ada", email: "ada@example.com" });
+    await db.insert(workspace).values({ id: "w1", name: "deevy", slug: "deevy" });
+    await db.insert(member).values({ id: "m1", workspaceId: "w1", userId: "u1" });
+    const [row] = await db
+      .insert(event)
+      .values({
+        workspaceId: "w1",
+        kind: "issue.created",
+        subjectType: "issue",
+        subjectId: "i1",
+      })
+      .returning();
+    return { db, seq: (row as { seq: number }).seq };
+  }
+
+  it("refuses a second Notification of the same kind", async () => {
+    const { db, seq } = await workspaceWithEvent();
+    await db
+      .insert(notification)
+      .values({ id: "n1", recipientMemberId: "m1", kind: "mention", eventId: seq });
+
+    await expect(
+      db
+        .insert(notification)
+        .values({ id: "n2", recipientMemberId: "m1", kind: "mention", eventId: seq }),
+    ).rejects.toThrow();
+  });
+
+  it("takes two Notifications of different kinds", async () => {
+    const { db, seq } = await workspaceWithEvent();
+    await db
+      .insert(notification)
+      .values({ id: "n1", recipientMemberId: "m1", kind: "mention", eventId: seq });
+
+    await db
+      .insert(notification)
+      .values({ id: "n2", recipientMemberId: "m1", kind: "assignment", eventId: seq });
+
+    expect(await db.query.notification.findMany()).toHaveLength(2);
   });
 });

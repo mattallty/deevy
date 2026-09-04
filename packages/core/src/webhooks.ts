@@ -158,8 +158,15 @@ export async function deriveWebhookDeliveriesForMany(
         recipientMemberId: null,
       })),
   );
+  // At most one attempt owed per subscription per Event, which the unique
+  // index makes true rather than this being the only writer careful enough to
+  // keep it (docs/plans/m3.md). A derivation that runs a second time — a
+  // retried request, a queue message delivered again — owes nothing new.
   for (let at = 0; at < rows.length; at += deliveryRowsPerInsert) {
-    await db.insert(delivery).values(rows.slice(at, at + deliveryRowsPerInsert));
+    await db
+      .insert(delivery)
+      .values(rows.slice(at, at + deliveryRowsPerInsert))
+      .onConflictDoNothing();
   }
   return rows.length;
 }

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { event } from "./event.ts";
 import { issue } from "./issue.ts";
 import { member } from "./workspace.ts";
@@ -41,5 +41,11 @@ export const notification = sqliteTable(
   (table) => [
     index("notification_recipient_idx").on(table.recipientMemberId, table.readAt),
     index("notification_eventId_idx").on(table.eventId),
+    /**
+     * One inbox row per Member per kind per Event, enforced here rather than
+     * respected by the one caller (docs/plans/m3.md). The kind is part of the
+     * key because one Event can owe the same Human two different things.
+     */
+    uniqueIndex("notification_event_uidx").on(table.recipientMemberId, table.kind, table.eventId),
   ],
 );
