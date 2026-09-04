@@ -1,9 +1,10 @@
 import type { Db } from "@deevy/db";
-import { webhookSubscription } from "@deevy/db";
+import { agent as agentTable, webhookSubscription } from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { appendEvent } from "../src/events.ts";
-import { deliverDueWebhooks, deliverWebhook } from "../src/work.ts";
+import { deliverDueWebhooks, deliverWebhook, sweepSchedules } from "../src/work.ts";
 import { router } from "../src/operations/index.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
 import { signPayload, verifySignature } from "../src/webhooks.ts";
@@ -181,6 +182,11 @@ function stubFetch(respond: () => Response) {
 }
 
 const ok = () => new Response("", { status: 200 });
+
+interface Started {
+  kind: string;
+  payload: { trigger: string };
+}
 
 describe("delivering what is owed to a URL", () => {
   it("POSTs the Event itself, signed, and marks the delivery done", async () => {
@@ -413,5 +419,73 @@ describe("subscribing a URL", () => {
     expect(row).toMatchObject({ attempts: 0, deliveredAt: null });
     await deliverDueWebhooks({ db, workspaceId, fetch: receiver.fetch });
     expect(receiver.posted).toHaveLength(2);
+  });
+});
+
+describe("what a receiver actually gets", () => {
+  /**
+   * The other tests here stop at the delivery row or at `deliverDueWebhooks`'
+   * return value. That is what let a real bug through: a sweep wrote its Events
+   * straight to the log, delivery was derived inside `appendEvent`, and nothing
+   * observed that the POST never arrived. This one follows a trigger all the
+   * way to the receiver and verifies the signature the way a receiver would.
+   */
+  it("is a signed POST it can verify, for an Event a sweep wrote", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+    const project = await asAda.projects.create({ name: "deevy", key: "DEV" });
+    const agent = await agentContext(db, { sponsor: ada.member, grants: [project.id] });
+    const asAgent = createRouterClient(router, { context: agent });
+
+    const secret = "whsec_the_receiver_holds_this_one";
+    await asAda.webhooks.create({ url: "https://runner.example/deevy", secret, kinds: ["run.*"] });
+
+    await asAda.issues.create({ projectKey: "DEV", title: "Nightly" });
+    await asAda.issues.update({ key: "DEV-1", assigneeMemberId: agent.member.id });
+    const opened = await asAgent.runs.list({ issueKey: "DEV-1" });
+    await asAgent.runs.finish({
+      runId: opened.runs[0]?.id ?? "",
+      status: "completed",
+      summary: "done",
+    });
+    await db
+      .update(agentTable)
+      .set({ scheduleMinutes: 60 })
+      .where(eq(agentTable.memberId, agent.member.id));
+
+    // The schedule sweep writes run.started without going through appendEvent.
+    const swept = await sweepSchedules({ db, workspaceId: ada.workspace.id });
+    expect(swept.started).toBe(1);
+
+    const receiver = stubFetch(ok);
+    await deliverDueWebhooks({
+      db,
+      workspaceId: ada.workspace.id,
+      fetch: receiver.fetch,
+    });
+
+    // Both paths arrive: the assignment trigger goes through appendEvent, the
+    // schedule does not, and the receiver cannot tell the difference.
+    const started = receiver.posted
+      .map((post) => ({ post, body: JSON.parse(post.body) as Started }))
+      .filter(({ body }) => body.kind === "run.started");
+    expect(started.map(({ body }) => body.payload.trigger).sort()).toEqual([
+      "assignment",
+      "schedule",
+    ]);
+
+    const post = started.find(({ body }) => body.payload.trigger === "schedule")?.post;
+    expect(post?.url).toBe("https://runner.example/deevy");
+
+    // And the receiver can prove it came from deevy, which is the only reason
+    // the delivery is worth anything.
+    const verified = await verifySignature({
+      secret,
+      header: post?.headers["deevy-signature"] ?? "",
+      body: post?.body ?? "",
+    });
+    expect(verified).toBe(true);
   });
 });
