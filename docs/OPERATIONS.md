@@ -106,16 +106,23 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler secret put GITHUB_CLIENT_SECRET
    ```
 
-   `wrangler secret list` shows the four names and no values. The rest are not credentials, so they go in a
-   `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
+   `wrangler secret list` shows the four names and no values. The rest are not credentials, so they can go in
+   a `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
 
    ```jsonc
    "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Flippable" },
    ```
 
-7. **Deploy again**, so the vars and the secrets are live: step 1 again from the repository root, because the
-   `vars` block changed the source the build projects, then `wrangler deploy` from `apps/web`. The output
-   names the Cron Trigger it registered alongside the bindings.
+   Deploying a public fork, put `DEEVY_ADMIN_EMAIL` in with `wrangler secret put` instead. It is not a
+   credential, but it is somebody's personal address, and a `vars` block is committed. A secret and a var
+   reach the Worker identically — `readWorkerEnv` cannot tell them apart — so this costs nothing but the
+   reviewer's view of it.
+
+7. **Deploy again**, if the `vars` block changed: step 1 again from the repository root, because that block is
+   part of the source the build projects, then `wrangler deploy` from `apps/web`. The output names the Cron
+   Trigger it registered alongside the bindings. A secret needs no deploy — `wrangler secret put` publishes a
+   new version by itself, live within a few seconds — so a deployment configured entirely through secrets
+   skips this step.
 
 8. **Check the trigger fires.** `wrangler tail --format pretty` and wait a minute: a `scheduled` invocation
    appears every minute, `Ok` with nothing to do on an empty Workspace. That is `runDueWork`, one bounded pass
