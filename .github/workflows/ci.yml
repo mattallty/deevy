@@ -51,6 +51,12 @@ jobs:
           vp run core#snapshot:openapi
           git diff --exit-code -- packages/core/openapi.json
 
+      # The tool set an agent sees, diffed like the HTTP surface (ADR-0009).
+      - name: MCP tool list is current
+        run: |
+          vp run core#snapshot:mcp-tools
+          git diff --exit-code -- packages/core/mcp-tools.json
+
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 20

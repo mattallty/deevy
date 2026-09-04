@@ -1612,6 +1612,7 @@ export const issues = {
     path: "/issues",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       projectKey: ProjectKeyLookup,
       title: z.string().trim().min(1).max(300),
@@ -1672,6 +1673,7 @@ export const issues = {
     path: "/projects/{projectKey}/issues",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       projectKey: ProjectKeyLookup,
       /** Return Issues numbered above this. Pass back the previous page's nextCursor. */
@@ -1719,6 +1721,7 @@ export const issues = {
     path: "/issues/{key}",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({ key: z.string() }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
@@ -1767,6 +1770,7 @@ export const issues = {
     path: "/issues/{key}/labels",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({ key: z.string(), labelIds: z.array(z.string()) }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {
@@ -1809,6 +1813,7 @@ export const issues = {
     path: "/issues/{key}",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       key: z.string(),
       title: z.string().trim().min(1).max(300).optional(),
@@ -1943,6 +1948,7 @@ export const labels = {
     path: "/labels",
     auth: "member",
     agents: true,
+    mcp: true,
     input: NoInput,
     output: z.object({ labels: z.array(LabelSchema) }),
     handler: async ({ context }) => {
@@ -2125,6 +2131,7 @@ export const comments = {
     path: "/issues/{issueKey}/comments",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({ issueKey: z.string(), body: z.string().trim().min(1).max(100_000) }),
     output: CommentWithAuthorSchema,
     handler: async ({ input, context }) => {
@@ -2220,6 +2227,7 @@ export const inbox = {
     path: "/inbox",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       unreadOnly: QueryFlag.optional(),
       /** Return Notifications older than this id's position. */
@@ -2443,6 +2451,7 @@ export const links = {
     path: "/issues/{issueKey}/links",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       issueKey: z.string(),
       url: z.url().max(2000),
@@ -2556,6 +2565,7 @@ export const documents = {
     path: "/issues/{issueKey}/documents/{name}",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       issueKey: z.string(),
       name: z.string(),
@@ -2584,6 +2594,7 @@ export const documents = {
     path: "/issues/{issueKey}/documents/{name}",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       issueKey: z.string(),
       name: z.string(),
@@ -2679,6 +2690,7 @@ export const runs = {
     path: "/issues/{issueKey}/runs",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({ issueKey: z.string() }),
     output: RunSchema,
     handler: async ({ input, context }) => {
@@ -2730,6 +2742,7 @@ export const runs = {
     path: "/runs/{runId}/activities",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       runId: z.string(),
       kind: z.enum(agentActivityKinds),
@@ -2825,6 +2838,7 @@ export const runs = {
     path: "/runs/{runId}/finish",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({
       runId: z.string(),
       status: z.enum(["completed", "failed"]),
