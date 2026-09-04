@@ -96,8 +96,10 @@ step that answers something else is where to stop.
 9. **Issue an API key**, on the same page. The plaintext is shown once. Expected: a key you can put in the
    loop's environment as `DEEVY_AGENT_KEY`; the page afterwards shows the key's name and never the key.
 
-10. **Create the Issue and give it to the Agent.** Issues, New in `deevy`: title `Ship M3`. Then set its
-    Assignee to `planner`, and approve the Intent and Spec Gates so it sits in Plan.
+10. **Create the Issue and give it to the Agent.** There is no top-level Issues section: an Issue is made on
+    its Project's own page, `/projects/DEV`, where the Issue list opens with a New Issue field and an Add
+    Issue button. Title it `Ship M3`. Then open `DEV-1`, set its Assignee to `planner`, and approve the Intent
+    and Spec Gates so it sits in Plan.
 
     Expected: the Issue is `DEV-1`, it is in the Plan State, and its Runs list already shows one Run,
     `trigger: assignment`, `status: pending`. The Run exists before the loop wakes up — that is the trigger,
