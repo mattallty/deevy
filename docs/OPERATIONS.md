@@ -56,11 +56,29 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
 2. **Sign in to Cloudflare.** `wrangler login` opens a browser and ends with `Successfully logged in.`
    `wrangler whoami` names the account everything below lands in.
 
-3. **Create the database.** `wrangler d1 create deevy` prints a `database_id`. Put it in
-   `apps/web/wrangler.jsonc` in place of the `00000000-…` placeholder — it is an identifier, not a credential,
-   and committing it is how the next deploy finds the same database.
+3. **Deploy once**, which provisions the database and tells you the origin. `wrangler deploy` finds a
+   `d1_databases` entry with a name and no id, says so, and creates it before it uploads anything:
 
-4. **Build the schema.**
+   ```
+   The following bindings need to be provisioned:
+   Binding        Resource
+   env.DB         D1 Database
+
+   Provisioning DB (D1 Database)...
+   Resource name found in config: deevy
+   🌀 Creating new D1 Database "deevy"...
+   ✨ DB provisioned 🎉
+   ```
+
+   There is no `wrangler d1 create` step and no `database_id` to paste anywhere: wrangler remembers which
+   database it made, so the next deploy finds the same one, and nothing account-specific is ever committed. It
+   then prints the `workers.dev` URL — `https://deevy.<subdomain>.workers.dev` — and the Cron Trigger it
+   registered. Sign-in does not work yet and nothing else has to:
+   `curl https://deevy.<subdomain>.workers.dev/healthz` answers `{"ok":true}`, and the SPA loads and says
+   nobody is signed in.
+
+4. **Build the schema.** The database exists now but is empty, so this follows the first deploy rather than
+   preceding it.
 
    ```bash
    wrangler d1 migrations apply deevy --remote
@@ -73,21 +91,16 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler's own `d1_migrations`. Applying twice is a no-op. Nothing here touches the local D1 that
    `vp run web#test:workers` uses; `--remote` is the whole difference.
 
-5. **Deploy once, to learn the origin.** `wrangler deploy` uploads the built Worker and the SPA and prints the
-   `workers.dev` URL — `https://deevy.<account>.workers.dev`. Sign-in does not work yet and nothing else has
-   to: `curl https://deevy.<account>.workers.dev/healthz` answers `{"ok":true}`, and the SPA loads and says
-   nobody is signed in.
-
-6. **Create the GitHub OAuth App** at <https://github.com/settings/developers>, with that origin as the
-   homepage and `https://deevy.<account>.workers.dev/api/auth/callback/github` as the Authorization callback
+5. **Create the GitHub OAuth App** at <https://github.com/settings/developers>, with that origin as the
+   homepage and `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` as the Authorization callback
    URL. The table under [Signing in](#signing-in-and-the-origin-better_auth_url-names) is the full set of
    origins and callbacks; the rule is that `BETTER_AUTH_URL` and the callback change together or sign-in
    breaks.
 
-7. **Put the secrets in.** Each command prompts for the value and answers `Success! Uploaded secret <name>`:
+6. **Put the secrets in.** Each command prompts for the value and answers `Success! Uploaded secret <name>`:
 
    ```bash
-   wrangler secret put BETTER_AUTH_URL          # https://deevy.<account>.workers.dev
+   wrangler secret put BETTER_AUTH_URL          # https://deevy.<subdomain>.workers.dev
    wrangler secret put BETTER_AUTH_SECRET       # openssl rand -base64 32
    wrangler secret put GITHUB_CLIENT_ID
    wrangler secret put GITHUB_CLIENT_SECRET
@@ -100,17 +113,17 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Flippable" },
    ```
 
-8. **Deploy again**, so the vars and the secrets are live: step 1 again from the repository root, because the
+7. **Deploy again**, so the vars and the secrets are live: step 1 again from the repository root, because the
    `vars` block changed the source the build projects, then `wrangler deploy` from `apps/web`. The output
    names the Cron Trigger it registered alongside the bindings.
 
-9. **Check the trigger fires.** `wrangler tail --format pretty` and wait a minute: a `scheduled` invocation
+8. **Check the trigger fires.** `wrangler tail --format pretty` and wait a minute: a `scheduled` invocation
    appears every minute, `Ok` with nothing to do on an empty Workspace. That is `runDueWork`, one bounded pass
    (ADR-0012).
 
-10. **Sign in** at the `workers.dev` origin with the GitHub account whose email is `DEEVY_ADMIN_EMAIL`. The
-    first sign-in creates the Workspace and makes you its admin; the Event log under the Workspace shows
-    `workspace.created` then `member.joined`, and nothing else ever creates a second Workspace.
+9. **Sign in** at the `workers.dev` origin with the GitHub account whose email is `DEEVY_ADMIN_EMAIL`. The
+   first sign-in creates the Workspace and makes you its admin; the Event log under the Workspace shows
+   `workspace.created` then `member.joined`, and nothing else ever creates a second Workspace.
 
 ### What a free account does not give you
 
@@ -240,12 +253,12 @@ guessed from the request instead, because then a caller would choose the audienc
 
 The GitHub OAuth App's Authorization callback URL follows from it:
 
-| Where deevy runs          | `BETTER_AUTH_URL`                     | Authorization callback URL                                     |
-| ------------------------- | ------------------------------------- | -------------------------------------------------------------- |
-| `wrangler dev --local`    | `http://localhost:8787`               | `http://localhost:8787/api/auth/callback/github`               |
-| a `workers.dev` subdomain | `https://deevy.<account>.workers.dev` | `https://deevy.<account>.workers.dev/api/auth/callback/github` |
-| a custom domain           | `https://deevy.example.com`           | `https://deevy.example.com/api/auth/callback/github`           |
-| the Docker image          | `https://deevy.example.com`           | `https://deevy.example.com/api/auth/callback/github`           |
+| Where deevy runs          | `BETTER_AUTH_URL`                       | Authorization callback URL                                       |
+| ------------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| `wrangler dev --local`    | `http://localhost:8787`                 | `http://localhost:8787/api/auth/callback/github`                 |
+| a `workers.dev` subdomain | `https://deevy.<subdomain>.workers.dev` | `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` |
+| a custom domain           | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/github`             |
+| the Docker image          | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/github`             |
 
 A GitHub OAuth App holds one callback URL, so a Worker reachable both on its `workers.dev` subdomain and on a
 custom domain needs an App for each, or a decision that sign-in happens on one of them. Move between origins
@@ -487,9 +500,10 @@ D1 runs a batch inside a transaction, where SQLite ignores `PRAGMA foreign_keys`
 the connection, does nothing on D1, the rebuild's `DROP TABLE` cascades the children away, and wrangler
 reports success. Better to fail while generating.
 
-The `database_id` in `apps/web/wrangler.jsonc` is a placeholder. Local D1 never reads it; a deployment needs
-the real one from `wrangler d1 create deevy`, which is step 3 of
-[Deploying to a free account](#deploying-to-a-free-account).
+`apps/web/wrangler.jsonc` names the database and deliberately gives no `database_id`. Local D1 works from the
+name alone, and the first `wrangler deploy` provisions a database of that name and remembers which one it is,
+so there is nothing to paste back into the configuration and nothing account-specific in an open-source
+repository — step 3 of [Deploying to a free account](#deploying-to-a-free-account).
 
 ## Upgrading
 
