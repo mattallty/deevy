@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "@better-auth/api-key": "catalog:",
+    "@better-auth/cimd": "catalog:",
     "@better-auth/drizzle-adapter": "catalog:",
+    "@better-auth/mcp": "catalog:",
     "@deevy/db": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@orpc/client": "catalog:",
