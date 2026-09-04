@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -41,13 +41,20 @@ const stub = vi.hoisted(() => ({
       grantedProjectIds: [],
     },
   ],
+  scheduled: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
   const client = stubClient({
-    agents: { list: async () => ({ agents: stub.agents }) },
+    agents: {
+      list: async () => ({ agents: stub.agents }),
+      update: async (input: Record<string, unknown>) => {
+        stub.scheduled.push(input);
+        return stub.agents[0];
+      },
+    },
   });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
@@ -88,5 +95,24 @@ describe("connecting an Agent over MCP", () => {
     const panel = await screen.findByRole("region", { name: /connect an agent/i });
     expect(within(panel).getByText(`${window.location.origin}/mcp`)).toBeTruthy();
     expect(within(panel).getByText(/claude mcp add/i).textContent).toContain("--transport http");
+  });
+});
+
+describe("an Agent's schedule", () => {
+  it("shows the interval each Agent wakes on, and sets one", async () => {
+    mount(<AgentsPage />);
+
+    const idle = await screen.findByRole("row", { name: /idle/i });
+    expect((within(idle).getByLabelText(/schedule/i) as HTMLSelectElement).value).toBe("60");
+
+    const planner = await screen.findByRole("row", { name: /planner/i });
+    const picker = within(planner).getByLabelText(/schedule/i) as HTMLSelectElement;
+    // Never is the default: an Agent that only reacts to what happens.
+    expect(picker.value).toBe("");
+
+    fireEvent.change(picker, { target: { value: "60" } });
+
+    await waitFor(() => expect(stub.scheduled).toHaveLength(1));
+    expect(stub.scheduled[0]).toEqual({ memberId: "m-planner", scheduleMinutes: 60 });
   });
 });

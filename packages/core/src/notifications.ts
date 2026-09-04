@@ -1,4 +1,5 @@
 import {
+  delivery as deliveryTable,
   issue as issueTable,
   notification as notificationTable,
   member as memberTable,
@@ -14,31 +15,136 @@ import { and, eq, isNull, ne } from "drizzle-orm";
  * time (docs/PLAN.md): this runs in the same request, right after the Event is
  * appended, and reads only that Event. Nothing here decides what happened.
  *
- * One row per recipient per Event. The actor is never told about their own
- * action, and a suspended Member is told nothing at all.
+ * Routing is two questions asked in order. Who does this Event concern — the
+ * answer the Event log alone gives, unchanged since M1 — and then, for each of
+ * them, which Channels it reaches: their own preferences say what they want to
+ * hear, and the Workspace's routing rules say where a Slack Channel gets it
+ * (docs/plans/m2.md). The first question never depends on the second, so
+ * turning Slack off changes where a Human hears about something and never
+ * whether it concerns them.
+ *
+ * One inbox row per recipient per Event. The actor is never told about their
+ * own action, and a suspended Member is told nothing at all.
  */
 export async function deriveNotifications(db: Db, event: Event): Promise<void> {
-  const recipients = await recipientsFor(db, event);
-  if (recipients.length === 0) return;
+  const { inbox, slack } = await routeEvent(db, event);
 
-  await db.insert(notificationTable).values(
-    recipients.map(({ memberId, kind }) => ({
-      id: crypto.randomUUID(),
-      recipientMemberId: memberId,
-      kind,
-      eventId: event.seq,
-      issueId: issueOf(event),
-    })),
-  );
+  if (inbox.length > 0) {
+    await db.insert(notificationTable).values(
+      inbox.map(({ memberId, kind }) => ({
+        id: crypto.randomUUID(),
+        recipientMemberId: memberId,
+        kind,
+        eventId: event.seq,
+        issueId: issueOf(event),
+      })),
+    );
+  }
+
+  // The delivery row is the record that a message is owed, and the only one
+  // (schema/delivery.ts): the sweep renders it from this Event when it sends,
+  // so nothing here copies what it will say. One row per Channel per Event
+  // with no recipient, because an incoming webhook posts to a room and three
+  // Humans concerned by one Event are not three messages in it.
+  if (slack.length > 0) {
+    await db.insert(deliveryTable).values(
+      slack.map(({ channelId }) => ({
+        id: crypto.randomUUID(),
+        workspaceId: event.workspaceId,
+        target: "slack" as const,
+        targetId: channelId,
+        eventSeq: event.seq,
+      })),
+    );
+  }
 }
 
-type Recipient = { memberId: string; kind: Notification["kind"] };
+export type Recipient = { memberId: string; kind: Notification["kind"] };
+
+/** One Slack Channel a Notification of this kind is due to reach. */
+export interface SlackTarget {
+  channelId: string;
+  /** Slack's incoming-webhook URL, out of the Channel's config. */
+  webhookUrl: string;
+  kind: Notification["kind"];
+}
+
+/** Where one Event's Notifications go. */
+export interface Routing {
+  /** The Members who get an inbox row, and what it says. */
+  inbox: Recipient[];
+  /**
+   * The Slack Channels the same Notification reaches, at most once each: a
+   * Channel is a room, not a person, so two recipients routed to the same one
+   * are one message.
+   */
+  slack: SlackTarget[];
+}
+
+const noRouting: Routing = { inbox: [], slack: [] };
+
+/**
+ * The routing decision for one Event: recipients first, then Channels. Two
+ * queries beyond the recipients, whatever the Workspace holds — the
+ * preferences of the Members concerned, and the Workspace's rules with their
+ * Channels — because this runs in the tail of every write.
+ */
+export async function routeEvent(db: Db, event: Event): Promise<Routing> {
+  const recipients = await recipientsFor(db, event);
+  if (recipients.length === 0) return noRouting;
+
+  const preferences = await db.query.notificationPreference.findMany({
+    where: { memberId: { in: recipients.map((recipient) => recipient.memberId) } },
+  });
+  const wanted = new Map(preferences.map((row) => [`${row.memberId}:${row.kind}`, row] as const));
+  // A Member who has never said otherwise wants everything, in both places:
+  // the row is a preference, and its absence is the default (schema/channel.ts).
+  const wants = (recipient: Recipient, where: "inbox" | "slack") =>
+    wanted.get(`${recipient.memberId}:${recipient.kind}`)?.[where] ?? true;
+
+  const inbox = recipients.filter((recipient) => wants(recipient, "inbox"));
+  const kinds = new Set(
+    recipients.filter((recipient) => wants(recipient, "slack")).map((recipient) => recipient.kind),
+  );
+  if (kinds.size === 0) return { inbox, slack: [] };
+
+  return { inbox, slack: await slackTargets(db, event, kinds) };
+}
+
+/**
+ * The Slack Channels the Workspace's rules send these kinds to. A rule with a
+ * null kind or a null Project means any of them (schema/channel.ts), and a
+ * rule scoped to a Project only fires for that Project's Events.
+ */
+async function slackTargets(
+  db: Db,
+  event: Event,
+  kinds: Set<Notification["kind"]>,
+): Promise<SlackTarget[]> {
+  const rules = await db.query.routingRule.findMany({
+    where: { workspaceId: event.workspaceId },
+    with: { channel: true },
+  });
+
+  const targets = new Map<string, SlackTarget>();
+  for (const rule of rules) {
+    if (rule.channel.kind !== "slack") continue;
+    if (rule.projectId !== null && rule.projectId !== event.projectId) continue;
+    const webhookUrl = rule.channel.config?.webhookUrl;
+    if (typeof webhookUrl !== "string" || webhookUrl.length === 0) continue;
+    for (const kind of kinds) {
+      if (rule.notificationKind !== null && rule.notificationKind !== kind) continue;
+      targets.set(`${rule.channelId}:${kind}`, { channelId: rule.channelId, webhookUrl, kind });
+    }
+  }
+  return [...targets.values()];
+}
 
 /**
  * The Issue a Notification points at. A Run is not an Issue, but it happens on
  * one, and its Events carry that Issue so the inbox needs no second query.
  */
-function issueOf(event: Event): string | null {
+export function issueOf(event: Event): string | null {
   if (event.subjectType === "issue") return event.subjectId;
   if (!event.kind.startsWith("run.")) return null;
   const carried = (event.payload as { issueId?: unknown } | null)?.issueId;
@@ -51,6 +157,27 @@ const runNotificationKinds: Partial<Record<Event["kind"], Notification["kind"]>>
   "run.completed": "run_finished",
   "run.failed": "run_finished",
 };
+
+/** The Events that mean a Gate is waiting, whichever way the Issue arrived in one. */
+const gateEventKinds = new Set<Event["kind"]>([
+  "issue.created",
+  "issue.moved",
+  "gate.approved",
+  "gate.rejected",
+]);
+
+/**
+ * What this Event tells a Human, decided from the Event alone. Delivery asks
+ * this again when it sends, hours later and without the request that appended
+ * the Event, so it must be a pure function of the row: the Event is the source
+ * (ADR-0003), and a kind copied into the delivery row would be a second one.
+ */
+export function notificationKindOf(event: Event): Notification["kind"] | null {
+  if (event.kind === "issue.assigned") return "assignment";
+  if (event.kind === "comment.created" || event.kind === "issue.updated") return "mention";
+  if (gateEventKinds.has(event.kind)) return "gate_awaiting";
+  return runNotificationKinds[event.kind] ?? null;
+}
 
 async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
   const payload = (event.payload ?? {}) as {

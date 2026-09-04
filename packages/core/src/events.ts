@@ -65,7 +65,12 @@ export type EventKind =
   | "run.completed"
   | "run.failed"
   /** Silence, not a decision: the sweep said so, and an Activity undoes it. */
-  | "run.went_stale";
+  | "run.went_stale"
+  /** Where Notifications go: the Channels themselves, and the rules that aim them. */
+  | "channel.created"
+  | "channel.updated"
+  | "channel.deleted"
+  | "routing.updated";
 
 export type EventPayload = Record<string, unknown>;
 

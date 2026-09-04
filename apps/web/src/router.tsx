@@ -10,7 +10,9 @@ import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectPage } from "./routes/projects/project.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
+import { ChannelsPage } from "./routes/settings/channels.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
+import { NotificationsPage } from "./routes/settings/notifications.tsx";
 import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
 import { WorkspacePage } from "./routes/settings/workspace.tsx";
@@ -97,6 +99,16 @@ const agentsRoute = createRoute({
   path: "/settings/agents",
   component: AgentsPage,
 });
+const channelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/channels",
+  component: ChannelsPage,
+});
+const notificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/notifications",
+  component: NotificationsPage,
+});
 const allowlistRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/allowlist",
@@ -116,6 +128,8 @@ const routeTree = rootRoute.addChildren([
   repositoriesRoute,
   membersRoute,
   agentsRoute,
+  channelsRoute,
+  notificationsRoute,
   allowlistRoute,
 ]);
 

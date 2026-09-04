@@ -1,11 +1,23 @@
-import { run as runTable, type Db } from "@deevy/db";
+import {
+  agent as agentTable,
+  issue as issueTable,
+  member as memberTable,
+  run as runTable,
+  type Db,
+} from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
 import { isOpen } from "../src/runs.ts";
 import { discardingJobQueue } from "../src/jobs.ts";
-import { dueRunsQuery, sweepStaleRuns } from "../src/work.ts";
+import {
+  dueAgentsQuery,
+  dueRunsQuery,
+  scheduledIssuesQuery,
+  sweepSchedules,
+  sweepStaleRuns,
+} from "../src/work.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
 
 const closers: Array<() => void> = [];
@@ -212,5 +224,150 @@ describe("the job queue port", () => {
     await expect(
       discardingJobQueue().enqueue({ kind: "webhook.delivery", id: "d1" }),
     ).resolves.toBeUndefined();
+  });
+});
+
+/** A second Issue in the same Project and State, straight into the table. */
+async function seedIssue(db: Db, projectId: string, stateId: string, number: number) {
+  const id = crypto.randomUUID();
+  await db.insert(issueTable).values({ id, projectId, number, title: `Issue ${number}`, stateId });
+  return id;
+}
+
+/** Gives an Agent a schedule, the way `agents.update` does. */
+async function scheduleEvery(db: Db, agentMemberId: string, minutes: number | null) {
+  await db
+    .update(agentTable)
+    .set({ scheduleMinutes: minutes })
+    .where(eq(agentTable.memberId, agentMemberId));
+}
+
+async function assignTo(db: Db, issueId: string, memberId: string | null) {
+  await db.update(issueTable).set({ assigneeMemberId: memberId }).where(eq(issueTable.id, issueId));
+}
+
+describe("the schedule sweep", () => {
+  it("starts one Run per assigned Issue when an Agent's schedule comes due, and none again", async () => {
+    const { db, workspaceId, project, issue, agent } = await workspaceWithAgent();
+    const second = await seedIssue(db, project.id, issue.stateId, 2);
+    await assignTo(db, issue.id, agent.member.id);
+    await assignTo(db, second, agent.member.id);
+    await scheduleEvery(db, agent.member.id, 60);
+
+    const first = await sweepSchedules({ db, workspaceId });
+    expect(first).toMatchObject({ due: 1, started: 2, more: false });
+
+    // The schedule just ran, so it is not due again until the hour is up, and
+    // the two Runs it started are open anyway.
+    const again = await sweepSchedules({ db, workspaceId });
+    expect(again).toMatchObject({ due: 0, started: 0, more: false });
+
+    const runs = await db.query.run.findMany();
+    expect(runs).toHaveLength(2);
+    expect(runs.every((run) => run.trigger === "schedule" && run.status === "pending")).toBe(true);
+    // Nobody asked for it: the clock is not a Member.
+    expect(runs.every((run) => run.triggeredByMemberId === null)).toBe(true);
+  });
+
+  it("leaves alone an Agent with no schedule, one not yet due, and a suspended one", async () => {
+    const { db, workspaceId, issue, agent } = await workspaceWithAgent();
+    await assignTo(db, issue.id, agent.member.id);
+
+    // No schedule at all.
+    expect(await sweepSchedules({ db, workspaceId })).toMatchObject({ due: 0, started: 0 });
+
+    // Due in an hour, swept half an hour in.
+    await scheduleEvery(db, agent.member.id, 60);
+    await sweepSchedules({ db, workspaceId });
+    await db.delete(runTable);
+    const halfAnHour = new Date(Date.now() + 30 * MINUTE);
+    expect(await sweepSchedules({ db, workspaceId, now: halfAnHour })).toMatchObject({ due: 0 });
+
+    // Due again, but suspended: a stopped Agent does no work (docs/PLAN.md).
+    await db
+      .update(memberTable)
+      .set({ suspendedAt: new Date() })
+      .where(eq(memberTable.id, agent.member.id));
+    const laterStill = new Date(Date.now() + 90 * MINUTE);
+    expect(await sweepSchedules({ db, workspaceId, now: laterStill })).toMatchObject({ due: 0 });
+    expect(await db.query.run.findMany()).toHaveLength(0);
+  });
+
+  it("is answered by indexes, scans nothing, and sorts nothing", async () => {
+    const { db, workspaceId } = await workspaceWithAgent();
+    const queries = {
+      "due agents": dueAgentsQuery(db, { workspaceId, now: new Date(), limit: 50 }),
+      "scheduled issues": scheduledIssuesQuery(db, { agentMemberIds: ["a"], limit: 50 }),
+    };
+
+    for (const query of Object.values(queries)) {
+      const plan = await db.all<{ detail: string }>(sql`EXPLAIN QUERY PLAN ${query.getSQL()}`);
+      const detail = plan.map((step) => step.detail).join("\n");
+      // A scan would cost the Workspace and a sort would visit every row
+      // before the LIMIT applied: one pass has to fit a Cron Trigger's budget.
+      expect(detail).not.toContain("SCAN");
+      expect(detail).not.toContain("TEMP B-TREE");
+    }
+    // The anti-join is the "at most one open Run per (issue, agent)" rule, and
+    // an index answers it rather than a lookup per Issue.
+    const issues = queries["scheduled issues"];
+    const plan = await db.all<{ detail: string }>(sql`EXPLAIN QUERY PLAN ${issues.getSQL()}`);
+    expect(plan.map((step) => step.detail).join("\n")).toContain("issue_assignee_idx");
+  });
+
+  it("costs the same handful of statements whatever the Workspace holds", async () => {
+    const { db, workspaceId, project, issue, agent } = await workspaceWithAgent();
+    await assignTo(db, issue.id, agent.member.id);
+    for (let number = 2; number <= 40; number += 1) {
+      await assignTo(db, await seedIssue(db, project.id, issue.stateId, number), agent.member.id);
+    }
+    await scheduleEvery(db, agent.member.id, 60);
+    const { counted, statements } = countingDb(db);
+
+    const result = await sweepSchedules({ db: counted, workspaceId });
+
+    expect(result).toEqual({ due: 1, started: 40, more: false });
+    // Two indexed SELECTs, the Runs and their Events in chunks that stay inside
+    // D1's hundred bound parameters per statement, and one UPDATE for the
+    // clocks. Never a query per Agent or per Issue.
+    expect(statements).toEqual([
+      "select",
+      "select",
+      "insert",
+      "insert",
+      "insert",
+      "insert",
+      "insert",
+      "update",
+    ]);
+  });
+
+  it("costs what the limit says, not what the table holds", async () => {
+    const { db, workspaceId, project, issue, agent } = await workspaceWithAgent();
+    await assignTo(db, issue.id, agent.member.id);
+    for (let number = 2; number <= 50; number += 1) {
+      await assignTo(db, await seedIssue(db, project.id, issue.stateId, number), agent.member.id);
+    }
+    await scheduleEvery(db, agent.member.id, 60);
+    const { counted, statements } = countingDb(db);
+
+    const first = await sweepSchedules({ db: counted, workspaceId, limit: 10 });
+
+    expect(first).toEqual({ due: 1, started: 10, more: true });
+    expect(statements).toEqual(["select", "select", "insert", "insert"]);
+    // The Agent is deliberately not stamped while the backlog is short of
+    // drained: an interval that marked itself done early would skip whatever
+    // the limit cut off. The Runs just started are open, so each pass makes
+    // progress and the sixth finds nothing left.
+    let passes = 1;
+    let result = first;
+    while (result.more && passes < 10) {
+      result = await sweepSchedules({ db, workspaceId, limit: 10 });
+      passes += 1;
+    }
+    expect(passes).toBe(6);
+    expect(await db.query.run.findMany()).toHaveLength(50);
+    const stamped = await db.query.agent.findFirst({ where: { memberId: agent.member.id } });
+    expect(stamped?.scheduleRanAt).not.toBeNull();
   });
 });
