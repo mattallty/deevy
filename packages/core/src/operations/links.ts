@@ -6,7 +6,7 @@ import { IssueLinkWithRepositorySchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
-import { requireIssue, requireRun } from "./shared.ts";
+import { assertProjectVisible, requireIssue, requireRun } from "./shared.ts";
 
 export const links = {
   list: defineOperation({
@@ -16,6 +16,7 @@ export const links = {
     path: "/issues/{issueKey}/links",
     auth: "member",
     agents: true,
+    mcp: true,
     input: z.object({ issueKey: z.string() }),
     output: z.object({ links: z.array(IssueLinkWithRepositorySchema) }),
     handler: async ({ input, context }) => {
@@ -100,15 +101,26 @@ export const links = {
     method: "DELETE",
     path: "/links/{linkId}",
     auth: "member",
+    agents: true,
+    mcp: true,
     input: z.object({ linkId: z.string() }),
     output: z.object({ removed: z.literal(true) }),
     handler: async ({ input, context }) => {
       const found = await context.db.query.issueLink.findFirst({
         where: { id: input.linkId },
-        with: { issue: { with: { project: true } } },
+        with: { issue: { with: { project: true } }, run: true },
       });
       if (!found || found.issue.project.workspaceId !== context.workspace.id) {
         throw new ORPCError("NOT_FOUND", { message: "No such Link" });
+      }
+      assertProjectVisible(context, found.issue.projectId);
+      // An Agent takes back its own evidence and nobody else's: a Link another
+      // Run attached is that attempt's record, and an Agent that could erase it
+      // would leave the Event log reading as housekeeping (docs/plans/m3.md).
+      if (context.member.kind === "agent" && found.run?.agentMemberId !== context.member.id) {
+        throw new ORPCError("FORBIDDEN", {
+          message: "An Agent can only remove a Link its own Run attached",
+        });
       }
       await context.db.delete(issueLinkTable).where(eq(issueLinkTable.id, found.id));
       await appendEvent(context, {

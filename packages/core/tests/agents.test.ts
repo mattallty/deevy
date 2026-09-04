@@ -67,6 +67,8 @@ describe("the Agent capability rule", () => {
       "labels.list",
       "links.add",
       "links.list",
+      // Bounded to the evidence its own Run attached (docs/plans/m3.md).
+      "links.remove",
       // Asking who it is, which is how it learns its own Member id.
       "me.get",
       "projects.get",

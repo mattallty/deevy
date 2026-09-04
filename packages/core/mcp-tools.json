@@ -289,6 +289,43 @@
     }
   },
   {
+    "name": "labels_create",
+    "operation": "labels.create",
+    "summary": "Define a Label, plain or scoped",
+    "readOnly": false,
+    "agents": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 30
+        }
+      },
+      "required": [
+        "name",
+        "color"
+      ]
+    }
+  },
+  {
     "name": "labels_list",
     "operation": "labels.list",
     "summary": "The Labels this Workspace defines",
@@ -343,6 +380,42 @@
       "required": [
         "issueKey",
         "url"
+      ]
+    }
+  },
+  {
+    "name": "links_list",
+    "operation": "links.list",
+    "summary": "What an Issue points at",
+    "readOnly": true,
+    "agents": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issueKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "issueKey"
+      ]
+    }
+  },
+  {
+    "name": "links_remove",
+    "operation": "links.remove",
+    "summary": "Stop an Issue pointing at something",
+    "readOnly": false,
+    "agents": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "linkId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "linkId"
       ]
     }
   },

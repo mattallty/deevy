@@ -45,8 +45,13 @@ describe("the committed tool manifest", () => {
       "issues_list",
       "issues_set_labels",
       "issues_update",
+      "labels_create",
       "labels_list",
       "links_add",
+      "links_list",
+      // Removing one is bounded by the rule that an Agent may only take back
+      // what its own Run attached (docs/plans/m3.md, slice 1).
+      "links_remove",
       "runs_finish",
       // Without it an Agent cannot read its own Activity feed, so a Human's
       // answer to a free-form elicitation never reaches the loop that asked.
@@ -60,5 +65,16 @@ describe("the committed tool manifest", () => {
       "runs_request_approval",
       "runs_start",
     ]);
+  });
+
+  it("widens Labels and Links no further than that", async () => {
+    const names = (await toolManifest()).map((tool) => tool.name);
+
+    // A Label is Workspace-scoped, so a granted Agent renaming or deleting one
+    // reaches Projects it was never granted (docs/plans/m2.md), and a Gate is a
+    // Human's to rule on. Creating a Label is additive, so it ships.
+    expect(names).not.toContain("labels_update");
+    expect(names).not.toContain("labels_delete");
+    expect(names).not.toContain("gates_approve");
   });
 });
