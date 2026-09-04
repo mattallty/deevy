@@ -27,8 +27,18 @@ export const me = {
       user: UserSchema,
       member: MemberSchema.nullable(),
       workspace: WorkspaceSchema.nullable(),
+      /**
+       * How this caller arrived: deevy's own UI, an Agent's API key, or a
+       * Human's MCP client over OAuth. The SPA says so, because "you are
+       * signed in" and "something is acting as you" are different facts
+       * (docs/plans/m2.md).
+       */
+      principal: z.enum(["anonymous", "cookie", "api_key", "oauth"]),
     }),
     handler: async ({ context }) => ({
+      // Absent means a cookie session: the only caller that builds a context
+      // without a principal is a test driving the router directly (registry.ts).
+      principal: context.principal?.kind ?? "cookie",
       user: {
         id: context.session.user.id,
         name: context.session.user.name,

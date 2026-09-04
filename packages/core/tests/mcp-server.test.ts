@@ -119,6 +119,39 @@ describe("POST /mcp without a credential", () => {
     );
   });
 
+  it("serves the Protected Resource Metadata at the URL that header names", async () => {
+    // RFC 9728 inserts the well-known segment between the host and the
+    // resource's own path, so a client that derives the URL rather than
+    // reading the header looks at /.well-known/oauth-protected-resource/mcp.
+    // Better Auth's own document is the root form as well; the challenge is
+    // the contract, so the challenge is what this follows (docs/plans/m2.md).
+    const baseURL = "https://deevy.example.com";
+    const { db, close } = testDb();
+    closers.push(close);
+    const auth = createAuth({
+      db,
+      env: { baseURL, secret, github: { clientId: "id", clientSecret: "secret" } },
+    });
+    const app = createApp({ db, auth, baseURL });
+
+    const challenged = await app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    });
+    const advertised = /resource_metadata="([^"]+)"/.exec(
+      challenged.headers.get("www-authenticate") ?? "",
+    )?.[1];
+    expect(advertised).toBe(`${baseURL}/.well-known/oauth-protected-resource/mcp`);
+
+    const metadata = await app.request(advertised as string);
+    expect(metadata.status).toBe(200);
+    const body = (await metadata.json()) as Record<string, unknown>;
+    expect(body.resource).toBe(`${baseURL}/mcp`);
+    expect(body.authorization_servers).toEqual([baseURL]);
+    expect(body.bearer_methods_supported).toEqual(["header"]);
+  });
+
   it("falls back to the request's own origin when no base URL is configured", async () => {
     // The Workers entry builds the app per request with no auth at all
     // (apps/web/src/worker.ts): /mcp is still mounted, and answers the

@@ -96,6 +96,30 @@ Which operations become tools is opt-in: `mcp: true` in the registry. `vp run co
 `packages/core/mcp-tools.json` and CI fails on a stale one, so the tool set an agent sees cannot drift without
 review, and an oRPC bump that reshapes a schema shows up as a diff.
 
+### As yourself, over OAuth
+
+A Human's own client needs no header: deevy is the authorization server (ADR-0007, docs/OPERATIONS.md). It is
+all built from `BETTER_AUTH_URL`, and everything in the dance has to happen on one origin, so in development
+point that at the Vite dev server rather than at the Node server:
+
+```
+BETTER_AUTH_URL=http://localhost:5173
+```
+
+The proxy sends `/api`, `/mcp` and `/.well-known` back to the Node server, and `/consent` — where the OAuth
+provider sends the browser mid-authorization — resolves to the SPA route that serves it. Then:
+
+```bash
+claude mcp add --transport http deevy http://localhost:5173/mcp
+```
+
+Left pointing at `http://localhost:3000`, the dance still runs but the consent page 404s: the Node server only
+serves the SPA when `DEEVY_WEB_DIST` names a built one, which is how the Docker image runs it and not how
+`vp run --parallel dev` does.
+
+Unset `BETTER_AUTH_URL` and the OAuth server is simply not there — a resource identifier is an absolute URL
+and there is nothing to build one from. Everything else, an Agent's API key included, works unchanged.
+
 ## Docker
 
 ```bash

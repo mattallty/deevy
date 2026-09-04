@@ -18,6 +18,7 @@ import { issues } from "./issues.ts";
 import { labels } from "./labels.ts";
 import { links } from "./links.ts";
 import { members } from "./members.ts";
+import { oauthClients } from "./oauth-clients.ts";
 import { preferences } from "./preferences.ts";
 import { projects } from "./projects.ts";
 import { repositories } from "./repositories.ts";
@@ -52,6 +53,7 @@ export const router = {
   channels,
   routing,
   preferences,
+  oauthClients,
   webhooks,
 };
 export type AppRouter = typeof router;
@@ -71,6 +73,7 @@ export {
   links,
   me,
   members,
+  oauthClients,
   preferences,
   projects,
   repositories,

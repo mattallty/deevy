@@ -5,6 +5,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import { ProjectsPage } from "./routes/index.tsx";
+import { ConsentPage } from "./routes/consent.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
@@ -18,6 +19,7 @@ import { TeamsPage } from "./routes/settings/teams.tsx";
 import { WebhooksPage } from "./routes/settings/webhooks.tsx";
 import { WorkspacePage } from "./routes/settings/workspace.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
+import { McpClientsPage } from "./routes/settings/mcp-clients.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
 import { AgentsPage } from "./routes/settings/agents.tsx";
 import { AppShell, type ShellProps } from "./routes/shell.tsx";
@@ -120,6 +122,17 @@ const allowlistRoute = createRoute({
   path: "/settings/allowlist",
   component: AllowlistPage,
 });
+const mcpClientsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/mcp-clients",
+  component: McpClientsPage,
+});
+// Where the OAuth provider sends a Human mid-authorization (packages/core/src/auth.ts).
+const consentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/consent",
+  component: ConsentPage,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -138,6 +151,8 @@ const routeTree = rootRoute.addChildren([
   webhooksRoute,
   notificationsRoute,
   allowlistRoute,
+  mcpClientsRoute,
+  consentRoute,
 ]);
 
 export interface AppRouterOptions {

@@ -38,7 +38,18 @@ const emptyIssue = {
 // client shape, and a stub only ever implements the operations a test touches.
 export function stubClient(overrides: StubOverrides = {}): never {
   const base: Record<string, Record<string, StubOperation>> = {
-    me: { get: async () => ({ user: {}, member: { role: "admin" }, workspace: {} }) },
+    me: {
+      get: async () => ({
+        user: {},
+        member: { role: "admin" },
+        workspace: {},
+        principal: "cookie",
+      }),
+    },
+    oauthClients: {
+      list: async () => ({ clients: [] }),
+      revoke: async () => ({ revoked: true }),
+    },
     workspace: {
       get: async () => ({ id: "w1", name: "deevy", slug: "deevy" }),
       update: async () => ({ id: "w1", name: "deevy", slug: "deevy" }),

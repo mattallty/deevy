@@ -64,6 +64,60 @@ and Links in the Projects it was granted, and drive its own Runs. It can never a
 manage Members, or approve a Gate, and neither can anything holding a delegated credential — a Gate is decided
 by a Human signed in to deevy, in a browser (ADR-0004).
 
+## A Human's own MCP client
+
+A Human points their own client at the same endpoint with no header at all, and acts as themselves rather
+than as an Agent:
+
+```bash
+claude mcp add --transport http deevy "$DEEVY_URL/mcp"
+```
+
+deevy is its own OAuth 2.1 authorization server (ADR-0007). The client discovers it from the 401 challenge,
+sends the Human to deevy in a browser to sign in and consent, and is issued an access token bound to
+`${BETTER_AUTH_URL}/mcp`. The Human sees every client that consented under Settings, MCP clients, and can
+revoke one there. Revoking removes the consent and the refresh token; an access token already issued expires
+on its own within the hour.
+
+Two documents make this discoverable, and both are served from the instance origin rather than from under
+`/api/auth`, because RFC 8414 and RFC 9728 both build a metadata URL by inserting the well-known segment
+right after the host:
+
+- `${BETTER_AUTH_URL}/.well-known/oauth-protected-resource/mcp` — and the root form beside it.
+- `${BETTER_AUTH_URL}/.well-known/oauth-authorization-server`, and `/.well-known/openid-configuration`.
+
+`BETTER_AUTH_URL` is what all of it is built from, so **the OAuth server is off when it is unset**. It has to
+be, since a resource identifier is an absolute URL and one guessed per request would bind tokens to whatever
+host the caller sent. The rest of deevy runs unchanged; only a Human's MCP client is refused.
+
+### Client registration, and what is known to be weak
+
+A client identifies itself in one of two ways, both enabled:
+
+- **Client ID Metadata Documents** (CIMD), which MCP 2026-07-28 prefers: the `client_id` is an HTTPS URL, and
+  deevy fetches the document at it. `client_id_metadata_document_supported: true` is advertised.
+- **Dynamic client registration** at `/api/auth/oauth2/register`, unauthenticated. It is deprecated in the
+  2026-07-28 revision and stays on only because the clients that do not speak CIMD cannot be asked to change.
+  Anyone who can reach the instance can create a client row; a client is worth nothing until a Human consents
+  to it, so the cost of that is rows, not access.
+
+**Known limitation.** Dereferencing a Client ID Metadata Document means fetching a URL an unknown caller
+chose, so the transport is the SSRF boundary. `@better-auth/cimd/node` ships a strict one built on `node:dns`
+and `node:https`, and deevy does not use it: `packages/core` is web-standard only (ADR-0006), and M3's
+Cloudflare Worker has no DNS-resolution primitive to build it on. deevy's own transport
+(`packages/core/src/cimd.ts`) refuses every non-HTTPS scheme, every host that is not publicly routable, and
+every redirect, and bounds the request in time and size — but it cannot pin the resolved address between the
+check and the connection, so a name that resolves public and then private is not caught. The reachable outcome
+is a blind GET from the instance: nothing of the response is returned to the caller. Put the instance behind
+an egress policy if that matters, or pass a stricter transport as `AuthEnv.fetchClientMetadataResource`.
+
+Scopes ride on the token and are enforced by nothing in v1: a Human's MCP client can do whatever that Human
+can, less the one thing below.
+
+**Except a Gate.** `gates.approve` and `gates.reject` require a browser session. A Human's own MCP client
+holding a valid token for that same Human is refused, deliberately: an approval is a Human's act in deevy's
+UI, and a delegated credential is not that Human (ADR-0004, docs/plans/m2.md).
+
 ## The volume
 
 Everything is in one SQLite file under `/data`. Migrations are applied at startup, so a new image on an old

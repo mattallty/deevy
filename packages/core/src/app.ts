@@ -52,6 +52,18 @@ export function createApp({
   if (auth) {
     app.use("/api/auth/*", cors({ origin, credentials: true }));
     app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+    // OAuth discovery lives at the origin, not under Better Auth's base path:
+    // RFC 8414 and RFC 9728 both insert the well-known segment right after the
+    // host, and a client that derives the URL rather than reading the 401's
+    // header looks nowhere else. The plugins answer these from `onRequest`,
+    // which runs on the raw request before any base-path routing, so handing
+    // them the request unchanged is all it takes (docs/plans/m2.md).
+    app.all("/.well-known/oauth-authorization-server", wellKnown(auth));
+    app.all("/.well-known/oauth-authorization-server/*", wellKnown(auth));
+    app.all("/.well-known/openid-configuration", wellKnown(auth));
+    app.all("/.well-known/oauth-protected-resource", wellKnown(auth));
+    app.all("/.well-known/oauth-protected-resource/*", wellKnown(auth));
   }
 
   // Before the oRPC handlers: the MCP surface builds its own context, because
@@ -109,6 +121,20 @@ export function createApp({
 export type App = ReturnType<typeof createApp>;
 
 /**
+ * One OAuth metadata document. It is public by definition and an MCP client
+ * reads it from wherever it is running, so it answers any origin; the document
+ * itself carries nothing a caller could not learn by asking for a token.
+ */
+function wellKnown(auth: Auth) {
+  return async (c: { req: { raw: Request } }) => {
+    const response = await auth.handler(c.req.raw);
+    const headers = new Headers(response.headers);
+    headers.set("access-control-allow-origin", "*");
+    return new Response(response.body, { status: response.status, headers });
+  };
+}
+
+/**
  * The context every operation sees: how the caller authenticated, the Member
  * row behind that credential, and, for an Agent, the Projects it may see.
  */
@@ -118,7 +144,7 @@ export async function buildContext(
   headers: Headers,
   baseURL?: string,
 ): Promise<AppContext> {
-  const { principal, session } = await resolvePrincipal({ auth, headers });
+  const { principal, session } = await resolvePrincipal({ auth, headers, baseURL });
   // An instance without auth cannot mint keys; apiKeysOf turns that into a
   // NOT_IMPLEMENTED rather than a caller's mistake (keys.ts).
   const base = {

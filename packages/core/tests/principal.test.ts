@@ -98,11 +98,16 @@ describe("resolvePrincipal", () => {
     const { db, auth } = testAuth();
     await db.insert(user).values({ id: "u1", name: "Ada", email: "ada@example.com" });
 
-    // An access token, which slice 7 will verify; today it is nobody, and the
-    // Human's cookie sitting beside it must not answer for it.
+    // Something offered as an access token, and the Human's own cookie sitting
+    // beside it. The cookie must not answer for the bearer, whether or not
+    // this instance is an authorization server at all.
     const headers = await cookieHeaders(auth, "u1");
     headers.set("authorization", "Bearer not-a-deevy-key");
     expect(await resolvePrincipal({ auth, headers })).toEqual({
+      principal: { kind: "anonymous" },
+      session: null,
+    });
+    expect(await resolvePrincipal({ auth, headers, baseURL: "http://localhost:3000" })).toEqual({
       principal: { kind: "anonymous" },
       session: null,
     });

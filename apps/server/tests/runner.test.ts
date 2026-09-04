@@ -201,8 +201,12 @@ describe("the runner", () => {
       await new Promise((resolve) => setTimeout(resolve, 2));
     }
     // Nothing the runner started may keep the event loop alive: a process that
-    // will not exit is the failure this test exists to catch.
-    expect(timeouts()).toBe(before);
+    // will not exit is the failure this test exists to catch. The count is
+    // process-global, so only a rise in it means anything — the runner leaking
+    // its interval would put it at `before + 1`. Equality would also fail on a
+    // timer somebody else's test happened to be holding when `before` was
+    // sampled and had let go of by now, which is not a failure of anything.
+    expect(timeouts()).toBeLessThanOrEqual(before);
 
     await runner.stop();
     const after = (await db.query.event.findMany()).length;
