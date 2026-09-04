@@ -150,6 +150,16 @@ approves in deevy.
 metadata-document fetch transport for Workers, and the token-verification workaround for a shared Worker. Done
 when the M2 scenario runs on a free Cloudflare account.
 
+Three things M2 leaves for it. The **CIMD fetch transport** M3 already owns is where the DNS-rebinding gap
+closes: M2's web-standard transport checks that a host is publicly routable and then connects by name, so it
+cannot pin the address it validated, and `AuthEnv.fetchClientMetadataResource` is the seam for one that can.
+The **`delivery` table lost a uniqueness guard**: slices 5 and 8 merged onto one table with a `target`
+discriminator, and the unique `(subscriptionId, eventSeq)` the plan called for became a plain index. Nothing
+duplicates today, because deliveries are derived one statement per Event, but the guard is gone and Queues
+give a message at-least-once, so M3 is when it starts to matter. And the **v1 tool set does not match the
+promise above**: "manage Labels and Links" shipped as `labels_list` and `links_add` only, with no create,
+update or remove over MCP. Either widen the surface or narrow the sentence.
+
 **M4 Reference runtime.** A documented sample agent runtime (Claude Code headless in a GitHub Action and as a
 local loop) consuming webhooks and the MCP inbox, plus operator docs for both targets.
 
