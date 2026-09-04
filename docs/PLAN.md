@@ -149,20 +149,27 @@ retries; Gate approvals including URL elicitation; Slack Channel and routing rul
 outside deevy picks up an assigned Issue, writes a plan Document, hits the Plan Gate, and resumes after a Human
 approves in deevy.
 
-**M3 Workers.** D1 storage adapter, Queues and Cron adapters, static assets configuration, the client-ID-
+**M3 Workers.** D1 storage adapter, an optional Queues adapter, static assets configuration, the client-ID-
 metadata-document fetch transport for Workers, and the token-verification workaround for a shared Worker. Done
-when the M2 scenario runs on a free Cloudflare account.
+when the M2 scenario runs on a free Cloudflare account, which [m3-acceptance.md](./m3-acceptance.md) walks as
+a numbered runbook.
 
-Three things M2 leaves for it. The **CIMD fetch transport** M3 already owns is where the DNS-rebinding gap
-closes: M2's web-standard transport checks that a host is publicly routable and then connects by name, so it
-cannot pin the address it validated, and `AuthEnv.fetchClientMetadataResource` is the seam for one that can.
-The **`delivery` table lost a uniqueness guard**: slices 5 and 8 merged onto one table with a `target`
-discriminator, and the unique `(subscriptionId, eventSeq)` the plan called for became a plain index. Nothing
-duplicates today, because deliveries are derived one statement per Event, but the guard is gone and Queues
-give a message at-least-once, so M3 is when it starts to matter. And the **v1 tool set did not match the
-promise above**: "manage Labels and Links" shipped as `labels_list` and `links_add` only, with no create,
-update or remove over MCP. M3 widens the surface rather than narrowing the sentence, to the twenty tools
-listed above.
+Two things shipped differently from the sentence above, both recorded in
+[ADR-0012](./adr/0012-the-cron-port-stayed-node-s-and-a-stream-ends-itself.md). There is **no Workers cron
+adapter**: Cloudflare owns the schedule and hands a one-shot `scheduled` handler, so the sweep itself moved
+into `packages/core/src/work.ts` and the `Cron` port stayed Node's. And a **live stream on Workers ends
+itself**, signing off with the cursor the browser resumes from, because each poll is one D1 query against a
+per-invocation cap.
+
+The three things M2 left are closed. The **`delivery` table has its uniqueness guard** back, as a unique
+`(target, targetId, eventSeq)` with the matching one on `notification`, so a message duplicated by an
+at-least-once queue costs one POST. The **v1 tool set matches the promise above**, at the twenty tools listed
+there. And the **DNS-rebinding gap closes on Node and narrows on Workers**, which is not the single answer M2
+expected: `apps/server/src/cimd.ts` resolves with `node:dns`, checks every address, and connects to one that
+passed with the name kept for SNI, so the address checked is the address used. workerd has no primitive that
+pins an address to a connection while preserving SNI, so the Workers transport puts a DNS-over-HTTPS
+pre-resolution in front of its shape check, and the residual race is written down in
+[OPERATIONS.md](./OPERATIONS.md#client-registration-and-what-is-known-to-be-weak) rather than claimed away.
 
 **M4 Reference runtime.** A documented sample agent runtime (Claude Code headless in a GitHub Action and as a
 local loop) consuming webhooks and the MCP inbox, plus operator docs for both targets.

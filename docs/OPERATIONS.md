@@ -6,8 +6,8 @@ admin, and everyone else joins through the allowlist.
 
 ## The image
 
-Published to `ghcr.io/mattallty/deevy` on every `v0.1.x` and `v0.2.x` tag, for `linux/amd64` and
-`linux/arm64`. Tags are the version (`v0.2.0`) and `latest`. The image carries the bundled Node server, the
+Published to `ghcr.io/mattallty/deevy` on every `v0.1.x`, `v0.2.x` and `v0.3.x` tag, for `linux/amd64` and
+`linux/arm64`. Tags are the version (`v0.3.0`) and `latest`. The image carries the bundled Node server, the
 migrations, and the built SPA; it runs the SPA and the API on one port, so there is no separate web container.
 
 ```bash
@@ -18,6 +18,118 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
   ghcr.io/mattallty/deevy:latest
 ```
+
+## The Worker
+
+The second deployment shape: the same codebase on Cloudflare, with D1 instead of the volume and a Cron
+Trigger instead of the timer (ADR-0006, ADR-0012). Everything below fits a free account except where it says
+otherwise, and none of it needs CI — there is no deploy-on-tag workflow for the Worker, because publishing one
+needs an account and the project keeps the deploy in a person's hands.
+
+**The deploy artifact is the build's output.** `vp run web#build:workers` emits two directories:
+`apps/web/dist/deevy` — the bundled Worker and `wrangler.json`, the committed `wrangler.jsonc` with the built
+entry and the built asset directory filled in — and `apps/web/dist/client`, the SPA those assets are. The
+committed `wrangler.jsonc` is a source, not a deploy artifact: it names `src/worker.ts` and an `assets` block
+with no `directory`, so wrangler refuses it on its own. The Cloudflare plugin writes
+`apps/web/.wrangler/deploy/config.json` pointing at the built file, which is how a bare `wrangler deploy` finds
+it, and `vp run web#check:workers` names that same file rather than trusting the note — a dry run of anything
+else is a typecheck of a configuration nobody ships.
+
+So: **build, then check, then deploy, in that order**, and a deploy that follows no build uploads the last
+build's bundle.
+
+### Deploying to a free account
+
+Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
+
+1. **Build and validate.** From the repository root:
+
+   ```bash
+   vp install
+   vp run web#build:workers
+   vp run web#check:workers
+   ```
+
+   The check ends with `--dry-run: exiting now.` and the bindings it found — `env.DB (deevy)`, a D1 Database.
+   A failure here is a configuration that would have failed on upload.
+
+2. **Sign in to Cloudflare.** `wrangler login` opens a browser and ends with `Successfully logged in.`
+   `wrangler whoami` names the account everything below lands in.
+
+3. **Create the database.** `wrangler d1 create deevy` prints a `database_id`. Put it in
+   `apps/web/wrangler.jsonc` in place of the `00000000-…` placeholder — it is an identifier, not a credential,
+   and committing it is how the next deploy finds the same database.
+
+4. **Build the schema.**
+
+   ```bash
+   wrangler d1 migrations apply deevy --remote
+   wrangler d1 migrations list deevy --remote
+   wrangler d1 execute deevy --remote --command "select name from sqlite_master where type='table' order by name"
+   ```
+
+   The first lists the twenty-two files in `packages/db/migrations`, asks to confirm, and reports each as
+   applied. The second then says there is nothing left to apply. The third lists deevy's tables plus
+   wrangler's own `d1_migrations`. Applying twice is a no-op. Nothing here touches the local D1 that
+   `vp run web#test:workers` uses; `--remote` is the whole difference.
+
+5. **Deploy once, to learn the origin.** `wrangler deploy` uploads the built Worker and the SPA and prints the
+   `workers.dev` URL — `https://deevy.<account>.workers.dev`. Sign-in does not work yet and nothing else has
+   to: `curl https://deevy.<account>.workers.dev/healthz` answers `{"ok":true}`, and the SPA loads and says
+   nobody is signed in.
+
+6. **Create the GitHub OAuth App** at <https://github.com/settings/developers>, with that origin as the
+   homepage and `https://deevy.<account>.workers.dev/api/auth/callback/github` as the Authorization callback
+   URL. The table under [Signing in](#signing-in-and-the-origin-better_auth_url-names) is the full set of
+   origins and callbacks; the rule is that `BETTER_AUTH_URL` and the callback change together or sign-in
+   breaks.
+
+7. **Put the secrets in.** Each command prompts for the value and answers `Success! Uploaded secret <name>`:
+
+   ```bash
+   wrangler secret put BETTER_AUTH_URL          # https://deevy.<account>.workers.dev
+   wrangler secret put BETTER_AUTH_SECRET       # openssl rand -base64 32
+   wrangler secret put GITHUB_CLIENT_ID
+   wrangler secret put GITHUB_CLIENT_SECRET
+   ```
+
+   `wrangler secret list` shows the four names and no values. The rest are not credentials, so they go in a
+   `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
+
+   ```jsonc
+   "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Flippable" },
+   ```
+
+8. **Deploy again**, so the vars and the secrets are live: step 1 again from the repository root, because the
+   `vars` block changed the source the build projects, then `wrangler deploy` from `apps/web`. The output
+   names the Cron Trigger it registered alongside the bindings.
+
+9. **Check the trigger fires.** `wrangler tail --format pretty` and wait a minute: a `scheduled` invocation
+   appears every minute, `Ok` with nothing to do on an empty Workspace. That is `runDueWork`, one bounded pass
+   (ADR-0012).
+
+10. **Sign in** at the `workers.dev` origin with the GitHub account whose email is `DEEVY_ADMIN_EMAIL`. The
+    first sign-in creates the Workspace and makes you its admin; the Event log under the Workspace shows
+    `workspace.created` then `member.joined`, and nothing else ever creates a second Workspace.
+
+### What a free account does not give you
+
+- **Queues are paid.** The `JOBS` binding is optional in the `Env` type and absent from the committed
+  configuration for exactly this reason: `wrangler deploy` must not fail on a queue the account may not
+  create. Without it a webhook goes out at the next Cron pass instead of the moment it is owed, and nothing
+  else differs — see [Queues, when the account has them](#queues-when-the-account-has-them).
+- **A Cron Trigger comes round once a minute at the finest.** That is Cloudflare's floor, not deevy's, and it
+  is why `DEEVY_SWEEP_INTERVAL_SECONDS` is a Node-only knob. A backlog drains twenty rows a minute.
+- **D1 caps the queries one invocation may run**, which is what bounds a live stream's life and what
+  `DEEVY_STREAM_SECONDS` divides up. The design assumes the free tier's 50 queries per invocation and 100k
+  rows written per day; Cloudflare's own limits pages are the current numbers, and a busy Workspace outgrows
+  the daily one long before it outgrows the per-invocation one.
+- **Nothing deploys the Worker from CI.** `vp run web#check:workers` proves the artifact on every pull
+  request; uploading it is `wrangler deploy` by a person. The Docker image is the half CI does publish, on a
+  version tag.
+- **A deployed Worker cannot pin an outbound address**, which is the one place where the Cloudflare deployment
+  is weaker than the Docker one. It is a workerd limitation and it is written out in full under
+  [Client registration](#client-registration-and-what-is-known-to-be-weak).
 
 ## Environment
 
@@ -376,7 +488,8 @@ the connection, does nothing on D1, the rebuild's `DROP TABLE` cascades the chil
 reports success. Better to fail while generating.
 
 The `database_id` in `apps/web/wrangler.jsonc` is a placeholder. Local D1 never reads it; a deployment needs
-the real one from `wrangler d1 create deevy`.
+the real one from `wrangler d1 create deevy`, which is step 3 of
+[Deploying to a free account](#deploying-to-a-free-account).
 
 ## Upgrading
 
