@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Auth } from "./auth.ts";
+import { createDeevyMcp } from "./mcp/server.ts";
 import { generateSpec } from "./openapi.ts";
 import { betterAuthKeys } from "./keys.ts";
 import { resolvePrincipal } from "./principal.ts";
@@ -20,6 +21,8 @@ export interface AppOptions {
   auth?: Auth;
   /** Browser origins allowed to call the API with credentials. */
   origin?: string[];
+  /** The public origin of this instance, for the MCP surface's RFC 9728 challenge. */
+  baseURL?: string;
   /** Called with errors thrown by operations. */
   onError?: (error: unknown) => void;
 }
@@ -29,7 +32,13 @@ export interface AppOptions {
  * ADR-0006): Better Auth under /api/auth, the RPC surface under /rpc, the
  * OpenAPI surface with its reference UI under /api.
  */
-export function createApp({ db, auth, origin = [], onError: report = console.error }: AppOptions) {
+export function createApp({
+  db,
+  auth,
+  origin = [],
+  baseURL,
+  onError: report = console.error,
+}: AppOptions) {
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
 
   app.get("/healthz", (c) => c.json({ ok: true }));
@@ -38,6 +47,11 @@ export function createApp({ db, auth, origin = [], onError: report = console.err
     app.use("/api/auth/*", cors({ origin, credentials: true }));
     app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
   }
+
+  // Before the oRPC handlers: the MCP surface builds its own context, because
+  // an unauthenticated call there is a 401 challenge rather than an error body.
+  const mcp = createDeevyMcp({ db, auth, baseURL, onError: report });
+  app.all("/mcp", (c) => mcp.fetch(c.req.raw));
 
   app.use("/rpc/*", async (c, next) => {
     c.set("ctx", await buildContext(db, auth, c.req.raw.headers));

@@ -25,6 +25,7 @@ export {
   type JobKind,
   type JobQueue,
 } from "./jobs.ts";
+export { createDeevyMcp, type DeevyMcp, type DeevyMcpOptions } from "./mcp/server.ts";
 export { generateSpec } from "./openapi.ts";
 export {
   resolvePrincipal,
