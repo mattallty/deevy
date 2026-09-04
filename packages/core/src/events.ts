@@ -1,4 +1,5 @@
 import { event, type Db, type Event, type Member, type Workspace } from "@deevy/db";
+import type { JobQueue } from "./jobs.ts";
 import { deriveNotifications } from "./notifications.ts";
 import { triggersFor } from "./triggers.ts";
 import { deriveWebhookDeliveries } from "./webhooks.ts";
@@ -99,6 +100,12 @@ export interface EventSource {
   db: Db;
   workspace: Pick<Workspace, "id">;
   member?: Pick<Member, "id"> | null;
+  /**
+   * Where a delivery this Event owes is nudged, on a deployment that has
+   * somewhere to nudge (jobs.ts). Absent is the honest default: the row is
+   * written either way and the next sweep finds it a beat later.
+   */
+  jobs?: JobQueue;
 }
 
 /** Appends one Event and returns the stored row, including its `seq` cursor. */
@@ -122,7 +129,21 @@ export async function appendEvent(source: EventSource, input: EventInput): Promi
   // And so do the deliveries owed to a subscribed URL, in the same tail and
   // for the same reason: the durable row is what makes a trigger reliable
   // whether or not anything is running to send it (ADR-0003).
-  await deriveWebhookDeliveries(source.db, row);
+  const owed = await deriveWebhookDeliveries(source.db, row);
+
+  // Then, and only then, the nudge: a job names a row that is already durable,
+  // so a deployment with a queue sends it now instead of at the next sweep and
+  // a deployment without one loses nothing (jobs.ts). The port says `enqueue`
+  // may not throw or reject; this does not depend on the port being kept,
+  // because a queue that is down must not turn a write that succeeded into a
+  // request that failed (docs/plans/m3.md slice 9).
+  for (const id of owed) {
+    try {
+      await source.jobs?.enqueue({ kind: "webhook.delivery", id });
+    } catch {
+      // The row is the record. The next sweep finds exactly this.
+    }
+  }
   // Triggers derive from the same Event, right after it (docs/plans/m2.md).
   // They write their own rows and hand back the Events those deserve, so this
   // stays the only writer of the log. The recursion that follows is bounded:

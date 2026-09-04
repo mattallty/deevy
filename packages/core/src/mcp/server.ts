@@ -10,6 +10,7 @@ import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { call } from "@orpc/server";
 import type { Auth } from "../auth.ts";
 import { buildContext } from "../app.ts";
+import type { JobQueue } from "../jobs.ts";
 import { router } from "../operations/index.ts";
 import type { AppContext } from "../operations/registry.ts";
 import type { GateElicitation } from "./elicitation.ts";
@@ -43,6 +44,12 @@ export interface DeevyMcpOptions {
   secret?: string;
   /** How long that `requestState` stays good. Tests shorten it; nothing else does. */
   stateTtlSeconds?: number;
+  /**
+   * Where a tool call's write nudges the deliveries it owed (jobs.ts). The
+   * same queue `createApp` hands the RPC and OpenAPI surfaces: an Agent that
+   * writes over MCP owes what an Agent that writes over /rpc owes.
+   */
+  jobs?: JobQueue;
   /** Called with anything a tool call raised that the caller is not told about. */
   onError?: (error: unknown) => void;
 }
@@ -68,6 +75,7 @@ export function createDeevyMcp({
   baseURL,
   secret,
   stateTtlSeconds,
+  jobs,
   onError: report = () => {},
 }: DeevyMcpOptions): DeevyMcp {
   const tools = projectTools(router);
@@ -83,7 +91,10 @@ export function createDeevyMcp({
   return {
     async fetch(request) {
       const origin = baseURL ?? new URL(request.url).origin;
-      const context = await buildContext(db, auth, request.headers, origin);
+      const context = {
+        ...(await buildContext(db, auth, request.headers, origin)),
+        ...(jobs ? { jobs } : {}),
+      };
       // No credential at all is an authentication answer, not a tool error:
       // the challenge is what starts the OAuth dance.
       if (!context.session) return challenge(request, baseURL);

@@ -4,6 +4,7 @@ import { openapi } from "@orpc/openapi";
 import { defineMeta, ORPCError, os } from "@orpc/server";
 import { z } from "zod";
 import type { Session } from "../auth.ts";
+import type { JobQueue } from "../jobs.ts";
 import type { LiveOptions } from "../live.ts";
 
 /**
@@ -50,6 +51,13 @@ export interface AppContext {
    * browser does, a Worker cannot (docs/plans/m3.md).
    */
   live?: LiveOptions;
+  /**
+   * Where a write's tail nudges the deliveries it just owed, when this
+   * deployment has a queue to nudge (jobs.ts). It rides on the context because
+   * `appendEvent` takes the context as its `EventSource`, so an operation goes
+   * on knowing nothing about it.
+   */
+  jobs?: JobQueue;
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"

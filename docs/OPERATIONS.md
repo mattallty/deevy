@@ -41,6 +41,7 @@ bindings arrive with the request.
 | `DEEVY_SWEEP_INTERVAL_SECONDS` | env         | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                                                                        |
 | `DEEVY_GATE_REMINDER_HOURS`    | env         | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                                                                      |
 | `DEEVY_STREAM_SECONDS`         | — unbounded | var                | 60                   | Nothing: a live stream on Workers ends after a minute and the browser resumes from the cursor it signed off with. Workers-only, because a Node process holds a connection for as long as the browser does. |
+| `JOBS`                         | — the sweep | optional binding   | — no queue           | Nothing: a webhook delivery goes out at the next Cron pass instead of the moment it is owed. Workers-only, and absent from the committed `apps/web/wrangler.jsonc` because Queues are a paid feature.      |
 | `DEEVY_DATABASE_PATH`          | env         | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                                                             |
 | `DEEVY_PORT`                   | env         | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                                                              |
 | `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                        |
@@ -74,6 +75,34 @@ missing from it is answered with the SPA's `index.html` — a 200 with the wrong
 
 The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
 created before that will ask for the extra scope at the next sign-in.
+
+### Queues, when the account has them
+
+A webhook delivery is a durable row before it is a message: `appendEvent` writes what a subscribed URL is owed
+in the same handler as the write, and the sweep above finds it whether or not anything else does. A Queue only
+changes when. On an account that has one, the write's tail hands the row's id to the `JOBS` binding, a
+consumer picks it up in the next second and the POST goes out at once instead of at the next trigger; on an
+account without one there is no binding, `createApp` discards the job, and the trigger is the whole delivery
+path. Nothing else differs, which is why the binding is optional in the `Env` type and absent from the
+committed `apps/web/wrangler.jsonc` — Queues are paid, and `wrangler deploy` must not fail on a queue a free
+account is not allowed to create.
+
+Adding one is two blocks and a name:
+
+```jsonc
+"queues": {
+  "producers": [{ "binding": "JOBS", "queue": "deevy-jobs" }],
+  "consumers": [{ "queue": "deevy-jobs", "max_batch_size": 10, "max_retries": 10 }],
+}
+```
+
+then `wrangler queues create deevy-jobs` before the deploy that first names it. Queues are at-least-once, so
+the same message can arrive twice; that costs one POST rather than two, because `deliverWebhook` claims the
+row before it sends and will not claim one that has already landed. A consumer failure is retried by the
+queue, and it is the row's own attempt count — not the queue's — that decides when deevy gives up and appends
+`webhook.exhausted`, exactly as it would in a sweep. `max_retries` below eight therefore ends a delivery's
+life early on a receiver that is down; the Cron pass still finds the row afterwards, so nothing is lost, but
+setting it at or above eight keeps the two paths saying the same thing.
 
 ### Live updates, and why a stream on Workers ends
 

@@ -1,21 +1,25 @@
 /**
  * Drives the built Worker over HTTP on workerd (docs/plans/m3.md slices 4 and 5).
  *
- * `wrangler dev --local` is miniflare with a real local D1, so this needs no
- * Cloudflare account. It is a script rather than a vitest file because
- * apps/web's test environment is jsdom and this is neither jsdom nor node's
- * own: what it tests is the deployed shape, bindings and asset routing
- * included, which a unit test of anything the Worker calls cannot see.
+ * `wrangler dev --local` is miniflare with a real local D1 and a real local
+ * Queue, so this needs no Cloudflare account. It is a script rather than a
+ * vitest file because apps/web's test environment is jsdom and this is neither
+ * jsdom nor node's own: what it tests is the deployed shape, bindings and
+ * asset routing included, which a unit test of anything the Worker calls
+ * cannot see.
  *
- * Four phases, four servers, over one build and one D1. The first serves
- * deevy on a configured origin the request did not arrive on, which is how it
- * proves the bindings reached the app. The second signs a Human in, and a
- * sign-in needs BETTER_AUTH_URL to be the origin the browser is on — so it
- * picks its port first, and takes the stubbed GitHub with it. The third fires
- * the Cron Trigger by hand and watches the background work happen on D1, and
- * it signs in too, because what it reads back it reads over the API. The
- * fourth watches the Event log the way the SPA does, over a stream short
- * enough to end while the smoke is looking at it.
+ * Six phases, six servers, over one build and one D1. The first serves deevy
+ * on a configured origin the request did not arrive on, which is how it proves
+ * the bindings reached the app. The second signs a Human in, and a sign-in
+ * needs BETTER_AUTH_URL to be the origin the browser is on — so it picks its
+ * port first, and takes the stubbed GitHub with it. The third fires the Cron
+ * Trigger by hand and watches the background work happen on D1, and it signs
+ * in too, because what it reads back it reads over the API. The fourth watches
+ * the Event log the way the SPA does, over a stream short enough to end while
+ * the smoke is looking at it. The fifth adds the queue binding an account with
+ * Queues has, and the sixth takes it away again — the same webhook, delivered
+ * by the Cron path alone, which is what makes the binding optional
+ * (docs/plans/m3.md slice 9).
  */
 import type { AppRouter } from "@deevy/core";
 import { createORPCClient } from "@orpc/client";
@@ -25,6 +29,7 @@ import { STREAM_POLL_MS } from "../src/env.ts";
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -153,24 +158,81 @@ function freePort(): Promise<number> {
   });
 }
 
+/** The entry those two stubs are prepended to, which the queue wrapper imports. */
+const stubMain = "index.stub.js";
+
+/** The Queue this run names. Only the phase that has a binding ever mentions it. */
+const queueName = "deevy-jobs-smoke";
+
 /**
- * The same built Worker with GitHub replaced, and the configuration that
- * serves it. Better Auth hardcodes GitHub's endpoints, so the seam is the
- * isolate's global `fetch`: scripts/stub-github.js goes in front of the bundle
- * and everything else — the D1 binding, the routing table, createApp itself —
- * is what a deployment gets (docs/plans/m3.md slice 5).
+ * The same built Worker with the outside world replaced, and the configuration
+ * that serves it. Better Auth hardcodes GitHub's endpoints and a subscription
+ * URL has to be https, so the seam for both is the isolate's global `fetch`:
+ * scripts/stub-github.js and scripts/stub-receiver.js go in front of the
+ * bundle and everything else — the D1 binding, the routing table, createApp
+ * itself — is what a deployment gets (docs/plans/m3.md slices 5 and 9).
  */
-async function stubbedGitHub(): Promise<string> {
-  const stubConfig = join(here, "../dist/deevy/wrangler.github-stub.json");
-  const stubMain = "index.github-stub.js";
-  const [stub, bundle, written] = await Promise.all([
+async function stubbedOutside(): Promise<string> {
+  const stubConfig = join(here, "../dist/deevy/wrangler.stub.json");
+  const [github, receiver, bundle, written] = await Promise.all([
     readFile(join(here, "stub-github.js"), "utf8"),
+    readFile(join(here, "stub-receiver.js"), "utf8"),
     readFile(join(here, "../dist/deevy/index.js"), "utf8"),
     readFile(config, "utf8"),
   ]);
-  await writeFile(join(here, "../dist/deevy", stubMain), `${stub}\n${bundle}`);
+  await writeFile(join(here, "../dist/deevy", stubMain), `${github}\n${receiver}\n${bundle}`);
   await writeFile(stubConfig, JSON.stringify({ ...JSON.parse(written), main: stubMain }));
   return stubConfig;
+}
+
+/**
+ * The stubbed Worker again, plus everything an account that has Queues brings:
+ * the producer binding `createApp` nudges deliveries on, a consumer of it, and
+ * the wrapper that lets this script put a message on the same queue by hand.
+ *
+ * `retry_delay: 0` is what makes the eighth attempt something a smoke run can
+ * wait for. It changes when the consumer is asked again and nothing else: the
+ * backoff that matters is the delivery row's own, and `deliverWebhook` claims
+ * a row by id rather than by whether it is due, exactly as a Redeliver does.
+ */
+async function withQueues(base: string): Promise<string> {
+  const queueConfig = join(here, "../dist/deevy/wrangler.queues.json");
+  const [hand, written] = await Promise.all([
+    readFile(join(here, "stub-queue-hand.js"), "utf8"),
+    readFile(base, "utf8"),
+  ]);
+  const handMain = "index.queue-hand.js";
+  await writeFile(join(here, "../dist/deevy", handMain), hand);
+  const parsed = JSON.parse(written) as {
+    assets?: { run_worker_first?: string[] };
+    [key: string]: unknown;
+  };
+  await writeFile(
+    queueConfig,
+    JSON.stringify({
+      ...parsed,
+      main: handMain,
+      // The wrapper's own path, which createApp does not mount: without it the
+      // asset handler answers with the SPA and the message is never sent.
+      assets: {
+        ...parsed.assets,
+        run_worker_first: [...(parsed.assets?.run_worker_first ?? []), "/__smoke/*"],
+      },
+      queues: {
+        producers: [{ binding: "JOBS", queue: queueName }],
+        consumers: [
+          {
+            queue: queueName,
+            max_batch_size: 1,
+            max_batch_timeout: 1,
+            max_retries: 10,
+            retry_delay: 0,
+          },
+        ],
+      },
+    }),
+  );
+  return queueConfig;
 }
 
 /** Every cookie a response set, as one request header. */
@@ -589,6 +651,248 @@ async function liveUpdatesInsideAWorkersBudget(origin: string): Promise<void> {
   resumed.stop();
 }
 
+/** One POST a subscribed URL was given, narrowed to what this script reads. */
+interface Received {
+  path: string;
+  /** The delivery row it names, which a retry of the same row repeats. */
+  delivery: string;
+}
+
+interface Receiver {
+  /** The origin a subscription points at; stub-receiver.js maps it onto this server. */
+  origin: string;
+  /** Every POST it has been given, in order. */
+  posts: Received[];
+  /** How many landed on one path. */
+  count(path: string): number;
+  close(): Promise<void>;
+}
+
+/**
+ * The far side of a webhook: a plain HTTP server on 127.0.0.1 that counts what
+ * it is given and answers 500 on any path with `fail` in it, which is how a
+ * phase watches a delivery run out of attempts. `https://receiver.smoke.test`
+ * is the name deevy is subscribed to, and the stub in front of the bundle is
+ * the only thing between the two (docs/plans/m3.md slice 9).
+ */
+async function receiver(): Promise<Receiver> {
+  const posts: Received[] = [];
+  const server = createHttpServer((request, response) => {
+    const path = (request.url ?? "/").split("?")[0] ?? "/";
+    posts.push({ path, delivery: String(request.headers["deevy-delivery"] ?? "") });
+    request.resume();
+    request.on("end", () => {
+      response.writeHead(path.includes("fail") ? 500 : 200).end();
+    });
+  });
+  const port = await freePort();
+  await new Promise<void>((resolve) => {
+    server.listen(port, "127.0.0.1", resolve);
+  });
+  return {
+    origin: `https://receiver.smoke.test:${String(port)}`,
+    posts,
+    count: (path) => posts.filter((one) => one.path === path).length,
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.close(() => {
+          resolve();
+        });
+      }),
+  };
+}
+
+/** The secret every subscription in this run signs with. It never comes back out. */
+const subscriptionSecret = "whsec-smoke-secret-not-a-real-one";
+
+/** A Project and a subscription pointed at one path of the receiver. */
+async function subscribe(
+  origin: string,
+  cookie: string,
+  options: { project: string; key: string; url: string },
+): Promise<string> {
+  await must(origin, "projects/create", { name: options.project, key: options.key }, cookie);
+  const created = await must(
+    origin,
+    "webhooks/create",
+    { url: options.url, secret: subscriptionSecret, kinds: ["issue.created"] },
+    cookie,
+  );
+  return String(created.id);
+}
+
+/** The delivery rows one subscription has, newest first, as the settings page reads them. */
+async function deliveriesOf(
+  origin: string,
+  cookie: string,
+  subscriptionId: string,
+): Promise<Array<{ id: string; attempts: number; deliveredAt: string | null }>> {
+  const read = await must(origin, "webhooks/deliveries", { subscriptionId }, cookie);
+  return (read.deliveries ?? []) as Array<{
+    id: string;
+    attempts: number;
+    deliveredAt: string | null;
+  }>;
+}
+
+/** Every Event of one kind in the Workspace, with what it carried. */
+async function eventsOfKind(
+  origin: string,
+  cookie: string,
+  kind: string,
+): Promise<Array<{ subjectId: string; payload: Record<string, unknown> }>> {
+  const listed = await must(origin, "events/list", { limit: 500 }, cookie);
+  const events = (listed.events ?? []) as Array<{
+    kind: string;
+    subjectId: string;
+    payload: Record<string, unknown> | null;
+  }>;
+  return events
+    .filter((event) => event.kind === kind)
+    .map((event) => ({ subjectId: event.subjectId, payload: event.payload ?? {} }));
+}
+
+/** Slice 9: a delivery goes out when it is written, on an account that has Queues. */
+async function queuesForAnAccountThatHasThem(origin: string, far: Receiver): Promise<void> {
+  const admin = await signIn(origin, adminEmail);
+  if (admin.cookie.length === 0) throw new Error(`the admin could not sign in: ${admin.location}`);
+
+  const landing = await subscribe(origin, admin.cookie, {
+    project: "Queued",
+    key: "QUE",
+    url: `${far.origin}/lands`,
+  });
+  await must(origin, "issues/create", { projectKey: "QUE", title: "Tell the URL" }, admin.cookie);
+
+  // No trigger is fired here, and none fires on its own: wrangler dev runs a
+  // Cron Trigger only when something asks it to (see `trigger` above). So a
+  // POST arriving at all is the queue having carried it.
+  const arrived = await until(() => far.count("/lands") > 0, 10_000);
+  const owed = await deliveriesOf(origin, admin.cookie, landing);
+  check(
+    "with a queue binding, a webhook is delivered without waiting for a trigger",
+    arrived && far.count("/lands") === 1 && owed.length === 1 && owed[0]?.deliveredAt !== null,
+    `${String(far.count("/lands"))} POSTs, delivery ${JSON.stringify(owed[0] ?? null)}`,
+  );
+
+  // Queues are at-least-once, so the same job comes round again. The row it
+  // names has already landed, `deliverWebhook` will not claim one that has,
+  // and the second arrival therefore makes no request at all.
+  const again = await fetch(`${origin}/__smoke/enqueue`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind: "webhook.delivery", id: owed[0]?.id }),
+  });
+  await again.text();
+  // Long enough for a message that was going to be delivered to have been.
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const after = await deliveriesOf(origin, admin.cookie, landing);
+  // Counted by the delivery the POST names, not only by the path: two arrivals
+  // of the same row are exactly what the header would have made visible.
+  const forThatRow = far.posts.filter((one) => one.delivery === owed[0]?.id).length;
+  check(
+    "the same message delivered twice POSTs once",
+    again.status === 200 &&
+      forThatRow === 1 &&
+      far.count("/lands") === 1 &&
+      after[0]?.attempts === 1,
+    `enqueue was ${String(again.status)}, ${String(far.count("/lands"))} POSTs of which ${String(
+      forThatRow,
+    )} name that delivery, ${String(after[0]?.attempts)} attempts`,
+  );
+
+  // A receiver that refuses everything, and the consumer asking again until
+  // the row itself says there is nothing left to try. The eighth attempt is
+  // where `maxWebhookAttempts` runs out and the log says so — which is what
+  // the sweep would have written, from the same function.
+  const refusing = await subscribe(origin, admin.cookie, {
+    project: "Refused",
+    key: "REF",
+    url: `${far.origin}/fails`,
+  });
+  await must(origin, "issues/create", { projectKey: "REF", title: "Nobody answers" }, admin.cookie);
+  const ranOut = await until(() => far.count("/fails") >= 8, 30_000);
+  // One more beat than the eighth POST needs, so a ninth attempt would have
+  // been counted by the time this reads the log.
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  const given = await eventsOfKind(origin, admin.cookie, "webhook.exhausted");
+  check(
+    "a consumer failure retries, and the eighth attempt gives up exactly as the sweep would",
+    ranOut &&
+      far.count("/fails") === 8 &&
+      given.length === 1 &&
+      given[0]?.subjectId === refusing &&
+      given[0]?.payload.attempts === 8 &&
+      given[0]?.payload.status === 500,
+    `${String(far.count("/fails"))} POSTs, ${String(given.length)} webhook.exhausted: ${JSON.stringify(
+      given[0] ?? null,
+    )}`,
+  );
+
+  // Left switched off, so the phase that follows owes them nothing and its one
+  // trigger has exactly one delivery to make.
+  for (const subscriptionId of [landing, refusing]) {
+    await must(origin, "webhooks/update", { subscriptionId, disabled: true }, admin.cookie);
+  }
+}
+
+/** Slice 9: the same webhook, on an account that has no Queues at all. */
+async function theCronPathAlone(origin: string, far: Receiver): Promise<void> {
+  const admin = await signIn(origin, adminEmail);
+  if (admin.cookie.length === 0) throw new Error(`the admin could not sign in: ${admin.location}`);
+
+  const subscriptionId = await subscribe(origin, admin.cookie, {
+    project: "Swept",
+    key: "SWT",
+    url: `${far.origin}/cron`,
+  });
+  await must(origin, "issues/create", { projectKey: "SWT", title: "Tell the URL" }, admin.cookie);
+
+  // There is no binding on this configuration, so `createApp` discards the job
+  // and nothing carries the row anywhere. Waiting is the assertion.
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const beforeTrigger = far.count("/cron");
+
+  const fired = await trigger(origin);
+  const delivered = await until(() => far.count("/cron") > 0, 10_000);
+  const owed = await deliveriesOf(origin, admin.cookie, subscriptionId);
+  check(
+    "with no queue block at all, the same webhook is delivered by the Cron path alone",
+    beforeTrigger === 0 &&
+      fired === 200 &&
+      delivered &&
+      far.count("/cron") === 1 &&
+      owed.length === 1 &&
+      owed[0]?.deliveredAt !== null,
+    `${String(beforeTrigger)} POSTs before the trigger and ${String(far.count("/cron"))} after it, ` +
+      `trigger ${String(fired)}, delivery ${JSON.stringify(owed[0] ?? null)}`,
+  );
+}
+
+/**
+ * The shape a free account can deploy: the committed configuration, which
+ * names no queue, through the dry run that is that file's typecheck
+ * (docs/plans/m3.md, convention 17).
+ */
+async function deploysWithoutAQueueBlock(): Promise<void> {
+  const committed = await readFile(join(here, "../wrangler.jsonc"), "utf8");
+  let ok = true;
+  try {
+    await run(
+      wrangler,
+      ["deploy", "--dry-run", "--outdir", join(here, "../dist/wrangler-dry-run-smoke")],
+      { cwd: join(here, "..") },
+    );
+  } catch {
+    ok = false;
+  }
+  check(
+    "wrangler deploy --dry-run succeeds on a configuration with no queue block",
+    ok && !committed.includes('"queues"'),
+    ok ? "the committed wrangler.jsonc names a queue" : "the dry run failed",
+  );
+}
+
 const failures: string[] = [];
 function check(name: string, ok: boolean, detail = ""): void {
   if (ok) console.log(`  ok  ${name}`);
@@ -817,7 +1121,7 @@ try {
   await withServer(
     persistTo,
     {
-      config: await stubbedGitHub(),
+      config: await stubbedOutside(),
       port,
       vars: {
         BETTER_AUTH_URL: `http://127.0.0.1:${String(port)}`,
@@ -839,7 +1143,7 @@ try {
   await withServer(
     persistTo,
     {
-      config: await stubbedGitHub(),
+      config: await stubbedOutside(),
       port: cronPort,
       vars: {
         BETTER_AUTH_URL: `http://127.0.0.1:${String(cronPort)}`,
@@ -860,7 +1164,7 @@ try {
   await withServer(
     persistTo,
     {
-      config: await stubbedGitHub(),
+      config: await stubbedOutside(),
       port: livePort,
       vars: {
         BETTER_AUTH_URL: `http://127.0.0.1:${String(livePort)}`,
@@ -874,6 +1178,55 @@ try {
     },
     liveUpdatesInsideAWorkersBudget,
   );
+
+  // Slice 9, in two halves that differ only in whether the account has Queues.
+  // One receiver serves both, so the counts each phase asserts are the same
+  // server's, and the second half is subscribed to a path the first never used.
+  const far = await receiver();
+  try {
+    const queuePort = await freePort();
+    await withServer(
+      persistTo,
+      {
+        config: await withQueues(await stubbedOutside()),
+        port: queuePort,
+        vars: {
+          BETTER_AUTH_URL: `http://127.0.0.1:${String(queuePort)}`,
+          BETTER_AUTH_SECRET: "smoke-secret-that-is-at-least-32-characters",
+          GITHUB_CLIENT_ID: "stub-client-id",
+          GITHUB_CLIENT_SECRET: "stub-client-secret",
+          DEEVY_ADMIN_EMAIL: adminEmail,
+          DEEVY_WORKSPACE_NAME: "Flippable",
+        },
+      },
+      (origin) => queuesForAnAccountThatHasThem(origin, far),
+    );
+
+    // The same build and the same D1, on the configuration a free account
+    // deploys: no producer binding, no consumer, and the Cron Trigger as the
+    // only thing that carries a delivery anywhere.
+    const sweepPort = await freePort();
+    await withServer(
+      persistTo,
+      {
+        config: await stubbedOutside(),
+        port: sweepPort,
+        vars: {
+          BETTER_AUTH_URL: `http://127.0.0.1:${String(sweepPort)}`,
+          BETTER_AUTH_SECRET: "smoke-secret-that-is-at-least-32-characters",
+          GITHUB_CLIENT_ID: "stub-client-id",
+          GITHUB_CLIENT_SECRET: "stub-client-secret",
+          DEEVY_ADMIN_EMAIL: adminEmail,
+          DEEVY_WORKSPACE_NAME: "Flippable",
+        },
+      },
+      (origin) => theCronPathAlone(origin, far),
+    );
+  } finally {
+    await far.close();
+  }
+
+  await deploysWithoutAQueueBlock();
 } finally {
   await rm(persistTo, { recursive: true, force: true });
 }

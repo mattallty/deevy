@@ -1,6 +1,6 @@
 import type { AuthEnv, LiveOptions } from "@deevy/core";
 import { fetchClientMetadataResource } from "@deevy/core/cimd";
-import type { createDb } from "@deevy/adapters/workers";
+import type { createDb, QueueProducer } from "@deevy/adapters/workers";
 
 /**
  * How often a stream on Workers looks for new Events. Slower than Node's
@@ -26,6 +26,15 @@ const defaultStreamSeconds = 60;
  */
 export interface WorkerBindings {
   DB: Parameters<typeof createDb>[0];
+  /**
+   * The Queue a delivery is nudged on, when this account has Queues. Optional
+   * on purpose and absent from the committed `wrangler.jsonc`: Queues are a
+   * paid feature and M3's definition of done is a free account, so a deploy
+   * must not fail on a queue it is not allowed to create. Present, a delivery
+   * goes out when it is written; absent, the Cron Trigger finds the same row a
+   * beat later (docs/OPERATIONS.md, docs/plans/m3.md slice 9).
+   */
+  JOBS?: QueueProducer;
   BETTER_AUTH_URL?: string;
   BETTER_AUTH_SECRET?: string;
   DEEVY_WEB_ORIGIN?: string;
