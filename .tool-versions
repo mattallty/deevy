@@ -1,0 +1,5 @@
+# Must agree with devEngines.packageManager in package.json. The lockfile is
+# pnpm 11's two-document format; a pnpm 10 on PATH calls it broken and then
+# blocks on the prompt to wipe node_modules. Node is pinned in .node-version,
+# which is what CI reads, so it is deliberately not repeated here.
+pnpm 11.25.0
