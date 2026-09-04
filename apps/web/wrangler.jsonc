@@ -24,5 +24,10 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
     },
   ],
+  // Every minute, the finest Cloudflare offers, which is why
+  // DEEVY_SWEEP_INTERVAL_SECONDS is a Node-only knob (docs/OPERATIONS.md).
+  // Cloudflare owns this schedule; the Worker's `scheduled` handler is one
+  // bounded pass of the same work the Node runner's timer drives.
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true },
 }

@@ -54,6 +54,7 @@ export {
 export { signPayload, verifySignature, webhookBody, type VerifyInput } from "./webhooks.ts";
 export {
   defaultDeliveryLimit,
+  defaultMaxPasses,
   defaultSilenceMs,
   defaultSweepLimit,
   deliverDueChannelMessages,
@@ -61,6 +62,7 @@ export {
   deliverWebhook,
   maxDeliveryAttempts,
   maxWebhookAttempts,
+  runDueWork,
   sweepSchedules,
   remindAboutGates,
   sweepStaleRuns,
@@ -68,6 +70,9 @@ export {
   type DeliverDueWebhooksOptions,
   type DeliverWebhookOptions,
   type DeliveryResult,
+  type DueWorkLimits,
+  type DueWorkResult,
+  type RunDueWorkOptions,
   type ScheduleSweepResult,
   type SweepResult,
   type SweepSchedulesOptions,

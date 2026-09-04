@@ -116,16 +116,18 @@ leak.
 ## Background work
 
 Every piece of background work is a bounded function in `packages/core/src/work.ts` — one indexed SELECT with
-a LIMIT, one batched UPDATE, never a query per row — reached through the `Cron` and `JobQueue` ports in
-`packages/core/src/jobs.ts`. The Node deployment satisfies `Cron` with `createTimerCron()` from
-`@deevy/adapters/node`, and `apps/server/src/runner.ts` starts the schedule beside `serve()` and stops it on
-SIGINT and SIGTERM. It is deliberately not inside `createApp`, which builds no timer and owns no schedule; on
-Workers the same sweep is driven by a Cron Trigger instead.
+a LIMIT, one batched UPDATE, never a query per row — and `runDueWork` there is the five of them in order, the
+whole of one trigger. Both deployments call it and neither owns it. Node satisfies the `Cron` port in
+`packages/core/src/jobs.ts` with `createTimerCron()` from `@deevy/adapters/node`, and
+`apps/server/src/runner.ts` starts that schedule beside `serve()`, drains while a pass says there is more, and
+stops it on SIGINT and SIGTERM. Cloudflare owns its own schedule, so `apps/web/src/worker.ts` has a
+`scheduled` handler instead of a `Cron`, and it asks for one tighter pass per trigger. Neither lives inside
+`createApp`, which builds no timer and owns no schedule.
 
-| Variable                       | Default | What it does                                                         |
-| ------------------------------ | ------- | -------------------------------------------------------------------- |
-| `DEEVY_RUN_STALE_MINUTES`      | 30      | Silence after which a Run goes `stale`. A later Activity revives it. |
-| `DEEVY_SWEEP_INTERVAL_SECONDS` | 60      | How often the runner looks for silent Runs.                          |
+| Variable                       | Default | What it does                                                                       |
+| ------------------------------ | ------- | ---------------------------------------------------------------------------------- |
+| `DEEVY_RUN_STALE_MINUTES`      | 30      | Silence after which a Run goes `stale`. A later Activity revives it.               |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | 60      | How often the runner looks for silent Runs. Node only; Workers has a Cron Trigger. |
 
 ## The MCP endpoint
 

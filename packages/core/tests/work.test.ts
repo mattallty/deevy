@@ -18,6 +18,7 @@ import {
   dueRunsQuery,
   dueWebhookDeliveriesQuery,
   remindAboutGates,
+  runDueWork,
   scheduledIssuesQuery,
   sweepSchedules,
   sweepStaleRuns,
@@ -558,5 +559,52 @@ describe("Events a sweep writes", () => {
 
     const after = await db.query.delivery.findMany({ where: { target: "webhook" } });
     expect(after.length).toBe(before + swept.started);
+  });
+});
+
+/**
+ * A database that aborts `controller` the first time a statement of `kind` is
+ * issued. The seam is the `db` argument every sweep already takes, so nothing
+ * here reaches inside `runDueWork` to decide when the trigger gives up.
+ */
+function abortOn(db: Db, kind: "update", controller: AbortController): Db {
+  let fired = false;
+  return new Proxy(db, {
+    get(target, property) {
+      const value = Reflect.get(target, property) as unknown;
+      if (property !== kind || typeof value !== "function") return value;
+      return (...args: unknown[]) => {
+        if (!fired) {
+          fired = true;
+          controller.abort();
+        }
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  }) as Db;
+}
+
+describe("one trigger's worth of background work", () => {
+  it("stops at the pass the signal was aborted before, and reports what it did", async () => {
+    const { db, project, issue, agent } = await workspaceWithAgent();
+    await seedRuns(db, { issueId: issue.id, agentMemberId: agent.member.id }, 3, 31);
+    // Work for the pass after the stale sweep, so the report saying it started
+    // nothing is a fact about the abort rather than about the seed.
+    const second = await seedIssue(db, project.id, issue.stateId, 2);
+    await assignTo(db, second, agent.member.id);
+    await scheduleEvery(db, agent.member.id, 60);
+
+    // The stale sweep's claiming UPDATE is the first of the trigger, so
+    // aborting on it lands between that pass and the schedule sweep.
+    const controller = new AbortController();
+    const result = await runDueWork({
+      db: abortOn(db, "update", controller),
+      signal: controller.signal,
+    });
+
+    expect(result).toMatchObject({ staleRuns: 3, scheduled: 0, aborted: true });
+    const runs = await db.query.run.findMany();
+    // The pass in flight finished, and the schedule sweep never began.
+    expect(runs.map((run) => run.status)).toEqual(["stale", "stale", "stale"]);
   });
 });

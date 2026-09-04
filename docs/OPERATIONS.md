@@ -38,7 +38,7 @@ bindings arrive with the request.
 | `DEEVY_WORKSPACE_NAME`         | env  | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                            |
 | `DEEVY_WEB_ORIGIN`             | env  | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                      |
 | `DEEVY_RUN_STALE_MINUTES`      | env  | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                             |
-| `DEEVY_SWEEP_INTERVAL_SECONDS` | env  | var                | 60                   | Nothing: the sweep looks every minute.                                                                                                                          |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | env  | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                             |
 | `DEEVY_GATE_REMINDER_HOURS`    | env  | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                           |
 | `DEEVY_DATABASE_PATH`          | env  | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                  |
 | `DEEVY_PORT`                   | env  | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                   |
@@ -46,8 +46,24 @@ bindings arrive with the request.
 
 The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
 signing in: `BETTER_AUTH_*`, `GITHUB_*`, `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME` do on Workers exactly
-what they do on Node, bootstrap and allowlist included. The background sweep is still Node's alone, so the
-Worker reads the three timing knobs and does not yet act on them.
+what they do on Node, bootstrap and allowlist included.
+
+### Background work, on a timer or on a Cron Trigger
+
+The stale sweep, the schedule trigger, the Gate reminder and both delivery loops are one function,
+`runDueWork` in `packages/core/src/work.ts`, and each runtime brings its own schedule to it. Node's
+`startRunner` brings a timer every `DEEVY_SWEEP_INTERVAL_SECONDS` and drains: it goes again while a pass says
+there is more. Cloudflare owns its own schedule, so the Worker has no interval to configure — `triggers.crons`
+in `apps/web/wrangler.jsonc` runs it every minute, the finest Cloudflare offers, and the `scheduled` handler
+takes one bounded pass of twenty rows and lets the next trigger find the rest. A backlog therefore drains a
+minute at a time on Workers rather than in one tick, which is the trade a CPU budget and a per-invocation D1
+query cap buy.
+
+`DEEVY_RUN_STALE_MINUTES` and `DEEVY_GATE_REMINDER_HOURS` mean the same thing on both. `wrangler dev --local`
+fires a trigger by hand at `/cdn-cgi/handler/scheduled?cron=*+*+*+*+*`, and the response waits for the pass, so
+a 500 there is the sweep's own error. `--test-scheduled`'s `/__scheduled` does not work on a Worker that also
+serves assets: the path is not one `createApp` mounts, so it is not in `assets.run_worker_first` and the asset
+handler answers it with the SPA's `index.html`.
 
 Which paths the Worker answers rather than the asset handler is `assets.run_worker_first` in
 `apps/web/wrangler.jsonc`. It is part of the routing table, not configuration: a path the app mounts that is
