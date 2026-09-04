@@ -1,0 +1,1 @@
+ALTER TABLE `issue_link` ADD `run_id` text REFERENCES run(id) ON DELETE SET NULL;

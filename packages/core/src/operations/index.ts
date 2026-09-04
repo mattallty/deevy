@@ -1,11 +1,14 @@
-import { and, asc, count, eq, gt, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
+  activity as activityTable,
+  agentActivityKinds,
   agent as agentTable,
   allowlistRule as allowlistRuleTable,
   event as eventTable,
   member as memberTable,
   run as runTable,
+  runStatuses,
   user as userTable,
 } from "@deevy/db";
 import {
@@ -82,7 +85,16 @@ import {
 } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
-import { RunSchema } from "../runs.ts";
+import {
+  ActivitySchema,
+  RunDetailSchema,
+  RunSchema,
+  assertFinishable,
+  openStatuses,
+  setRunStatus,
+  statusAfterActivity,
+  statusAfterAnswer,
+} from "../runs.ts";
 import { eventIterator } from "@orpc/server";
 import { subscribeToEvents } from "../live.ts";
 import { NoInput, defineOperation, defineStreamOperation } from "./registry.ts";
@@ -2437,10 +2449,18 @@ export const links = {
       title: z.string().trim().max(300).nullish(),
       /** Derived from the URL unless given. */
       kind: z.enum(issueLinkKinds).optional(),
+      /** The Run that found it, so evidence is attributed to the attempt that produced it. */
+      runId: z.string().optional(),
     }),
     output: IssueLinkWithRepositorySchema,
     handler: async ({ input, context }) => {
       const { issue, project } = await requireIssue(context, input.issueKey);
+      if (input.runId) {
+        const attributed = await requireRun(context, input.runId);
+        if (attributed.run.issueId !== issue.id) {
+          throw new ORPCError("BAD_REQUEST", { message: "That Run is on another Issue" });
+        }
+      }
       const known = await context.db.query.repository.findMany({
         where: { workspaceId: context.workspace.id },
         columns: { id: true, url: true },
@@ -2456,6 +2476,7 @@ export const links = {
         title: input.title ?? null,
         ref: parsed.ref,
         repositoryId: parsed.repositoryId,
+        runId: input.runId ?? null,
         createdBy: context.member.id,
       });
       await appendEvent(context, {
@@ -2463,7 +2484,12 @@ export const links = {
         subjectType: "issue",
         subjectId: issue.id,
         projectId: project.id,
-        payload: { linkId: id, kind: input.kind ?? parsed.kind, url: input.url },
+        payload: {
+          linkId: id,
+          kind: input.kind ?? parsed.kind,
+          url: input.url,
+          ...(input.runId ? { runId: input.runId } : {}),
+        },
       });
       const row = await context.db.query.issueLink.findFirst({
         where: { id },
@@ -2603,6 +2629,48 @@ function runView(row: Run, issueKey: string) {
   };
 }
 
+/**
+ * Runs page newest first, and two Runs can share a millisecond, so the cursor
+ * is the pair that is unique: the createdAt of the last row and its id. A
+ * cursor on the timestamp alone would drop the loser of a tie.
+ */
+const RunCursor = /^(\d+):(.+)$/;
+
+function parseRunCursor(cursor: string): { at: Date; id: string } {
+  const match = RunCursor.exec(cursor);
+  if (!match) throw new ORPCError("BAD_REQUEST", { message: "Not a cursor from this list" });
+  return { at: new Date(Number(match[1])), id: match[2] as string };
+}
+
+/** The Run an operation names, or NOT_FOUND. Scoped to the Workspace and to what the caller may see. */
+async function requireRun(context: ContextFor<"member">, runId: string) {
+  const found = await context.db.query.run.findFirst({
+    where: { id: runId },
+    with: { issue: { with: { project: true } } },
+  });
+  if (!found || found.issue.project.workspaceId !== context.workspace.id) {
+    throw new ORPCError("NOT_FOUND", { message: "No such Run" });
+  }
+  assertProjectVisible(context, found.issue.projectId);
+  return {
+    run: found,
+    issue: found.issue,
+    project: found.issue.project,
+    key: issueKey(found.issue.project.key, found.issue.number),
+  };
+}
+
+/**
+ * An Activity is what an Agent posts to its own Run (CONTEXT.md), so nobody
+ * else writes into that feed: another Agent's Run is not theirs to narrate, and
+ * a Human speaks through `runs.answer`.
+ */
+function assertOwnRun(context: ContextFor<"member">, run: Run): void {
+  if (run.agentMemberId !== context.member.id) {
+    throw new ORPCError("FORBIDDEN", { message: "This Run belongs to another Agent" });
+  }
+}
+
 export const runs = {
   start: defineOperation({
     name: "runs.start",
@@ -2619,6 +2687,21 @@ export const runs = {
       // which Agent, which arrives with the triggers in slice 4.
       if (context.member.kind !== "agent") {
         throw new ORPCError("BAD_REQUEST", { message: "Only an Agent can start its own Run" });
+      }
+      // One attempt at a time: a second open Run on the same Issue by the same
+      // Agent is two attempts claiming one outcome (docs/plans/m2.md).
+      const already = await context.db.query.run.findFirst({
+        where: {
+          issueId: issue.id,
+          agentMemberId: context.member.id,
+          status: { in: [...openStatuses] },
+        },
+        columns: { id: true },
+      });
+      if (already) {
+        throw new ORPCError("CONFLICT", {
+          message: "This Agent already has an open Run on this Issue",
+        });
       }
       const id = crypto.randomUUID();
       await context.db.insert(runTable).values({
@@ -2637,6 +2720,217 @@ export const runs = {
         payload: { issueId: issue.id, trigger: row.trigger, agentMemberId: context.member.id },
       });
       return runView(row, input.issueKey);
+    },
+  }),
+
+  postActivity: defineOperation({
+    name: "runs.postActivity",
+    summary: "Post one Activity to your Run: a thought, an action, an elicitation, or an error",
+    method: "POST",
+    path: "/runs/{runId}/activities",
+    auth: "member",
+    agents: true,
+    input: z.object({
+      runId: z.string(),
+      kind: z.enum(agentActivityKinds),
+      body: z.string().min(1).max(20_000),
+      payload: z.record(z.string(), z.unknown()).nullish(),
+    }),
+    output: z.object({ run: RunSchema, activity: ActivitySchema }),
+    handler: async ({ input, context }) => {
+      const { run, issue, project, key } = await requireRun(context, input.runId);
+      assertOwnRun(context, run);
+      const status = statusAfterActivity(run.status, input.kind);
+
+      const id = crypto.randomUUID();
+      await context.db.insert(activityTable).values({
+        id,
+        runId: run.id,
+        kind: input.kind,
+        body: input.body,
+        payload: input.payload ?? null,
+      });
+      await setRunStatus(context.db, run, status, { touchActivity: true });
+
+      await appendEvent(context, {
+        kind: "run.activity",
+        subjectType: "run",
+        subjectId: run.id,
+        projectId: project.id,
+        payload: { issueId: issue.id, activityId: id, activityKind: input.kind },
+      });
+      // An elicitation is the Agent asking a Human something, so it is its own
+      // Event: that is what a Notification and the live feed hang off.
+      if (status === "awaiting_input") {
+        await appendEvent(context, {
+          kind: "run.awaiting_input",
+          subjectType: "run",
+          subjectId: run.id,
+          projectId: project.id,
+          payload: { issueId: issue.id, activityId: id, question: input.body },
+        });
+      }
+
+      const updated = (await context.db.query.run.findFirst({ where: { id: run.id } })) as Run;
+      const row = await context.db.query.activity.findFirst({ where: { id } });
+      if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR");
+      return { run: runView(updated, key), activity: row };
+    },
+  }),
+
+  answer: defineOperation({
+    name: "runs.answer",
+    summary: "Answer a Run's elicitation, so the Agent carries on",
+    method: "POST",
+    path: "/runs/{runId}/answer",
+    auth: "member",
+    input: z.object({ runId: z.string(), body: z.string().min(1).max(20_000) }),
+    output: z.object({ run: RunSchema, activity: ActivitySchema }),
+    handler: async ({ input, context }) => {
+      // No `agents: true`: an elicitation asks a Human, and the registry
+      // refuses an Agent this operation without a check of its own.
+      const { run, issue, project, key } = await requireRun(context, input.runId);
+      const status = statusAfterAnswer(run.status);
+
+      // The answer joins the Activity feed as a `response`, because that feed
+      // is where the Agent looks: an answer it cannot read is no answer.
+      const id = crypto.randomUUID();
+      await context.db.insert(activityTable).values({
+        id,
+        runId: run.id,
+        kind: "prompt",
+        body: input.body,
+      });
+      await setRunStatus(context.db, run, status, { touchActivity: true });
+
+      await appendEvent(context, {
+        kind: "run.answered",
+        subjectType: "run",
+        subjectId: run.id,
+        projectId: project.id,
+        payload: { issueId: issue.id, activityId: id },
+      });
+
+      const updated = (await context.db.query.run.findFirst({ where: { id: run.id } })) as Run;
+      const row = await context.db.query.activity.findFirst({ where: { id } });
+      if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR");
+      return { run: runView(updated, key), activity: row };
+    },
+  }),
+
+  finish: defineOperation({
+    name: "runs.finish",
+    summary: "End your Run, completed or failed, with a summary of what happened",
+    method: "POST",
+    path: "/runs/{runId}/finish",
+    auth: "member",
+    agents: true,
+    input: z.object({
+      runId: z.string(),
+      status: z.enum(["completed", "failed"]),
+      summary: z.string().min(1).max(10_000),
+    }),
+    output: RunSchema,
+    handler: async ({ input, context }) => {
+      const { run, issue, project, key } = await requireRun(context, input.runId);
+      assertOwnRun(context, run);
+      assertFinishable(run.status);
+
+      await setRunStatus(context.db, run, input.status, { summary: input.summary });
+      await appendEvent(context, {
+        kind: input.status === "completed" ? "run.completed" : "run.failed",
+        subjectType: "run",
+        subjectId: run.id,
+        projectId: project.id,
+        payload: { issueId: issue.id, summary: input.summary },
+      });
+
+      const updated = (await context.db.query.run.findFirst({ where: { id: run.id } })) as Run;
+      return runView(updated, key);
+    },
+  }),
+
+  list: defineOperation({
+    name: "runs.list",
+    summary: "Runs on an Issue or by an Agent, newest first, from a cursor",
+    method: "GET",
+    path: "/runs",
+    auth: "member",
+    agents: true,
+    input: z.object({
+      issueKey: z.string().optional(),
+      agentMemberId: z.string().optional(),
+      status: z.enum(runStatuses).optional(),
+      /** Return Runs older than this position. Pass back the previous page's nextCursor. */
+      before: z.string().optional(),
+      limit: z.coerce.number().int().min(1).max(200).default(50),
+    }),
+    output: z.object({
+      runs: z.array(RunSchema),
+      /** The position of the last Run returned, or null when the page is empty. */
+      nextCursor: z.string().nullable(),
+    }),
+    handler: async ({ input, context }) => {
+      // One of the two indexes carries every query: (issueId, createdAt) or
+      // (agentMemberId, status). A Workspace-wide scan is not on offer.
+      if (!input.issueKey && !input.agentMemberId) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Say whose Runs you want: an Issue key or an Agent",
+        });
+      }
+      const onIssue = input.issueKey ? await requireIssue(context, input.issueKey) : null;
+      const cursor = input.before ? parseRunCursor(input.before) : null;
+      const granted = context.grantedProjectIds;
+
+      const rows = await context.db
+        .select({ run: runTable, number: issueTable.number, projectKey: projectTable.key })
+        .from(runTable)
+        .innerJoin(issueTable, eq(runTable.issueId, issueTable.id))
+        .innerJoin(projectTable, eq(issueTable.projectId, projectTable.id))
+        .where(
+          and(
+            eq(projectTable.workspaceId, context.workspace.id),
+            granted ? inArray(issueTable.projectId, granted) : undefined,
+            onIssue ? eq(runTable.issueId, onIssue.issue.id) : undefined,
+            input.agentMemberId === undefined
+              ? undefined
+              : eq(runTable.agentMemberId, input.agentMemberId),
+            input.status === undefined ? undefined : eq(runTable.status, input.status),
+            cursor
+              ? or(
+                  lt(runTable.createdAt, cursor.at),
+                  and(eq(runTable.createdAt, cursor.at), lt(runTable.id, cursor.id)),
+                )
+              : undefined,
+          ),
+        )
+        .orderBy(desc(runTable.createdAt), desc(runTable.id))
+        .limit(input.limit);
+
+      const last = rows.at(-1);
+      return {
+        runs: rows.map((row) => runView(row.run, issueKey(row.projectKey, row.number))),
+        nextCursor: last ? `${last.run.createdAt.getTime()}:${last.run.id}` : null,
+      };
+    },
+  }),
+
+  get: defineOperation({
+    name: "runs.get",
+    summary: "One Run with its Activity feed in the order it happened",
+    method: "GET",
+    path: "/runs/{runId}",
+    auth: "member",
+    agents: true,
+    input: z.object({ runId: z.string() }),
+    output: RunDetailSchema,
+    handler: async ({ input, context }) => {
+      const { run, key } = await requireRun(context, input.runId);
+      const activities = await context.db.query.activity.findMany({
+        where: { runId: run.id },
+        orderBy: { createdAt: "asc" },
+      });
+      return { ...runView(run, key), activities };
     },
   }),
 };

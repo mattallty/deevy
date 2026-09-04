@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { issue } from "./issue.ts";
+import { run } from "./run.ts";
 import { member, workspace } from "./workspace.ts";
 
 const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
@@ -43,6 +44,8 @@ export const issueLink = sqliteTable(
     /** The pull request number, the commit SHA, or the branch name. */
     ref: text("ref"),
     repositoryId: text("repository_id").references(() => repository.id, { onDelete: "set null" }),
+    /** The Run that attached it, so evidence an Agent found is attributed to its attempt. */
+    runId: text("run_id").references(() => run.id, { onDelete: "set null" }),
     createdBy: text("created_by").references(() => member.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
   },

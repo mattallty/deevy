@@ -69,6 +69,12 @@ describe("the Agent capability rule", () => {
       "links.list",
       "projects.get",
       "projects.list",
+      // `runs.answer` is not here: an elicitation asks a Human.
+      "runs.finish",
+      "runs.get",
+      "runs.list",
+      "runs.postActivity",
+      "runs.start",
     ]);
   });
 });

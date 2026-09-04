@@ -53,7 +53,29 @@ export const run = sqliteTable(
   ],
 );
 
-export const activityKinds = ["thought", "action", "elicitation", "response", "error"] as const;
+/**
+ * What an Agent narrates, plus `prompt`, which only a Human writes: their
+ * answer to an elicitation. Linear splits them the same way, so an agent
+ * ported to deevy never confuses its own output with a Human's words
+ * (docs/research/landscape-agent-aware-trackers.md).
+ */
+export const activityKinds = [
+  "thought",
+  "action",
+  "elicitation",
+  "response",
+  "error",
+  "prompt",
+] as const;
+
+/** The kinds an Agent may post. `prompt` is the Human's word, so it is not here. */
+export const agentActivityKinds = [
+  "thought",
+  "action",
+  "elicitation",
+  "response",
+  "error",
+] as const;
 
 /** One entry an Agent posts to its Run while working (CONTEXT.md). */
 export const activity = sqliteTable(

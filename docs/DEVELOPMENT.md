@@ -58,12 +58,26 @@ apps/web            React SPA; also the Cloudflare Worker entry (src/worker.ts) 
 apps/server         Node entry (Hono on @hono/node-server), bundled by vp pack; Dockerfile
 packages/core       operation registry, oRPC router, Hono app factory, Better Auth factory
 packages/db         Drizzle schema, relations, migrations
-packages/adapters   node/ (node:sqlite, migrator, static assets) and workers/ (D1)
+packages/adapters   node/ (node:sqlite, migrator, static assets, timer cron) and workers/ (D1)
 ```
 
 Rules that keep the two deployment targets honest (ADR-0006): `packages/core` and `packages/db` never import
 Node modules; anything runtime-specific lives in `packages/adapters`. The Worker build in CI is what catches a
 leak.
+
+## Background work
+
+Every piece of background work is a bounded function in `packages/core/src/work.ts` — one indexed SELECT with
+a LIMIT, one batched UPDATE, never a query per row — reached through the `Cron` and `JobQueue` ports in
+`packages/core/src/jobs.ts`. The Node deployment satisfies `Cron` with `createTimerCron()` from
+`@deevy/adapters/node`, and `apps/server/src/runner.ts` starts the schedule beside `serve()` and stops it on
+SIGINT and SIGTERM. It is deliberately not inside `createApp`, which the Cloudflare Worker calls once per
+request; on Workers the same sweep is driven by a Cron Trigger instead.
+
+| Variable                       | Default | What it does                                                         |
+| ------------------------------ | ------- | -------------------------------------------------------------------- |
+| `DEEVY_RUN_STALE_MINUTES`      | 30      | Silence after which a Run goes `stale`. A later Activity revives it. |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | 60      | How often the runner looks for silent Runs.                          |
 
 ## Docker
 

@@ -64,7 +64,7 @@ export const RunSchema = z.object({
 export const ActivitySchema = z.object({
   id: z.string(),
   runId: z.string(),
-  kind: z.enum(["thought", "action", "elicitation", "response", "error"]),
+  kind: z.enum(["thought", "action", "elicitation", "response", "error", "prompt"]),
   body: z.string(),
   payload: z.record(z.string(), z.unknown()).nullable(),
   createdAt: z.date(),
@@ -85,8 +85,10 @@ export async function setRunStatus(
     .set({
       status,
       // The first Activity is what starts a Run working, so that is when the
-      // clock starts, not when the trigger created it.
-      startedAt: current.startedAt ?? (status === "active" ? now : null),
+      // clock starts, not when the trigger created it. A Run whose first word
+      // is a question has started too: it is waiting, not idle.
+      startedAt:
+        current.startedAt ?? (status === "active" || status === "awaiting_input" ? now : null),
       ...(extra.touchActivity ? { lastActivityAt: now } : {}),
       ...(extra.summary === undefined ? {} : { summary: extra.summary }),
       finishedAt: status === "completed" || status === "failed" ? now : null,

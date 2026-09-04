@@ -9,6 +9,16 @@ export interface ServerEnv {
   adminEmail?: string;
   workspaceName?: string;
   webDist?: string;
+  /** Silence after which a Run is presumed stale (docs/plans/m2.md). */
+  runStaleMinutes: number;
+  /** How often the background runner sweeps for silent Runs. */
+  sweepIntervalSeconds: number;
+}
+
+/** A positive number from the environment, or the default when it is absent or nonsense. */
+function positive(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
@@ -27,5 +37,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,
     webDist: env.DEEVY_WEB_DIST,
+    runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
+    sweepIntervalSeconds: positive(env.DEEVY_SWEEP_INTERVAL_SECONDS, 60),
   };
 }

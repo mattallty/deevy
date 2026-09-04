@@ -41,3 +41,17 @@ describe("server", () => {
     close();
   });
 });
+
+describe("the runner's environment", () => {
+  it("defaults the stale window to thirty minutes and the sweep to every minute", () => {
+    const env = readEnv({});
+    expect(env.runStaleMinutes).toBe(30);
+    expect(env.sweepIntervalSeconds).toBe(60);
+  });
+
+  it("takes both from the environment", () => {
+    const env = readEnv({ DEEVY_RUN_STALE_MINUTES: "5", DEEVY_SWEEP_INTERVAL_SECONDS: "10" });
+    expect(env.runStaleMinutes).toBe(5);
+    expect(env.sweepIntervalSeconds).toBe(10);
+  });
+});

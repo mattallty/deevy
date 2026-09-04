@@ -10,6 +10,8 @@ const kindText = {
   mention: "mentioned you",
   assignment: "assigned this to you",
   gate_awaiting: "a Gate is waiting",
+  run_awaiting_input: "a Run is waiting on you",
+  run_finished: "a Run finished",
 } as const;
 
 /** What needs you, derived from the Event log and grouped by Issue. */

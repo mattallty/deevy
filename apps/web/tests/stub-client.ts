@@ -137,6 +137,14 @@ export function stubClient(overrides: StubOverrides = {}): never {
       add: async () => ({}),
       remove: async () => ({ removed: true }),
     },
+    runs: {
+      list: async () => ({ runs: [], nextCursor: null }),
+      get: async () => ({ activities: [] }),
+      start: async () => ({}),
+      postActivity: async () => ({ run: {}, activity: {} }),
+      answer: async () => ({ run: {}, activity: {} }),
+      finish: async () => ({}),
+    },
     comments: {
       list: async () => ({ comments: [] }),
       create: async () => ({}),
