@@ -1,0 +1,88 @@
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { allowlistRule as allowlistRuleTable } from "@deevy/db";
+import { allowlistRuleKinds } from "@deevy/db";
+import { AllowlistRuleSchema } from "../schemas.ts";
+import { ORPCError } from "@orpc/server";
+import { appendEvent } from "../events.ts";
+import { NoInput, defineOperation } from "./registry.ts";
+import { AllowlistValue } from "./shared.ts";
+
+export const allowlist = {
+  list: defineOperation({
+    name: "allowlist.list",
+    summary: "The rules that admit a sign-in to this Workspace",
+    method: "GET",
+    path: "/allowlist",
+    auth: "admin",
+    input: NoInput,
+    output: z.object({ rules: z.array(AllowlistRuleSchema) }),
+    handler: async ({ context }) => {
+      const rules = await context.db.query.allowlistRule.findMany({
+        where: { workspaceId: context.workspace.id },
+        orderBy: { createdAt: "asc" },
+      });
+      return { rules };
+    },
+  }),
+
+  add: defineOperation({
+    name: "allowlist.add",
+    summary: "Admit every sign-in matching an email domain or a GitHub organization",
+    method: "POST",
+    path: "/allowlist",
+    auth: "admin",
+    input: z.object({ kind: z.enum(allowlistRuleKinds), value: AllowlistValue }),
+    output: AllowlistRuleSchema,
+    handler: async ({ input, context }) => {
+      const existing = await context.db.query.allowlistRule.findFirst({
+        where: { workspaceId: context.workspace.id, kind: input.kind, value: input.value },
+      });
+      if (existing) throw new ORPCError("CONFLICT", { message: "That rule is already in place" });
+
+      const [row] = await context.db
+        .insert(allowlistRuleTable)
+        .values({
+          id: crypto.randomUUID(),
+          workspaceId: context.workspace.id,
+          kind: input.kind,
+          value: input.value,
+          createdBy: context.member.id,
+        })
+        .returning();
+      if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR");
+      await appendEvent(context, {
+        kind: "allowlist.rule_added",
+        subjectType: "allowlist_rule",
+        subjectId: row.id,
+        payload: { kind: row.kind, value: row.value },
+      });
+      return row;
+    },
+  }),
+
+  remove: defineOperation({
+    name: "allowlist.remove",
+    summary: "Stop admitting sign-ins that only this rule matched",
+    method: "DELETE",
+    path: "/allowlist/{ruleId}",
+    auth: "admin",
+    input: z.object({ ruleId: z.string() }),
+    output: z.object({ removed: z.literal(true) }),
+    handler: async ({ input, context }) => {
+      const found = await context.db.query.allowlistRule.findFirst({
+        where: { id: input.ruleId, workspaceId: context.workspace.id },
+      });
+      if (!found) throw new ORPCError("NOT_FOUND", { message: "No such allowlist rule" });
+
+      await context.db.delete(allowlistRuleTable).where(eq(allowlistRuleTable.id, found.id));
+      await appendEvent(context, {
+        kind: "allowlist.rule_removed",
+        subjectType: "allowlist_rule",
+        subjectId: found.id,
+        payload: { kind: found.kind, value: found.value },
+      });
+      return { removed: true as const };
+    },
+  }),
+};

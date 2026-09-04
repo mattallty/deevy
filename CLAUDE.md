@@ -48,8 +48,10 @@ and is enforced by middleware, which also treats a suspended Member as no Member
 narrows accordingly. A streaming operation (the SSE Event stream) is a `defineStreamOperation` with an
 `eventIterator` output and a handler returning an async generator. oRPC is the implementation behind it:
 the same procedure becomes the RPC endpoint (`/rpc`, used by the SPA through `@orpc/tanstack-query`), the OpenAPI
-route (`/api`, reference UI at `/api/docs`), and in M2 an MCP tool. Add operations in
-`packages/core/src/operations/index.ts` and never build oRPC procedures elsewhere (ADR-0009). GET operations
+route (`/api`, reference UI at `/api/docs`), and in M2 an MCP tool. Each area is a module in
+`packages/core/src/operations/` (`issues.ts`, `runs.ts`, …) whose helpers, when more than one area
+needs them, live in `shared.ts`; `index.ts` only assembles the router. Add an operation to its area's
+module and never build oRPC procedures outside the registry (ADR-0009). GET operations
 need an object input schema; use `NoInput` for none.
 
 **Request context** is built once per request in `packages/core/src/app.ts`: Better Auth session, then the

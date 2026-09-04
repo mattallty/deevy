@@ -19,6 +19,23 @@ export function isOpen(status: RunStatus): boolean {
 }
 
 /**
+ * At most one open Run per (Issue, Agent): a second one is two attempts
+ * claiming one outcome (docs/plans/m2.md). Every path that creates a Run asks
+ * this first — `runs.start` refuses with CONFLICT, a trigger simply does not
+ * fire — so the rule is written once and nothing double-fires.
+ */
+export async function openRunFor(
+  db: Db,
+  issueId: string,
+  agentMemberId: string,
+): Promise<{ id: string } | undefined> {
+  return db.query.run.findFirst({
+    where: { issueId, agentMemberId, status: { in: [...openStatuses] } },
+    columns: { id: true },
+  });
+}
+
+/**
  * Where an Activity of each kind leaves the Run. An elicitation is the Agent
  * asking a Human something, so the Run waits; everything else is work, so it
  * runs. Posting to a finished Run is refused rather than silently reopening it.
