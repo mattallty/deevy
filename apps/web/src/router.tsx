@@ -15,6 +15,7 @@ import { LabelsPage } from "./routes/settings/labels.tsx";
 import { NotificationsPage } from "./routes/settings/notifications.tsx";
 import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
+import { WebhooksPage } from "./routes/settings/webhooks.tsx";
 import { WorkspacePage } from "./routes/settings/workspace.tsx";
 import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
@@ -104,6 +105,11 @@ const channelsRoute = createRoute({
   path: "/settings/channels",
   component: ChannelsPage,
 });
+const webhooksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/webhooks",
+  component: WebhooksPage,
+});
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/notifications",
@@ -129,6 +135,7 @@ const routeTree = rootRoute.addChildren([
   membersRoute,
   agentsRoute,
   channelsRoute,
+  webhooksRoute,
   notificationsRoute,
   allowlistRoute,
 ]);

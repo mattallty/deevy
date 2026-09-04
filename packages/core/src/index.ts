@@ -51,15 +51,21 @@ export {
   type FetchLike,
   type SlackPayload,
 } from "./slack.ts";
+export { signPayload, verifySignature, webhookBody, type VerifyInput } from "./webhooks.ts";
 export {
   defaultDeliveryLimit,
   defaultSilenceMs,
   defaultSweepLimit,
   deliverDueChannelMessages,
+  deliverDueWebhooks,
+  deliverWebhook,
   maxDeliveryAttempts,
+  maxWebhookAttempts,
   sweepSchedules,
   sweepStaleRuns,
   type DeliverDueChannelMessagesOptions,
+  type DeliverDueWebhooksOptions,
+  type DeliverWebhookOptions,
   type DeliveryResult,
   type ScheduleSweepResult,
   type SweepResult,

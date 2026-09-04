@@ -285,3 +285,119 @@ describe("what a Human says into a Run", () => {
     await expect(posting).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
+
+describe("runs.requestApproval", () => {
+  it("waits on the Gate the Issue is in, with the deevy URL a Human clicks", async () => {
+    const { asAdmin, asAgent, project } = await workspaceWithAgent();
+    // Intent and Spec approved, so DEV-1 sits in the Plan Gate.
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.postActivity({ runId: run.id, kind: "action", body: "Wrote the plan" });
+    const plan = project.states.find((state) => state.name === "Plan")!;
+
+    const asked = await asAgent.runs.requestApproval({ runId: run.id });
+
+    expect(asked).toMatchObject({ status: "awaiting", stateId: plan.id, stateName: "Plan" });
+    expect(asked.url).toBe(`https://deevy.test/issues/DEV-1?gate=${plan.id}`);
+    expect(asked.run.status).toBe("awaiting_input");
+
+    const feed = await asAgent.runs.get({ runId: run.id });
+    const elicitation = feed.activities.findLast((row) => row.kind === "elicitation");
+    expect(elicitation?.payload).toMatchObject({ gateStateId: plan.id, url: asked.url });
+  });
+
+  it("asks the Humans the Gate names, and not the Sponsor behind the Run", async () => {
+    const { db, admin, asAdmin, asAgent } = await workspaceWithAgent();
+    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const states = (await asAdmin.workflow.get({ projectKey: "DEV" })).states;
+    await asAdmin.workflow.update({
+      projectKey: "DEV",
+      states: states.map((current) => ({
+        id: current.id,
+        name: current.name,
+        isGate: current.isGate,
+        category: current.category,
+        approverMemberIds: current.name === "Plan" ? [bob.member.id] : [],
+      })),
+    });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+
+    const asked = await asAgent.runs.requestApproval({ runId: run.id });
+
+    expect(asked.approverMemberIds).toEqual([bob.member.id]);
+    const told = await db.query.notification.findMany({ where: { kind: "gate_awaiting" } });
+    // Ada is the Agent's Sponsor and an admin, and is still not asked: the Gate
+    // names Bob, and a Gate decides who decides it (ADR-0004).
+    expect(told.map((row) => row.recipientMemberId)).toContain(bob.member.id);
+    expect(told.map((row) => row.recipientMemberId)).not.toContain(admin.member.id);
+    expect(await db.query.notification.findMany({ where: { kind: "run_awaiting_input" } })).toEqual(
+      [],
+    );
+  });
+
+  it("carries on once a Human decides, and is told who decided and what they said", async () => {
+    const { asAdmin, asAgent, admin } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+
+    const moved = await asAdmin.gates.approve({ key: "DEV-1", note: "Looks right" });
+    expect(moved.state.name).toBe("Build");
+
+    const answered = await asAgent.runs.requestApproval({ runId: run.id });
+    expect(answered).toMatchObject({
+      status: "approved",
+      stateName: "Plan",
+      decidedByMemberId: admin.member.id,
+      note: "Looks right",
+    });
+    expect(answered.run.status).toBe("active");
+  });
+
+  it("hears a rejection too, and the Issue going back a State does not lose it", async () => {
+    const { asAdmin, asAgent } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+
+    const sentBack = await asAdmin.gates.reject({ key: "DEV-1", note: "Thin on tests" });
+    expect(sentBack.state.name).toBe("Spec");
+
+    const answered = await asAgent.runs.requestApproval({ runId: run.id });
+    expect(answered).toMatchObject({
+      status: "rejected",
+      stateName: "Plan",
+      note: "Thin on tests",
+    });
+    expect(answered.run.status).toBe("active");
+  });
+
+  it("asks afresh about the next Gate once it has been told about the last one", async () => {
+    const { asAdmin, asAgent } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+    await asAdmin.gates.reject({ key: "DEV-1", note: "Thin on tests" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+
+    // Told, and back at work in the Spec Gate: asking again is a new question
+    // about where the Issue is now, not the old ruling repeated.
+    const next = await asAgent.runs.requestApproval({ runId: run.id });
+
+    expect(next).toMatchObject({ status: "awaiting", stateName: "Spec" });
+    expect(next.run.status).toBe("awaiting_input");
+    const feed = await asAgent.runs.get({ runId: run.id });
+    expect(feed.activities.map((row) => row.kind)).toEqual([
+      "elicitation",
+      "prompt",
+      "elicitation",
+    ]);
+    expect(feed.activities[1]?.body).toContain("Plan Gate on DEV-1 was rejected: Thin on tests");
+  });
+});

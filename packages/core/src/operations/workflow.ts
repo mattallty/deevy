@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
+  gateApprover as gateApproverTable,
   issue as issueTable,
   workflowState as workflowStateTable,
   workflowStateCategories,
@@ -11,6 +12,55 @@ import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
 import type { ContextFor } from "./registry.ts";
 import { ProjectKeyLookup, requireProject, requireProjectOrAdmin } from "./shared.ts";
+
+/**
+ * A State plus the Humans its Gate names. They live in their own table because
+ * a Gate names none, one or several (schema/gate.ts), and an empty list is the
+ * default rather than a missing value: any Human may decide it.
+ */
+const WorkflowStateWithApproversSchema = WorkflowStateSchema.extend({
+  approverMemberIds: z.array(z.string()),
+});
+
+/** A Project's States in order, each carrying the approvers its Gate names. */
+async function statesWithApprovers(context: ContextFor<"member">, projectId: string) {
+  const states = await context.db.query.workflowState.findMany({
+    where: { projectId },
+    orderBy: { position: "asc" },
+  });
+  if (states.length === 0) return [];
+  // One query for the whole Workflow rather than one per State: a Workflow is
+  // read whole and D1 charges per round trip (docs/plans/m1.md).
+  const rows = await context.db.query.gateApprover.findMany({
+    where: { stateId: { in: states.map((state) => state.id) } },
+  });
+  return states.map((state) => ({
+    ...state,
+    approverMemberIds: rows.filter((row) => row.stateId === state.id).map((row) => row.memberId),
+  }));
+}
+
+/**
+ * Only a Human of this Workspace may be named an approver: an Agent never
+ * decides a Gate (ADR-0004), so naming one is a mistake worth reporting rather
+ * than a rule that would silently never fire.
+ */
+async function assertHumanApprovers(
+  context: ContextFor<"member">,
+  states: Array<{ approverMemberIds?: string[] | null | undefined }>,
+): Promise<void> {
+  const named = [...new Set(states.flatMap((state) => state.approverMemberIds ?? []))];
+  if (named.length === 0) return;
+  const humans = await context.db.query.member.findMany({
+    where: { id: { in: named }, workspaceId: context.workspace.id, kind: "human" },
+    columns: { id: true },
+  });
+  if (humans.length !== named.length) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Only a Human of this Workspace can be named a Gate's approver",
+    });
+  }
+}
 
 /**
  * Only an Agent of this Workspace can be the Agent a State's rule names: the
@@ -42,14 +92,10 @@ export const workflow = {
     path: "/projects/{projectKey}/workflow",
     auth: "member",
     input: z.object({ projectKey: ProjectKeyLookup }),
-    output: z.object({ states: z.array(WorkflowStateSchema) }),
+    output: z.object({ states: z.array(WorkflowStateWithApproversSchema) }),
     handler: async ({ input, context }) => {
       const project = await requireProject(context, input.projectKey);
-      const states = await context.db.query.workflowState.findMany({
-        where: { projectId: project.id },
-        orderBy: { position: "asc" },
-      });
-      return { states };
+      return { states: await statesWithApprovers(context, project.id) };
     },
   }),
 
@@ -77,13 +123,18 @@ export const workflow = {
            * starts a Run (docs/plans/m2.md). Null, or left out, is no rule.
            */
           triggerAgentMemberId: z.string().nullish(),
+          /**
+           * The Humans this Gate names. Empty, or left out, means any Human may
+           * decide it, which is what M1 shipped (docs/plans/m2.md).
+           */
+          approverMemberIds: z.array(z.string()).default([]),
         }),
       ),
       deleteStates: z.array(z.string()).default([]),
       /** Where the Issues in a deleted State go. Required when any of them holds Issues. */
       moveIssuesTo: z.string().nullish(),
     }),
-    output: z.object({ states: z.array(WorkflowStateSchema) }),
+    output: z.object({ states: z.array(WorkflowStateWithApproversSchema) }),
     handler: async ({ input, context }) => {
       const project = await requireProjectOrAdmin(context, input.projectKey);
       if (input.states.length === 0) {
@@ -102,6 +153,7 @@ export const workflow = {
       }
 
       await assertAgents(context, input.states);
+      await assertHumanApprovers(context, input.states);
 
       const doomed = input.deleteStates.filter((id) => known.has(id));
       if (doomed.length > 0) {
@@ -161,6 +213,18 @@ export const workflow = {
           kept.push(id);
         }
       }
+      // Approvers are rewritten whole per State, like the States themselves: the
+      // array given is the list, and an empty one widens the Gate back to any
+      // Human. A deleted State takes its rows with it by cascade.
+      for (const [at, state] of input.states.entries()) {
+        const stateId = kept[at] as string;
+        await context.db.delete(gateApproverTable).where(eq(gateApproverTable.stateId, stateId));
+        if (state.approverMemberIds.length === 0) continue;
+        await context.db
+          .insert(gateApproverTable)
+          .values([...new Set(state.approverMemberIds)].map((memberId) => ({ stateId, memberId })));
+      }
+
       const remove = doomed.filter((id) => !kept.includes(id));
       if (remove.length > 0) {
         await context.db
@@ -180,11 +244,7 @@ export const workflow = {
         projectId: project.id,
         payload: { states: input.states.map((state) => state.name), removed: remove.length },
       });
-      const states = await context.db.query.workflowState.findMany({
-        where: { projectId: project.id },
-        orderBy: { position: "asc" },
-      });
-      return { states };
+      return { states: await statesWithApprovers(context, project.id) };
     },
   }),
 };

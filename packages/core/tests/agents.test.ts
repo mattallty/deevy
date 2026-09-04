@@ -74,6 +74,8 @@ describe("the Agent capability rule", () => {
       "runs.get",
       "runs.list",
       "runs.postActivity",
+      // It may ask for a Gate decision, and never make one (ADR-0004).
+      "runs.requestApproval",
       "runs.start",
     ]);
   });

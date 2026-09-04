@@ -1,15 +1,25 @@
 import type { Db } from "@deevy/db";
 import type {
   CallToolResult,
+  InputRequiredResult,
   ListToolsResult,
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
+import type { ServerContext } from "@modelcontextprotocol/server";
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { call } from "@orpc/server";
 import type { Auth } from "../auth.ts";
 import { buildContext } from "../app.ts";
 import { router } from "../operations/index.ts";
 import type { AppContext } from "../operations/registry.ts";
+import type { GateElicitation } from "./elicitation.ts";
+import {
+  createGateElicitation,
+  elicitationKey,
+  gateApprovalOperation,
+  pendingGateApproval,
+  principalId,
+} from "./elicitation.ts";
 import { toolError } from "./errors.ts";
 import type { ToolDescriptor } from "./tools.ts";
 import { projectTools } from "./tools.ts";
@@ -24,6 +34,15 @@ export interface DeevyMcpOptions {
    * development and wrong behind a proxy that rewrites the host.
    */
   baseURL?: string;
+  /**
+   * The instance secret, which signs the `requestState` a Gate elicitation
+   * hands the client (mcp/elicitation.ts). Absent, a random per-process key is
+   * used: correct while one process serves every round of a flow, and a clean
+   * refusal rather than a forgery when it is not.
+   */
+  secret?: string;
+  /** How long that `requestState` stays good. Tests shorten it; nothing else does. */
+  stateTtlSeconds?: number;
   /** Called with anything a tool call raised that the caller is not told about. */
   onError?: (error: unknown) => void;
 }
@@ -47,17 +66,24 @@ export function createDeevyMcp({
   db,
   auth,
   baseURL,
+  secret,
+  stateTtlSeconds,
   onError: report = () => {},
 }: DeevyMcpOptions): DeevyMcp {
   const tools = projectTools(router);
+  const elicitation = createGateElicitation({
+    key: elicitationKey(secret),
+    ...(stateTtlSeconds === undefined ? {} : { ttlSeconds: stateTtlSeconds }),
+  });
   const handler = createMcpHandler(
-    (mcpRequest) => serverFor(tools, contextOf(mcpRequest.authInfo), report),
+    (mcpRequest) => serverFor(tools, contextOf(mcpRequest.authInfo), report, elicitation),
     { responseMode: "auto", legacy: "stateless", onerror: report },
   );
 
   return {
     async fetch(request) {
-      const context = await buildContext(db, auth, request.headers);
+      const origin = baseURL ?? new URL(request.url).origin;
+      const context = await buildContext(db, auth, request.headers, origin);
       // No credential at all is an authentication answer, not a tool error:
       // the challenge is what starts the OAuth dance.
       if (!context.session) return challenge(request, baseURL);
@@ -65,8 +91,10 @@ export function createDeevyMcp({
         authInfo: {
           // The SDK's AuthInfo is a pass-through envelope; deevy's own answer
           // to "who is calling" is the Principal already inside the context.
+          // `clientId` carries it because that is the field the requestState
+          // codec's `bind` can reach (mcp/elicitation.ts).
           token: "",
-          clientId: context.principal?.kind ?? "cookie",
+          clientId: principalId(context),
           scopes: [],
           extra: { [contextKey]: context },
         },
@@ -93,8 +121,15 @@ function serverFor(
   tools: ToolDescriptor[],
   context: AppContext,
   report: (error: unknown) => void,
+  elicitation: GateElicitation,
 ): McpServer {
-  const server = new McpServer({ name: "deevy", version: "0.0.0" });
+  const server = new McpServer(
+    { name: "deevy", version: "0.0.0" },
+    // The seam verifies an echoed `requestState` before the handler runs, and
+    // refuses one minted for another principal or past its expiry with the
+    // protocol's own -32602 (mcp/elicitation.ts).
+    { requestState: { verify: elicitation.verify } },
+  );
   for (const tool of tools) {
     server.registerTool(
       tool.name,
@@ -103,7 +138,8 @@ function serverFor(
         inputSchema: tool.inputSchema as StandardSchemaWithJSON,
         annotations: { readOnlyHint: tool.readOnly },
       },
-      (input: unknown) => runTool(tool, input, context, report),
+      (input: unknown, ctx: ServerContext) =>
+        runTool(tool, input, context, report, elicitation, ctx),
     );
   }
 
@@ -153,9 +189,18 @@ async function runTool(
   input: unknown,
   context: AppContext,
   report: (error: unknown) => void,
-): Promise<CallToolResult> {
+  elicitation: GateElicitation,
+  ctx: ServerContext,
+): Promise<CallToolResult | InputRequiredResult> {
   try {
     const output = await call(tool.procedure, input, { context });
+    // A Gate nobody has ruled on yet is the one answer that is not an answer:
+    // the client is sent to deevy and retries, and the retry reads the
+    // decision row rather than anything the client carried back.
+    if (tool.operation === gateApprovalOperation) {
+      const waiting = pendingGateApproval(output);
+      if (waiting) return elicitation.ask(waiting, ctx);
+    }
     // Dates and the like become what the wire carries before the model reads
     // them, so the text and the structured content cannot disagree.
     const json = JSON.parse(JSON.stringify(output ?? null)) as unknown;

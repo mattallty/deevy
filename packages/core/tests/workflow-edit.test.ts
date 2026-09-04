@@ -182,3 +182,61 @@ describe("the State rule on a Workflow", () => {
     ).rejects.toThrow(/Agent/);
   });
 });
+
+describe("the approvers a Gate names", () => {
+  it("narrows a Gate to the Humans it names, and an empty list widens it again", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client } = await withProject(db);
+    const bob = await memberContext(db, { name: "Bob" });
+
+    const asGiven = (states: WorkflowStateView[], approverMemberIds: string[]) =>
+      states.map((current) => ({
+        id: current.id,
+        name: current.name,
+        isGate: current.isGate,
+        category: current.category,
+        approverMemberIds: current.name === "Plan" ? approverMemberIds : [],
+      }));
+
+    const original = (await client.workflow.get({ projectKey: "DEV" })).states;
+    const named = await client.workflow.update({
+      projectKey: "DEV",
+      states: asGiven(original, [admin.member.id, bob.member.id]),
+    });
+
+    expect(named.states.find((s) => s.name === "Plan")?.approverMemberIds).toEqual(
+      expect.arrayContaining([admin.member.id, bob.member.id]),
+    );
+    expect(named.states.find((s) => s.name === "Spec")?.approverMemberIds).toEqual([]);
+    const read = await client.workflow.get({ projectKey: "DEV" });
+    expect(read.states.find((s) => s.name === "Plan")?.approverMemberIds).toHaveLength(2);
+
+    const widened = await client.workflow.update({
+      projectKey: "DEV",
+      states: asGiven(named.states, []),
+    });
+    expect(widened.states.every((s) => s.approverMemberIds.length === 0)).toBe(true);
+  });
+
+  it("refuses to name an Agent, which ADR-0004 never lets decide a Gate", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client } = await withProject(db);
+    const agent = await agentContext(db, { sponsor: admin.member });
+    const states = (await client.workflow.get({ projectKey: "DEV" })).states;
+
+    await expect(
+      client.workflow.update({
+        projectKey: "DEV",
+        states: states.map((current) => ({
+          id: current.id,
+          name: current.name,
+          isGate: current.isGate,
+          category: current.category,
+          ...(current.name === "Plan" ? { approverMemberIds: [agent.member.id] } : {}),
+        })),
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});

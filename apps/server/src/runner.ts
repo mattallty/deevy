@@ -1,4 +1,10 @@
-import { deliverDueChannelMessages, sweepSchedules, sweepStaleRuns, type Cron } from "@deevy/core";
+import {
+  deliverDueChannelMessages,
+  deliverDueWebhooks,
+  sweepSchedules,
+  sweepStaleRuns,
+  type Cron,
+} from "@deevy/core";
 import type { Db } from "@deevy/db";
 
 /**
@@ -83,6 +89,9 @@ export function startRunner({
         deliverDueChannelMessages({ db, workspaceId, baseUrl, ...deliveries }),
       );
     }
+    // And what is owed to a subscribed URL, which needs no origin: the body is
+    // the Event itself and carries no link (ADR-0003).
+    await drain(signal, () => deliverDueWebhooks({ db, workspaceId, ...deliveries }));
   }
 
   let inFlight: Promise<void> = Promise.resolve();

@@ -24,6 +24,26 @@ const stub = vi.hoisted(() => ({
       documentTemplate: null,
       triggerAgentMemberId: "m-planner",
     },
+    {
+      id: "s3",
+      name: "Build",
+      position: 2,
+      isGate: false,
+      category: "active",
+      documentName: null,
+      documentTemplate: null,
+      triggerAgentMemberId: null,
+    },
+  ],
+  members: [
+    { id: "m-ada", kind: "human", user: { id: "u-ada", name: "Ada" }, suspendedAt: null },
+    { id: "m-bob", kind: "human", user: { id: "u-bob", name: "Bob" }, suspendedAt: null },
+    {
+      id: "m-planner",
+      kind: "agent",
+      user: { id: "u-planner", name: "Planner" },
+      suspendedAt: null,
+    },
   ],
   agents: [
     {
@@ -59,6 +79,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
   const { stubClient } = await import("./stub-client.ts");
   const client = stubClient({
     agents: { list: async () => ({ agents: stub.agents }) },
+    members: { list: async () => ({ members: stub.members }) },
     workflow: {
       get: async () => ({ states: stub.states }),
       update: async (input: Record<string, unknown>) => {
@@ -113,6 +134,44 @@ describe("the Agent a State triggers", () => {
     expect(stub.saved[0]?.states).toMatchObject([
       { name: "Intent", triggerAgentMemberId: "m-builder" },
       { name: "Plan", triggerAgentMemberId: "m-planner" },
+      { name: "Build", triggerAgentMemberId: null },
+    ]);
+  });
+});
+
+describe("the approvers a Gate names", () => {
+  it("offers the Workspace's Humans on a Gate, and nothing on a State that is not one", async () => {
+    mount();
+    const [intent, , build] = await states();
+
+    const picker = (await within(intent!).findByLabelText(
+      "Approvers for Intent",
+    )) as HTMLSelectElement;
+    await waitFor(() => expect(within(picker).getByRole("option", { name: "Ada" })).toBeTruthy());
+    expect(within(picker).getByRole("option", { name: "Bob" })).toBeTruthy();
+    // An Agent never decides a Gate (ADR-0004), so it is not on offer.
+    expect(within(picker).queryByRole("option", { name: "Planner" })).toBeNull();
+    expect(within(build!).queryByLabelText("Approvers for Build")).toBeNull();
+  });
+
+  it("saves the Humans it names with the rest of the Workflow", async () => {
+    stub.saved.length = 0;
+    mount();
+    const [intent] = await states();
+    const picker = (await within(intent!).findByLabelText(
+      "Approvers for Intent",
+    )) as HTMLSelectElement;
+    await waitFor(() => expect(within(picker).getByRole("option", { name: "Bob" })).toBeTruthy());
+
+    for (const option of picker.options) option.selected = option.value === "m-bob";
+    fireEvent.change(picker);
+    fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
+
+    await waitFor(() => expect(stub.saved).toHaveLength(1));
+    expect(stub.saved[0]?.states).toMatchObject([
+      { name: "Intent", approverMemberIds: ["m-bob"] },
+      { name: "Plan", approverMemberIds: [] },
+      { name: "Build", approverMemberIds: [] },
     ]);
   });
 });

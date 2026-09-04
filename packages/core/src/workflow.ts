@@ -1,4 +1,5 @@
 import {
+  gateApprover as gateApproverTable,
   gateDecision as gateDecisionTable,
   issue as issueTable,
   type Db,
@@ -8,6 +9,7 @@ import {
 } from "@deevy/db";
 import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
+import { issueUrl } from "./slack.ts";
 
 /** A State as the default template describes it, before it belongs to a Project. */
 export type WorkflowStateTemplate = Pick<
@@ -138,6 +140,39 @@ export function assertHuman(member: Pick<Member, "kind">): void {
   if (member.kind === "agent") {
     throw new ORPCError("FORBIDDEN", { message: "Only a Human can decide a Gate" });
   }
+}
+
+/**
+ * The Humans a Gate names, in no particular order. Empty is M1's behaviour and
+ * the default: any Human may decide it (schema/gate.ts). Naming approvers
+ * narrows both who is asked and who may answer.
+ */
+export async function gateApprovers(db: Db, stateId: string): Promise<string[]> {
+  const rows = await db
+    .select({ memberId: gateApproverTable.memberId })
+    .from(gateApproverTable)
+    .where(eq(gateApproverTable.stateId, stateId));
+  return rows.map((row) => row.memberId);
+}
+
+/**
+ * A named list narrows who may decide; an empty one narrows nothing. ADR-0004
+ * keeps every Agent out either way, which `assertHuman` says first.
+ */
+export function assertNamedApprover(approvers: string[], memberId: string): void {
+  if (approvers.length === 0 || approvers.includes(memberId)) return;
+  throw new ORPCError("FORBIDDEN", {
+    message: "This Gate names its approvers, and you are not one of them",
+  });
+}
+
+/**
+ * The Issue's page with this Gate in focus: the link an Agent hands a Human
+ * when it reaches a Gate mid-Run (docs/plans/m2.md). The SPA reads `?gate=`
+ * and scrolls to it.
+ */
+export function gateUrl(baseUrl: string, key: string, stateId: string): string {
+  return `${issueUrl(baseUrl, key)}?gate=${encodeURIComponent(stateId)}`;
 }
 
 /** The State an approval moves to: the next by position, or none when the Gate is last. */

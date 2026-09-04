@@ -23,6 +23,11 @@ export interface AppOptions {
   origin?: string[];
   /** The public origin of this instance, for the MCP surface's RFC 9728 challenge. */
   baseURL?: string;
+  /**
+   * The instance secret. The MCP surface signs the `requestState` of a Gate
+   * elicitation with it (mcp/elicitation.ts).
+   */
+  secret?: string;
   /** Called with errors thrown by operations. */
   onError?: (error: unknown) => void;
 }
@@ -37,6 +42,7 @@ export function createApp({
   auth,
   origin = [],
   baseURL,
+  secret,
   onError: report = console.error,
 }: AppOptions) {
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
@@ -50,15 +56,19 @@ export function createApp({
 
   // Before the oRPC handlers: the MCP surface builds its own context, because
   // an unauthenticated call there is a 401 challenge rather than an error body.
-  const mcp = createDeevyMcp({ db, auth, baseURL, onError: report });
+  const mcp = createDeevyMcp({ db, auth, baseURL, secret, onError: report });
   app.all("/mcp", (c) => mcp.fetch(c.req.raw));
 
+  // The origin a handler builds a link back into deevy from: what this
+  // instance was configured with, or, in development, whatever it was reached
+  // on. Wrong only behind a proxy that rewrites the host and sets no baseURL.
+  const originOf = (url: string) => baseURL ?? new URL(url).origin;
   app.use("/rpc/*", async (c, next) => {
-    c.set("ctx", await buildContext(db, auth, c.req.raw.headers));
+    c.set("ctx", await buildContext(db, auth, c.req.raw.headers, originOf(c.req.url)));
     await next();
   });
   app.use("/api/*", async (c, next) => {
-    c.set("ctx", await buildContext(db, auth, c.req.raw.headers));
+    c.set("ctx", await buildContext(db, auth, c.req.raw.headers, originOf(c.req.url)));
     await next();
   });
 
@@ -106,6 +116,7 @@ export async function buildContext(
   db: Db,
   auth: Auth | undefined,
   headers: Headers,
+  baseURL?: string,
 ): Promise<AppContext> {
   const { principal, session } = await resolvePrincipal({ auth, headers });
   // An instance without auth cannot mint keys; apiKeysOf turns that into a
@@ -114,6 +125,7 @@ export async function buildContext(
     db,
     principal,
     grantedProjectIds: null,
+    ...(baseURL ? { baseURL } : {}),
     ...(auth ? { apiKeys: betterAuthKeys(auth, db) } : {}),
   };
   if (!session) return { ...base, session: null, member: null, workspace: null };

@@ -29,7 +29,7 @@ export function buildServer(env: ServerEnv) {
       workspaceName: env.workspaceName,
     },
   });
-  const app = createApp({ db, auth, origin, baseURL: env.baseURL });
+  const app = createApp({ db, auth, origin, baseURL: env.baseURL, secret: env.secret });
   if (env.webDist) mountSpa(app, resolve(env.webDist));
   return { app, db, close };
 }

@@ -49,6 +49,7 @@ describe("the committed tool manifest", () => {
       "links_add",
       "runs_finish",
       "runs_post_activity",
+      "runs_request_approval",
       "runs_start",
     ]);
   });

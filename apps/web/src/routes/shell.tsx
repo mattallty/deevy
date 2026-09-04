@@ -11,6 +11,7 @@ import {
   Users,
   Bot,
   UsersRound,
+  Webhook,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ const settings: NavItem[] = [
   { to: "/settings/labels", label: "Labels", icon: Tags },
   { to: "/settings/repositories", label: "Repositories", icon: GitBranch },
   { to: "/settings/channels", label: "Channels", icon: Radio },
+  { to: "/settings/webhooks", label: "Webhooks", icon: Webhook },
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/members", label: "Members", icon: Users },
   { to: "/settings/agents", label: "Agents", icon: Bot },

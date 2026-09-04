@@ -24,6 +24,49 @@ const stub = vi.hoisted(() => {
       finishedAt: new Date("2026-09-04T10:20:00Z"),
     },
     answer: vi.fn(async () => ({ run: {}, activity: {} })),
+    gated: { ...base, id: "run-gated", status: "awaiting_input" as const },
+    activities: {
+      "run-waiting": [
+        {
+          id: "a0",
+          runId: "run-waiting",
+          kind: "elicitation",
+          body: "Postgres or SQLite?",
+          payload: null,
+          createdAt: new Date("2026-09-04T10:05:00Z"),
+        },
+      ],
+      "run-gated": [
+        {
+          id: "a1",
+          runId: "run-gated",
+          kind: "elicitation",
+          body: "Waiting for a Human to decide the Spec Gate on DEV-1",
+          payload: { gateStateId: "s2", url: "https://deevy.test/issues/DEV-1?gate=s2" },
+          createdAt: new Date("2026-09-04T10:05:00Z"),
+        },
+      ],
+      "run-done": [
+        {
+          id: "a2",
+          runId: "run-done",
+          kind: "elicitation",
+          body: "Waiting for a Human to decide the Plan Gate on DEV-1",
+          payload: { gateStateId: "s3", url: "https://deevy.test/issues/DEV-1?gate=s3" },
+          createdAt: new Date("2026-09-04T10:10:00Z"),
+        },
+      ],
+    } as Record<string, unknown[]>,
+    decided: [
+      {
+        id: "g1",
+        stateId: "s3",
+        decision: "approved",
+        note: "Looks right",
+        memberId: "m-ada",
+        createdAt: new Date("2026-09-04T10:15:00Z"),
+      },
+    ],
   };
 });
 
@@ -31,8 +74,12 @@ vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
   const client = stubClient({
+    members: {
+      list: async () => ({ members: [{ id: "m-ada", user: { name: "Ada" } }] }),
+    },
     runs: {
-      list: async () => ({ runs: [stub.waiting, stub.done], nextCursor: null }),
+      list: async () => ({ runs: [stub.waiting, stub.gated, stub.done], nextCursor: null }),
+      get: async ({ runId }: { runId: string }) => ({ activities: stub.activities[runId] ?? [] }),
       answer: stub.answer,
     },
   });
@@ -66,5 +113,20 @@ describe("the Runs section on an Issue", () => {
 
     const done = await screen.findByRole("article", { name: /run-done/i });
     await waitFor(() => expect(within(done).queryByRole("textbox")).toBeNull());
+  });
+
+  it("says which Run is waiting for a Gate, and afterwards who decided it", async () => {
+    mount(<IssueRuns issueKey="DEV-1" decisions={stub.decided} />);
+
+    const gated = await screen.findByRole("article", { name: /run-gated/i });
+    expect(await within(gated).findByText(/waiting for approval/i)).toBeTruthy();
+    // A Gate is decided in the Gate panel, so the link points there and the
+    // free-text answer box is not on offer for this kind of wait.
+    const link = within(gated).getByRole("link", { name: /gate/i });
+    expect(link.getAttribute("href")).toBe("https://deevy.test/issues/DEV-1?gate=s2");
+    await waitFor(() => expect(within(gated).queryByRole("textbox")).toBeNull());
+
+    const done = await screen.findByRole("article", { name: /run-done/i });
+    expect(await within(done).findByText(/approved by Ada/i)).toBeTruthy();
   });
 });

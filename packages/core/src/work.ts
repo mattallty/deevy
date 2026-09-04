@@ -7,7 +7,9 @@ import {
   member as memberTable,
   project as projectTable,
   run as runTable,
+  webhookSubscription as webhookSubscriptionTable,
   type Db,
+  type deliveryTargets,
   type Event,
 } from "@deevy/db";
 import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
@@ -15,6 +17,7 @@ import type { EventKind } from "./events.ts";
 import { issueOf, notificationKindOf } from "./notifications.ts";
 import { openStatuses } from "./runs.ts";
 import { postSlackMessage, slackMessage, type FetchLike, type SlackPayload } from "./slack.ts";
+import { postWebhook } from "./webhooks.ts";
 
 /**
  * Background work, expressed the only way ADR-0006 allows: a bounded function
@@ -359,27 +362,59 @@ export async function sweepSchedules({
   return result;
 }
 
+/**
+ * What is owed to somewhere outside deevy, in two arms over one table.
+ *
+ * A Slack Channel and a subscribed URL are the same problem: a message owed to
+ * a destination that may be down, retried until it lands or is given up on. So
+ * they share the `delivery` table (schema/delivery.ts), the claim that makes
+ * two senders safe without a transaction, the backoff, and the recording of
+ * what came back. What differs is what the message says, how patient each is,
+ * and — for a webhook — the signature, and the Event that records giving up.
+ */
+
 /** Deliveries one pass may send. Slack answers in tens of milliseconds; twenty fits a tick. */
 export const defaultDeliveryLimit = 20;
 
 /**
- * Attempts before a delivery is given up on. Six with the backoff below spans
- * about an hour and a half, which outlasts a Slack incident but not a webhook
- * URL that has been revoked.
+ * Attempts before a Slack message is given up on. Six with the backoff below
+ * spans about an hour and a half, which outlasts a Slack incident but not a
+ * webhook URL that has been revoked.
  */
 export const maxDeliveryAttempts = 6;
 
-/** The first retry, doubling per attempt: 30s, 1m, 2m, 4m, 8m. */
-const deliveryBackoffMs = 30_000;
+/**
+ * A webhook is given up on later than a Slack message: eight attempts spread
+ * over most of a day. A room that missed a Notification has the inbox behind
+ * it, but an Agent's runtime that misses a trigger simply never starts, and
+ * ADR-0003 makes delivering triggers reliably deevy's side of the bargain.
+ */
+export const maxWebhookAttempts = 8;
 
-/** However many attempts have failed, the next one is never further off than this. */
-const maxDeliveryBackoffMs = 60 * 60_000;
+/** How a failed delivery waits before the next attempt. */
+interface Backoff {
+  /** The wait after the first failure, doubling with every one after it. */
+  firstMs: number;
+  /** However many attempts have failed, the next is never further off than this. */
+  ceilingMs: number;
+  /** Spreads the retries, so a receiver coming back up is not hit by all of them at once. */
+  jitter: boolean;
+}
+
+/** Slack: 30s, 1m, 2m, 4m, 8m, and then it is given up on. */
+const slackBackoff: Backoff = { firstMs: 30_000, ceilingMs: 60 * 60_000, jitter: false };
+
+/** A webhook: 10s doubling to a six-hour ceiling (docs/plans/m2.md). */
+const webhookBackoff: Backoff = { firstMs: 10_000, ceilingMs: 6 * 60 * 60_000, jitter: true };
 
 /**
  * How long a claim holds a delivery. Long enough for a POST that is timing out
  * to finish, short enough that a process dying mid-send costs one minute.
  */
 const deliveryLockMs = 60_000;
+
+/** Exhausted deliveries whose Events go in one statement; each row binds six columns. */
+const exhaustedRowsPerInsert = 16;
 
 export interface DueDeliveriesQueryOptions {
   workspaceId: string;
@@ -390,17 +425,16 @@ export interface DueDeliveriesQueryOptions {
 }
 
 /**
- * What is owed and due, and the sweep's one scan: `delivery_due_idx` is
- * `(deliveredAt, nextAttemptAt)`, so the two leading terms are the two this
- * where clause opens with. There is deliberately no ORDER BY, for the reason
- * `dueRunsQuery` gives: sorting makes SQLite visit every due row before the
- * LIMIT applies, so one pass would cost the backlog.
- *
- * Exported so a test can EXPLAIN it: the query plan is the guarantee.
+ * What is owed and due to one kind of destination, and each sweep's one scan:
+ * `delivery_due_idx` is `(deliveredAt, nextAttemptAt)`, so the two leading
+ * terms are the two this where clause opens with. There is deliberately no
+ * ORDER BY, for the reason `dueRunsQuery` gives: sorting makes SQLite visit
+ * every due row before the LIMIT applies, so one pass would cost the backlog.
  */
-export function dueDeliveriesQuery(
+function dueDeliveries(
   db: Db,
-  { workspaceId, now, limit, maxAttempts = maxDeliveryAttempts }: DueDeliveriesQueryOptions,
+  target: (typeof deliveryTargets)[number],
+  { workspaceId, now, limit, maxAttempts }: Required<DueDeliveriesQueryOptions>,
 ) {
   return db
     .select({ id: deliveryTable.id })
@@ -410,7 +444,7 @@ export function dueDeliveriesQuery(
         isNull(deliveryTable.deliveredAt),
         lte(deliveryTable.nextAttemptAt, now),
         eq(deliveryTable.workspaceId, workspaceId),
-        eq(deliveryTable.target, "slack"),
+        eq(deliveryTable.target, target),
         // Out of attempts is given up on, not retried forever.
         lt(deliveryTable.attempts, maxAttempts),
         // Somebody else may be sending it right now.
@@ -418,6 +452,175 @@ export function dueDeliveriesQuery(
       ),
     )
     .limit(limit);
+}
+
+/** The Slack arm's due scan. Exported so a test can EXPLAIN it: the plan is the guarantee. */
+export function dueDeliveriesQuery(
+  db: Db,
+  { maxAttempts = maxDeliveryAttempts, ...options }: DueDeliveriesQueryOptions,
+) {
+  return dueDeliveries(db, "slack", { ...options, maxAttempts });
+}
+
+/** The webhook arm's, which differs only in the destination and in how patient it is. */
+export function dueWebhookDeliveriesQuery(
+  db: Db,
+  { maxAttempts = maxWebhookAttempts, ...options }: DueDeliveriesQueryOptions,
+) {
+  return dueDeliveries(db, "webhook", { ...options, maxAttempts });
+}
+
+/** One delivery this pass holds, and everything needed to render what it says. */
+interface Claimed {
+  id: string;
+  targetId: string;
+  eventSeq: number;
+  attempts: number;
+}
+
+/**
+ * Takes the deliveries it can, and hands back only those it really took.
+ *
+ * This is what makes two senders safe without a transaction, which D1 does not
+ * have (ADR-0006): the UPDATE re-checks the lock it read, and only the ids it
+ * returns are sent, so two passes claim disjoint sets and no destination hears
+ * the same Event twice.
+ */
+async function claimDeliveries(db: Db, ids: string[], now: Date): Promise<Claimed[]> {
+  return db
+    .update(deliveryTable)
+    .set({ lockedUntil: new Date(now.getTime() + deliveryLockMs) })
+    .where(
+      and(
+        inArray(deliveryTable.id, ids),
+        or(isNull(deliveryTable.lockedUntil), lt(deliveryTable.lockedUntil, now)),
+      ),
+    )
+    .returning({
+      id: deliveryTable.id,
+      targetId: deliveryTable.targetId,
+      eventSeq: deliveryTable.eventSeq,
+      attempts: deliveryTable.attempts,
+    });
+}
+
+/** One claimed delivery, and what came back from sending it. */
+interface Attempted {
+  id: string;
+  delivered: boolean;
+  status: number;
+  error: string | null;
+}
+
+interface Recorded {
+  delivered: number;
+  failed: number;
+  /** The ids that just ran out of attempts, which nothing will look at again. */
+  exhausted: string[];
+}
+
+/**
+ * Writes down what came back, in one statement per distinct outcome. A
+ * destination that is up answers every message the same way and one that is
+ * down refuses them all the same way, so this is one UPDATE in practice and
+ * bounded by the limit at worst.
+ */
+async function recordOutcomes(
+  db: Db,
+  attempted: Attempted[],
+  options: {
+    now: Date;
+    backoff: Backoff;
+    maxAttempts: number;
+    attemptsBefore: Map<string, number>;
+  },
+): Promise<Recorded> {
+  const { now, backoff, maxAttempts, attemptsBefore } = options;
+  const outcomes = new Map<string, Attempted[]>();
+  for (const one of attempted) {
+    const key = `${one.delivered}:${one.status}:${one.error ?? ""}`;
+    const group = outcomes.get(key);
+    if (group) group.push(one);
+    else outcomes.set(key, [one]);
+  }
+
+  const recorded: Recorded = { delivered: 0, failed: 0, exhausted: [] };
+  for (const group of outcomes.values()) {
+    const [first] = group as [Attempted, ...Attempted[]];
+    const ids = group.map((one) => one.id);
+    if (first.delivered) {
+      await db
+        .update(deliveryTable)
+        .set({
+          deliveredAt: now,
+          attempts: sql`${deliveryTable.attempts} + 1`,
+          lockedUntil: null,
+          lastStatus: first.status,
+          lastError: null,
+        })
+        .where(inArray(deliveryTable.id, ids));
+      recorded.delivered += group.length;
+      continue;
+    }
+    // Jitter is a per-statement factor in thousandths rather than a value per
+    // row: the backoff itself stays arithmetic SQLite does on the row's own
+    // attempt count, so a retry needs no second read of what was just written.
+    const spread = backoff.jitter ? 900 + Math.floor(Math.random() * 300) : 1000;
+    await db
+      .update(deliveryTable)
+      .set({
+        attempts: sql`${deliveryTable.attempts} + 1`,
+        lockedUntil: null,
+        lastStatus: first.status,
+        lastError: first.error,
+        nextAttemptAt: sql`${now.getTime()} + min(${backoff.firstMs} * (1 << ${deliveryTable.attempts}), ${backoff.ceilingMs}) * ${spread} / 1000`,
+      })
+      .where(inArray(deliveryTable.id, ids));
+    recorded.failed += group.length;
+  }
+
+  // Out of attempts is not a failure to retry: nothing will look at these rows
+  // again, because the due scan passes over anything at the ceiling.
+  recorded.exhausted = attempted
+    .filter((one) => !one.delivered && (attemptsBefore.get(one.id) ?? 0) + 1 >= maxAttempts)
+    .map((one) => one.id);
+  return recorded;
+}
+
+/**
+ * Retires deliveries that can never be sent — the Channel or the subscription
+ * they were owed to is gone — rather than retrying them to no purpose.
+ */
+async function retireDeliveries(db: Db, ids: string[], reason: string, maxAttempts: number) {
+  if (ids.length === 0) return;
+  await db
+    .update(deliveryTable)
+    .set({ attempts: maxAttempts, lockedUntil: null, lastError: reason })
+    .where(inArray(deliveryTable.id, ids));
+}
+
+/** The Events a pass is about to render messages from, in one statement. */
+async function eventsOf(db: Db, claimed: Claimed[]) {
+  const rows = await db
+    .select({
+      seq: eventTable.seq,
+      workspaceId: eventTable.workspaceId,
+      kind: eventTable.kind,
+      actorMemberId: eventTable.actorMemberId,
+      subjectType: eventTable.subjectType,
+      subjectId: eventTable.subjectId,
+      projectId: eventTable.projectId,
+      payload: eventTable.payload,
+      createdAt: eventTable.createdAt,
+    })
+    .from(eventTable)
+    .where(
+      inArray(
+        eventTable.seq,
+        claimed.map((row) => row.eventSeq),
+      ),
+    );
+  return new Map(rows.map((row) => [row.seq, row as unknown as Event]));
 }
 
 export interface DeliverDueChannelMessagesOptions {
@@ -438,22 +641,14 @@ export interface DeliverDueChannelMessagesOptions {
 export interface DeliveryResult {
   /** Deliveries this pass claimed. Fewer than were due when another sweep held them. */
   scanned: number;
-  /** Messages Slack accepted. */
+  /** Messages the destination accepted. */
   delivered: number;
   /** Messages it refused, which will be tried again. */
   failed: number;
-  /** Deliveries that ran out of attempts, or whose Channel is gone. */
+  /** Deliveries that ran out of attempts, or whose destination is gone. */
   gaveUp: number;
   /** The limit was reached, so call again rather than raising the limit. */
   more: boolean;
-}
-
-/** One claimed delivery, and what came back from posting it. */
-interface Attempted {
-  id: string;
-  delivered: boolean;
-  status: number;
-  error: string | null;
 }
 
 /**
@@ -461,14 +656,9 @@ interface Attempted {
  *
  * Bounded exactly like the sweeps above: one indexed SELECT with a LIMIT, one
  * UPDATE that claims what it found, three batched lookups for the rows the
- * messages are rendered from, and one UPDATE per distinct outcome — which is
- * one when a Channel is up and one when it is down. Never a query per row, so
- * a pass costs the limit rather than the Workspace (M3's Cron Trigger).
- *
- * The claim is what makes two sweeps safe without a transaction, which D1 does
- * not have (ADR-0006): the UPDATE re-checks the lock it read and only the ids
- * it hands back are sent, so two passes claim disjoint sets and no Channel
- * hears the same Event twice.
+ * messages are rendered from, and one UPDATE per distinct outcome. Never a
+ * query per row, so a pass costs the limit rather than the Workspace (M3's
+ * Cron Trigger).
  */
 export async function deliverDueChannelMessages({
   db,
@@ -489,46 +679,18 @@ export async function deliverDueChannelMessages({
   };
   if (due.length === 0) return result;
 
-  const claimed = await db
-    .update(deliveryTable)
-    .set({ lockedUntil: new Date(now.getTime() + deliveryLockMs) })
-    .where(
-      and(
-        inArray(
-          deliveryTable.id,
-          due.map((row) => row.id),
-        ),
-        or(isNull(deliveryTable.lockedUntil), lt(deliveryTable.lockedUntil, now)),
-      ),
-    )
-    .returning({
-      id: deliveryTable.id,
-      targetId: deliveryTable.targetId,
-      eventSeq: deliveryTable.eventSeq,
-      attempts: deliveryTable.attempts,
-    });
-
+  const claimed = await claimDeliveries(
+    db,
+    due.map((row) => row.id),
+    now,
+  );
   result.scanned = claimed.length;
   if (claimed.length === 0) return result;
 
   // The three lookups the messages are rendered from, batched: the Events
   // themselves, the Channels they are headed for, and the Issues they name.
   // The payload was never stored, so this is where it is built (ADR-0003).
-  const events = await db
-    .select({
-      seq: eventTable.seq,
-      kind: eventTable.kind,
-      subjectType: eventTable.subjectType,
-      subjectId: eventTable.subjectId,
-      payload: eventTable.payload,
-    })
-    .from(eventTable)
-    .where(
-      inArray(
-        eventTable.seq,
-        claimed.map((row) => row.eventSeq),
-      ),
-    );
+  const eventBySeq = await eventsOf(db, claimed);
   const channels = await db
     .select({ id: channelTable.id, config: channelTable.config })
     .from(channelTable)
@@ -539,7 +701,6 @@ export async function deliverDueChannelMessages({
       ),
     );
 
-  const eventBySeq = new Map(events.map((row) => [row.seq, row as unknown as Event]));
   const webhookOf = new Map(channels.map((row) => [row.id, row.config?.webhookUrl] as const));
   const issueIds = [
     ...new Set([...eventBySeq.values()].map((event) => issueOf(event)).filter((id) => id !== null)),
@@ -596,66 +757,228 @@ export async function deliverDueChannelMessages({
     }),
   );
 
-  // One statement per distinct outcome. A Channel that is up answers every
-  // message the same way and a Channel that is down refuses them all the same
-  // way, so this is one UPDATE in practice and bounded by the limit at worst.
-  const outcomes = new Map<string, Attempted[]>();
-  for (const one of attempted) {
-    const key = `${one.delivered}:${one.status}:${one.error ?? ""}`;
-    const group = outcomes.get(key);
-    if (group) group.push(one);
-    else outcomes.set(key, [one]);
-  }
+  const recorded = await recordOutcomes(db, attempted, {
+    now,
+    backoff: slackBackoff,
+    maxAttempts,
+    attemptsBefore: new Map(claimed.map((row) => [row.id, row.attempts])),
+  });
+  result.delivered = recorded.delivered;
+  result.failed = recorded.failed;
+  result.gaveUp = recorded.exhausted.length + undeliverable.length;
 
-  for (const group of outcomes.values()) {
-    const [first] = group as [Attempted, ...Attempted[]];
-    const ids = group.map((one) => one.id);
-    if (first.delivered) {
-      await db
-        .update(deliveryTable)
-        .set({
-          deliveredAt: now,
-          attempts: sql`${deliveryTable.attempts} + 1`,
-          lockedUntil: null,
-          lastStatus: first.status,
-          lastError: null,
-        })
-        .where(inArray(deliveryTable.id, ids));
-      result.delivered += group.length;
+  await retireDeliveries(db, undeliverable, "the Channel this was owed to is gone", maxAttempts);
+  return result;
+}
+
+export interface DeliverDueWebhooksOptions {
+  db: Db;
+  workspaceId: string;
+  /** The clock, so a test does not have to wait out the backoff. */
+  now?: Date;
+  /** Most deliveries to send in one pass. */
+  limit?: number;
+  /** Attempts before a delivery is given up on. */
+  maxAttempts?: number;
+  /** The way out. A test passes its own and never reaches the network. */
+  fetch?: FetchLike;
+}
+
+/**
+ * Sends what the Event log says is owed to a subscribed URL (ADR-0003).
+ *
+ * The same shape as the Slack arm and, deliberately, the same claim, backoff
+ * and outcome recording: one indexed SELECT with a LIMIT, one claiming UPDATE,
+ * two batched lookups, one UPDATE per outcome, and one insert for whatever ran
+ * out of attempts. Never a query per row.
+ */
+export async function deliverDueWebhooks({
+  db,
+  workspaceId,
+  now = new Date(),
+  limit = defaultDeliveryLimit,
+  maxAttempts = maxWebhookAttempts,
+  fetch: fetchImpl = fetch,
+}: DeliverDueWebhooksOptions): Promise<DeliveryResult> {
+  const due = await dueWebhookDeliveriesQuery(db, { workspaceId, now, limit, maxAttempts });
+  const result: DeliveryResult = {
+    scanned: 0,
+    delivered: 0,
+    failed: 0,
+    gaveUp: 0,
+    more: due.length >= limit,
+  };
+  if (due.length === 0) return result;
+
+  return sendClaimedWebhooks({
+    db,
+    claimed: await claimDeliveries(
+      db,
+      due.map((row) => row.id),
+      now,
+    ),
+    now,
+    maxAttempts,
+    fetchImpl,
+    result,
+  });
+}
+
+export interface DeliverWebhookOptions {
+  db: Db;
+  /** The durable row this is about. A queue message carries nothing else (jobs.ts). */
+  deliveryId: string;
+  now?: Date;
+  maxAttempts?: number;
+  fetch?: FetchLike;
+}
+
+/**
+ * One delivery, claimed and sent on its own.
+ *
+ * This is the form a queue consumer drives, one message at a time (M3's
+ * Cloudflare Queue), and the form the SPA's Redeliver button ends at. It is
+ * the sweep with the scan replaced by an id, so it claims, backs off and gives
+ * up in exactly the same way: a delivery must not be sent twice because two
+ * different things decided to send it.
+ */
+export async function deliverWebhook({
+  db,
+  deliveryId,
+  now = new Date(),
+  maxAttempts = maxWebhookAttempts,
+  fetch: fetchImpl = fetch,
+}: DeliverWebhookOptions): Promise<DeliveryResult> {
+  return sendClaimedWebhooks({
+    db,
+    claimed: await claimDeliveries(db, [deliveryId], now),
+    now,
+    maxAttempts,
+    fetchImpl,
+    result: { scanned: 0, delivered: 0, failed: 0, gaveUp: 0, more: false },
+  });
+}
+
+/** What both webhook forms do once they hold their deliveries. */
+async function sendClaimedWebhooks({
+  db,
+  claimed,
+  now,
+  maxAttempts,
+  fetchImpl,
+  result,
+}: {
+  db: Db;
+  claimed: Claimed[];
+  now: Date;
+  maxAttempts: number;
+  fetchImpl: FetchLike;
+  result: DeliveryResult;
+}): Promise<DeliveryResult> {
+  result.scanned = claimed.length;
+  if (claimed.length === 0) return result;
+
+  // The two lookups the POSTs are rendered from, batched: the Events, and the
+  // subscriptions they are headed for. Nothing was copied into the delivery
+  // row, so the body is built here, from the log itself (ADR-0003).
+  const eventBySeq = await eventsOf(db, claimed);
+  const subscriptions = await db
+    .select({
+      id: webhookSubscriptionTable.id,
+      url: webhookSubscriptionTable.url,
+      secret: webhookSubscriptionTable.secret,
+      disabledAt: webhookSubscriptionTable.disabledAt,
+    })
+    .from(webhookSubscriptionTable)
+    .where(
+      inArray(
+        webhookSubscriptionTable.id,
+        claimed.map((row) => row.targetId),
+      ),
+    );
+  const subscriptionById = new Map(subscriptions.map((row) => [row.id, row]));
+
+  // A delivery whose subscription is gone, or has since been disabled, can
+  // never be sent: it is retired rather than retried.
+  const undeliverable: string[] = [];
+  const sending: Array<{ id: string; event: Event; url: string; secret: string }> = [];
+  for (const row of claimed) {
+    const event = eventBySeq.get(row.eventSeq);
+    const subscription = subscriptionById.get(row.targetId);
+    if (!event || !subscription || subscription.disabledAt !== null) {
+      undeliverable.push(row.id);
       continue;
     }
-    await db
-      .update(deliveryTable)
-      .set({
-        attempts: sql`${deliveryTable.attempts} + 1`,
-        lockedUntil: null,
-        lastStatus: first.status,
-        lastError: first.error,
-        // The backoff is arithmetic SQLite does on the row's own attempt
-        // count, so a retry needs no second read of what was just written.
-        nextAttemptAt: sql`${now.getTime()} + min(${deliveryBackoffMs} * (1 << ${deliveryTable.attempts}), ${maxDeliveryBackoffMs})`,
-      })
-      .where(inArray(deliveryTable.id, ids));
-    result.failed += group.length;
+    sending.push({ id: row.id, event, url: subscription.url, secret: subscription.secret });
   }
 
-  // Out of attempts is not a failure to retry: nothing will look at these rows
-  // again, because the claim above passes over anything at the ceiling.
-  const claimedAttempts = new Map(claimed.map((row) => [row.id, row.attempts]));
-  result.gaveUp = attempted.filter(
-    (one) => !one.delivered && (claimedAttempts.get(one.id) ?? 0) + 1 >= maxAttempts,
-  ).length;
+  const attempted: Attempted[] = await Promise.all(
+    sending.map(async ({ id, event, url, secret }) => {
+      const posted = await postWebhook({
+        url,
+        secret,
+        event,
+        deliveryId: id,
+        now,
+        fetch: fetchImpl,
+      });
+      return {
+        id,
+        delivered: posted.delivered,
+        status: posted.status,
+        error: posted.error ?? null,
+      };
+    }),
+  );
 
-  if (undeliverable.length > 0) {
-    await db
-      .update(deliveryTable)
-      .set({
-        attempts: maxAttempts,
-        lockedUntil: null,
-        lastError: "the Channel this was owed to is gone",
-      })
-      .where(inArray(deliveryTable.id, undeliverable));
-    result.gaveUp += undeliverable.length;
+  const recorded = await recordOutcomes(db, attempted, {
+    now,
+    backoff: webhookBackoff,
+    maxAttempts,
+    attemptsBefore: new Map(claimed.map((row) => [row.id, row.attempts])),
+  });
+  result.delivered = recorded.delivered;
+  result.failed = recorded.failed;
+  result.gaveUp = recorded.exhausted.length + undeliverable.length;
+
+  await retireDeliveries(
+    db,
+    undeliverable,
+    "the subscription this was owed to is gone",
+    maxAttempts,
+  );
+
+  // Giving up is worth recording: a subscriber that has stopped answering is
+  // the operator's problem, and the Event log is where deevy says so. Written
+  // straight to the log rather than through `appendEvent`, like the sweeps
+  // above: this is not a request, and an Event appended here would derive a
+  // delivery to the very URL that just refused eight of them.
+  if (recorded.exhausted.length > 0) {
+    // Only a delivery that was actually sent can run out of attempts, so its
+    // Event and its subscription are both in hand here.
+    const sentById = new Map(sending.map((one) => [one.id, one]));
+    const outcomeById = new Map(attempted.map((one) => [one.id, one]));
+    const subscriptionOf = new Map(claimed.map((row) => [row.id, row.targetId]));
+    const rows = recorded.exhausted.map((id) => {
+      const { event } = sentById.get(id) as { event: Event };
+      const outcome = outcomeById.get(id);
+      return {
+        workspaceId: event.workspaceId,
+        kind: "webhook.exhausted" satisfies EventKind,
+        subjectType: "webhook",
+        subjectId: subscriptionOf.get(id) as string,
+        projectId: event.projectId,
+        payload: {
+          eventSeq: event.seq,
+          attempts: maxAttempts,
+          status: outcome?.status ?? 0,
+          error: outcome?.error ?? null,
+        },
+      };
+    });
+    for (let at = 0; at < rows.length; at += exhaustedRowsPerInsert) {
+      await db.insert(eventTable).values(rows.slice(at, at + exhaustedRowsPerInsert));
+    }
   }
 
   return result;

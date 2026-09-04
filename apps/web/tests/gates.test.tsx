@@ -126,6 +126,30 @@ describe("an Issue sitting in a Gate", () => {
     );
   });
 
+  it("is highlighted and scrolled to when a deevy link names it", async () => {
+    // jsdom implements no scrolling, so the call itself is what a link
+    // handing a Human straight to a Gate can be checked by.
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+
+    await mountAt("/issues/DEV-1?gate=s1");
+
+    const panel = await screen.findByRole("group", { name: /Intent Gate/i });
+    expect(panel.dataset.focused).toBe("true");
+    await waitFor(() => expect(scrolled).toHaveBeenCalled());
+  });
+
+  it("is left alone when the link names a State the Issue has moved on from", async () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+
+    await mountAt("/issues/DEV-1?gate=s2");
+
+    const panel = await screen.findByRole("group", { name: /Intent Gate/i });
+    expect(panel.dataset.focused).toBeUndefined();
+    expect(scrolled).not.toHaveBeenCalled();
+  });
+
   it("shows the decisions already made on it", async () => {
     await mountAt("/issues/DEV-1");
 
