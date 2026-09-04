@@ -4,6 +4,7 @@ import { agent, projectGrant } from "./schema/agent.ts";
 import { activity, run } from "./schema/run.ts";
 import { channel, notificationPreference, routingRule } from "./schema/channel.ts";
 import { delivery } from "./schema/delivery.ts";
+import { webhookSubscription } from "./schema/webhook.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
@@ -48,6 +49,7 @@ export const tables = {
   routingRule,
   notificationPreference,
   delivery,
+  webhookSubscription,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
