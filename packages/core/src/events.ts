@@ -1,5 +1,6 @@
 import { event, type Db, type Event, type Member, type Workspace } from "@deevy/db";
 import { deriveNotifications } from "./notifications.ts";
+import { triggersFor } from "./triggers.ts";
 
 /**
  * The Event log is the audit trail (docs/PLAN.md): every write appends one
@@ -105,5 +106,13 @@ export async function appendEvent(source: EventSource, input: EventInput): Promi
   // Notifications derive from the Event, in the same request and right after
   // it, so nothing else has to remember to tell anyone (docs/plans/m1.md).
   await deriveNotifications(source.db, row);
+  // Triggers derive from the same Event, right after it (docs/plans/m2.md).
+  // They write their own rows and hand back the Events those deserve, so this
+  // stays the only writer of the log. The recursion that follows is bounded:
+  // a `run.*` Event triggers nothing, and an Event a trigger already acted on
+  // finds the Run it created open and fires nothing a second time.
+  for (const followed of await triggersFor(source.db, row)) {
+    await appendEvent(source, followed);
+  }
   return row;
 }
