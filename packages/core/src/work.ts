@@ -14,7 +14,7 @@ import {
 } from "@deevy/db";
 import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { EventKind } from "./events.ts";
-import { issueOf, notificationKindOf } from "./notifications.ts";
+import { deriveNotifications, issueOf, notificationKindOf } from "./notifications.ts";
 import { openStatuses } from "./runs.ts";
 import { postSlackMessage, slackMessage, type FetchLike, type SlackPayload } from "./slack.ts";
 import { postWebhook } from "./webhooks.ts";
@@ -981,5 +981,88 @@ async function sendClaimedWebhooks({
     }
   }
 
+  return result;
+}
+
+/** Four hours of nobody deciding, by default, before the approvers are asked again. */
+const defaultGateSilenceMs = 4 * 60 * 60 * 1000;
+
+export interface RemindAboutGatesOptions {
+  db: Db;
+  workspaceId: string;
+  now?: Date;
+  silenceMs?: number;
+  limit?: number;
+}
+
+/**
+ * Runs waiting on a Gate that nobody has decided, ordered by how long they have
+ * been waiting. Read straight off (status, lastActivityAt), which is the same
+ * index the stale sweep uses, so there is no sort.
+ */
+export function waitingOnGatesQuery(
+  db: Db,
+  options: { workspaceId: string; cutoff: Date; limit: number },
+) {
+  return db
+    .select({ id: runTable.id, lastActivityAt: runTable.lastActivityAt })
+    .from(runTable)
+    .innerJoin(issueTable, eq(runTable.issueId, issueTable.id))
+    .innerJoin(projectTable, eq(issueTable.projectId, projectTable.id))
+    .where(
+      and(
+        eq(runTable.status, "awaiting_input"),
+        lt(runTable.lastActivityAt, options.cutoff),
+        eq(projectTable.workspaceId, options.workspaceId),
+      ),
+    )
+    .limit(options.limit);
+}
+
+/**
+ * Asks a Gate's approvers again when nobody has decided it.
+ *
+ * A Run waiting on a Human is not stale, so the stale sweep leaves it alone
+ * for ever (docs/plans/m2.md). Left there it occupies the Agent's one open Run
+ * on that Issue and nobody is reminded, so this re-derives the Notification the
+ * Gate already produced once. It moves no Run and appends no Event: nothing has
+ * happened in the Workspace, someone simply has not looked yet.
+ *
+ * Bounded like every other sweep: one indexed scan with a limit, then the
+ * Events those Runs already wrote, then one insert.
+ */
+export async function remindAboutGates({
+  db,
+  workspaceId,
+  now = new Date(),
+  silenceMs = defaultGateSilenceMs,
+  limit = defaultSweepLimit,
+}: RemindAboutGatesOptions): Promise<SweepResult> {
+  const cutoff = new Date(now.getTime() - silenceMs);
+  const waiting = await waitingOnGatesQuery(db, { workspaceId, cutoff, limit });
+
+  const result = { scanned: waiting.length, changed: 0, more: waiting.length >= limit };
+  if (waiting.length === 0) return result;
+
+  // The Event that put each Run into the Gate is the one to re-derive from: it
+  // carries the State, so the same approvers are asked as the first time.
+  const asked = await db.query.event.findMany({
+    where: {
+      kind: "run.awaiting_input",
+      subjectId: { in: waiting.map((row) => row.id) },
+    },
+    orderBy: { seq: "asc" },
+  });
+
+  const latest = new Map<string, (typeof asked)[number]>();
+  for (const event of asked) latest.set(event.subjectId, event);
+
+  for (const event of latest.values()) {
+    // Touching the Run is what stops this asking twice in the same round, and
+    // it is honest: someone was told just now.
+    await db.update(runTable).set({ lastActivityAt: now }).where(eq(runTable.id, event.subjectId));
+    await deriveNotifications(db, event);
+    result.changed += 1;
+  }
   return result;
 }

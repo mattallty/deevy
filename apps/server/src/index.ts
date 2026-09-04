@@ -18,6 +18,7 @@ const runner = startRunner({
   cron: createTimerCron(),
   staleMinutes: env.runStaleMinutes,
   sweepIntervalSeconds: env.sweepIntervalSeconds,
+  gateReminderHours: env.gateReminderHours,
   // The origin a Slack message links back to. Without one nothing is sent, so
   // the deliveries wait in their rows until the instance knows its own URL.
   ...(env.baseURL ? { baseUrl: env.baseURL } : {}),

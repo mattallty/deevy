@@ -13,6 +13,7 @@ export interface ServerEnv {
   runStaleMinutes: number;
   /** How often the background runner sweeps for silent Runs. */
   sweepIntervalSeconds: number;
+  gateReminderHours: number;
 }
 
 /** A positive number from the environment, or the default when it is absent or nonsense. */
@@ -39,5 +40,6 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     webDist: env.DEEVY_WEB_DIST,
     runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
     sweepIntervalSeconds: positive(env.DEEVY_SWEEP_INTERVAL_SECONDS, 60),
+    gateReminderHours: positive(env.DEEVY_GATE_REMINDER_HOURS, 4),
   };
 }

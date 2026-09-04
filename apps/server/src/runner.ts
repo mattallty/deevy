@@ -2,6 +2,7 @@ import {
   deliverDueChannelMessages,
   deliverDueWebhooks,
   sweepSchedules,
+  remindAboutGates,
   sweepStaleRuns,
   type Cron,
 } from "@deevy/core";
@@ -22,6 +23,8 @@ export interface RunnerOptions {
   cron: Cron;
   /** Silence after which a Run is presumed stale. `DEEVY_RUN_STALE_MINUTES`. */
   staleMinutes?: number;
+  /** Hours a Gate may sit undecided before its approvers are asked again. */
+  gateReminderHours?: number;
   /** How often the sweep runs. `DEEVY_SWEEP_INTERVAL_SECONDS`. */
   sweepIntervalSeconds?: number;
   /** Runs one sweep pass may move. */
@@ -46,6 +49,7 @@ export function startRunner({
   db,
   cron,
   staleMinutes = 30,
+  gateReminderHours = 4,
   sweepIntervalSeconds = 60,
   sweepLimit,
   maxPassesPerTick = 5,
@@ -53,6 +57,7 @@ export function startRunner({
   deliveryLimit,
 }: RunnerOptions): Runner {
   const silenceMs = staleMinutes * 60_000;
+  const gateSilenceMs = gateReminderHours * 3_600_000;
 
   const limit = sweepLimit === undefined ? {} : { limit: sweepLimit };
   const deliveries = deliveryLimit === undefined ? {} : { limit: deliveryLimit };
@@ -92,6 +97,12 @@ export function startRunner({
     // And what is owed to a subscribed URL, which needs no origin: the body is
     // the Event itself and carries no link (ADR-0003).
     await drain(signal, () => deliverDueWebhooks({ db, workspaceId, ...deliveries }));
+    // A Run waiting on a Gate is not silent, so the stale sweep never touches
+    // it; without this a Gate nobody decides holds the Agent's one open Run on
+    // that Issue for ever and nobody is asked again (docs/plans/m2.md).
+    await drain(signal, () =>
+      remindAboutGates({ db, workspaceId, silenceMs: gateSilenceMs, ...limit }),
+    );
   }
 
   let inFlight: Promise<void> = Promise.resolve();
