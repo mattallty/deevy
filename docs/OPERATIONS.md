@@ -124,9 +124,20 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    new version by itself, live within a few seconds — so a deployment configured entirely through secrets
    skips this step.
 
-8. **Check the trigger fires.** `wrangler tail --format pretty` and wait a minute: a `scheduled` invocation
-   appears every minute, `Ok` with nothing to do on an empty Workspace. That is `runDueWork`, one bounded pass
-   (ADR-0012).
+8. **Check the trigger fires**, by giving it something to do rather than by watching the log. `wrangler tail`
+   does not reliably surface `scheduled` invocations — ten minutes of it on a working deployment showed
+   request traffic and no scheduled event at all, which reads exactly like a dead schedule and is not one. So
+   ask the sweep for a visible effect instead: give an Agent that has an assigned Issue a one-minute schedule,
+   and a Run with `trigger = "schedule"` appears within two minutes. That is `runDueWork`, one bounded pass
+   (ADR-0012), driven by Cloudflare's own timer.
+
+   ```bash
+   wrangler d1 execute deevy --remote --command "update agent set schedule_minutes = 1"
+   # wait two minutes, then:
+   wrangler d1 execute deevy --remote --command "select status, trigger from run"
+   # and put it back:
+   wrangler d1 execute deevy --remote --command "update agent set schedule_minutes = null"
+   ```
 
 9. **Sign in** at the `workers.dev` origin with the GitHub account whose email is `DEEVY_ADMIN_EMAIL`. The
    first sign-in creates the Workspace and makes you its admin, and nothing else ever creates a second one.
