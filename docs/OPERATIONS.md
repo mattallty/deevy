@@ -129,8 +129,11 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    (ADR-0012).
 
 9. **Sign in** at the `workers.dev` origin with the GitHub account whose email is `DEEVY_ADMIN_EMAIL`. The
-   first sign-in creates the Workspace and makes you its admin; the Event log under the Workspace shows
-   `workspace.created` then `member.joined`, and nothing else ever creates a second Workspace.
+   first sign-in creates the Workspace and makes you its admin, and nothing else ever creates a second one.
+   Settings, Members lists exactly one Member — you, `admin`, `human`. The Event log behind that has no
+   Workspace-level view in the SPA, where it is read per Issue as the timeline; the whole log is
+   `GET /api/events`, which a signed-in browser can simply visit, and it opens with `workspace.created` then
+   `member.joined`, both with a null actor because deevy did the writing.
 
 ### What a free account does not give you
 
