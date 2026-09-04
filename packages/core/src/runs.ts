@@ -120,6 +120,31 @@ export async function setRunStatus(
  * ruling itself, so an Agent that lost its elicitation still learns the
  * outcome by asking again (docs/plans/m2.md).
  */
+/**
+ * Who may rule on a Gate.
+ *
+ * It was an array of Member ids whose emptiness carried the rule: none named
+ * meant every active Human could decide, which is what M1 shipped and what
+ * `gateRecipients` still does. Nothing said so on the wire, so an Agent that
+ * read `approverMemberIds: []` reported that its request had reached nobody
+ * and would sit there for ever, while every Human in the Workspace had in fact
+ * been notified. One field cannot carry two rules; this one says which
+ * (docs/plans/m3.md).
+ */
+export const GateApproversSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("any_human") }),
+  // Non-empty by construction: a named list with nothing in it is the state
+  // that caused the confusion, and it is now unrepresentable.
+  z.object({ kind: z.literal("named"), memberIds: z.array(z.string()).min(1) }),
+]);
+
+export type GateApprovers = z.infer<typeof GateApproversSchema>;
+
+/** The rule behind a Gate's named approvers, as the answer states it. */
+export function gateApproversView(memberIds: string[]): GateApprovers {
+  return memberIds.length > 0 ? { kind: "named", memberIds } : { kind: "any_human" };
+}
+
 export const GateApprovalSchema = z.object({
   run: RunSchema,
   status: z.enum(["awaiting", "approved", "rejected"]),
@@ -128,8 +153,8 @@ export const GateApprovalSchema = z.object({
   stateName: z.string(),
   /** The Issue's page with that Gate in focus. */
   url: z.string(),
-  /** The Humans asked. Empty means any Human may decide it. */
-  approverMemberIds: z.array(z.string()),
+  /** Who may rule on it, said outright rather than inferred from a list's length. */
+  approvers: GateApproversSchema,
   decidedByMemberId: z.string().nullable(),
   note: z.string().nullable(),
 });

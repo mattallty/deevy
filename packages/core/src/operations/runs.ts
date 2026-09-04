@@ -16,6 +16,7 @@ import {
   RunDetailSchema,
   RunSchema,
   assertFinishable,
+  gateApproversView,
   isOpen,
   lastGateRequest,
   openStatuses,
@@ -261,7 +262,7 @@ export const runs = {
         limit: 1,
       });
       const decided = decisions.find((row) => row.createdAt >= since) ?? null;
-      const approverMemberIds = await gateApprovers(context.db, gate.id);
+      const approvers = gateApproversView(await gateApprovers(context.db, gate.id));
       const url = gateUrl(context.baseURL ?? "", key, gate.id);
 
       if (decided) {
@@ -298,7 +299,7 @@ export const runs = {
           stateId: gate.id,
           stateName: gate.name,
           url,
-          approverMemberIds,
+          approvers,
           decidedByMemberId: decided.memberId,
           note: decided.note,
         };
@@ -351,7 +352,7 @@ export const runs = {
         stateId: gate.id,
         stateName: gate.name,
         url,
-        approverMemberIds,
+        approvers,
         decidedByMemberId: null,
         note: null,
       };
