@@ -11,6 +11,15 @@ export {
   type Session,
 } from "./auth.ts";
 export {
+  boundMetadataResponse,
+  checkMetadataUrl,
+  createClientMetadataFetch,
+  fetchClientMetadataResource,
+  isPubliclyRoutable,
+  type ClientMetadataFetchOptions,
+  type MetadataResourceFetch,
+} from "./cimd.ts";
+export {
   appendEvent,
   type EventInput,
   type EventKind,

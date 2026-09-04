@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./app": "./src/app.ts",
     "./auth": "./src/auth.ts",
+    "./cimd": "./src/cimd.ts",
     "./router": "./src/operations/index.ts",
     "./openapi": "./src/openapi.ts",
     "./package.json": "./package.json"
