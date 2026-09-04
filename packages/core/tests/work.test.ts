@@ -17,6 +17,7 @@ import {
   dueAgentsQuery,
   dueRunsQuery,
   dueWebhookDeliveriesQuery,
+  remindAboutGates,
   scheduledIssuesQuery,
   sweepSchedules,
   sweepStaleRuns,
@@ -454,5 +455,49 @@ describe("the webhook delivery sweep", () => {
     // The due scan, the claim, the two batched lookups the POSTs are rendered
     // from, and one UPDATE for the ten that landed the same way.
     expect(statements).toEqual(["select", "update", "select", "select", "update"]);
+  });
+});
+
+describe("remindAboutGates", () => {
+  it("asks the approvers again about a Gate nobody has decided, once per round", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const asAda = createRouterClient(router, { context: ada });
+    const project = await asAda.projects.create({ name: "deevy", key: "DEV" });
+    const agent = await agentContext(db, { sponsor: ada.member, grants: [project.id] });
+    const asAgent = createRouterClient(router, { context: agent });
+    await asAda.issues.create({ projectKey: "DEV", title: "Waiting on a Human" });
+
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+    const before = (await asAda.inbox.list({})).notifications.length;
+
+    // Nothing has been decided and nobody has looked. A Run waiting on a Human
+    // is not stale, so the stale sweep leaves it alone for ever; without a
+    // reminder the Agent's slot on that Issue is occupied and nobody is asked
+    // again (docs/plans/m2.md, slice 6).
+    const quiet = await remindAboutGates({
+      db,
+      workspaceId: ada.workspace.id,
+      now: new Date(Date.now() + 5 * 60 * 1000),
+      silenceMs: 4 * 60 * 60 * 1000,
+    });
+    expect(quiet).toMatchObject({ scanned: 0, changed: 0 });
+    expect((await asAda.inbox.list({})).notifications.length).toBe(before);
+
+    const due = new Date(Date.now() + 5 * 60 * 60 * 1000);
+    const first = await remindAboutGates({ db, workspaceId: ada.workspace.id, now: due });
+    expect(first).toMatchObject({ scanned: 1, changed: 1 });
+    expect((await asAda.inbox.list({})).notifications.length).toBe(before + 1);
+    expect(
+      (await createRouterClient(router, { context: bob }).inbox.list({})).notifications[0],
+    ).toMatchObject({ kind: "gate_awaiting" });
+
+    // Reminding is not nagging: the same round does not ask twice.
+    const second = await remindAboutGates({ db, workspaceId: ada.workspace.id, now: due });
+    expect(second).toMatchObject({ scanned: 0, changed: 0 });
+    expect((await asAda.inbox.list({})).notifications.length).toBe(before + 1);
   });
 });

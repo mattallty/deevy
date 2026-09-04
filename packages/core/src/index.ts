@@ -62,6 +62,7 @@ export {
   maxDeliveryAttempts,
   maxWebhookAttempts,
   sweepSchedules,
+  remindAboutGates,
   sweepStaleRuns,
   type DeliverDueChannelMessagesOptions,
   type DeliverDueWebhooksOptions,
