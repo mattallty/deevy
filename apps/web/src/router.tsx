@@ -22,6 +22,7 @@ import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { McpClientsPage } from "./routes/settings/mcp-clients.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
 import { AgentsPage } from "./routes/settings/agents.tsx";
+import { AgentPage } from "./routes/settings/agent.tsx";
 import { AppShell, type ShellProps } from "./routes/shell.tsx";
 
 /**
@@ -117,6 +118,13 @@ const notificationsRoute = createRoute({
   path: "/settings/notifications",
   component: NotificationsPage,
 });
+const agentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/agents/$memberId",
+  component: function AgentRoute() {
+    return <AgentPage memberId={agentRoute.useParams().memberId} />;
+  },
+});
 const allowlistRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings/allowlist",
@@ -147,6 +155,7 @@ const routeTree = rootRoute.addChildren([
   repositoriesRoute,
   membersRoute,
   agentsRoute,
+  agentRoute,
   channelsRoute,
   webhooksRoute,
   notificationsRoute,

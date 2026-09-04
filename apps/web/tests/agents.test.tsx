@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
@@ -44,6 +45,12 @@ const stub = vi.hoisted(() => ({
   scheduled: [] as Array<Record<string, unknown>>,
 }));
 
+const calls = vi.hoisted(() => ({
+  create: vi.fn(async (_input: { name: string; handle?: string | null }) => ({ id: "m-new" })),
+  suspend: vi.fn(async (_input: { memberId: string }) => ({})),
+  reinstate: vi.fn(async (_input: { memberId: string }) => ({})),
+}));
+
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
@@ -54,21 +61,34 @@ vi.mock("../src/lib/orpc.ts", async () => {
         stub.scheduled.push(input);
         return stub.agents[0];
       },
+      create: calls.create,
+      suspend: calls.suspend,
+      reinstate: calls.reinstate,
     },
   });
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { AgentsPage } = await import("../src/routes/settings/agents.tsx");
+const { createAppRouter } = await import("../src/router.tsx");
 
-function mount(ui: React.ReactNode) {
+/** The page links to an Agent's own page, so it is mounted through the router. */
+async function mountAt(path: string) {
+  const router = createAppRouter(
+    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { initialEntries: [path] },
+  );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  await router.load();
 }
 
 describe("the Agents settings page", () => {
   it("lists every Agent with the Human accountable for it", async () => {
-    mount(<AgentsPage />);
+    await mountAt("/settings/agents");
 
     const planner = await screen.findByRole("row", { name: /planner/i });
     expect(within(planner).getByText("Ada Lovelace")).toBeTruthy();
@@ -79,7 +99,7 @@ describe("the Agents settings page", () => {
   });
 
   it("says how many Projects an Agent may see", async () => {
-    mount(<AgentsPage />);
+    await mountAt("/settings/agents");
 
     const planner = await screen.findByRole("row", { name: /planner/i });
     expect(within(planner).getByText("1 Project")).toBeTruthy();
@@ -90,7 +110,7 @@ describe("the Agents settings page", () => {
 
 describe("connecting an Agent over MCP", () => {
   it("gives the endpoint and a command to paste, so a Sponsor need not guess", async () => {
-    mount(<AgentsPage />);
+    await mountAt("/settings/agents");
 
     const panel = await screen.findByRole("region", { name: /connect an agent/i });
     expect(within(panel).getByText(`${window.location.origin}/mcp`)).toBeTruthy();
@@ -100,7 +120,7 @@ describe("connecting an Agent over MCP", () => {
 
 describe("an Agent's schedule", () => {
   it("shows the interval each Agent wakes on, and sets one", async () => {
-    mount(<AgentsPage />);
+    await mountAt("/settings/agents");
 
     const idle = await screen.findByRole("row", { name: /idle/i });
     expect((within(idle).getByLabelText(/schedule/i) as HTMLSelectElement).value).toBe("60");
@@ -114,5 +134,32 @@ describe("an Agent's schedule", () => {
 
     await waitFor(() => expect(stub.scheduled).toHaveLength(1));
     expect(stub.scheduled[0]).toEqual({ memberId: "m-planner", scheduleMinutes: 60 });
+  });
+});
+
+describe("sponsoring an Agent", () => {
+  it("creates one from the page, because the operator guide says this is where", async () => {
+    await mountAt("/settings/agents");
+
+    fireEvent.click(await screen.findByRole("button", { name: "New Agent" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "Reviewer" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+
+    await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(1));
+    expect(calls.create.mock.calls[0]?.[0]).toMatchObject({ name: "Reviewer" });
+  });
+
+  it("stops one that is working, and brings back one that is not", async () => {
+    await mountAt("/settings/agents");
+
+    const planner = await screen.findByRole("row", { name: /planner/i });
+    fireEvent.click(within(planner).getByRole("button", { name: "Suspend" }));
+    await waitFor(() => expect(calls.suspend).toHaveBeenCalledTimes(1));
+    expect(calls.suspend.mock.calls[0]?.[0]).toMatchObject({ memberId: "m-planner" });
+
+    const idle = await screen.findByRole("row", { name: /idle/i });
+    fireEvent.click(within(idle).getByRole("button", { name: "Reinstate" }));
+    await waitFor(() => expect(calls.reinstate).toHaveBeenCalledTimes(1));
   });
 });
