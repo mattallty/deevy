@@ -109,8 +109,8 @@ function equal(left: string, right: string): boolean {
  * which `webhook_subscription_workspace_idx` answers and of which a Workspace
  * has a handful, and one multi-row insert.
  */
-export async function deriveWebhookDeliveries(db: Db, event: Event): Promise<void> {
-  await deriveWebhookDeliveriesForMany(db, event.workspaceId, [event]);
+export async function deriveWebhookDeliveries(db: Db, event: Event): Promise<string[]> {
+  return deriveWebhookDeliveriesForMany(db, event.workspaceId, [event]);
 }
 
 /** How many delivery rows one insert carries; D1 caps bound parameters at 100. */
@@ -132,8 +132,8 @@ export async function deriveWebhookDeliveriesForMany(
   db: Db,
   workspaceId: string,
   events: Array<Pick<Event, "seq" | "kind" | "projectId" | "workspaceId">>,
-): Promise<number> {
-  if (events.length === 0) return 0;
+): Promise<string[]> {
+  if (events.length === 0) return [];
   const subscriptions = await db
     .select({
       id: webhookSubscription.id,
@@ -144,7 +144,7 @@ export async function deriveWebhookDeliveriesForMany(
     .where(
       and(eq(webhookSubscription.workspaceId, workspaceId), isNull(webhookSubscription.disabledAt)),
     );
-  if (subscriptions.length === 0) return 0;
+  if (subscriptions.length === 0) return [];
 
   const rows = events.flatMap((event) =>
     subscriptions
@@ -162,13 +162,19 @@ export async function deriveWebhookDeliveriesForMany(
   // index makes true rather than this being the only writer careful enough to
   // keep it (docs/plans/m3.md). A derivation that runs a second time — a
   // retried request, a queue message delivered again — owes nothing new.
+  const written: string[] = [];
   for (let at = 0; at < rows.length; at += deliveryRowsPerInsert) {
-    await db
+    const inserted = await db
       .insert(delivery)
       .values(rows.slice(at, at + deliveryRowsPerInsert))
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: delivery.id });
+    for (const row of inserted) written.push(row.id);
   }
-  return rows.length;
+  // The ids the insert really wrote, not the ids it was offered: a derivation
+  // that ran a second time hands back nothing, so nothing is enqueued for a
+  // delivery something else is already carrying (events.ts).
+  return written;
 }
 
 /**

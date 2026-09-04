@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Auth } from "./auth.ts";
+import { discardingJobQueue, type JobQueue } from "./jobs.ts";
 import type { LiveOptions } from "./live.ts";
 import { createDeevyMcp } from "./mcp/server.ts";
 import { generateSpec } from "./openapi.ts";
@@ -36,6 +37,14 @@ export interface AppOptions {
    * D1 query against a per-invocation cap (docs/plans/m3.md slice 7).
    */
   live?: LiveOptions;
+  /**
+   * Where a write's tail nudges the deliveries it just owed (jobs.ts). The
+   * default discards, because a queue is a latency optimisation and never a
+   * correctness requirement: without one, the next sweep finds the same rows a
+   * beat later, which is what `apps/server` and a Worker on an account with no
+   * Queues both do (docs/plans/m3.md slice 9).
+   */
+  jobs?: JobQueue;
   /** Called with errors thrown by operations. */
   onError?: (error: unknown) => void;
 }
@@ -52,6 +61,7 @@ export function createApp({
   baseURL,
   secret,
   live,
+  jobs = discardingJobQueue(),
   onError: report = console.error,
 }: AppOptions) {
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
@@ -77,7 +87,7 @@ export function createApp({
 
   // Before the oRPC handlers: the MCP surface builds its own context, because
   // an unauthenticated call there is a 401 challenge rather than an error body.
-  const mcp = createDeevyMcp({ db, auth, baseURL, secret, onError: report });
+  const mcp = createDeevyMcp({ db, auth, baseURL, secret, jobs, onError: report });
   app.all("/mcp", (c) => mcp.fetch(c.req.raw));
 
   // The origin a handler builds a link back into deevy from: what this
@@ -90,6 +100,7 @@ export function createApp({
   const contextFor = async (request: Request) => ({
     ...(await buildContext(db, auth, request.headers, originOf(request.url))),
     ...(live ? { live } : {}),
+    jobs,
   });
   app.use("/rpc/*", async (c, next) => {
     c.set("ctx", await contextFor(c.req.raw));

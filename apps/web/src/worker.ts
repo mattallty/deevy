@@ -1,6 +1,14 @@
-import { createDb } from "@deevy/adapters/workers";
+import { createDb, createQueueJobQueue, jobIn } from "@deevy/adapters/workers";
+import type { QueueBatch } from "@deevy/adapters/workers";
 import type { App } from "@deevy/core/app";
-import { createApp, createAuth, runDueWork, type AuthEnv, type DueWorkLimits } from "@deevy/core";
+import {
+  createApp,
+  createAuth,
+  deliverWebhook,
+  runDueWork,
+  type AuthEnv,
+  type DueWorkLimits,
+} from "@deevy/core";
 import type { WorkerBindings, WorkerEnv } from "./env.ts";
 import { readWorkerEnv, workerAuthEnv } from "./env.ts";
 
@@ -71,6 +79,10 @@ export function isolateFor(bindings: WorkerBindings): Isolate {
       // stream that ends itself signs off with the cursor the next one resumes
       // from (docs/plans/m3.md slice 7).
       live: env.live,
+      // Only when the account has Queues. Absent, `createApp` discards jobs
+      // and every delivery waits for the next Cron pass, which is the whole
+      // difference an optional binding makes (docs/plans/m3.md slice 9).
+      ...(bindings.JOBS ? { jobs: createQueueJobQueue(bindings.JOBS) } : {}),
     }),
     db,
     env,
@@ -137,5 +149,42 @@ export default {
         }),
       ),
     );
+  },
+
+  /**
+   * One delivery per message, on an account that has Queues (docs/plans/m3.md
+   * slice 9). The message is a pointer to a durable row, so this handler adds
+   * no behaviour the Cron path does not already have — it only arrives sooner.
+   *
+   * Queues are at-least-once, which is why the same message twice has to cost
+   * one POST: `deliverWebhook` claims the row before it sends, and refuses to
+   * claim one that already landed, so the second arrival makes no request at
+   * all. Acked when the delivery landed, when it ran out of attempts, and when
+   * there was nothing left to claim; retried only while another attempt is
+   * still owed, and the row's own attempt count — not the queue's — decides
+   * when `webhook.exhausted` is appended, exactly as it would in a sweep.
+   */
+  async queue(batch: QueueBatch, bindings: WorkerBindings): Promise<void> {
+    const isolate = isolateFor(bindings);
+    await isolate.ready;
+    for (const message of batch.messages) {
+      const job = jobIn(message.body);
+      // A message this version cannot read will not become readable by being
+      // sent again, so it is a permanent failure rather than a retry.
+      if (!job) {
+        message.ack();
+        continue;
+      }
+      try {
+        const sent = await deliverWebhook({ db: isolate.db, deliveryId: job.id });
+        if (sent.delivered > 0 || sent.gaveUp > 0 || sent.scanned === 0) message.ack();
+        else message.retry();
+      } catch {
+        // D1 refused, or the POST threw where `postWebhook` could not catch it.
+        // The row is untouched, so the message is worth another look — and if
+        // the queue gives up first, the next Cron pass still finds it.
+        message.retry();
+      }
+    }
   },
 };
