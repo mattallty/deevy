@@ -231,6 +231,36 @@ Everything is in one SQLite file under `/data`. Migrations are applied at startu
 volume upgrades itself. Mount a named volume or a host directory; do not mount the file itself, because SQLite
 writes `-wal` and `-shm` alongside it.
 
+## The schema, on either runtime
+
+One schema, two appliers, two journals (ADR-0008). Nothing is shared between them, because nothing needs to
+be: a D1 database is only ever migrated by wrangler, and a SQLite file only ever by the Node migrator.
+
+| What                | Node                                 | Workers                                       |
+| ------------------- | ------------------------------------ | --------------------------------------------- |
+| Where the rows live | `DEEVY_DATABASE_PATH`, a SQLite file | the `DB` binding, a D1 database               |
+| What is applied     | `packages/db/drizzle/<folder>/`      | `packages/db/migrations/NNNN_<folder>.sql`    |
+| Who applies it      | the migrator, at startup             | `wrangler d1 migrations apply deevy`, by hand |
+| Record of what ran  | `__drizzle_migrations`               | wrangler's own `d1_migrations`                |
+| If it never runs    | the server exits at startup          | every request fails on a missing table        |
+
+`packages/db/migrations` is a build artifact, not a source: `vp run db#generate:d1` writes it from
+`packages/db/drizzle`, `vp run db#generate` chains the two, and `vp run db#check:migrations` fails CI on a
+stale one exactly as a stale `openapi.json` does. `apps/web/wrangler.jsonc` points the `DB` binding at it
+through `migrations_dir`, and `vp run db#check:d1` applies it to an empty local D1 and checks that what
+wrangler built is the schema `packages/db/src/schema` describes. None of that needs a Cloudflare account.
+
+The projection is not a copy. drizzle separates statements with `--> statement-breakpoint`; the emitter turns
+those into plain statement separation and refuses, naming the file and the line, anything D1 will not honour:
+transaction control, `ATTACH`, `DETACH`, `VACUUM`, and every `PRAGMA`. The PRAGMA is the one that matters.
+D1 runs a batch inside a transaction, where SQLite ignores `PRAGMA foreign_keys` outright — so the
+`PRAGMA foreign_keys=OFF` that drizzle wraps around a table rebuild, and that the Node migrator honours at
+the connection, does nothing on D1, the rebuild's `DROP TABLE` cascades the children away, and wrangler
+reports success. Better to fail while generating.
+
+The `database_id` in `apps/web/wrangler.jsonc` is a placeholder. Local D1 never reads it; a deployment needs
+the real one from `wrangler d1 create deevy`.
+
 ## Upgrading
 
 ```bash

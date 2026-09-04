@@ -46,6 +46,11 @@ jobs:
       - name: Migration SQL guard
         run: vp run db#check:migrations
 
+      # drizzle generates and wrangler applies (ADR-0008), so the projection is
+      # only proven by wrangler applying it: an empty local D1, no account.
+      - name: Migrations build the schema on D1
+        run: vp run db#check:d1
+
       - name: OpenAPI snapshot is current
         run: |
           vp run core#snapshot:openapi
