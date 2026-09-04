@@ -71,6 +71,9 @@ export const events = {
         projectId: input.projectId,
         after: input.after,
         signal,
+        // Whatever this runtime allows a stream. Absent on Node, where the
+        // stream lives as long as the request does (docs/plans/m3.md).
+        ...context.live,
       }),
   }),
 };

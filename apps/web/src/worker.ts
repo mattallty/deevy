@@ -61,7 +61,18 @@ function isolateFor(bindings: WorkerBindings): Isolate {
     },
   });
   const isolate: Isolate = {
-    app: createApp({ db, auth, origin, baseURL: env.baseURL, secret: env.secret }),
+    app: createApp({
+      db,
+      auth,
+      origin,
+      baseURL: env.baseURL,
+      secret: env.secret,
+      // A stream ends before the platform ends it: one D1 query per poll
+      // against a per-invocation cap makes a stream's life arithmetic, and a
+      // stream that ends itself signs off with the cursor the next one resumes
+      // from (docs/plans/m3.md slice 7).
+      live: env.live,
+    }),
     db,
     env,
     ready: auth.$context.then(

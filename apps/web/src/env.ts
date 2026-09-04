@@ -1,4 +1,21 @@
+import type { LiveOptions } from "@deevy/core";
 import type { createDb } from "@deevy/adapters/workers";
+
+/**
+ * How often a stream on Workers looks for new Events. Slower than Node's
+ * second on purpose: each poll is one D1 query, and D1 caps the queries one
+ * invocation may run, so doubling the interval doubles a stream's life for a
+ * second of latency on a board nobody is watching that closely
+ * (docs/plans/m3.md slice 7).
+ */
+export const STREAM_POLL_MS = 2000;
+
+/**
+ * How long a stream lives before ending itself, when no binding says
+ * otherwise. Thirty polls, against a per-invocation cap of fifty queries that
+ * a signed-in request has already spent a handful of.
+ */
+const defaultStreamSeconds = 60;
 
 /**
  * What the platform hands the Worker: the D1 binding, plus the vars and
@@ -17,6 +34,7 @@ export interface WorkerBindings {
   DEEVY_WORKSPACE_NAME?: string;
   DEEVY_RUN_STALE_MINUTES?: string;
   DEEVY_GATE_REMINDER_HOURS?: string;
+  DEEVY_STREAM_SECONDS?: string;
 }
 
 /**
@@ -38,6 +56,12 @@ export interface WorkerEnv {
   runStaleMinutes: number;
   /** Hours a Gate may sit undecided before its approvers are asked again. */
   gateReminderHours: number;
+  /**
+   * What this runtime allows an Event stream. Workers-only: on Node the stream
+   * lives as long as the request, and `apps/server` passes nothing
+   * (docs/plans/m3.md slice 7).
+   */
+  live: LiveOptions;
 }
 
 /** A positive number from a binding, or the default when it is absent or nonsense. */
@@ -64,5 +88,9 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
     workspaceName: env.DEEVY_WORKSPACE_NAME,
     runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
     gateReminderHours: positive(env.DEEVY_GATE_REMINDER_HOURS, 4),
+    live: {
+      pollMs: STREAM_POLL_MS,
+      maxDurationMs: positive(env.DEEVY_STREAM_SECONDS, defaultStreamSeconds) * 1000,
+    },
   };
 }

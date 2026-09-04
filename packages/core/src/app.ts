@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Auth } from "./auth.ts";
+import type { LiveOptions } from "./live.ts";
 import { createDeevyMcp } from "./mcp/server.ts";
 import { generateSpec } from "./openapi.ts";
 import { betterAuthKeys } from "./keys.ts";
@@ -28,6 +29,13 @@ export interface AppOptions {
    * elicitation with it (mcp/elicitation.ts).
    */
   secret?: string;
+  /**
+   * What this runtime allows an Event stream: how often it polls, and how long
+   * it may live. Omitted, a stream runs until the request is aborted, which is
+   * what a Node process wants; a Worker passes both, because each poll is one
+   * D1 query against a per-invocation cap (docs/plans/m3.md slice 7).
+   */
+  live?: LiveOptions;
   /** Called with errors thrown by operations. */
   onError?: (error: unknown) => void;
 }
@@ -43,6 +51,7 @@ export function createApp({
   origin = [],
   baseURL,
   secret,
+  live,
   onError: report = console.error,
 }: AppOptions) {
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
@@ -75,12 +84,19 @@ export function createApp({
   // instance was configured with, or, in development, whatever it was reached
   // on. Wrong only behind a proxy that rewrites the host and sets no baseURL.
   const originOf = (url: string) => baseURL ?? new URL(url).origin;
+  // The stream settings ride on the context beside the caller's identity: the
+  // handler is the same on both runtimes and the entry supplies the numbers,
+  // so there is no `if (workers)` anywhere in here (docs/plans/m3.md).
+  const contextFor = async (request: Request) => ({
+    ...(await buildContext(db, auth, request.headers, originOf(request.url))),
+    ...(live ? { live } : {}),
+  });
   app.use("/rpc/*", async (c, next) => {
-    c.set("ctx", await buildContext(db, auth, c.req.raw.headers, originOf(c.req.url)));
+    c.set("ctx", await contextFor(c.req.raw));
     await next();
   });
   app.use("/api/*", async (c, next) => {
-    c.set("ctx", await buildContext(db, auth, c.req.raw.headers, originOf(c.req.url)));
+    c.set("ctx", await contextFor(c.req.raw));
     await next();
   });
 

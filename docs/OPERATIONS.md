@@ -28,21 +28,22 @@ beside `wrangler.jsonc`, so run `wrangler dev` from `apps/web` and let it find i
 `.gitignore` keeps the file itself out of the repository. Nothing on the Worker reads `process.env`; the
 bindings arrive with the request.
 
-| Variable                       | Node | Workers            | Default              | Without it                                                                                                                                                      |
-| ------------------------------ | ---- | ------------------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BETTER_AUTH_URL`              | env  | secret             | the request's origin | Sign-in callbacks are wrong, the OAuth server is off, and Slack deliveries wait.                                                                                |
-| `BETTER_AUTH_SECRET`           | env  | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out. |
-| `GITHUB_CLIENT_ID`             | env  | secret             | —                    | Nobody can sign in. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                                                                                     |
-| `GITHUB_CLIENT_SECRET`         | env  | secret             | —                    | As above.                                                                                                                                                       |
-| `DEEVY_ADMIN_EMAIL`            | env  | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                            |
-| `DEEVY_WORKSPACE_NAME`         | env  | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                            |
-| `DEEVY_WEB_ORIGIN`             | env  | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                      |
-| `DEEVY_RUN_STALE_MINUTES`      | env  | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                             |
-| `DEEVY_SWEEP_INTERVAL_SECONDS` | env  | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                             |
-| `DEEVY_GATE_REMINDER_HOURS`    | env  | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                           |
-| `DEEVY_DATABASE_PATH`          | env  | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                  |
-| `DEEVY_PORT`                   | env  | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                   |
-| `DEEVY_WEB_DIST`               | env  | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                             |
+| Variable                       | Node        | Workers            | Default              | Without it                                                                                                                                                                                                 |
+| ------------------------------ | ----------- | ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_URL`              | env         | secret             | the request's origin | Sign-in callbacks are wrong, the OAuth server is off, and Slack deliveries wait.                                                                                                                           |
+| `BETTER_AUTH_SECRET`           | env         | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out.                                            |
+| `GITHUB_CLIENT_ID`             | env         | secret             | —                    | Nobody can sign in. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                                                                                                                                |
+| `GITHUB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
+| `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                       |
+| `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                       |
+| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                 |
+| `DEEVY_RUN_STALE_MINUTES`      | env         | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                                                                        |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | env         | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                                                                        |
+| `DEEVY_GATE_REMINDER_HOURS`    | env         | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                                                                      |
+| `DEEVY_STREAM_SECONDS`         | — unbounded | var                | 60                   | Nothing: a live stream on Workers ends after a minute and the browser resumes from the cursor it signed off with. Workers-only, because a Node process holds a connection for as long as the browser does. |
+| `DEEVY_DATABASE_PATH`          | env         | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                                                             |
+| `DEEVY_PORT`                   | env         | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                                                              |
+| `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                        |
 
 The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
 signing in: `BETTER_AUTH_*`, `GITHUB_*`, `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME` do on Workers exactly
@@ -73,6 +74,20 @@ missing from it is answered with the SPA's `index.html` — a 200 with the wrong
 
 The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
 created before that will ask for the extra scope at the next sign-in.
+
+### Live updates, and why a stream on Workers ends
+
+The board keeps itself in step by reading the Event log as it happens, over one long-lived request per
+browser: `events.subscribe` polls the log and sends what it finds, plus a heartbeat carrying its cursor. On
+Node that request lives as long as the browser holds it and `DEEVY_STREAM_SECONDS` means nothing there.
+
+On Workers it cannot. Each poll is one D1 query and D1 caps the queries one invocation may run — 50 on the
+free plan — so a stream's life is that cap divided by its poll interval, and a stream that overran it would be
+cut off mid-message. deevy ends it first instead: the Worker polls every two seconds and, after
+`DEEVY_STREAM_SECONDS`, sends one last heartbeat carrying the cursor it reached and returns. The SPA treats a
+clean end as an invitation rather than a failure, reconnecting at once from that cursor, so nothing is missed
+and nobody sees the seam. Raising the value raises the query count with it — one every two seconds — so a
+value much over 90 spends the whole cap on polling and leaves none for signing the request in.
 
 ### Signing in, and the origin `BETTER_AUTH_URL` names
 

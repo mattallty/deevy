@@ -11,6 +11,13 @@ const stub = vi.hoisted(() => ({
       event: { seq: 8, kind: "issue.created", subjectType: "issue", projectId: "p1" },
     },
   ],
+  /**
+   * How many streams end of their own accord before the rest stay open. A
+   * Worker's stream ends when its budget is spent, and what the hook does next
+   * is the difference between a board that is a poll behind and one that is two
+   * seconds behind (docs/plans/m3.md slice 7).
+   */
+  endsCleanly: 0,
 }));
 
 vi.mock("../src/lib/orpc.ts", async () => {
@@ -26,9 +33,13 @@ vi.mock("../src/lib/orpc.ts", async () => {
       list: async () => ({ events: [], nextCursor: null }),
       subscribe: async (input: unknown) => {
         stub.subscribed.push(input);
+        const ends = stub.endsCleanly > 0;
+        if (ends) stub.endsCleanly -= 1;
         return (async function* () {
           for (const message of stub.messages) yield message;
-          // Then stay open, the way the real stream does.
+          // A stream that has spent its budget returns; otherwise it stays
+          // open, the way a Node one does.
+          if (ends) return;
           await new Promise(() => {});
         })();
       },
@@ -68,8 +79,35 @@ describe("useLiveEvents", () => {
     expect(keys).not.toContain("members");
   });
 
+  it("resubscribes from the cursor at once when the stream ends on purpose", async () => {
+    stub.subscribed.length = 0;
+    stub.endsCleanly = 1;
+    stub.messages = [
+      { type: "heartbeat", cursor: 7 },
+      {
+        type: "event",
+        event: { seq: 8, kind: "issue.created", subjectType: "issue", projectId: "p1" },
+      },
+      // The sign-off a Worker's stream ends with: where it got to.
+      { type: "heartbeat", cursor: 8 },
+    ];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Probe />
+      </QueryClientProvider>,
+    );
+
+    // Well inside the two seconds a failed stream costs: an end on purpose is
+    // not a failure and must not be paid for like one.
+    await waitFor(() => expect(stub.subscribed.length).toBe(2), { timeout: 500 });
+    expect(stub.subscribed[1]).toEqual({ after: 8 });
+  });
+
   it("resumes from the last seq it saw after the stream drops", async () => {
     stub.subscribed.length = 0;
+    stub.endsCleanly = 0;
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
