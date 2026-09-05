@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
+import { OptionsSelect } from "@/components/options-select";
 
 /** The Notification kinds a rule can name, in the words the API uses. */
 const kinds = [
@@ -191,70 +191,57 @@ export function ChannelsPage() {
           <div key={at} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor={`rule-kind-${at}`}>Notification</Label>
-              <NativeSelect
+              <OptionsSelect
                 id={`rule-kind-${at}`}
+                className="w-48"
                 value={rule.notificationKind ?? anyValue}
-                onChange={(changed) =>
+                onChange={(next) =>
                   setDraft((current) =>
                     current.map((one, index) =>
                       index === at
-                        ? {
-                            ...one,
-                            notificationKind: (changed.target.value || null) as Kind | null,
-                          }
+                        ? { ...one, notificationKind: (next || null) as Kind | null }
                         : one,
                     ),
                   )
                 }
-              >
-                <option value={anyValue}>Any</option>
-                {kinds.map((kind) => (
-                  <option key={kind.value} value={kind.value}>
-                    {kind.label}
-                  </option>
-                ))}
-              </NativeSelect>
+                options={[{ value: anyValue, label: "Any" }, ...kinds]}
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor={`rule-project-${at}`}>Project</Label>
-              <NativeSelect
+              <OptionsSelect
                 id={`rule-project-${at}`}
+                className="w-32"
                 value={rule.projectId ?? anyValue}
-                onChange={(changed) =>
+                onChange={(next) =>
                   setDraft((current) =>
                     current.map((one, index) =>
-                      index === at ? { ...one, projectId: changed.target.value || null } : one,
+                      index === at ? { ...one, projectId: next || null } : one,
                     ),
                   )
                 }
-              >
-                <option value={anyValue}>Any</option>
-                {(projects.data?.projects ?? []).map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.key}
-                  </option>
-                ))}
-              </NativeSelect>
+                options={[
+                  { value: anyValue, label: "Any" },
+                  ...(projects.data?.projects ?? []).map((project) => ({
+                    value: project.id,
+                    label: project.key,
+                  })),
+                ]}
+              />
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <Label htmlFor={`rule-channel-${at}`}>Channel</Label>
-              <NativeSelect
+              <OptionsSelect
                 id={`rule-channel-${at}`}
+                className="w-full"
                 value={rule.channelId}
-                onChange={(changed) =>
+                onChange={(next) =>
                   setDraft((current) =>
-                    current.map((one, index) =>
-                      index === at ? { ...one, channelId: changed.target.value } : one,
-                    ),
+                    current.map((one, index) => (index === at ? { ...one, channelId: next } : one)),
                   )
                 }
-              >
-                {rows.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.name}
-                  </option>
-                ))}
-              </NativeSelect>
+                options={rows.map((channel) => ({ value: channel.id, label: channel.name }))}
+              />
             </div>
             <Button
               variant="ghost"

@@ -13,7 +13,6 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   type DraftState,
@@ -23,6 +22,7 @@ import {
 } from "@/components/workflow-state-fields";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
+import { OptionsSelect } from "@/components/options-select";
 
 /**
  * The ordered State editor. A team that wants Todo, Doing, Done deletes the
@@ -229,7 +229,6 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
             <StateFields
               state={current}
               index={at}
-              humans={humans}
               agents={agents.data?.agents ?? []}
               onEdit={(change) => edit(at, change)}
               renderTemplate={(state, onEdit) => (
@@ -277,20 +276,18 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
         {removed.length > 0 ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor="move-issues-to">Move Issues in deleted States to</Label>
-            <NativeSelect
+            <OptionsSelect
               id="move-issues-to"
+              className="w-64"
               value={moveIssuesTo ?? ""}
-              onChange={(changed) => setMoveIssuesTo(changed.target.value || null)}
-            >
-              <option value="">Nowhere (fails if any hold Issues)</option>
-              {draft
-                .filter((state) => state.id)
-                .map((state) => (
-                  <option key={state.id} value={state.id}>
-                    {state.name}
-                  </option>
-                ))}
-            </NativeSelect>
+              onChange={(next) => setMoveIssuesTo(next || null)}
+              options={[
+                { value: "", label: "Nowhere (fails if any hold Issues)" },
+                ...draft
+                  .filter((state) => state.id)
+                  .map((state) => ({ value: state.id ?? "", label: state.name })),
+              ]}
+            />
           </div>
         ) : null}
 

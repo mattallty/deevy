@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAutosave } from "@/lib/autosave";
 import { orpc } from "@/lib/orpc";
+import { OptionsSelect } from "@/components/options-select";
 
 const NO_TEAM = "";
 
@@ -107,22 +107,16 @@ export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="project-team">Team</Label>
-          <NativeSelect
+          <OptionsSelect
             id="project-team"
+            className="w-56"
             value={teamId}
-            onChange={(changed) =>
-              void autosave.saveNow({
-                teamId: changed.target.value === NO_TEAM ? null : changed.target.value,
-              })
-            }
-          >
-            <option value={NO_TEAM}>No Team</option>
-            {(teams.data?.teams ?? []).map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </NativeSelect>
+            onChange={(next) => void autosave.saveNow({ teamId: next === NO_TEAM ? null : next })}
+            options={[
+              { value: NO_TEAM, label: "No Team" },
+              ...(teams.data?.teams ?? []).map((team) => ({ value: team.id, label: team.name })),
+            ]}
+          />
           <p className="text-xs text-muted-foreground">
             A Team owns a Project and can be mentioned; it is not a permission wall.
           </p>

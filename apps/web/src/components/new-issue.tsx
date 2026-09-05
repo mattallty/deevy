@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { orpc } from "@/lib/orpc";
 import { useShortcut, useShortcutScope } from "@/lib/shortcuts";
+import { OptionsSelect } from "@/components/options-select";
 
 /**
  * Creating an Issue, from wherever the Human happens to be.
@@ -131,18 +131,20 @@ function NewIssueDialog({
         >
           <div className="flex flex-col gap-2">
             <Label htmlFor="new-issue-project">Project</Label>
-            <NativeSelect
+            <OptionsSelect
               id="new-issue-project"
+              className="w-full"
               value={chosen}
-              onChange={(changed) => setProjectKey(changed.target.value)}
-            >
-              <option value="">Choose a Project</option>
-              {options.map((project: { id: string; key: string; name: string }) => (
-                <option key={project.id} value={project.key}>
-                  {project.name} ({project.key})
-                </option>
-              ))}
-            </NativeSelect>
+              onChange={setProjectKey}
+              placeholder="Choose a Project"
+              options={[
+                { value: "", label: "Choose a Project" },
+                ...options.map((project: { id: string; key: string; name: string }) => ({
+                  value: project.key,
+                  label: `${project.name} (${project.key})`,
+                })),
+              ]}
+            />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="new-issue-title">Title</Label>

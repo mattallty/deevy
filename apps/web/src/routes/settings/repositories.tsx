@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
+import { OptionsSelect } from "@/components/options-select";
 
 const providers = ["github", "gitlab", "other"] as const;
 
@@ -58,17 +58,13 @@ export function RepositoriesPage() {
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-provider">Provider</Label>
-          <NativeSelect
+          <OptionsSelect
             id="repo-provider"
+            className="w-40"
             value={provider}
-            onChange={(changed) => setProvider(changed.target.value as (typeof providers)[number])}
-          >
-            {providers.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </NativeSelect>
+            onChange={(next) => setProvider(next as (typeof providers)[number])}
+            options={providers.map((option) => ({ value: option, label: option }))}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-name">Name</Label>

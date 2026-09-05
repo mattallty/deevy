@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption } from "./select.ts";
 
 const stub = vi.hoisted(() => ({
   listed: [] as unknown[],
@@ -108,11 +109,11 @@ describe("the Event log", () => {
     await mountAt("/settings/events");
     const table = await screen.findByRole("table", { name: "Event log" });
 
-    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "run" } });
+    await pickOption(screen.getByLabelText("Kind"), "run.*");
     expect(within(table).queryByText("gate.approved")).toBeNull();
     expect(within(table).getByText("run.started")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "" } });
+    await pickOption(screen.getByLabelText("Kind"), "Every kind");
     fireEvent.click(within(table).getByText("gate.approved"));
     expect((await screen.findByLabelText("Payload of 12")).textContent).toContain(
       '"state": "Intent"',

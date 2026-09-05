@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { OptionsSelect } from "@/components/options-select";
 
 export const stateCategories = ["backlog", "active", "done"] as const;
 export type StateCategory = (typeof stateCategories)[number];
@@ -46,13 +46,12 @@ export interface StateFieldsProps {
   state: DraftState;
   /** Makes the ids unique when several States are on one page. */
   index: number;
-  humans: NamedMember[];
   agents: NamedMember[];
   onEdit: (change: Partial<DraftState>) => void;
   /** The Document template control; the default is a plain Textarea. */
   renderTemplate?: (state: DraftState, onEdit: (change: Partial<DraftState>) => void) => ReactNode;
-  /** The approvers control for a Gate; the default is a native multi-select. */
-  renderApprovers?: (state: DraftState, onEdit: (change: Partial<DraftState>) => void) => ReactNode;
+  /** The approvers control for a Gate (components/approvers-picker.tsx on the page). */
+  renderApprovers: (state: DraftState, onEdit: (change: Partial<DraftState>) => void) => ReactNode;
   /** Lay the fields out in one column (a narrow card) rather than a wrapping row. */
   stacked?: boolean;
 }
@@ -62,12 +61,11 @@ export interface StateFieldsProps {
  * of it (docs/plans/ui-redesign-2.md slice H), so a layout can change without
  * the form changing under it. The accessible names are the test contract:
  * Name, Counts as, Gate, Document it asks for, Template for <State>, Assign an
- * Agent on entering, Approvers for <State>.
+ * Agent on entering, Approvers for <State> (the label; the picker is the caller's).
  */
 export function StateFields({
   state,
   index,
-  humans,
   agents,
   onEdit,
   renderTemplate,
@@ -87,17 +85,13 @@ export function StateFields({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`state-category-${index}`}>Counts as</Label>
-        <NativeSelect
+        <OptionsSelect
           id={`state-category-${index}`}
+          className="w-32"
           value={state.category}
-          onChange={(changed) => onEdit({ category: changed.target.value as StateCategory })}
-        >
-          {stateCategories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </NativeSelect>
+          onChange={(next) => onEdit({ category: next as StateCategory })}
+          options={stateCategories.map((category) => ({ value: category, label: category }))}
+        />
       </div>
       <div className="flex items-center gap-2 pb-2">
         <Checkbox
@@ -131,18 +125,16 @@ export function StateFields({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`state-agent-${index}`}>Assign an Agent on entering</Label>
-        <NativeSelect
+        <OptionsSelect
           id={`state-agent-${index}`}
+          className="w-48"
           value={state.triggerAgentMemberId ?? ""}
-          onChange={(changed) => onEdit({ triggerAgentMemberId: changed.target.value || null })}
-        >
-          <option value="">Nobody</option>
-          {agents.map((agent) => (
-            <option key={agent.id} value={agent.id}>
-              {agent.user.name}
-            </option>
-          ))}
-        </NativeSelect>
+          onChange={(next) => onEdit({ triggerAgentMemberId: next || null })}
+          options={[
+            { value: "", label: "Nobody" },
+            ...agents.map((agent) => ({ value: agent.id, label: agent.user.name })),
+          ]}
+        />
       </div>
       {state.isGate ? (
         <div className="flex w-full flex-col gap-2">
@@ -150,30 +142,7 @@ export function StateFields({
           <p className="text-xs text-muted-foreground">
             Naming nobody leaves it to any Human, which is the default.
           </p>
-          {renderApprovers ? (
-            renderApprovers(state, onEdit)
-          ) : (
-            <select
-              id={`state-approvers-${index}`}
-              multiple
-              size={Math.min(Math.max(humans.length, 2), 5)}
-              className="w-full rounded-md border border-input bg-input/20 p-1 text-xs/relaxed outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              value={state.approverMemberIds}
-              onChange={(changed) =>
-                onEdit({
-                  approverMemberIds: [...changed.target.selectedOptions].map(
-                    (option) => option.value,
-                  ),
-                })
-              }
-            >
-              {humans.map((human) => (
-                <option key={human.id} value={human.id}>
-                  {human.user.name}
-                </option>
-              ))}
-            </select>
-          )}
+          {renderApprovers(state, onEdit)}
         </div>
       ) : null}
     </div>

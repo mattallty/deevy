@@ -334,9 +334,13 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `itemToStringLabel`, `isItemEqualToValue`, and `removeLabel` on each chip (`label-picker.tsx` is the
   model; approvers reuse it). In a test: `fireEvent.change(input, …)` filters, `fireEvent.keyDown(input,
 { key: "ArrowDown" })` opens, then `screen.findByRole("option", …)` — the popup is portalled.
-- **Selects:** `SelectContent` children go inside a `SelectGroup` (with `SelectLabel` when they have a
-  heading), as the Base UI shadcn docs show — in that build the group carries the list's padding, so bare
-  items sit flush against the popup edge. Round 2 found seven screens doing that.
+- **Selects are shadcn's, never native.** A plain choice from a list of strings is `OptionsSelect`
+  (`components/options-select.tsx`: the documented tree — `Select` › `SelectTrigger` + `SelectValue`, then
+  `SelectContent` › `SelectGroup` › `SelectItem` — over an options array, `""` meaning none). A choice that
+  needs its own item markup composes those parts directly, still with the `SelectGroup`: in that build the
+  group carries the list's padding, so bare items sit flush against the popup edge. `ui/native-select.tsx`
+  is gone. In a test, `pickOption(trigger, name)` from `tests/select.ts` drives one (ArrowDown opens,
+  Enter on the highlighted option chooses — a click does not), and `selectedLabel(trigger)` reads it.
 - **The Inbox** is one flat two-line list (`ul aria-label="Notifications"`): actor chip · verb · on KEY,
   the Issue title, the quote. `lib/notification-text.ts` phrases it from the joined Event, actor and
   comment; a checkbox per row and `x` select, a `toolbar "Selection"` marks several read.

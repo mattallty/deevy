@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption } from "./select.ts";
 
 const created = vi.fn(async () => ({
   id: "new-issue",
@@ -95,10 +96,8 @@ describe("creating an Issue from anywhere", () => {
     const router = await mountAt("/inbox");
 
     fireEvent.click(screen.getByRole("button", { name: /new issue/i }));
-    // The Projects are fetched only once the dialog is open, so the option has
-    // to exist before the select can be set to it.
-    await screen.findByRole("option", { name: /ops/i });
-    fireEvent.change(screen.getByLabelText(/project/i), { target: { value: "OPS" } });
+    // The Projects are fetched once the dialog is open; the select lists them when opened.
+    await pickOption(screen.getByLabelText(/project/i), /ops/i);
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: "Ship the launch page" },
     });

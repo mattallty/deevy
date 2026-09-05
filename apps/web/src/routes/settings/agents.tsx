@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { NativeSelect } from "@/components/ui/native-select";
 import {
   Table,
   TableBody,
@@ -25,6 +24,7 @@ import {
 import { MemberChip } from "@/components/member-chip";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
+import { OptionsSelect } from "@/components/options-select";
 
 /** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
 function mcpEndpoint(): string {
@@ -145,24 +145,25 @@ export function AgentsPage() {
                 {grantSummary(agent.grantedProjectIds.length)}
               </TableCell>
               <TableCell>
-                <NativeSelect
+                <OptionsSelect
                   aria-label={`Schedule for ${agent.user.name}`}
-                  value={agent.scheduleMinutes ?? ""}
+                  className="w-44"
+                  value={agent.scheduleMinutes === null ? "" : String(agent.scheduleMinutes)}
                   disabled={update.isPending}
-                  onChange={(changed) =>
+                  onChange={(next) =>
                     update.mutate({
                       memberId: agent.id,
-                      scheduleMinutes: changed.target.value ? Number(changed.target.value) : null,
+                      scheduleMinutes: next ? Number(next) : null,
                     })
                   }
-                >
-                  <option value="">Never</option>
-                  {intervals.map((interval) => (
-                    <option key={interval.minutes} value={interval.minutes}>
-                      {interval.label}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  options={[
+                    { value: "", label: "Never" },
+                    ...intervals.map((interval) => ({
+                      value: String(interval.minutes),
+                      label: interval.label,
+                    })),
+                  ]}
+                />
               </TableCell>
               <TableCell className="flex items-center justify-end gap-2 text-right">
                 {agent.suspendedAt ? (

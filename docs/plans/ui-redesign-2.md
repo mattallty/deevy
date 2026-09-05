@@ -201,6 +201,13 @@ straight into `SelectContent`, so they sat flush against the popup edge. Every `
 items in `SelectGroup` (a ground rule in `deevy-ui`). Also seen in the diff and left alone: upstream's
 newest style carries `cn-menu-target cn-menu-translucent` on the popup, which ours predates.
 
+A second pass (2026-09-06) replaced every remaining native select — seventeen, in ten files: Document
+version, the Board's Assignee filter, New Issue's Project, the State's category and Agent, the Agents
+table's schedule, the Event log's three filters, the routing rules' three, the Repository provider, the
+Project's Team, the Workflow's Move-Issues-to — with `components/options-select.tsx`, one wrapper that
+renders the documented tree from an options array. `ui/native-select.tsx` is deleted. Tests drive a Base UI
+Select with `tests/select.ts` (`pickOption`: ArrowDown, then Enter on the highlighted option).
+
 ### B″ — Breadcrumb (point 20) — shipped
 
 `components/app-breadcrumb.tsx` on the vendored shadcn `ui/breadcrumb` (Base UI `useRender`, already in the

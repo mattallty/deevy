@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption, selectedLabel } from "./select.ts";
 
 const stub = vi.hoisted(() => ({
   agents: [
@@ -127,14 +128,14 @@ describe("an Agent's schedule", () => {
     await mountAt("/settings/agents");
 
     const idle = await screen.findByRole("row", { name: /idle/i });
-    expect((within(idle).getByLabelText(/schedule/i) as HTMLSelectElement).value).toBe("60");
+    expect(selectedLabel(within(idle).getByLabelText(/schedule/i))).toBe("Hourly");
 
     const planner = await screen.findByRole("row", { name: /planner/i });
-    const picker = within(planner).getByLabelText(/schedule/i) as HTMLSelectElement;
+    const picker = within(planner).getByLabelText(/schedule/i);
     // Never is the default: an Agent that only reacts to what happens.
-    expect(picker.value).toBe("");
+    expect(selectedLabel(picker)).toBe("Never");
 
-    fireEvent.change(picker, { target: { value: "60" } });
+    await pickOption(picker, "Hourly");
 
     await waitFor(() => expect(stub.scheduled).toHaveLength(1));
     expect(stub.scheduled[0]).toEqual({ memberId: "m-planner", scheduleMinutes: 60 });

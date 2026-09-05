@@ -3,13 +3,13 @@ import { useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
+import { OptionsSelect } from "@/components/options-select";
 
 /**
  * The Documents on an Issue: intent, spec, plan, whichever the Workflow asked
@@ -103,22 +103,23 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor={`version-${name}`}>Version</Label>
-          <NativeSelect
+          <OptionsSelect
             id={`version-${name}`}
+            className="w-36"
             value={String(reading)}
-            onChange={(changed) => {
+            onChange={(next) => {
               setDraft(null);
-              setVersion(Number(changed.target.value));
+              setVersion(Number(next));
             }}
-          >
-            {Array.from({ length: currentVersion }, (_, index) => currentVersion - index).map(
-              (candidate) => (
-                <option key={candidate} value={candidate}>
-                  {candidate === currentVersion ? `${candidate} (current)` : candidate}
-                </option>
-              ),
-            )}
-          </NativeSelect>
+            options={Array.from(
+              { length: currentVersion },
+              (_, index) => currentVersion - index,
+            ).map((candidate) => ({
+              value: String(candidate),
+              label:
+                candidate === currentVersion ? `${String(candidate)} (current)` : String(candidate),
+            }))}
+          />
         </div>
         <span className="flex-1" />
         {draft === null && !readingOlder ? (

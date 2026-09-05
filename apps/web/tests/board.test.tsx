@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption } from "./select.ts";
 
 const stub = vi.hoisted(() => {
   const states = [
@@ -144,7 +145,7 @@ describe("the board", () => {
     await mountAt("/projects/DEV/board");
 
     await findColumns();
-    fireEvent.change(screen.getByLabelText("Assignee"), { target: { value: stub.ada.id } });
+    await pickOption(screen.getByLabelText("Assignee"), /Ada/);
 
     expect(await screen.findByText("DEV-1")).toBeTruthy();
     await waitFor(() => expect(screen.queryByText("DEV-2")).toBeNull());

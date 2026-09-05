@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption, selectedLabel } from "./select.ts";
 
 const stub = vi.hoisted(() => ({
   states: [
@@ -121,22 +122,21 @@ describe("the Agent a State triggers", () => {
 
     const intent = await open("Intent");
     const onIntent = within(intent).getByLabelText("Assign an Agent on entering");
-    await waitFor(() => expect(within(onIntent).getByText("Builder")).toBeTruthy());
-    expect((onIntent as HTMLSelectElement).value).toBe("");
+    expect(selectedLabel(onIntent)).toBe("Nobody");
+    fireEvent.keyDown(onIntent, { key: "ArrowDown" });
+    expect(await screen.findByRole("option", { name: "Builder" })).toBeTruthy();
+    fireEvent.keyDown(onIntent, { key: "Escape" });
 
     const plan = await open("Plan");
     const onPlan = within(plan).getByLabelText("Assign an Agent on entering");
-    expect((onPlan as HTMLSelectElement).value).toBe("m-planner");
-    expect(within(onPlan).getByText("Planner")).toBeTruthy();
+    await waitFor(() => expect(selectedLabel(onPlan)).toBe("Planner"));
   });
 
   it("saves the rule with the rest of the Workflow", async () => {
     mount();
     const intent = await open("Intent");
     const picker = within(intent).getByLabelText("Assign an Agent on entering");
-    await waitFor(() => expect(within(picker).getByText("Builder")).toBeTruthy());
-
-    fireEvent.change(picker, { target: { value: "m-builder" } });
+    await pickOption(picker, "Builder");
     fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
 
     await waitFor(() => expect(stub.saved).toHaveLength(1));

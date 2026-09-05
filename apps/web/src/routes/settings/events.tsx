@@ -6,10 +6,10 @@ import { MemberChip } from "@/components/member-chip";
 import { SettingsPage } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/native-select";
 import { describeEvent } from "@/lib/event-text";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
+import { OptionsSelect } from "@/components/options-select";
 
 const PAGE = 100;
 const ANY = "";
@@ -180,71 +180,65 @@ export function EventLogPage() {
       description="Every change in this Workspace, newest first: who did what, to which Issue or Project, and when. The Activity, the live stream and the inbox all derive from this; a row opens its raw payload."
     >
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
-        <NativeSelect
+        <OptionsSelect
           aria-label="Kind"
           className="w-40"
           value={kindPrefix}
-          onChange={(changed) => setKindPrefix(changed.target.value)}
-        >
-          <option value={ANY}>Every kind</option>
-          {[
-            "issue",
-            "gate",
-            "run",
-            "document",
-            "comment",
-            "member",
-            "agent",
-            "project",
-            "workspace",
-          ].map((prefix) => (
-            <option key={prefix} value={prefix}>
-              {prefix}.*
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
+          onChange={setKindPrefix}
+          options={[
+            { value: ANY, label: "Every kind" },
+            ...[
+              "issue",
+              "gate",
+              "run",
+              "document",
+              "comment",
+              "member",
+              "agent",
+              "project",
+              "workspace",
+            ].map((prefix) => ({ value: prefix, label: `${prefix}.*` })),
+          ]}
+        />
+        <OptionsSelect
           aria-label="Subject"
           className="w-40"
           value={subjectType}
-          onChange={(changed) => {
-            setSubjectType(changed.target.value);
+          onChange={(next) => {
+            setSubjectType(next);
             setBefore(null);
           }}
-        >
-          <option value={ANY}>Any subject</option>
-          {[
-            "issue",
-            "run",
-            "project",
-            "member",
-            "team",
-            "label",
-            "channel",
-            "webhook",
-            "workspace",
-          ].map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
+          options={[
+            { value: ANY, label: "Any subject" },
+            ...[
+              "issue",
+              "run",
+              "project",
+              "member",
+              "team",
+              "label",
+              "channel",
+              "webhook",
+              "workspace",
+            ].map((type) => ({ value: type, label: type })),
+          ]}
+        />
+        <OptionsSelect
           aria-label="Project"
-          className="w-44"
+          className="w-48"
           value={projectId}
-          onChange={(changed) => {
-            setProjectId(changed.target.value);
+          onChange={(next) => {
+            setProjectId(next);
             setBefore(null);
           }}
-        >
-          <option value={ANY}>All Projects</option>
-          {(projects.data?.projects ?? []).map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.key} — {project.name}
-            </option>
-          ))}
-        </NativeSelect>
+          options={[
+            { value: ANY, label: "All Projects" },
+            ...(projects.data?.projects ?? []).map((project) => ({
+              value: project.id,
+              label: `${project.key} — ${project.name}`,
+            })),
+          ]}
+        />
         <span className="flex-1" />
         {before !== null ? (
           <Button variant="ghost" size="sm" onClick={() => setBefore(null)}>

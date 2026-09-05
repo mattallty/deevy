@@ -109,7 +109,6 @@ export function BoardPage({
           sponsorsAgents={myAgentIds.size > 0}
           hideProject
           hideGroup
-          nativeAssignee
         />
       </PageHeader>
 
