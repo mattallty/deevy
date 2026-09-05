@@ -151,12 +151,33 @@ describe("the forge", () => {
   });
 
   it("is absent without a credential or a GitHub repository, so a branch still ships", () => {
-    expect(forgeFor(null)).toBeNull();
-    expect(forgeFor({ url: "https://github.com/a/b.git", baseBranch: "main" })).toBeNull();
-    expect(forgeFor({ url: "/tmp/bare", token: "ghp_x", baseBranch: "main" })).toBeNull();
-    expect(
-      forgeFor({ url: "https://github.com/a/b.git", token: "ghp_x", baseBranch: "main" }),
-    ).not.toBeNull();
+    const github = { url: "https://github.com/a/b.git", token: "ghp_x", baseBranch: "main" };
+
+    expect(forgeFor({ repo: null })).toBeNull();
+    expect(forgeFor({ repo: { url: github.url, baseBranch: "main" } })).toBeNull();
+    expect(forgeFor({ repo: { url: "/tmp/bare", token: "ghp_x", baseBranch: "main" } })).toBeNull();
+    expect(forgeFor({ repo: github })).not.toBeNull();
+  });
+
+  it("takes an API root and a slug the clone URL cannot supply", async () => {
+    const seen: string[] = [];
+    const forge = forgeFor(
+      {
+        repo: { url: "/tmp/a-bare-repository", token: "ghp_x", baseBranch: "main" },
+        githubApi: "http://localhost:9999/api/",
+        githubRepo: "owner/repo",
+      },
+      async (url) => {
+        seen.push(new Request(url).url);
+        return new Response(JSON.stringify({ html_url: "http://localhost/pull/1", number: 1 }));
+      },
+    );
+
+    // A repository on disk has neither host nor slug, which is what an
+    // acceptance run against a bare repository needs (docs/m4-acceptance.md).
+    expect(forge).not.toBeNull();
+    await forge?.open({ branch: "b", base: "main", title: "t", body: "y" });
+    expect(seen).toEqual(["http://localhost:9999/api/repos/owner/repo/pulls"]);
   });
 
   it("asks GitHub for a pull request the way GitHub documents it", async () => {

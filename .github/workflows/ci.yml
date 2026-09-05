@@ -48,6 +48,13 @@ jobs:
       - name: The Worker serves deevy
         run: vp run web#test:workers
 
+      # M4's acceptance walk, which needs no account and no OAuth App: deevy on
+      # both deployments, a GitHub stub, a bare git repository and a stub of
+      # GitHub's pull-request API, with the real supervisor driving
+      # (docs/m4-acceptance.md).
+      - name: The reference runtime works an Issue end to end, on both deployments
+        run: vp run claude-agent#acceptance
+
       - name: Migration SQL guard
         run: vp run db#check:migrations
 

@@ -33,7 +33,7 @@ const work = {
   deevy,
   session: buildSession(config),
   runTimeoutMs: config.runTimeoutSeconds * 1000,
-  forge: forgeFor(config.repo),
+  forge: forgeFor(config),
   workspace: (options: { runId: string }) =>
     openWorkspace({
       ...options,

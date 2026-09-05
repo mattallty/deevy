@@ -49,15 +49,22 @@ export interface Ruling {
   decidedByMemberId: string | null;
 }
 
-/** A refusal deevy explained, carrying the code the supervisor branches on. */
+/**
+ * A refusal deevy explained, carrying the code the supervisor branches on.
+ *
+ * The fields are assigned rather than declared as constructor parameters:
+ * Node's type stripping runs this source directly in `scripts/acceptance.ts`,
+ * and a parameter property is syntax it refuses rather than erases.
+ */
 export class DeevyError extends Error {
-  constructor(
-    readonly code: string,
-    readonly status: number,
-    message: string,
-  ) {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(code: string, status: number, message: string) {
     super(message);
     this.name = "DeevyError";
+    this.code = code;
+    this.status = status;
   }
 }
 

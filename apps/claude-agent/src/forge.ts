@@ -32,12 +32,15 @@ export function githubSlug(url: string): string | null {
 export function githubForge(options: {
   slug: string;
   token: string;
+  /** The API root. GitHub Enterprise has its own, and so does a local stub. */
+  api?: string;
   fetch?: typeof globalThis.fetch;
 }): Forge {
   const call = options.fetch ?? globalThis.fetch;
+  const api = (options.api ?? "https://api.github.com").replace(/\/+$/, "");
   return {
     async open(draft) {
-      const res = await call(`https://api.github.com/repos/${options.slug}/pulls`, {
+      const res = await call(`${api}/repos/${options.slug}/pulls`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${options.token}`,
@@ -60,16 +63,35 @@ export function githubForge(options: {
   };
 }
 
+export interface ForgeConfig {
+  repo: RepoConfig | null;
+  /** The API root, when it is not github.com's. */
+  githubApi?: string;
+  /** `owner/name`, when it cannot be read off the clone URL. */
+  githubRepo?: string;
+}
+
 /**
  * The forge for a repository, when there is one to be had.
  *
- * A repository that is not on GitHub, or one with no credential, gets a branch
- * pushed and no pull request. That is a smaller record rather than a broken
- * one, and the operator can see the branch.
+ * A repository with no credential, or one whose owner and name cannot be
+ * established, gets a branch pushed and no pull request. That is a smaller
+ * record rather than a broken one, and the operator can see the branch.
+ *
+ * The two overrides exist because the clone URL is not always the whole story:
+ * GitHub Enterprise has its own API root, and an acceptance run against a
+ * repository on disk has neither host nor slug to read
+ * (docs/m4-acceptance.md).
  */
-export function forgeFor(repo: RepoConfig | null, fetch?: typeof globalThis.fetch): Forge | null {
+export function forgeFor(config: ForgeConfig, fetch?: typeof globalThis.fetch): Forge | null {
+  const repo = config.repo;
   if (!repo?.token) return null;
-  const slug = githubSlug(repo.url);
+  const slug = config.githubRepo ?? githubSlug(repo.url);
   if (!slug) return null;
-  return githubForge({ slug, token: repo.token, ...(fetch ? { fetch } : {}) });
+  return githubForge({
+    slug,
+    token: repo.token,
+    ...(config.githubApi ? { api: config.githubApi } : {}),
+    ...(fetch ? { fetch } : {}),
+  });
 }

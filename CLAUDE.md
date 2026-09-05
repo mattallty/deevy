@@ -9,7 +9,11 @@ milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`, r
 Worker in `docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen slices from
 `docs/plans/m1.md`; M2 (Agents) done, in nine slices from `docs/plans/m2.md`, with a worked agent loop in
 `docs/agent-loop.md`; M3 (Workers) built in ten slices from `docs/plans/m3.md`, its end-to-end walk written up
-in `docs/m3-acceptance.md`; M4 (Reference runtime) is next, planned in ten slices in `docs/plans/m4.md`.
+in `docs/m3-acceptance.md` and executed; M4 (Reference runtime) done, in ten slices from `docs/plans/m4.md`,
+shipping `apps/claude-agent`, whose acceptance walk is a script (`vp run claude-agent#acceptance`) that runs
+both deployments locally on every commit — no Cloudflare account, no OAuth App, no repository on the internet
+(`docs/m4-acceptance.md`). v1 is complete;
+what comes next is PLAN.md's after-v1 list.
 
 ## Commands
 
@@ -20,7 +24,7 @@ format, so pnpm 11 is required and pinned twice over: `devEngines.packageManager
 the prompt to wipe `node_modules`, so if an install hangs with no output, check `pnpm --version` first.
 `vp dev`, `vp build`, `vp test`, `vp check` are built-ins that ignore package.json scripts; `vp run <script>`
 runs scripts, `-r` recursively, `pkg#script` for one package (package names are `web`, `server`, `core`, `db`,
-`adapters`).
+`adapters`, `claude-agent`; the last has its own `apps/claude-agent/README.md`).
 
 - `vp check` (root): format, lint, typecheck the whole tree; `vp check --fix` applies formatting. Run it before
   every commit; CI runs it first.

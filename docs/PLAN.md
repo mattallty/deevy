@@ -152,7 +152,8 @@ approves in deevy.
 **M3 Workers.** D1 storage adapter, an optional Queues adapter, static assets configuration, the client-ID-
 metadata-document fetch transport for Workers, and the token-verification workaround for a shared Worker. Done
 when the M2 scenario runs on a free Cloudflare account, which [m3-acceptance.md](./m3-acceptance.md) walks as
-a numbered runbook.
+a numbered runbook. **That walk has been executed**, on a real account with a real GitHub OAuth App, both torn
+down afterwards.
 
 Two things shipped differently from the sentence above, both recorded in
 [ADR-0012](./adr/0012-the-cron-port-stayed-node-s-and-a-stream-ends-itself.md). There is **no Workers cron
@@ -171,8 +172,29 @@ pins an address to a connection while preserving SNI, so the Workers transport p
 pre-resolution in front of its shape check, and the residual race is written down in
 [OPERATIONS.md](./OPERATIONS.md#client-registration-and-what-is-known-to-be-weak) rather than claimed away.
 
-**M4 Reference runtime.** A documented sample agent runtime (Claude Code headless in a GitHub Action and as a
-local loop) consuming webhooks and the MCP inbox, plus operator docs for both targets.
+**M4 Reference runtime.** `apps/claude-agent`: a service holding one Agent's API key that finds the Issues
+that Agent is assigned, runs Claude against them through the Claude Agent SDK, stops at Gates, resumes when a
+Human rules, and delivers a branch and a pull request linked back to the Run that produced it. It reaches
+deevy over HTTP and MCP like any third party — no `packages/core` import, no `workspace:*` dependency — which
+is what makes it a test of ADR-0005's surfaces rather than a second view of them. Built in ten slices from
+[m4.md](./plans/m4.md), with operator docs for both targets in [OPERATIONS.md](./OPERATIONS.md) and its own
+acceptance walk in [m4-acceptance.md](./m4-acceptance.md) — a script rather than a runbook, which walks both
+deployments on this machine with no account, no OAuth App and no repository on the internet, and runs on
+every commit.
+
+Two things shipped differently from the sentence this paragraph replaced, both recorded in ADRs. There is
+**no GitHub Action**: an agent bills for thinking, a Run stopped at a Gate may wait days, and a fresh runner
+pays for a clone it throws away, so the runtime is a long-running service on a laptop or in a container
+([ADR-0013](./adr/0013-the-reference-runtime-is-a-service-not-a-ci-job.md)). And the webhook it consumes
+**wakes the service** rather than dispatching a job, which is the whole of what a delivery has to do when the
+thing that does the work is already up; polling stays on, so a missed delivery costs latency and never a Run.
+
+The runtime's session holds file and shell tools in a checked-out repository, and everything it reads was
+written by whoever has access to the Project. What bounds that — the container, the named tool list, an
+environment with the runtime's own secrets removed, a git credential the session never sees, and a Gate no
+Agent can approve — is
+[ADR-0014](./adr/0014-an-agents-input-is-untrusted-and-its-tools-are-not.md), along with what is deliberately
+not bounded.
 
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
 mirroring Documents into the Repository; the Slack app; email Channel; private Projects; four-eyes Gates;

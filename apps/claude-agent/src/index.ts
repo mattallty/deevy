@@ -35,6 +35,7 @@ export {
   githubForge,
   githubSlug,
   type Forge,
+  type ForgeConfig,
   type PullRequest,
   type PullRequestDraft,
 } from "./forge.ts";

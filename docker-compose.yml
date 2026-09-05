@@ -34,10 +34,11 @@ services:
   #
   #     docker compose --profile agent up -d
   #
-  # Build it with `docker build -f apps/claude-agent/Dockerfile -t deevy-agent .`
+  # Read docs/OPERATIONS.md before you start one: it holds a shell in a checkout
+  # and reads text anyone with Project access wrote (ADR-0014).
   agent:
     profiles: ["agent"]
-    image: deevy-agent
+    image: ghcr.io/mattallty/deevy-agent:latest
     restart: unless-stopped
     depends_on:
       deevy:

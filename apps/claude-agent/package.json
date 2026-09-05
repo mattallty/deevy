@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vp pack",
     "start": "node dist/main.mjs",
-    "test": "vp test"
+    "test": "vp test",
+    "acceptance": "node scripts/acceptance.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "catalog:"

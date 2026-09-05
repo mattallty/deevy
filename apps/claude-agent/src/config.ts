@@ -43,6 +43,10 @@ export interface Config {
   webhookSecret?: string;
   /** The port the listener binds. Zero picks one, which is only useful in a test. */
   listenPort: number;
+  /** The GitHub API root, when it is not github.com's. */
+  githubApi?: string;
+  /** `owner/name`, when it cannot be read off the clone URL. */
+  githubRepo?: string;
 }
 
 const efforts = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -88,5 +92,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     ...(env.DEEVY_AGENT_WORKDIR ? { workdir: env.DEEVY_AGENT_WORKDIR } : {}),
     ...(env.DEEVY_AGENT_WEBHOOK_SECRET ? { webhookSecret: env.DEEVY_AGENT_WEBHOOK_SECRET } : {}),
     listenPort: positive(env.DEEVY_AGENT_PORT, 8787),
+    ...(env.DEEVY_AGENT_GITHUB_API ? { githubApi: env.DEEVY_AGENT_GITHUB_API } : {}),
+    ...(env.DEEVY_AGENT_GITHUB_REPO ? { githubRepo: env.DEEVY_AGENT_GITHUB_REPO } : {}),
   };
 }
