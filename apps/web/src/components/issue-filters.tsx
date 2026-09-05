@@ -110,13 +110,15 @@ export function IssueFilters({
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ANY}>All Projects</SelectItem>
-            {projects.map((project) => (
-              <SelectItem key={project.key} value={project.key}>
-                <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
-                {project.name}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectItem value={ANY}>All Projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.key} value={project.key}>
+                  <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       )}
@@ -133,13 +135,15 @@ export function IssueFilters({
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ANY}>Any State</SelectItem>
-          {states.map((state) => (
-            <SelectItem key={state.name} value={state.name}>
-              {state.name}
-              {state.isGate ? <span className="text-xs text-gate">Gate</span> : null}
-            </SelectItem>
-          ))}
+          <SelectGroup>
+            <SelectItem value={ANY}>Any State</SelectItem>
+            {states.map((state) => (
+              <SelectItem key={state.name} value={state.name}>
+                {state.name}
+                {state.isGate ? <span className="text-xs text-gate">Gate</span> : null}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
 
@@ -262,8 +266,10 @@ export function IssueFilters({
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="state">Group by State</SelectItem>
-          <SelectItem value="none">No grouping</SelectItem>
+          <SelectGroup>
+            <SelectItem value="state">Group by State</SelectItem>
+            <SelectItem value="none">No grouping</SelectItem>
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>

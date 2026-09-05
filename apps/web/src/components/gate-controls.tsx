@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -149,12 +150,14 @@ export function GateControls({
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {workflow.data?.states.map((option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.name}
-                {option.isGate ? " (Gate)" : ""}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {workflow.data?.states.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                  {option.isGate ? " (Gate)" : ""}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       )}

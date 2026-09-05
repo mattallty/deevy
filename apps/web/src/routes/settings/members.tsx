@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -82,8 +83,10 @@ export function MembersPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">admin</SelectItem>
-                      <SelectItem value="member">member</SelectItem>
+                      <SelectGroup>
+                        <SelectItem value="admin">admin</SelectItem>
+                        <SelectItem value="member">member</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   {member.kind === "agent" ? <Badge variant="secondary">Agent</Badge> : null}

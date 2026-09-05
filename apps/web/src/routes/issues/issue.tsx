@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -202,12 +203,14 @@ export function IssuePage({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                {members.data?.members.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    <MemberChip member={member} size="xs" />
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {members.data?.members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <MemberChip member={member} size="xs" />
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </section>

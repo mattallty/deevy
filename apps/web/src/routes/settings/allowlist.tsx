@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -69,8 +70,10 @@ export function AllowlistPage() {
               <SelectValue>{(selected: RuleKind) => kindLabels[selected]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
-              <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
+              <SelectGroup>
+                <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
+                <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>

@@ -310,6 +310,9 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   never from an `aria-label` on the input.
 - **Screenshots** come from `vp run web#screens` (`apps/web/scripts/screens.ts`) against the seeded
   `dev:stub` instance, into `docs/screens/`; regenerate at milestones.
+- **Selects:** `SelectContent` children go inside a `SelectGroup` (with `SelectLabel` when they have a
+  heading), as the Base UI shadcn docs show — in that build the group carries the list's padding, so bare
+  items sit flush against the popup edge. Round 2 found seven screens doing that.
 - **Live regions:** the Gate banner and the Run's "Needs your answer" band are `role="status"`. Nothing
   else announces; a new one needs a reason.
 - **Everything outside the shell** (`SignedOut`, `NotAMember`, `Suspended`) renders in `SignInFrame`

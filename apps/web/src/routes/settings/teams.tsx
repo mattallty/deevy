@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -147,11 +148,13 @@ function AddToTeam({ teamId, taken, members, onAdd }: AddToTeamProps) {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {available.map((member) => (
-            <SelectItem key={member.id} value={member.id}>
-              {member.user.name}
-            </SelectItem>
-          ))}
+          <SelectGroup>
+            {available.map((member) => (
+              <SelectItem key={member.id} value={member.id}>
+                {member.user.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
       <Button

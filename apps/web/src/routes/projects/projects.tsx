@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -188,12 +189,14 @@ function NewProjectDialog({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NO_TEAM}>No Team</SelectItem>
-                {teams.data?.teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value={NO_TEAM}>No Team</SelectItem>
+                  {teams.data?.teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
