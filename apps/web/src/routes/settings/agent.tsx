@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { orpc } from "@/lib/orpc";
@@ -168,25 +176,39 @@ function SponsorPicker({ memberId, current }: { memberId: string; current: strin
       <Label htmlFor="agent-sponsor" className="text-xs text-muted-foreground">
         Sponsor
       </Label>
-      <NativeSelect
-        id="agent-sponsor"
-        aria-label="Change Sponsor"
-        className="w-48"
-        value={current ?? ""}
-        disabled={setSponsor.isPending}
-        onChange={(changed) => {
-          if (changed.target.value) {
-            setSponsor.mutate({ memberId, sponsorMemberId: changed.target.value });
+      {/* A combobox, typed into: the Workspace's Humans, the current one shown. */}
+      <Combobox
+        items={humans}
+        value={humans.find((human) => human.id === current) ?? null}
+        onValueChange={(next) => {
+          const human = next as (typeof humans)[number] | null;
+          if (human && human.id !== current) {
+            setSponsor.mutate({ memberId, sponsorMemberId: human.id });
           }
         }}
+        itemToStringLabel={(human: (typeof humans)[number]) => human.user.name}
+        isItemEqualToValue={(a: (typeof humans)[number], b: (typeof humans)[number]) =>
+          a.id === b.id
+        }
+        disabled={setSponsor.isPending}
       >
-        {current ? null : <option value="">Nobody</option>}
-        {humans.map((human) => (
-          <option key={human.id} value={human.id}>
-            {human.user.name}
-          </option>
-        ))}
-      </NativeSelect>
+        <ComboboxInput
+          id="agent-sponsor"
+          aria-label="Change Sponsor"
+          className="w-56"
+          placeholder={current ? undefined : "Nobody yet; name a Human…"}
+        />
+        <ComboboxContent>
+          <ComboboxEmpty>No Human by that name.</ComboboxEmpty>
+          <ComboboxList>
+            {(human: (typeof humans)[number]) => (
+              <ComboboxItem key={human.id} value={human}>
+                {human.user.name}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
       {setSponsor.error ? (
         <p className="text-xs text-destructive">{setSponsor.error.message}</p>
       ) : null}
@@ -239,23 +261,39 @@ function Grants({ memberId, onChanged }: { memberId: string; onChanged: () => Pr
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="grant-project">Grant a Project</Label>
-        <NativeSelect
-          id="grant-project"
-          className="w-72"
-          value=""
-          disabled={add.isPending || ungranted.length === 0}
-          onChange={(changed) => {
-            const projectId = changed.target.value;
-            if (projectId) add.mutate({ memberId, projectId });
+        {/* A combobox over the Projects not yet granted; choosing one grants it. */}
+        <Combobox
+          items={ungranted}
+          value={null}
+          onValueChange={(next) => {
+            const project = next as (typeof ungranted)[number] | null;
+            if (project) add.mutate({ memberId, projectId: project.id });
           }}
+          itemToStringLabel={(project: (typeof ungranted)[number]) =>
+            `${project.key} — ${project.name}`
+          }
+          isItemEqualToValue={(a: (typeof ungranted)[number], b: (typeof ungranted)[number]) =>
+            a.id === b.id
+          }
+          disabled={add.isPending || ungranted.length === 0}
         >
-          <option value="">Choose a Project…</option>
-          {ungranted.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.key} — {project.name}
-            </option>
-          ))}
-        </NativeSelect>
+          <ComboboxInput
+            id="grant-project"
+            className="w-72"
+            placeholder={ungranted.length === 0 ? "Every Project is granted" : "Choose a Project…"}
+          />
+          <ComboboxContent>
+            <ComboboxEmpty>No Project matches.</ComboboxEmpty>
+            <ComboboxList>
+              {(project: (typeof ungranted)[number]) => (
+                <ComboboxItem key={project.id} value={project}>
+                  <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
+                  {project.name}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
       </div>
       {(add.error ?? remove.error) ? (
         <p className="text-sm text-destructive">{(add.error ?? remove.error)?.message}</p>

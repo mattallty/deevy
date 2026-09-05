@@ -130,12 +130,12 @@ describe("an Agent's own page", () => {
     await mountAt("/settings/agents/m-planner");
 
     const grants = await screen.findByRole("region", { name: /projects/i });
-    // The picker only offers Projects it has not been granted, so it stays
-    // closed until both queries have answered.
-    await within(grants).findByRole("option", { name: /OPS/ });
-    fireEvent.change(within(grants).getByLabelText(/grant a project/i), {
-      target: { value: "p-ops" },
-    });
+    // A combobox over the Projects not yet granted: ArrowDown opens it under
+    // jsdom, the options are portalled, choosing one grants it.
+    const picker = within(grants).getByLabelText(/grant a project/i);
+    fireEvent.keyDown(picker, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: /OPS/ }));
+    fireEvent.keyDown(picker, { key: "Escape" });
     await waitFor(() => expect(calls.grantAdd).toHaveBeenCalledTimes(1));
     expect(calls.grantAdd.mock.calls[0]?.[0]).toMatchObject({
       memberId: "m-planner",
