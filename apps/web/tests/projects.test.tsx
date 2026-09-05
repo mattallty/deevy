@@ -201,12 +201,22 @@ describe("the Project's tabs", () => {
 
     const name = (await screen.findByLabelText("Name")) as HTMLInputElement;
     expect(name.value).toBe("deevy");
+    // No Save button: the field saves itself when you leave it, sending only what changed.
     fireEvent.change(name, { target: { value: "deevy, renamed" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() =>
-      expect(stub.saved).toContainEqual(
-        expect.objectContaining({ key: "DEV", name: "deevy, renamed", teamId: "t1" }),
-      ),
-    );
+    fireEvent.blur(name);
+    await waitFor(() => expect(stub.saved).toContainEqual({ key: "DEV", name: "deevy, renamed" }));
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect((await screen.findByRole("status")).textContent).toMatch(/Saved/);
+  });
+
+  it("refuses an empty name inline and restores the last one", async () => {
+    await mountAt("/projects/DEV/settings");
+
+    const name = (await screen.findByLabelText("Name")) as HTMLInputElement;
+    fireEvent.change(name, { target: { value: "   " } });
+    fireEvent.blur(name);
+    expect(await screen.findByText("A Project needs a name")).toBeTruthy();
+    expect(name.value).toBe("deevy");
+    expect(stub.saved.some((call) => (call as { name?: string }).name === "")).toBe(false);
   });
 });

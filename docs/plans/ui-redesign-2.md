@@ -312,7 +312,7 @@ colour as a left rule and each option a dot. Under jsdom, typing filters but `Ar
 the recipe `labels.test.tsx` and `deevy-ui` now record. `ComboboxChip` gained `removeLabel` so the remove
 button has a name ("Remove backend").
 
-### G — Project settings autosave (point 18)
+### G — Project settings autosave (point 18) — shipped
 
 `routes/projects/project-settings.tsx` loses Save/Cancel. Each field saves itself: text inputs on blur (and
 `Enter` for the name), the Team select on change, through `projects.update` with only the changed field;
@@ -322,6 +322,11 @@ the last saved value restored on blur. `useAutosave(value, save)` in `src/lib/au
 last-write-wins, unit-tested) so Workspace and Agent settings can adopt it later; this slice converts only
 the Project form. `projects.test.tsx` "edits the Project's name" becomes: change, blur, expect the update
 call — no "Save" button.
+
+What shipped differently in G: `useAutosave(save)` in `lib/autosave.ts` gives `saveNow`, `schedule`,
+`flush`, `retry` and a status; the form uses `saveNow` on blur and Enter (a debounced `schedule` exists for a
+later field that types continuously). Each save sends only the changed field, so the test now expects
+`{ key, name }` alone. An empty name is refused inline ("A Project needs a name") and the field snaps back.
 
 ### Sizes the groups fix aligns to (slice B detail)
 
