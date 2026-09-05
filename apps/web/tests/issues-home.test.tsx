@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const ada = {
@@ -216,5 +216,33 @@ describe("the Issues home", () => {
       await router.load();
     });
     expect(router.state.location.search).toMatchObject({ peek: "OPS-1" });
+  });
+});
+
+describe("the board view of the Issues home", () => {
+  it("toggles to the Board, writing view to the URL and hiding Group by", async () => {
+    const router = await mountAt("/");
+    await screen.findByRole("table", { name: "Issues" });
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ view: "board" }));
+    expect(await screen.findByRole("region", { name: "Intent" })).toBeTruthy();
+    expect(screen.queryByRole("table", { name: "Issues" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Group by" })).toBeNull();
+  });
+
+  it("folds same-named States into one column across Projects and keeps the Gate ruling on a card", async () => {
+    await mountAt("/?view=board");
+    const intent = await screen.findByRole("region", { name: "Intent" });
+    const names = [...document.querySelectorAll('[data-slot="board-column"]')].map((column) =>
+      column.getAttribute("aria-label"),
+    );
+    expect(new Set(names).size).toBe(names.length);
+    expect(within(intent).getByText("Gate")).toBeTruthy();
+    expect(
+      within(intent).getByRole("button", { name: "Decide the Intent Gate on DEV-1" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Rotate the secret").closest('[data-slot="board-column"]'),
+    ).not.toBeNull();
   });
 });

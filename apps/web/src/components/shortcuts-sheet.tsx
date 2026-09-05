@@ -25,7 +25,7 @@ const groups: Array<{ title: string; rows: Array<[keys: string, does: string]> }
     ],
   },
   {
-    title: "In a list",
+    title: "In a list, or on a board",
     rows: [
       ["j", "Next row"],
       ["k", "Previous row"],

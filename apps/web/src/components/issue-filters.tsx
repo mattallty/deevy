@@ -1,4 +1,4 @@
-import { Bot, User } from "lucide-react";
+import { Bot, User, Kanban, List } from "lucide-react";
 import { MemberChip, type ChipMember } from "@/components/member-chip";
 import {
   Select,
@@ -25,6 +25,8 @@ export interface IssuesSearch {
   /** `0` shows closed Issues too; the default is open ones. */
   open?: "0" | "1";
   group?: "state" | "none";
+  /** The list, or the board: the same Issues as columns by State (slice F). */
+  view?: "list" | "board";
   q?: string;
   peek?: string;
 }
@@ -40,6 +42,7 @@ export function parseIssuesSearch(search: Record<string, unknown>): IssuesSearch
   const kind = text("kind");
   const open = text("open");
   const group = text("group");
+  const view = text("view");
   return {
     ...(text("project") ? { project: text("project") } : {}),
     ...(text("state") ? { state: text("state") } : {}),
@@ -47,6 +50,7 @@ export function parseIssuesSearch(search: Record<string, unknown>): IssuesSearch
     ...(kind === "human" || kind === "agent" ? { kind } : {}),
     ...(open === "0" || open === "1" ? { open } : {}),
     ...(group === "state" || group === "none" ? { group } : {}),
+    ...(view === "board" ? { view } : {}),
     ...(text("q") ? { q: text("q") } : {}),
     ...(text("peek") ? { peek: text("peek") } : {}),
   };
@@ -74,6 +78,8 @@ export function IssueFilters({
   members,
   sponsorsAgents,
   hideProject = false,
+  hideGroup = false,
+  showView = false,
   nativeAssignee = false,
 }: {
   value: IssuesSearch;
@@ -84,6 +90,10 @@ export function IssueFilters({
   /** Whether the signed-in Human sponsors any Agent, which is when "My Agents" is offered. */
   sponsorsAgents: boolean;
   hideProject?: boolean;
+  /** On a board the rows are already grouped; the Group control would lie. */
+  hideGroup?: boolean;
+  /** Offer List / Board (the Workspace lists; a Project has its Board tab). */
+  showView?: boolean;
   /** A plain `<select>` for the Assignee: the Board's test drives it with a change event. */
   nativeAssignee?: boolean;
 }) {
@@ -256,22 +266,43 @@ export function IssueFilters({
 
       <span className="flex-1" />
 
-      <Select
-        value={value.group ?? "state"}
-        onValueChange={(next) => onChange({ group: next === "none" ? "none" : undefined })}
-      >
-        <SelectTrigger aria-label="Group by" className="w-36">
-          <SelectValue>
-            {(selected: string) => (selected === "none" ? "No grouping" : "Group by State")}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem value="state">Group by State</SelectItem>
-            <SelectItem value="none">No grouping</SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      {showView ? (
+        <ToggleGroup
+          value={[value.view ?? "list"]}
+          onValueChange={(next: string[]) =>
+            onChange({ view: next[0] === "board" ? "board" : undefined })
+          }
+          aria-label="View"
+          variant="outline"
+          spacing={0}
+        >
+          <ToggleGroupItem value="list" aria-label="List">
+            <List />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="board" aria-label="Board">
+            <Kanban />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      ) : null}
+
+      {hideGroup ? null : (
+        <Select
+          value={value.group ?? "state"}
+          onValueChange={(next) => onChange({ group: next === "none" ? "none" : undefined })}
+        >
+          <SelectTrigger aria-label="Group by" className="w-36">
+            <SelectValue>
+              {(selected: string) => (selected === "none" ? "No grouping" : "Group by State")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="state">Group by State</SelectItem>
+              <SelectItem value="none">No grouping</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 }

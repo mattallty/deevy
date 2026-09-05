@@ -3,6 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { useMemo, useState } from "react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
+import {
+  IssueBoard,
+  groupIntoColumns,
+  type BoardColumn,
+  type BoardIssue,
+} from "@/components/issue-board";
 import { IssueFilters, type FilterState, type IssuesSearch } from "@/components/issue-filters";
 import { MemberChip } from "@/components/member-chip";
 import { PageHeader } from "@/components/page-header";
@@ -10,14 +16,13 @@ import { SidePeek } from "@/components/side-peek";
 import { StateBadge } from "@/components/state-badge";
 import { Badge } from "@/components/ui/badge";
 import { orpc } from "@/lib/orpc";
+import { categoryOrder, foldStates } from "@/lib/states";
 import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
 >["issues"][number];
-
-const categoryOrder = { backlog: 0, active: 1, done: 2 } as const;
 
 /** Relative, short: "3d", "2h", "just now". */
 function ago(value: Date | string): string {
@@ -103,23 +108,46 @@ export function IssuesPage({
     });
   }, [issues.data, search.state, search.kind, search.assignee, myAgentIds]);
 
-  // Every State name across the visible Projects, in Workflow order.
-  const states = useMemo<FilterState[]>(() => {
-    const seen = new Map<string, FilterState>();
-    for (const project of projects.data?.projects ?? []) {
-      if (projectKey && project.key !== projectKey) continue;
-      for (const state of project.states ?? []) {
-        if (!seen.has(state.name)) {
-          seen.set(state.name, {
-            name: state.name,
-            isGate: state.isGate,
-            category: state.category as FilterState["category"],
-          });
-        }
-      }
+  // Every State name across the visible Projects, in Workflow order (lib/states.ts).
+  const folded = useMemo(
+    () => foldStates(projects.data?.projects ?? [], projectKey),
+    [projects.data, projectKey],
+  );
+  const states = useMemo<FilterState[]>(
+    () => folded.map(({ name, isGate, category }) => ({ name, isGate, category })),
+    [folded],
+  );
+
+  // The board: a column per folded State name, plus one for any State a row is
+  // in that no Workflow names (a stale cache, a race), so no card goes unshown.
+  const board = search.view === "board" && !fixedProject;
+  const boardColumns = useMemo<BoardColumn[]>(() => {
+    const columns: BoardColumn[] = folded.map((state) => ({
+      id: state.name,
+      name: state.name,
+      isGate: state.isGate,
+      category: state.category,
+      resolveTarget: (issue) => state.byProject.get(issue.projectId) ?? null,
+    }));
+    for (const row of rows) {
+      if (columns.some((column) => column.id === row.state.name)) continue;
+      columns.push({
+        id: row.state.name,
+        name: row.state.name,
+        isGate: row.state.isGate,
+        category: (row.state.category in categoryOrder
+          ? row.state.category
+          : "active") as FilterState["category"],
+        resolveTarget: (issue) => (issue.state.name === row.state.name ? issue.state.id : null),
+      });
     }
-    return [...seen.values()].sort((a, b) => categoryOrder[a.category] - categoryOrder[b.category]);
-  }, [projects.data, projectKey]);
+    return columns;
+  }, [folded, rows]);
+  const boardValue = useMemo(
+    () =>
+      groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], (issue) => issue.state.name),
+    [boardColumns, rows],
+  );
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const grouped = search.group !== "none";
@@ -168,8 +196,11 @@ export function IssuesPage({
 
   // The rows as they are on screen, for j and k.
   const visibleIds = useMemo(
-    () => (groups ? groups.flatMap((g) => (g.collapsed ? [] : g.rows)) : rows).map((r) => r.key),
-    [groups, rows],
+    () =>
+      board
+        ? boardColumns.flatMap((column) => (boardValue[column.id] ?? []).map((card) => card.key))
+        : (groups ? groups.flatMap((g) => (g.collapsed ? [] : g.rows)) : rows).map((r) => r.key),
+    [board, boardColumns, boardValue, groups, rows],
   );
   const [selected, setSelected] = useState<string | null>(null);
   const move = (delta: number) => {
@@ -289,6 +320,8 @@ export function IssuesPage({
       members={memberList}
       sponsorsAgents={myAgentIds.size > 0}
       hideProject={Boolean(fixedProject)}
+      hideGroup={board}
+      showView={!fixedProject}
     />
   );
 
@@ -307,6 +340,17 @@ export function IssuesPage({
 
       {issues.isError ? (
         <p className="text-destructive">Could not load Issues: {issues.error.message}</p>
+      ) : board ? (
+        <IssueBoard
+          columns={boardColumns}
+          issues={rows as unknown as BoardIssue[]}
+          columnOf={(issue) => issue.state.name}
+          loading={issues.isPending}
+          selectedKey={selected}
+          onSelect={setSelected}
+          onOpen={peek}
+          onDragStart={() => search.peek && onSearch({ peek: undefined })}
+        />
       ) : (
         <DataTable
           aria-label="Issues"
@@ -328,6 +372,7 @@ export function IssuesPage({
 
       <SidePeek
         issueKey={search.peek ?? null}
+        modal={!board}
         onClose={() => onSearch({ peek: undefined })}
         onOpenFull={openFull}
       />

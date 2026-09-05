@@ -333,7 +333,7 @@ but wraps in `overflow-hidden rounded-md` so the group has one radius and interi
 triggers → `text-sm`. `issues-home.test.tsx` pins `getByRole("button", { name: "All", pressed: false })`,
 so the items stay buttons with `aria-pressed`.
 
-### F — List or Board, on any Issue list (point 15; mockup first)
+### F — List or Board, on any Issue list (point 15; mockup first) — shipped
 
 **URL**: `view=board` joins `IssuesSearch` (absent = list); a `ToggleGroup aria-label="View"` with icon items
 "List" / "Board" sits at the right of the filter bar on the Workspace lists only (the Project's Issues tab
@@ -376,6 +376,14 @@ that have this State, faint; (C) cards carry a muted Project name line vs key on
 card. **Tests**: `issues-home.test.tsx` — the toggle writes `view=board`, hides Group by, folds same-named
 States into one column with OPS-1 in Todo, a Gate card offers the ruling, `j`/`Enter` work on cards; new
 `issue-board.test.tsx` for `planDrop`, `foldStates`, `groupIntoColumns`.
+
+What shipped differently in F: as designed, with `lib/states.ts` (`foldStates`) replacing the list's inline
+dedupe and `components/issue-board.tsx` carrying `planDrop`, `groupIntoColumns`, `IssueBoardView`,
+`IssueBoard`, `BoardCard` and the Gate dialog; the Project Board is now forty lines of data plumbing over
+it, its tests untouched. The seeded Workspace shows the fold at work: Intent · Todo · Spec · Plan · Build ·
+Review · Doing · Done, OPS cards in Todo and Doing. The refusal path is covered by `planDrop`'s unit tests
+and the dimming by the mockup; a synthetic pointer drag did not activate dnd-kit in the Browser pane, so
+the toast was not exercised end to end.
 
 ### H — Workflow editor: visible order, real editor, real picker (point 17; mockup first)
 
