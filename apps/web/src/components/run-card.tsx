@@ -282,7 +282,10 @@ export function RunCard({ run, decisions, pinned = false, answering, onAnswer }:
       ) : null}
 
       {run.status === "awaiting_input" && !waitingOnGate ? (
-        <div className="flex flex-col gap-2 border-t border-gate/40 bg-gate/5 px-3 py-2">
+        <div
+          role="status"
+          className="flex flex-col gap-2 border-t border-gate/40 bg-gate/5 px-3 py-2"
+        >
           <p className="text-xs font-medium text-gate-foreground dark:text-gate">
             Needs your answer
           </p>

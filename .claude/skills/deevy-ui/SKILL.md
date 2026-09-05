@@ -11,6 +11,22 @@ Everything else is quiet. This skill records the decisions of the 2026-09 redesi
 (`docs/plans/ui-redesign.md`); each slice of that plan appends what it settled. Read `shadcn` (component
 rules) and `frontend-design` (design process) beside it.
 
+## Where things are
+
+| You want                                 | Look at                                                                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| tokens, type, both themes                | `apps/web/src/index.css`, `/dev/tokens` on a dev instance                                                         |
+| the frame, sidebar, top bar, member menu | `routes/shell.tsx`                                                                                                |
+| ⌘K, shortcuts, `?`                       | `components/command-palette.tsx`, `lib/shortcuts.ts`, `components/shortcuts-sheet.tsx`                            |
+| a list screen                            | `components/data-table.tsx`, `components/issue-filters.tsx`, `routes/issues/list.tsx`                             |
+| the Issue, peek or page                  | `routes/issues/issue.tsx`, `components/side-peek.tsx`, `gate-controls.tsx`, `activity-stream.tsx`, `run-card.tsx` |
+| the editor                               | `components/markdown-editor.tsx` (Tiptap, markdown in and out), `components/markdown.tsx`                         |
+| Inbox, Board, Project                    | `routes/inbox.tsx`, `routes/projects/board.tsx` (`components/reui/kanban.tsx`), `routes/projects/*`               |
+| a Settings page                          | `components/settings-page.tsx`, `routes/settings/*`, `settingsNav` in `routes/settings/layout.tsx`                |
+| the chips and badges                     | `components/member-chip.tsx`, `state-badge.tsx`, `run-status.tsx`, `kbd-hint.tsx`                                 |
+| everything outside the shell             | `App.tsx` (`SignInFrame`, `DevSignIn`)                                                                            |
+| the accessible names tests rely on       | "Test contracts", at the end                                                                                      |
+
 ## Ground rules
 
 - Vocabulary is CONTEXT.md's, in code, copy and tests: Member, Human, Agent, Sponsor, Workspace, Project,
@@ -265,6 +281,32 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `before`, filters by Project and subject on the server and by kind prefix on the page, and shows a row's
   payload as JSON when clicked. It is under Settings › Workspace › Event log; admins' reading.
 - `DataTable` without groups is the plain table with a keyboard row; the Event log is its first flat use.
+
+## What slice 11 settled (polish, mobile, the keyboard on screen)
+
+- **Mobile is read-and-rule, and it falls out of the containers.** Do not add breakpoint-specific
+  components: the Sidebar is a Sheet below 768px, the peek is full width below `sm`, the Inbox folds to one
+  pane below 1024px, the Issue view stacks under `@3xl`, the Board scrolls horizontally. A new screen gets
+  the same treatment by using the same containers; check it at 390px with `scrollWidth === innerWidth`,
+  and clip any table cell that mixes text with chips (`min-w-0 overflow-hidden`; a `max-w-0` cell does
+  not clip on its own, so chips paint over the next column).
+- **The keyboard map lives in `components/shortcuts-sheet.tsx`** as data, shown by `?` and by the palette's
+  Help group. Add a shortcut there when you add one to the app; the sheet is what a Human reads, so its
+  wording is the app's, not the code's (`mod+enter` renders as ⌘↵ / Ctrl+↵ through `Shortcut`).
+- **The palette knows the focused Issue from the URL**, `focusedIssue(pathname, search)` in
+  `command-palette.tsx`: `/issues/KEY` first, else `?peek=`. Its group is Open full page (peek only), Copy
+  key, Copy link. Actions that need a picker stay in the rail behind `a`/`s`/`l`/`p`.
+- **Live regions:** the Gate banner and the Run's "Needs your answer" band are `role="status"`. Nothing
+  else announces; a new one needs a reason.
+- **Everything outside the shell** (`SignedOut`, `NotAMember`, `Suspended`) renders in `SignInFrame`
+  (`App.tsx`): the legend on the left is built from `MemberChip` and `StateBadge` with placeholder Members,
+  so a token change shows up there too. The dev form stays under the GitHub button, only when `health.ping`
+  reports `devSignIn`.
+- **`ui/*` hygiene:** a `ui/*` file may sit unimported (it is the kit), but a dependency only an unimported
+  file needs goes with the file. Removed in slice 11: `chart`, `carousel`, `calendar`, `input-otp`,
+  `aspect-ratio`, `menubar`, `navigation-menu`, `slider`, `progress`, `radio-group`, `drawer`,
+  `context-menu`, `hover-card`, `pagination`, `accordion`, and `recharts`, `embla-carousel-react`,
+  `react-day-picker`, `input-otp` from the catalog. Add one back with `pnpm dlx shadcn@latest add`.
 
 ## Test contracts
 

@@ -202,15 +202,23 @@ export function IssuesPage({
       id: "title",
       header: "Title",
       cell: (row) => (
-        <span className="flex items-center gap-2">
-          <span className="truncate font-medium">{row.title}</span>
+        // Clipped, so long Labels shorten the title instead of painting over the
+        // next column; on a phone the Labels go and the title keeps the cell.
+        <span className="flex min-w-0 items-center gap-2 overflow-hidden">
+          <span className="min-w-0 truncate font-medium">{row.title}</span>
           {row.labels.slice(0, 2).map((label) => (
-            <Badge key={label.id} variant="outline" className="shrink-0 font-normal">
+            <Badge
+              key={label.id}
+              variant="outline"
+              className="hidden shrink-0 font-normal sm:inline-flex"
+            >
               {label.scope ? `${label.scope}: ${label.name}` : label.name}
             </Badge>
           ))}
           {row.labels.length > 2 ? (
-            <span className="text-xs text-muted-foreground">+{row.labels.length - 2}</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              +{row.labels.length - 2}
+            </span>
           ) : null}
         </span>
       ),

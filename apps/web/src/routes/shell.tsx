@@ -20,6 +20,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { Shortcut } from "@/components/kbd-hint";
 import { MemberChip } from "@/components/member-chip";
 import { NewIssueButton, NewIssueProvider } from "@/components/new-issue";
+import { ShortcutsSheet } from "@/components/shortcuts-sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,6 +81,7 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   useLiveEvents(true);
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   // "My Agents' Issues" is offered to a Sponsor and to nobody else.
@@ -88,6 +90,7 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   );
 
   useShortcut("mod+k", () => setPaletteOpen((open) => !open), { global: true });
+  useShortcut("?", () => setShortcutsOpen((open) => !open));
   useShortcut("g i", () => void navigate({ to: "/inbox" }));
   useShortcut("g m", () => void navigate({ to: "/", search: { assignee: "me" } }));
   useShortcut("g a", () => void navigate({ to: "/", search: {} }));
@@ -260,7 +263,9 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
           open={paletteOpen}
           onOpenChange={setPaletteOpen}
           projects={(projects.data?.projects ?? []).map(({ key, name }) => ({ key, name }))}
+          onShowShortcuts={() => setShortcutsOpen(true)}
         />
+        <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
         <Toaster />
       </NewIssueProvider>
     </SidebarProvider>

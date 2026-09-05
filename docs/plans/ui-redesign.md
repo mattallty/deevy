@@ -490,13 +490,45 @@ since none of them sorts, folds or has a keyboard row.
 `routes/settings/events.tsx`, `events.list` `before` input + snapshot, `docs/OPERATIONS.md` points at it.
 New `event-log.test.tsx`.
 
-### 11 — Polish, mobile, prune, skill
+### 11 — Polish, mobile, prune, skill (shipped)
 
 Mobile is **read-and-rule** only: sidebar offcanvas, peek as full-screen Sheet, Inbox single pane, Issue
 page rail stacked with the ruling card first, Board scrolls without drag. Palette Issue actions; shortcuts
 sheet; `aria-live` on the Gate banner and Run band; sign-in from `login-04`; delete the unused `ui/*`;
 `docs/screens/` from the seeded instance; `deevy-ui/SKILL.md` final (tokens, components, templates,
 keyboard map, contract table); `docs/plans/ui-redesign.md` records what shipped differently.
+
+What shipped differently:
+
+- **Mobile needed two lines, not new components.** Slices 1–8 had already made every layout
+  container-driven: shadcn's Sidebar is a Sheet below 768px, the Inbox's two panes fold to one below
+  1024px, the Issue view stacks its rail above the main column under `@3xl`, and the Board's columns scroll
+  inside their own `overflow-x-auto` row. Measuring each at 390px (`scrollWidth === innerWidth`, ruling
+  card above the title) found two misses: the peek was shadcn's `w-3/4` below `sm` (now `w-full`), and the
+  Issues table's Label chips painted over the Assignee column because nothing clipped the title cell (now
+  clipped, chips hidden below `sm`).
+- **Palette Issue actions are three, not nine.** The plan listed Assign, Move, Approve/Reject, Label, Parent,
+  Copy key, Copy link and Open full page. Only the last three are in the palette: the rest each need a picker
+  the rail already has, one keystroke away (`a`, `s`, `l`, `p`), and a palette that opened a second picker
+  was one step longer than the rail. The palette knows the focused Issue from the URL (`/issues/KEY`, else
+  `?peek=`) through `focusedIssue()` in `command-palette.tsx`, so it needs no provider.
+- **The shortcuts sheet** (`components/shortcuts-sheet.tsx`, `?`, and "Keyboard shortcuts" under the
+  palette's Help group) carries the keyboard map as data, so the map in `deevy-ui/SKILL.md` and the one on
+  screen are the same list.
+- **`aria-live`:** the Gate banner already was `role="status"` (slice 4); the Run's "Needs your answer"
+  band is now too. Nothing else on the screen announces.
+- **Sign-in** is the `login-04` shape without the block's files: a two-column frame (`SignInFrame` in
+  `App.tsx`) whose left half is the legend built from the real `MemberChip` and `StateBadge`, and whose right
+  half is whatever the visitor has to do — sign in, or read why they are not a Member or are suspended.
+  Below `lg` the legend goes and the brand sits above the card.
+- **Pruned:** the fifteen `ui/*` files the plan named, and the four dependencies only they used
+  (`recharts`, `embla-carousel-react`, `react-day-picker`, `input-otp`) from `apps/web/package.json` and
+  the catalog. Thirteen other unimported `ui/*` files stay (`popover`, `card`, `alert`, `switch`, `field`,
+  `combobox`, `scroll-area`, …): they are the base kit the next screen reaches for, and cost nothing
+  unimported.
+- **`docs/screens/` was not made.** The Browser pane returns screenshots to the session, not to disk, so a
+  checked-in gallery would have been retyped by hand and stale by the next slice. The seeded instance is
+  the gallery: `docs/DEVELOPMENT.md` "Running without an OAuth App" is how to open it.
 
 ## Risks and how the slices carry them
 

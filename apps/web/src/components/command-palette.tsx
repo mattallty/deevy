@@ -1,16 +1,21 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   CircleUser,
+  Copy,
   FolderKanban,
   GitBranch,
   Inbox,
   Kanban,
+  Keyboard,
+  Link2,
   ListTodo,
+  Maximize2,
   Plus,
   Settings,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useNewIssue } from "@/components/new-issue";
 import {
   Command,
@@ -35,19 +40,24 @@ export interface PaletteProject {
 /**
  * ⌘K: everywhere in deevy by name, the things you can make, and any Issue by
  * key or title, from one box (docs/plans/ui-redesign.md). Issues come from
- * `issues.list`'s `q`, one query per keystroke past the first; the actions on
- * a focused Issue arrive with the Issue panel.
+ * `issues.list`'s `q`, one query per keystroke past the first. The Issue in
+ * front of you — the page at `/issues/KEY`, or the one `?peek=` holds open —
+ * gets its own group at the top: open it whole, copy its key, copy its link.
  */
 export function CommandPalette({
   open,
   onOpenChange,
   projects,
+  onShowShortcuts,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projects: PaletteProject[];
+  onShowShortcuts?: () => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const focused = focusedIssue(location.pathname, location.search as { peek?: unknown });
   const { open: newIssue } = useNewIssue();
   // While it is open the page behind it is quiet, so `g i` typed into the
   // search box searches instead of jumping.
@@ -70,6 +80,10 @@ export function CommandPalette({
   const goTo = (to: string) => {
     close();
     void navigate({ to: to as "/" });
+  };
+  const copy = (what: string, text: string) => {
+    close();
+    void navigator.clipboard?.writeText(text).then(() => toast(`Copied ${what}`));
   };
   const goToProject = (key: string, where: "" | "/board" | "/workflow") => {
     close();
@@ -97,6 +111,48 @@ export function CommandPalette({
           <CommandEmpty>
             {searching && found.isPending ? "Searching…" : "Nothing matches."}
           </CommandEmpty>
+          {focused ? (
+            <>
+              <CommandGroup heading={focused.key}>
+                {focused.peeked ? (
+                  <CommandItem
+                    value={`${focused.key} open full page`}
+                    onSelect={() => {
+                      close();
+                      void navigate({
+                        to: "/issues/$issueKey",
+                        params: { issueKey: focused.key },
+                      });
+                    }}
+                  >
+                    <Maximize2 />
+                    Open full page
+                    <CommandShortcut>o</CommandShortcut>
+                  </CommandItem>
+                ) : null}
+                <CommandItem
+                  value={`${focused.key} copy key`}
+                  onSelect={() => copy(focused.key, focused.key)}
+                >
+                  <Copy />
+                  Copy key
+                </CommandItem>
+                <CommandItem
+                  value={`${focused.key} copy link`}
+                  onSelect={() =>
+                    copy(
+                      "the link",
+                      new URL(`/issues/${focused.key}`, window.location.origin).toString(),
+                    )
+                  }
+                >
+                  <Link2 />
+                  Copy link
+                </CommandItem>
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          ) : null}
           {searching && found.data && found.data.issues.length > 0 ? (
             <CommandGroup heading="Issues">
               {found.data.issues.map((issue) => (
@@ -221,8 +277,36 @@ export function CommandPalette({
               )),
             )}
           </CommandGroup>
+          {onShowShortcuts ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Help">
+                <CommandItem
+                  onSelect={() => {
+                    close();
+                    onShowShortcuts();
+                  }}
+                >
+                  <Keyboard />
+                  Keyboard shortcuts
+                  <CommandShortcut>?</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            </>
+          ) : null}
         </CommandList>
       </Command>
     </CommandDialog>
   );
+}
+
+/** The Issue the screen is about, if it is about one: the page's, else the peek's. */
+export function focusedIssue(
+  pathname: string,
+  search: { peek?: unknown },
+): { key: string; peeked: boolean } | null {
+  const onPage = /^\/issues\/([^/]+)\/?$/.exec(pathname);
+  if (onPage?.[1]) return { key: decodeURIComponent(onPage[1]), peeked: false };
+  if (typeof search.peek === "string" && search.peek) return { key: search.peek, peeked: true };
+  return null;
 }

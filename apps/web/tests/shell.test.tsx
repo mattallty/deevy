@@ -160,3 +160,30 @@ describe("the app shell", () => {
     expect(within(menu).getByRole("menuitemradio", { name: /Dark/ })).toBeTruthy();
   });
 });
+
+describe("keyboard help and the focused Issue", () => {
+  it("? opens the shortcuts sheet, and the palette lists it under Help", async () => {
+    await mountAt("/");
+    fireEvent.keyDown(document.body, { key: "?", shiftKey: true });
+    expect(await screen.findByRole("heading", { name: "Keyboard" })).toBeTruthy();
+    expect(screen.getByText("Mark everything read")).toBeTruthy();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true });
+    expect(await screen.findByRole("option", { name: /Keyboard shortcuts/ })).toBeTruthy();
+  });
+
+  it("the palette acts on the Issue the peek holds open", async () => {
+    await mountAt("/?peek=DEV-3");
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true });
+    expect(await screen.findByRole("option", { name: /Open full page/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Copy key/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Copy link/ })).toBeTruthy();
+  });
+
+  it("on the Issue page the group has no Open full page, since you are there", async () => {
+    await mountAt("/issues/DEV-3");
+    fireEvent.keyDown(document.body, { key: "k", metaKey: true });
+    expect(await screen.findByRole("option", { name: /Copy key/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /Open full page/ })).toBeNull();
+  });
+});
