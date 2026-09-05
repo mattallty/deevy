@@ -29,8 +29,24 @@ vi.mock("../src/lib/orpc.ts", async () => {
     projects: {
       list: async () => ({
         projects: [
-          { id: "p1", key: "DEV", name: "deevy", description: null, team: null, archivedAt: null },
-          { id: "p2", key: "OPS", name: "ops", description: null, team: null, archivedAt: null },
+          {
+            id: "p1",
+            key: "DEV",
+            name: "deevy",
+            description: null,
+            team: null,
+            archivedAt: null,
+            states: [],
+          },
+          {
+            id: "p2",
+            key: "OPS",
+            name: "ops",
+            description: null,
+            team: null,
+            archivedAt: null,
+            states: [],
+          },
         ],
       }),
     },

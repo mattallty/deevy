@@ -4,8 +4,9 @@ import {
   createRouter,
   createMemoryHistory,
   redirect,
+  useNavigate,
 } from "@tanstack/react-router";
-import { parseIssuesSearch } from "./components/issue-filters.tsx";
+import { parseIssuesSearch, type IssuesSearch } from "./components/issue-filters.tsx";
 import { IssuesPage } from "./routes/issues/list.tsx";
 import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
@@ -13,7 +14,8 @@ import { TokensPage } from "./routes/dev/tokens.tsx";
 import { InboxPage, parseInboxSearch } from "./routes/inbox.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
-import { ProjectPage } from "./routes/projects/project.tsx";
+import { ProjectIssuesTab, ProjectLayout } from "./routes/projects/project.tsx";
+import { ProjectSettingsPage } from "./routes/projects/project-settings.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { ChannelsPage } from "./routes/settings/channels.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
@@ -66,11 +68,43 @@ const projectsRoute = createRoute({
   path: "/projects",
   component: ProjectsPage,
 });
+// A Project is a layout route: header and tabs, with each tab a child so it is
+// linkable alone. The Issue filters and the peek ride on the layout's search,
+// so the Issues tab and the Board share them (docs/plans/ui-redesign.md).
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$key",
+  validateSearch: (search: Record<string, unknown>) => parseIssuesSearch(search),
   component: function Project() {
-    return <ProjectPage projectKey={projectRoute.useParams().key} />;
+    return <ProjectLayout projectKey={projectRoute.useParams().key} />;
+  },
+});
+function useProjectSearch() {
+  const search = projectRoute.useSearch();
+  // The router's own navigate, not the layout route's: a route's navigate takes
+  // its path as `from`, and a tab writing its search would land on the layout —
+  // the Board losing "/board" the moment a peek opened. `to: "."` is where we are.
+  const navigate = useNavigate();
+  const onSearch = (patch: Partial<IssuesSearch>) =>
+    void navigate({
+      to: ".",
+      search: (previous) =>
+        parseIssuesSearch({ ...(previous as Record<string, unknown>), ...patch }) as never,
+    });
+  return { search, onSearch };
+}
+const projectIssuesRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/",
+  component: function ProjectIssues() {
+    const { search, onSearch } = useProjectSearch();
+    return (
+      <ProjectIssuesTab
+        projectKey={projectRoute.useParams().key}
+        search={search}
+        onSearch={onSearch}
+      />
+    );
   },
 });
 const inboxRoute = createRoute({
@@ -91,30 +125,35 @@ const inboxRoute = createRoute({
   },
 });
 const boardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$key/board",
-  validateSearch: (search: Record<string, unknown>) => parseIssuesSearch(search),
+  getParentRoute: () => projectRoute,
+  path: "board",
   component: function Board() {
-    const search = boardRoute.useSearch();
-    const navigate = boardRoute.useNavigate();
+    const { search, onSearch } = useProjectSearch();
     return (
-      <BoardPage
-        projectKey={boardRoute.useParams().key}
-        search={search}
-        onSearch={(patch) =>
-          void navigate({
-            search: (previous) => parseIssuesSearch({ ...previous, ...patch }),
-          })
-        }
-      />
+      <BoardPage projectKey={projectRoute.useParams().key} search={search} onSearch={onSearch} />
     );
   },
 });
 const workflowRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$key/settings/workflow",
+  getParentRoute: () => projectRoute,
+  path: "workflow",
   component: function Workflow() {
-    return <WorkflowPage projectKey={workflowRoute.useParams().key} />;
+    return <WorkflowPage projectKey={projectRoute.useParams().key} />;
+  },
+});
+const projectSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings",
+  component: function ProjectSettings() {
+    return <ProjectSettingsPage projectKey={projectRoute.useParams().key} />;
+  },
+});
+// Where the Workflow editor used to live; links in the wild keep working.
+const oldWorkflowRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/workflow",
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: "/projects/$key/workflow", params: { key: params.key } });
   },
 });
 const issueRoute = createRoute({
@@ -221,9 +260,13 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   projectsRoute,
   inboxRoute,
-  projectRoute,
-  boardRoute,
-  workflowRoute,
+  projectRoute.addChildren([
+    projectIssuesRoute,
+    boardRoute,
+    workflowRoute,
+    projectSettingsRoute,
+    oldWorkflowRoute,
+  ]),
   issueRoute,
   settingsRoute.addChildren([
     settingsIndexRoute,

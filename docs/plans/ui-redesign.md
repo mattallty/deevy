@@ -461,12 +461,17 @@ What shipped differently in slice 7: no jsdom pointer-sequence test for a drag w
 sensors need layout jsdom does not have, so the non-modal peek and the close-on-drag are asserted by the
 card test and read in the browser instead.
 
-### 8 — Project tabs, Project settings, Workflow route
+### 8 — Project tabs, Project settings, Workflow route (shipped)
 
 Tab routes; `workflow.tsx` at `/projects/$key/workflow` with a redirect from the old path, its States
 reordered by drag with `@diceui/sortable` (the `Move X up/down` buttons stay for the keyboard and the tests);
 `project-settings.tsx` on `projects.update`/`archive`. `gates.test.tsx`, `workflow.test.tsx` mount the new
 path; `projects.test.tsx` "Workflow" list moves with the strip.
+
+What shipped differently in slice 8: the Dice UI sortable arrived importing `radix-ui` for its `asChild`
+Slot — the one thing the no-Radix rule exists to catch — so the import is replaced by a local twenty-line
+Slot and the dependency removed; and the Issues tab is the Issues home embedded rather than the old
+per-Project table, so filters, grouping, keyboard and the peek are the same on both.
 
 ### 9 — Settings template, eleven pages, Agent detail
 

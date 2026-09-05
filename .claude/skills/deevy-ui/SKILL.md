@@ -228,6 +228,23 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **Filters** are the shared `IssueFilters` with `hideProject` and `nativeAssignee` — the Assignee is a plain
   `<select>` on the Board because its test drives it with a change event.
 
+## What slice 8 settled (the Project)
+
+- **`/projects/$key` is a layout route** (`ProjectLayout`: header, `ul aria-label="Workflow"` strip of
+  `StateBadge`s, `nav aria-label="Project"` tabs) with children `/` (Issues: quick-add "New Issue"/"Add
+  Issue" + the Issues home `embedded` and `fixedProject`), `board`, `workflow`, `settings`
+  (`projects.update`/`archive`), and `settings/workflow` redirecting to `workflow`. The Issue filters and
+  `?peek=` validate on the layout, so the tabs share them.
+- **A tab writes its search with the router's `useNavigate()` and `to: "."`**, never the layout route's
+  `useNavigate()`: a route's navigate takes its own path as `from`, and the Board lost `/board` the moment a
+  peek opened.
+- **`components/diceui/sortable.tsx`** is `@diceui/sortable` (MIT, dnd-kit) with `radix-ui`'s `Slot`
+  replaced by `lib/slot.tsx` (twenty lines: clone the child with merged props and composed refs) — the CLI
+  had added `radix-ui` to the catalog, which the no-Radix rule forbids; it also wrote `lib/compose-refs.ts`.
+  The Workflow editor's States are `SortableItem asChild` around each `<li>` with a "Drag <State>" handle;
+  the "Move up/down" buttons stay for the keyboard and the tests. New draft States carry a `uid`.
+- Under a Project the Workflow editor's heading is an `h2`: the Project's name is the page's `h1`.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

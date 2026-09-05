@@ -15,6 +15,7 @@ const stub = vi.hoisted(() => {
   return {
     states,
     created: [] as unknown[],
+    saved: [] as unknown[],
     projects: [
       {
         id: "p1",
@@ -69,6 +70,10 @@ vi.mock("../src/lib/orpc.ts", async () => {
       },
       create: async (input: unknown) => {
         stub.created.push(input);
+        return stub.projects[0];
+      },
+      update: async (input: unknown) => {
+        stub.saved.push(input);
         return stub.projects[0];
       },
     },
@@ -168,5 +173,40 @@ describe("the Teams settings page", () => {
     expect(within(team).getByRole("heading", { name: "Platform" })).toBeTruthy();
     expect(within(team).getByText("@platform")).toBeTruthy();
     expect(within(team).getByText("Ada Lovelace")).toBeTruthy();
+  });
+});
+
+describe("the Project's tabs", () => {
+  it("links Issues, Board, Workflow and Settings, and marks the one you are on", async () => {
+    await mountAt("/projects/DEV/settings");
+
+    const nav = await screen.findByRole("navigation", { name: "Project" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href")),
+    ).toEqual([
+      "/projects/DEV",
+      "/projects/DEV/board",
+      "/projects/DEV/workflow",
+      "/projects/DEV/settings",
+    ]);
+    expect(within(nav).getByRole("link", { name: "Settings" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+  });
+
+  it("edits the Project's name from the Settings tab", async () => {
+    await mountAt("/projects/DEV/settings");
+
+    const name = (await screen.findByLabelText("Name")) as HTMLInputElement;
+    expect(name.value).toBe("deevy");
+    fireEvent.change(name, { target: { value: "deevy, renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(stub.saved).toContainEqual(
+        expect.objectContaining({ key: "DEV", name: "deevy, renamed", teamId: "t1" }),
+      ),
+    );
   });
 });

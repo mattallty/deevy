@@ -71,11 +71,11 @@ export function CommandPalette({
     close();
     void navigate({ to: to as "/" });
   };
-  const goToProject = (key: string, where: "" | "/board" | "/settings/workflow") => {
+  const goToProject = (key: string, where: "" | "/board" | "/workflow") => {
     close();
     if (where === "/board") void navigate({ to: "/projects/$key/board", params: { key } });
-    else if (where === "/settings/workflow")
-      void navigate({ to: "/projects/$key/settings/workflow", params: { key } });
+    else if (where === "/workflow")
+      void navigate({ to: "/projects/$key/workflow", params: { key } });
     else void navigate({ to: "/projects/$key", params: { key } });
   };
 
@@ -195,7 +195,7 @@ export function CommandPalette({
                   <CommandItem
                     key={`${project.key}-workflow`}
                     value={`${project.key} ${project.name} Workflow`}
-                    onSelect={() => goToProject(project.key, "/settings/workflow")}
+                    onSelect={() => goToProject(project.key, "/workflow")}
                   >
                     <GitBranch />
                     <span className="font-mono text-xs text-muted-foreground">{project.key}</span>

@@ -27,6 +27,7 @@ const stub = vi.hoisted(() => {
     parent: null,
     children: [] as unknown[],
     closedAt: null,
+    updatedAt: new Date("2026-09-05T10:00:00Z"),
     project: { id: "p1", key: "DEV", name: "deevy" },
     gateDecisions: [] as unknown[],
     labels: [] as unknown[],

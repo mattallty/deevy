@@ -42,9 +42,15 @@ function ago(value: Date | string): string {
 export function IssuesPage({
   search,
   onSearch,
+  fixedProject,
+  embedded = false,
 }: {
   search: IssuesSearch;
   onSearch: (patch: Partial<IssuesSearch>) => void;
+  /** Under a Project's tab: that Project only, and no Project filter. */
+  fixedProject?: string;
+  /** No header of its own; the page around it has one. */
+  embedded?: boolean;
 }) {
   const navigate = useNavigate();
   const me = useQuery(orpc.me.get.queryOptions());
@@ -70,10 +76,11 @@ export function IssuesPage({
       : search.assignee && !["agents:me", "none"].includes(search.assignee)
         ? search.assignee
         : undefined;
+  const projectKey = fixedProject ?? search.project;
   const issues = useQuery(
     orpc.issues.list.queryOptions({
       input: {
-        ...(search.project ? { projectKey: search.project } : {}),
+        ...(projectKey ? { projectKey } : {}),
         ...(assigneeMemberId ? { assigneeMemberId } : {}),
         ...(search.open === "0" ? {} : { open: true }),
         ...(search.q ? { q: search.q } : {}),
@@ -100,8 +107,8 @@ export function IssuesPage({
   const states = useMemo<FilterState[]>(() => {
     const seen = new Map<string, FilterState>();
     for (const project of projects.data?.projects ?? []) {
-      if (search.project && project.key !== search.project) continue;
-      for (const state of project.states) {
+      if (projectKey && project.key !== projectKey) continue;
+      for (const state of project.states ?? []) {
         if (!seen.has(state.name)) {
           seen.set(state.name, {
             name: state.name,
@@ -112,7 +119,7 @@ export function IssuesPage({
       }
     }
     return [...seen.values()].sort((a, b) => categoryOrder[a.category] - categoryOrder[b.category]);
-  }, [projects.data, search.project]);
+  }, [projects.data, projectKey]);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const grouped = search.group !== "none";
@@ -262,25 +269,33 @@ export function IssuesPage({
           ? (projects.data?.projects.find((p) => p.key === search.project)?.name ?? search.project)
           : "All Issues";
 
+  const count = issues.data
+    ? `${String(rows.length)} ${rows.length === 1 ? "Issue" : "Issues"}${search.open === "0" ? "" : " open"}`
+    : undefined;
+  const filters = (
+    <IssueFilters
+      value={search}
+      onChange={onSearch}
+      projects={(projects.data?.projects ?? []).map(({ key, name }) => ({ key, name }))}
+      states={states}
+      members={memberList}
+      sponsorsAgents={myAgentIds.size > 0}
+      hideProject={Boolean(fixedProject)}
+    />
+  );
+
   return (
     <section className={cn("flex flex-col gap-4")}>
-      <PageHeader
-        title={title}
-        description={
-          issues.data
-            ? `${String(rows.length)} ${rows.length === 1 ? "Issue" : "Issues"}${search.open === "0" ? "" : " open"}`
-            : undefined
-        }
-      >
-        <IssueFilters
-          value={search}
-          onChange={onSearch}
-          projects={(projects.data?.projects ?? []).map(({ key, name }) => ({ key, name }))}
-          states={states}
-          members={memberList}
-          sponsorsAgents={myAgentIds.size > 0}
-        />
-      </PageHeader>
+      {embedded ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {filters}
+          {count ? <span className="text-xs text-muted-foreground">{count}</span> : null}
+        </div>
+      ) : (
+        <PageHeader title={title} description={count}>
+          {filters}
+        </PageHeader>
+      )}
 
       {issues.isError ? (
         <p className="text-destructive">Could not load Issues: {issues.error.message}</p>

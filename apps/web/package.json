@@ -16,6 +16,7 @@
     "@deevy/adapters": "workspace:*",
     "@deevy/core": "workspace:*",
     "@dnd-kit/core": "catalog:",
+    "@dnd-kit/modifiers": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
     "@fontsource-variable/ibm-plex-sans": "catalog:",
