@@ -19,6 +19,7 @@ export default defineConfig({
     overrides: [
       {
         files: [
+          "apps/claude-agent/**",
           "apps/server/**",
           "apps/web/scripts/**",
           "packages/adapters/src/node/**",
