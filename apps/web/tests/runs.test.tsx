@@ -48,6 +48,22 @@ const stub = vi.hoisted(() => {
       ],
       "run-done": [
         {
+          id: "a-thought",
+          runId: "run-done",
+          kind: "thought",
+          body: "Reading intent v2",
+          payload: null,
+          createdAt: new Date("2026-09-04T10:01:00Z"),
+        },
+        {
+          id: "a-action",
+          runId: "run-done",
+          kind: "action",
+          body: "Wrote plan v1",
+          payload: null,
+          createdAt: new Date("2026-09-04T10:02:00Z"),
+        },
+        {
           id: "a2",
           runId: "run-done",
           kind: "elicitation",
@@ -86,7 +102,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { IssueRuns } = await import("../src/components/issue-runs.tsx");
+const { IssueRuns } = await import("../src/components/run-card.tsx");
 
 function mount(ui: React.ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -128,5 +144,22 @@ describe("the Runs section on an Issue", () => {
 
     const done = await screen.findByRole("article", { name: /run-done/i });
     expect(await within(done).findByText(/approved by Ada/i)).toBeTruthy();
+  });
+
+  it("puts the Run that is waiting first, open, and draws each kind of Activity", async () => {
+    mount(<IssueRuns issueKey="DEV-1" />);
+
+    const articles = await screen.findAllByRole("article");
+    // Two are waiting; the finished one is last.
+    expect(articles.at(-1)?.getAttribute("aria-label")).toBe("run-done");
+    expect(articles[0]?.getAttribute("data-pinned")).toBe("true");
+
+    const done = await screen.findByRole("article", { name: /run-done/i });
+    const feed = await within(done).findByRole("list", { name: /Activity of run-done/ });
+    const kinds = within(feed)
+      .getAllByRole("listitem")
+      .map((item) => item.getAttribute("data-kind"));
+    expect(kinds).toEqual(["thought", "action", "elicitation"]);
+    expect(within(feed).getByText("Reading intent v2")).toBeTruthy();
   });
 });

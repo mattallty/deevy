@@ -7,7 +7,7 @@ import { MemberChip } from "@/components/member-chip";
 import { StateBadge } from "@/components/state-badge";
 import { IssueDocuments } from "@/components/issue-documents";
 import { IssueLinks } from "@/components/issue-links";
-import { IssueRuns } from "@/components/issue-runs";
+import { IssueRuns } from "@/components/run-card";
 import { LabelPicker } from "@/components/label-picker";
 import { Markdown } from "@/components/markdown.tsx";
 import { Button } from "@/components/ui/button";

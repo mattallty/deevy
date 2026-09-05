@@ -185,6 +185,21 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **Sheet width.** shadcn's `SheetContent` sets `data-[side=right]:sm:max-w-sm`; to widen it, use the same
   variant chain (`data-[side=right]:sm:max-w-[720px]`) or the narrower class wins.
 
+## What slice 5 settled (Runs)
+
+- **`components/run-card.tsx`** exports `IssueRuns` (the section on an Issue) and `RunCard`. Each card is
+  an `article` named by the Run id: the Agent's `MemberChip`, `RunStatus` (label "Waiting for approval"
+  when the Run waits on a Gate), "started by <trigger>", elapsed time, the summary, and the Activity feed as
+  `<ol aria-label="Activity of <id>">` with `li[data-kind]` per Activity — thought (muted italic), action,
+  elicitation (gate hue), response (agent hue), error (destructive, mono), prompt (human hue). Feeds fold to
+  the last three unless pinned or expanded.
+- **The Run owed a Human comes first** (`data-pinned`), open, with a "Needs your answer" band and a plain
+  `Textarea` named "Answer this Run" (⌘Enter sends) — a textarea, not the editor, because the runs test asks
+  for one textbox and a reply to an Agent is a sentence. A Run waiting on a Gate shows "Open the Gate" and
+  no answer box: the ruling card is the only place a Gate is decided (ADR-0004).
+- `MarkdownEditor`'s Source textarea is hidden with the HTML attribute, so it is never a second textbox to a
+  role query while a label still finds it.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

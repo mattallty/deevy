@@ -93,6 +93,9 @@ export function MarkdownEditor({
         rows={rows}
         value={value}
         placeholder={placeholder}
+        // The attribute, not only the class: a hidden control is not a second
+        // textbox to anything that asks by role, while a label still finds it.
+        hidden={view !== "source"}
         onChange={(changed) => onChange(changed.target.value)}
         onKeyDown={(pressed) => {
           if (onSubmit && pressed.key === "Enter" && (pressed.metaKey || pressed.ctrlKey)) {

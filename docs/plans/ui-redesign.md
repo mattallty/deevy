@@ -429,10 +429,14 @@ stays an inline toggle group rather than a `Popover`+`Command`, because that is 
 and a 300px rail holds it; and the avatar stack for approvers and children waits for the approver rule to
 be shown at all (slice 5).
 
-### 5 — Runs
+### 5 — Runs (shipped)
 
 `issue-runs.tsx` → `run-card.tsx`; kinds in `activity-item.tsx`; pinned `awaiting_input` Run; the answer box on the inline editor ("Answer this Run" kept).
 `runs.test.tsx` unchanged; new cases per kind and for the pin.
+
+What shipped differently in slice 5: the answer box stays a plain textarea rather than the inline editor —
+the Runs tests ask for one textbox on the waiting Run, and an answer to an Agent is a sentence, not a
+Document; ⌘Enter sends either way.
 
 ### 6 — Inbox that you act from
 
