@@ -390,7 +390,7 @@ Review · Doing · Done, OPS cards in Todo and Doing. The refusal path is covere
 and the dimming by the mockup; a synthetic pointer drag did not activate dnd-kit in the Browser pane, so
 the toast was not exercised end to end.
 
-### H — Workflow editor: visible order, real editor, real picker (point 17; mockup first)
+### H — Workflow editor: visible order, real editor, real picker (point 17; mockup first) — shipped
 
 **Groundwork (behaviour-preserving, lands before the mockups)**: `routes/projects/workflow.tsx` splits into
 the thin data-bound `WorkflowPage` and a pure `components/workflow-editor.tsx` (`WorkflowEditor` with
@@ -433,6 +433,15 @@ heavy):
 but a sticky footer makes the pending change visible: "3 unsaved changes · Save Workflow · Reset", per-card
 `data-dirty`/`data-new`, the "Move Issues in deleted States to" select when a State is removed. Tests added:
 reorder by keyboard shows the new step numbers, typing a template saves `documentTemplate`, the footer count.
+
+What shipped differently in H: Matt picked **master–detail** over the recommended stepper. The left list
+(`ul aria-label="States"`) has a drag handle, the step number and the StateBadge per row, an unsaved dot,
+and a row button named `Edit <State>`; the right side is `form aria-label="<State>"` with the arrows and
+Delete in its header and `StateFields` inside, the template in the markdown editor (`Template for <State>`
+on its Source textarea) and approvers in `components/approvers-picker.tsx`. A sticky footer counts unsaved
+changes (edited, added, removed, or a reorder) beside Add State, Reset and Save Workflow. The tests moved to
+select-then-query (`open("Plan")`), the approvers test to the combobox recipe, and the Gate test's display
+value to the page. No separate `WorkflowEditor` extraction was needed beyond `StateFields`.
 
 ## Order, checkpoints, records
 

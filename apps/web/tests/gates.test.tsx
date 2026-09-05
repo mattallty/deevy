@@ -186,6 +186,7 @@ describe("the Workflow editor", () => {
 
     const list = await screen.findByRole("list", { name: "States" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(4);
-    expect(within(list).getAllByDisplayValue("Intent")).toHaveLength(1);
+    // Master–detail: the first State's form sits beside the list, not inside it.
+    expect(screen.getAllByDisplayValue("Intent")).toHaveLength(1);
   });
 });

@@ -8,6 +8,9 @@ import {
   SortableOverlay,
 } from "@/components/diceui/sortable";
 import { useEffect, useState } from "react";
+import { ApproversPicker } from "@/components/approvers-picker";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -19,6 +22,7 @@ import {
   newDraftState,
 } from "@/components/workflow-state-fields";
 import { orpc } from "@/lib/orpc";
+import { cn } from "@/lib/utils";
 
 /**
  * The ordered State editor. A team that wants Todo, Doing, Done deletes the
@@ -34,6 +38,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const [draft, setDraft] = useState<DraftState[] | null>(null);
   const [removed, setRemoved] = useState<string[]>([]);
   const [moveIssuesTo, setMoveIssuesTo] = useState<string | null>(null);
+  const [selectedUid, setSelectedUid] = useState<string | null>(null);
 
   // The server's Workflow is the starting point; edits are local until saved.
   useEffect(() => {
@@ -94,7 +99,32 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
     const state = draft[at];
     if (state?.id) setRemoved([...removed, state.id]);
     setDraft(draft.filter((_, index) => index !== at));
+    setSelectedUid(draft[at + 1]?.uid ?? draft[at - 1]?.uid ?? null);
   };
+
+  // The picked layout (docs/plans/ui-redesign-2.md slice H): the order on the
+  // left, one State's rules on the right. What is unsaved is counted in the footer.
+  const current = draft.find((state) => state.uid === selectedUid) ?? draft[0] ?? null;
+  const at = current ? draft.indexOf(current) : -1;
+  const original = new Map((workflow.data?.states ?? []).map((state) => [state.id, state]));
+  const isDirty = (state: DraftState) => {
+    const was = state.id ? original.get(state.id) : undefined;
+    if (!was) return true;
+    return (
+      was.name !== state.name ||
+      was.isGate !== state.isGate ||
+      was.category !== state.category ||
+      (was.documentName ?? null) !== state.documentName ||
+      (was.documentTemplate ?? null) !== state.documentTemplate ||
+      (was.triggerAgentMemberId ?? null) !== state.triggerAgentMemberId ||
+      [...(was.approverMemberIds ?? [])].sort().join() !==
+        [...state.approverMemberIds].sort().join()
+    );
+  };
+  const moved = draft.filter(
+    (state, index) => state.id && (workflow.data?.states ?? [])[index]?.id !== state.id,
+  ).length;
+  const changes = draft.filter(isDirty).length + removed.length + (moved > 0 ? 1 : 0);
 
   return (
     <section className="flex flex-col gap-4">
@@ -103,73 +133,143 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
         <p className="text-sm text-muted-foreground">
           The States {projectKey} Issues move through, in order. A Gate is one an Issue cannot leave
           without a Human&apos;s approval, and a State that names an Agent hands it the Issue and
-          starts a Run the moment one arrives.
+          starts a Run the moment one arrives. Pick a State to edit its rules; drag, or use the
+          arrows, to reorder.
         </p>
       </header>
 
-      <Sortable value={draft} onValueChange={setDraft} getItemValue={(state) => state.uid}>
-        <SortableContent asChild>
-          <ul aria-label="States" className="flex flex-col gap-2">
-            {draft.map((state, index) => (
-              <SortableItem key={state.uid} value={state.uid} asChild>
-                <li className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3">
-                  <SortableItemHandle
-                    aria-label={`Drag ${state.name}`}
-                    className="mb-2 self-center text-muted-foreground hover:text-foreground"
+      <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <Sortable value={draft} onValueChange={setDraft} getItemValue={(state) => state.uid}>
+          <SortableContent asChild>
+            <ul aria-label="States" className="flex flex-col gap-1">
+              {draft.map((state, index) => (
+                <SortableItem key={state.uid} value={state.uid} asChild>
+                  <li
+                    className={cn(
+                      "flex items-center gap-1 rounded-md",
+                      state.uid === current?.uid && "bg-accent",
+                    )}
+                    {...(isDirty(state) ? { "data-dirty": "true" } : {})}
                   >
-                    <GripVertical className="size-4" />
-                  </SortableItemHandle>
-                  <div className="flex-1">
-                    <StateFields
-                      state={state}
-                      index={index}
-                      humans={humans}
-                      agents={agents.data?.agents ?? []}
-                      onEdit={(change) => edit(index, change)}
-                    />
-                  </div>
-                  <div className="flex gap-1 pb-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Move ${state.name} up`}
-                      onClick={() => swap(index, index - 1)}
+                    <SortableItemHandle
+                      aria-label={`Drag ${state.name}`}
+                      className="px-1.5 text-muted-foreground hover:text-foreground"
                     >
-                      <ArrowUp />
-                    </Button>
-                    <Button
+                      <GripVertical className="size-4" />
+                    </SortableItemHandle>
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Move ${state.name} down`}
-                      onClick={() => swap(index, index + 1)}
+                      aria-label={`Edit ${state.name}`}
+                      aria-current={state.uid === current?.uid ? "true" : undefined}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm hover:bg-accent"
+                      onClick={() => setSelectedUid(state.uid)}
                     >
-                      <ArrowDown />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete ${state.name}`}
-                      onClick={() => drop(index)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                </li>
-              </SortableItem>
-            ))}
-          </ul>
-        </SortableContent>
-        <SortableOverlay />
-      </Sortable>
+                      <span className="w-4 font-mono text-xs text-muted-foreground">
+                        {index + 1}
+                      </span>
+                      <StateBadge state={state} />
+                      {isDirty(state) ? (
+                        <span
+                          aria-label="unsaved"
+                          className="ml-auto size-1.5 shrink-0 rounded-full bg-gate"
+                        />
+                      ) : null}
+                    </button>
+                  </li>
+                </SortableItem>
+              ))}
+            </ul>
+          </SortableContent>
+          <SortableOverlay />
+        </Sortable>
 
-      <div className="flex flex-wrap items-end gap-3">
+        {current ? (
+          <form
+            aria-label={current.name}
+            className={cn(
+              "flex flex-col gap-4 rounded-lg border bg-card p-4",
+              current.isGate && "border-gate/40 bg-gate/5",
+            )}
+            onSubmit={(event) => event.preventDefault()}
+          >
+            <div className="flex items-center gap-3">
+              <StateBadge state={current} size="md" />
+              <span className="font-mono text-xs text-muted-foreground">Step {at + 1}</span>
+              <span className="flex-1" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Move ${current.name} up`}
+                disabled={at <= 0}
+                onClick={() => swap(at, at - 1)}
+              >
+                <ArrowUp />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Move ${current.name} down`}
+                disabled={at >= draft.length - 1}
+                onClick={() => swap(at, at + 1)}
+              >
+                <ArrowDown />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Delete ${current.name}`}
+                onClick={() => drop(at)}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+            <StateFields
+              state={current}
+              index={at}
+              humans={humans}
+              agents={agents.data?.agents ?? []}
+              onEdit={(change) => edit(at, change)}
+              renderTemplate={(state, onEdit) => (
+                <div className="max-h-96 overflow-y-auto rounded-md border">
+                  <MarkdownEditor
+                    mode="block"
+                    aria-label={`Template for ${state.name}`}
+                    value={state.documentTemplate ?? ""}
+                    onChange={(next) => onEdit({ documentTemplate: next })}
+                    rows={8}
+                    placeholder="## Problem"
+                  />
+                </div>
+              )}
+              renderApprovers={(state, onEdit) => (
+                <ApproversPicker
+                  id={`state-approvers-${String(at)}`}
+                  humans={humans}
+                  value={state.approverMemberIds}
+                  onChange={(approverMemberIds) => onEdit({ approverMemberIds })}
+                />
+              )}
+            />
+          </form>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No States. Add one to give the work a path.
+          </p>
+        )}
+      </div>
+
+      <div className="sticky bottom-0 flex flex-wrap items-end gap-3 border-t bg-background/95 py-3 backdrop-blur">
         <Button
           type="button"
           variant="outline"
-          onClick={() => setDraft([...draft, newDraftState()])}
+          onClick={() => {
+            const added = newDraftState();
+            setDraft([...draft, added]);
+            setSelectedUid(added.uid);
+          }}
         >
           Add State
         </Button>
@@ -194,9 +294,27 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           </div>
         ) : null}
 
+        <span className="flex-1 text-sm text-muted-foreground">
+          {changes === 0
+            ? "No changes"
+            : `${String(changes)} unsaved ${changes === 1 ? "change" : "changes"}`}
+        </span>
         <Button
           type="button"
-          disabled={save.isPending || draft.length === 0}
+          variant="ghost"
+          disabled={changes === 0}
+          onClick={() => {
+            setDraft(null);
+            setRemoved([]);
+          }}
+        >
+          Reset
+        </Button>
+        <Button
+          type="button"
+          disabled={
+            save.isPending || draft.length === 0 || draft.some((state) => !state.name.trim())
+          }
           onClick={() =>
             save.mutate({
               projectKey,
@@ -218,16 +336,6 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           }
         >
           Save Workflow
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            setDraft(null);
-            setRemoved([]);
-          }}
-        >
-          Reset
         </Button>
       </div>
 
