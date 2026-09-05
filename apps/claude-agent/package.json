@@ -6,7 +6,6 @@
   "scripts": {
     "build": "vp pack",
     "start": "node dist/main.mjs",
-    "test": "vp test",
     "acceptance": "node scripts/acceptance.ts"
   },
   "dependencies": {

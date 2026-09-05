@@ -1,7 +1,7 @@
 import { member, user, workspace } from "@deevy/db";
 import { ORPCError, call, createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { createApp } from "../src/app.ts";
+import { createApp, isDefinedRefusal } from "../src/app.ts";
 import { bootstrapWorkspace, slugify } from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import type { AppContext } from "../src/operations/registry.ts";
@@ -109,5 +109,30 @@ describe("bootstrapWorkspace", () => {
   it("slugifies names", () => {
     expect(slugify("Flippable Team!")).toBe("flippable-team");
     expect(slugify("   ")).toBe("workspace");
+  });
+});
+
+describe("what reaches an operator's log", () => {
+  it("reports a failure nobody expected, and not a refusal a handler chose", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const reported: unknown[] = [];
+    const app = createApp({ db, onError: (error) => reported.push(error) });
+
+    // A caller asking for something that is not there, and one asking without
+    // being anybody: both are the operation answering correctly.
+    await app.request("/api/runs/nope", { headers: { authorization: "Bearer nope" } });
+    await app.request("/api/members");
+
+    expect(reported).toEqual([]);
+  });
+
+  it("is not fooled by the class, only by what the caller is told", () => {
+    expect(isDefinedRefusal(new ORPCError("NOT_FOUND"))).toBe(true);
+    expect(isDefinedRefusal(new ORPCError("FORBIDDEN"))).toBe(true);
+    expect(isDefinedRefusal(new ORPCError("CONFLICT"))).toBe(true);
+    // deevy raising this on purpose is still something to read about.
+    expect(isDefinedRefusal(new ORPCError("INTERNAL_SERVER_ERROR"))).toBe(false);
+    expect(isDefinedRefusal(new Error("the database went away"))).toBe(false);
   });
 });

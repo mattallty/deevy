@@ -10,7 +10,6 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vp test",
     "generate:auth": "auth generate --config ./auth.generate.config.ts --output ./src/schema/auth.ts -y",
     "generate": "drizzle-kit generate && node scripts/emit-d1-migrations.ts",
     "generate:d1": "node scripts/emit-d1-migrations.ts",

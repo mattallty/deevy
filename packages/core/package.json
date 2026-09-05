@@ -13,7 +13,6 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vp test",
     "snapshot:openapi": "node scripts/snapshot-openapi.ts",
     "snapshot:mcp-tools": "node scripts/snapshot-mcp-tools.ts"
   },

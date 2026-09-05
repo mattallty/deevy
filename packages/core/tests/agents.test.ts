@@ -489,7 +489,9 @@ describe("an Agent's own webhook", () => {
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     const asAdmin = createRouterClient(router, { context: admin });
-    const project = await asAdmin.projects.create({ key: "DEV", name: "deevy" });
+    // The Project has to exist for the Agent to be granted one; nothing here
+    // needs its id.
+    await asAdmin.projects.create({ key: "DEV", name: "deevy" });
     const created = await asAdmin.agents.create({ name: "Planner" });
 
     await asAdmin.agents.update({

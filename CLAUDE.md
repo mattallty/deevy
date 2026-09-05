@@ -29,7 +29,11 @@ runs scripts, `-r` recursively, `pkg#script` for one package (package names are 
 - `vp check` (root): format, lint, typecheck the whole tree; `vp check --fix` applies formatting. Run it before
   every commit; CI runs it first.
 - `vp run -r test`: all tests. One file: `cd packages/core && vp test tests/app.test.ts`; one case: add
-  `-t "name substring"`. Tests import from `vite-plus/test`, not `vitest`.
+  `-t "name substring"`. Tests import from `vite-plus/test`, not `vitest`. `test` is a **task** in each
+  package's `vite.config.ts` and deliberately not a package.json script: only tasks are cached
+  (`run.cache.scripts` is false at the root, so the generators are never cached), a task may not share a name
+  with a script, and one defined at the workspace root would also run in the root itself. A new package copies
+  that `run.tasks` block and leaves `test` out of its `scripts`.
 - `vp run -r --parallel dev`: Node server on 3000 (rebuilt and restarted by `vp pack --watch`) plus the SPA
   on 5173 proxying `/api`, `/rpc`, `/healthz`. Needs a `.env` (copy `.env.example`).
 - `vp run -r build`, `vp run web#build:workers` then `vp run web#check:workers` (wrangler dry run). In that

@@ -11,15 +11,21 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Four jobs that need nothing from each other, because wall-clock time is what
+# anybody waits for. Run as one job these took six minutes, most of it one
+# machine running six test suites against each other for its four cores; split,
+# the slowest arm is the tests and everything else finishes under it. Each arm
+# pays its own install, which is the trade: more runner minutes, half the wait.
 jobs:
-  verify:
+  check:
+    name: Format, lint, typecheck, and the snapshots
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@v1.18.0
+        uses: voidzero-dev/setup-vp@v1.19.0
         with:
           node-version-file: .node-version
           cache: true
@@ -31,9 +37,6 @@ jobs:
       - name: Format, lint, typecheck
         run: vp check
 
-      - name: Test
-        run: vp run -r test
-
       - name: Build (Node server and SPA)
         run: vp run -r build
 
@@ -43,25 +46,8 @@ jobs:
       - name: Validate the Worker bundle
         run: vp run web#check:workers
 
-      # The deployed shape, on workerd: bindings and asset routing included,
-      # which no test of createApp can see. `--local` needs no account.
-      - name: The Worker serves deevy
-        run: vp run web#test:workers
-
-      # M4's acceptance walk, which needs no account and no OAuth App: deevy on
-      # both deployments, a GitHub stub, a bare git repository and a stub of
-      # GitHub's pull-request API, with the real supervisor driving
-      # (docs/m4-acceptance.md).
-      - name: The reference runtime works an Issue end to end, on both deployments
-        run: vp run claude-agent#acceptance
-
       - name: Migration SQL guard
         run: vp run db#check:migrations
-
-      # drizzle generates and wrangler applies (ADR-0008), so the projection is
-      # only proven by wrangler applying it: an empty local D1, no account.
-      - name: Migrations build the schema on D1
-        run: vp run db#check:d1
 
       - name: OpenAPI snapshot is current
         run: |
@@ -74,62 +60,143 @@ jobs:
           vp run core#snapshot:mcp-tools
           git diff --exit-code -- packages/core/mcp-tools.json
 
-  docker:
+  # Sharded, because six suites on one four-core runner spent most of their time
+  # waiting for each other. The groups are balanced on measured time — apps/web
+  # is 73s on its own and sets the floor, so splitting further buys nothing
+  # while the runtime arm sits at ~120s.
+  test:
+    name: Tests (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: web
+            filters: -F web
+          - name: core
+            filters: -F core -F db -F adapters
+          - name: runtime and server
+            filters: -F claude-agent -F server
     steps:
-      - uses: actions/checkout@v5
-      - name: Build the Docker image
+      - uses: actions/checkout@v7
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1.19.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+
+      - name: Install
+        run: vp install --frozen-lockfile
+
+      # Restored after the install, which can touch the directory. `test` is a
+      # task in each package's vite.config rather than a package.json script,
+      # which is what makes it cacheable at all; the fingerprint is the files
+      # each suite reads, so a shard whose packages nobody touched skips
+      # entirely and one that reads a changed packages/core does not.
+      # https://viteplus.dev/guide/github-actions-cache
+      - name: Restore the task cache
+        uses: actions/cache/restore@v6
+        with:
+          path: node_modules/.vite/task-cache
+          # Unique per run so every run saves, and per shard so three jobs
+          # writing at once do not overwrite each other's.
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.shard.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.shard.name }}-
+
+      - name: Test
+        run: vp run ${{ matrix.shard.filters }} test
+
+      - name: Save the task cache
+        uses: actions/cache/save@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.shard.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+  runtime:
+    name: The deployed shapes, and the runtime against them
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1.19.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+
+      - name: Install
+        run: vp install --frozen-lockfile
+
+      - name: Build (Node server and SPA)
+        run: vp run -r build
+
+      - name: Build (Cloudflare Worker)
+        run: vp run web#build:workers
+
+      # The deployed shape, on workerd: bindings and asset routing included,
+      # which no test of createApp can see. `--local` needs no account.
+      - name: The Worker serves deevy
+        run: vp run web#test:workers
+
+      # drizzle generates and wrangler applies (ADR-0008), so the projection is
+      # only proven by wrangler applying it: an empty local D1, no account.
+      - name: Migrations build the schema on D1
+        run: vp run db#check:d1
+
+      # M4's acceptance walk, which needs no account and no OAuth App: deevy on
+      # both deployments, a GitHub stub, a bare git repository and a stub of
+      # GitHub's pull-request API, with the real supervisor driving
+      # (docs/m4-acceptance.md).
+      - name: The reference runtime works an Issue end to end, on both deployments
+        run: vp run claude-agent#acceptance
+
+  # Both images in one job: the runtime smoke needs a deevy to talk to, and
+  # building that image twice in two jobs is the same minute spent twice. This
+  # arm is well inside the tests' shadow either way, so the minutes are the only
+  # thing to save here.
+  #
+  # No layer cache, and that is measured rather than assumed: `type=gha` with
+  # `mode=max` took `Build deevy` from 40s to 208s, because the image runs
+  # `vp install` and a whole workspace build, and exporting every layer of that
+  # costs more than repeating it.
+  images:
+    name: The images, and the runtime's socket
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build deevy
         run: docker build -f apps/server/Dockerfile -t deevy:ci .
-      - name: Smoke the image
+
+      - name: Build the runtime
+        run: docker build -f apps/claude-agent/Dockerfile -t deevy-agent:ci .
+
+      - name: Smoke the deevy image
         run: |
-          docker run -d --name deevy -p 3000:3000 \
+          docker network create deevy-ci
+          docker run -d --name deevy --network deevy-ci -p 3000:3000 \
             -e BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-ci-secret \
             -e BETTER_AUTH_URL=http://localhost:3000 \
             -e DEEVY_DATABASE_PATH=/data/deevy.sqlite deevy:ci
-          for i in $(seq 1 20); do
+          for i in $(seq 1 30); do
             if curl -fsS http://localhost:3000/healthz; then exit 0; fi
             sleep 1
           done
           docker logs deevy
           exit 1
 
-  # The reference runtime is a second image and a separate deployment
-  # (docs/plans/m4.md). The smoke proves the image builds, starts, reads its
-  # configuration and reaches a real deevy over a real socket; every claim about
-  # what it does with a Run is a test in apps/claude-agent, against a real deevy
-  # and a scripted session.
-  agent-image:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: verify
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build the runtime image
-        run: docker build -f apps/claude-agent/Dockerfile -t deevy-agent:ci .
-
-      # BETTER_AUTH_URL stays loopback because Better Auth refuses a plain-http
-      # MCP resource that is not. It is the OAuth issuer, and the runtime
-      # authenticates with an API key, so the two are independent here.
-      - name: Start deevy
-        run: |
-          docker network create deevy-ci
-          docker build -f apps/server/Dockerfile -t deevy:ci .
-          docker run -d --name deevy --network deevy-ci \
-            -e BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-ci-secret \
-            -e BETTER_AUTH_URL=http://localhost:3000 \
-            -e DEEVY_DATABASE_PATH=/data/deevy.sqlite deevy:ci
-          for i in $(seq 1 30); do
-            if docker run --rm --network deevy-ci curlimages/curl:8.11.1 \
-              -fsS http://deevy:3000/healthz; then exit 0; fi
-            sleep 1
-          done
-          docker logs deevy
-          exit 1
-
       # A key nobody issued is refused, and the runtime says so and stops rather
-      # than polling an instance it cannot be a Member of.
+      # than polling an instance it cannot be a Member of. BETTER_AUTH_URL stays
+      # loopback above because Better Auth refuses a plain-http MCP resource
+      # that is not; it is the OAuth issuer, and this authenticates with an API
+      # key, so the two are independent here.
       - name: The runtime reaches deevy and reports what it is told
         run: |
           set +e
