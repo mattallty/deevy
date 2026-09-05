@@ -16,7 +16,14 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { orpc } from "@/lib/orpc";
 
@@ -24,6 +31,7 @@ import { orpc } from "@/lib/orpc";
  * The intervals a schedule offers. Anything finer than a quarter of an hour is
  * a poll, not a schedule, and the sweep only runs once a minute anyway.
  */
+const NEVER = "never";
 const intervals = [
   { minutes: 15, label: "Every 15 minutes" },
   { minutes: 30, label: "Every 30 minutes" },
@@ -95,25 +103,36 @@ export function AgentPage({ memberId }: { memberId: string }) {
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor="agent-schedule">Wake</Label>
-          <NativeSelect
-            id="agent-schedule"
-            className="w-56"
-            value={agent.scheduleMinutes ?? ""}
+          {/* shadcn's Base UI Select, as its docs compose it: trigger and value, then a group of items. */}
+          <Select
+            value={agent.scheduleMinutes === null ? NEVER : String(agent.scheduleMinutes)}
             disabled={update.isPending}
-            onChange={(changed) =>
-              update.mutate({
-                memberId,
-                scheduleMinutes: changed.target.value ? Number(changed.target.value) : null,
-              })
-            }
+            onValueChange={(next) => {
+              if (next === null) return;
+              update.mutate({ memberId, scheduleMinutes: next === NEVER ? null : Number(next) });
+            }}
           >
-            <option value="">Never</option>
-            {intervals.map((interval) => (
-              <option key={interval.minutes} value={interval.minutes}>
-                {interval.label}
-              </option>
-            ))}
-          </NativeSelect>
+            <SelectTrigger id="agent-schedule" className="w-56">
+              <SelectValue>
+                {(selected: string) =>
+                  selected === NEVER
+                    ? "Never"
+                    : (intervals.find((interval) => String(interval.minutes) === selected)?.label ??
+                      selected)
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={NEVER}>Never</SelectItem>
+                {intervals.map((interval) => (
+                  <SelectItem key={interval.minutes} value={String(interval.minutes)}>
+                    {interval.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         {update.error ? <p className="text-sm text-destructive">{update.error.message}</p> : null}
       </SettingsSection>
