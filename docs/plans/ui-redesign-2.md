@@ -192,6 +192,22 @@ What shipped differently:
 - **The folded avatar**: `MemberChip` gained `avatarOnly` (tooltip then carries the name), and the member
   menu passes it when `useSidebar().state === "collapsed"`; the chevron hides at icon width.
 
+### B′ — Select popovers (point 19) — shipped
+
+Matt reported every Select's popover lacking spacing. Against the upstream `@shadcn/select` (Base UI build):
+the component tree was right — Positioner → Popup → scroll arrows around `List` — but in that build the `p-1`
+lives on **`SelectGroup`**, and the docs always wrap items in one; seven of our screens put `SelectItem`s
+straight into `SelectContent`, so they sat flush against the popup edge. Every `SelectContent` now wraps its
+items in `SelectGroup` (a ground rule in `deevy-ui`). Also seen in the diff and left alone: upstream's
+newest style carries `cn-menu-target cn-menu-translucent` on the popup, which ours predates.
+
+### Mockups — up, pick pending (checkpoint 2)
+
+`/dev/mockups/{inbox,activity,kanban,workflow}` from `src/dev/fixtures.ts`, variants numbered per screen.
+Groundwork that shipped with them: `components/workflow-state-fields.tsx` (`StateFields`, `DraftState`,
+`newDraftState`) extracted from the Workflow editor with its tests untouched, and `@reui/timeline` vendored
+as `components/reui/timeline.tsx` (MIT, Base UI).
+
 ### C — Inbox that says what happened (points 4, 5; mockup first)
 
 **Data.** `inbox.list` (core) additionally returns, per row, `comment: { id, body } | null` (joined when the

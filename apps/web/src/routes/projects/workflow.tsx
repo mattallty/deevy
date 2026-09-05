@@ -9,31 +9,16 @@ import {
 } from "@/components/diceui/sortable";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  type DraftState,
+  type StateCategory,
+  StateFields,
+  newDraftState,
+} from "@/components/workflow-state-fields";
 import { orpc } from "@/lib/orpc";
-
-const categories = ["backlog", "active", "done"] as const;
-type Category = (typeof categories)[number];
-
-interface DraftState {
-  /** Stable for the life of the draft: a new State has no id yet, and the sortable needs one. */
-  uid: string;
-  id?: string;
-  name: string;
-  isGate: boolean;
-  category: Category;
-  documentName: string | null;
-  documentTemplate: string | null;
-  /** The Agent entering this State assigns the Issue to, and starts a Run for. */
-  triggerAgentMemberId: string | null;
-  /** The Humans this Gate names. Empty means any Human may decide it. */
-  approverMemberIds: string[];
-}
 
 /**
  * The ordered State editor. A team that wants Todo, Doing, Done deletes the
@@ -59,7 +44,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           id: state.id,
           name: state.name,
           isGate: state.isGate,
-          category: state.category as Category,
+          category: state.category as StateCategory,
           documentName: state.documentName,
           documentTemplate: state.documentTemplate,
           triggerAgentMemberId: state.triggerAgentMemberId,
@@ -134,105 +119,15 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                   >
                     <GripVertical className="size-4" />
                   </SortableItemHandle>
-                  <div className="flex flex-1 flex-col gap-2">
-                    <Label htmlFor={`state-name-${index}`}>Name</Label>
-                    <Input
-                      id={`state-name-${index}`}
-                      value={state.name}
-                      onChange={(changed) => edit(index, { name: changed.target.value })}
+                  <div className="flex-1">
+                    <StateFields
+                      state={state}
+                      index={index}
+                      humans={humans}
+                      agents={agents.data?.agents ?? []}
+                      onEdit={(change) => edit(index, change)}
                     />
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={`state-category-${index}`}>Counts as</Label>
-                    <NativeSelect
-                      id={`state-category-${index}`}
-                      value={state.category}
-                      onChange={(changed) =>
-                        edit(index, { category: changed.target.value as Category })
-                      }
-                    >
-                      {categories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div className="flex items-center gap-2 pb-2">
-                    <Checkbox
-                      id={`state-gate-${index}`}
-                      checked={state.isGate}
-                      onCheckedChange={(checked) => edit(index, { isGate: checked === true })}
-                    />
-                    <Label htmlFor={`state-gate-${index}`}>Gate</Label>
-                  </div>
-                  <div className="flex w-full flex-col gap-2">
-                    <Label htmlFor={`state-document-${index}`}>Document it asks for</Label>
-                    <Input
-                      id={`state-document-${index}`}
-                      value={state.documentName ?? ""}
-                      placeholder="intent, spec, plan… or nothing"
-                      onChange={(changed) =>
-                        edit(index, { documentName: changed.target.value.trim() || null })
-                      }
-                    />
-                    {state.documentName ? (
-                      <Textarea
-                        aria-label={`Template for ${state.name}`}
-                        rows={4}
-                        value={state.documentTemplate ?? ""}
-                        placeholder="## Problem"
-                        onChange={(changed) =>
-                          edit(index, { documentTemplate: changed.target.value })
-                        }
-                      />
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={`state-agent-${index}`}>Assign an Agent on entering</Label>
-                    <NativeSelect
-                      id={`state-agent-${index}`}
-                      value={state.triggerAgentMemberId ?? ""}
-                      onChange={(changed) =>
-                        edit(index, { triggerAgentMemberId: changed.target.value || null })
-                      }
-                    >
-                      <option value="">Nobody</option>
-                      {(agents.data?.agents ?? []).map((agent) => (
-                        <option key={agent.id} value={agent.id}>
-                          {agent.user.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  {state.isGate ? (
-                    <div className="flex w-full flex-col gap-2">
-                      <Label htmlFor={`state-approvers-${index}`}>Approvers for {state.name}</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Naming nobody leaves it to any Human, which is the default.
-                      </p>
-                      <select
-                        id={`state-approvers-${index}`}
-                        multiple
-                        size={Math.min(Math.max(humans.length, 2), 5)}
-                        className="w-full rounded-md border border-input bg-input/20 p-1 text-xs/relaxed outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-                        value={state.approverMemberIds}
-                        onChange={(changed) =>
-                          edit(index, {
-                            approverMemberIds: [...changed.target.selectedOptions].map(
-                              (option) => option.value,
-                            ),
-                          })
-                        }
-                      >
-                        {humans.map((human) => (
-                          <option key={human.id} value={human.id}>
-                            {human.user.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : null}
                   <div className="flex gap-1 pb-1">
                     <Button
                       type="button"
@@ -274,21 +169,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
         <Button
           type="button"
           variant="outline"
-          onClick={() =>
-            setDraft([
-              ...draft,
-              {
-                uid: crypto.randomUUID(),
-                name: "New State",
-                isGate: false,
-                category: "active",
-                documentName: null,
-                documentTemplate: null,
-                triggerAgentMemberId: null,
-                approverMemberIds: [],
-              },
-            ])
-          }
+          onClick={() => setDraft([...draft, newDraftState()])}
         >
           Add State
         </Button>

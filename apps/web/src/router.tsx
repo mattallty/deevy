@@ -18,6 +18,7 @@ import { IssuesPage } from "./routes/issues/list.tsx";
 import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
 import { TokensPage } from "./routes/dev/tokens.tsx";
+import { MockupsPage } from "@/routes/dev/mockups";
 import { InboxPage, parseInboxSearch } from "./routes/inbox.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
@@ -270,6 +271,15 @@ const tokensRoute = createRoute({
   component: TokensPage,
 });
 
+// The round-2 mockups, one screen per URL; unlinked and deleted after the pick.
+const mockupsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dev/mockups/$screen",
+  component: function MockupsRoute() {
+    return <MockupsPage screen={mockupsRoute.useParams().screen} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   projectsRoute,
@@ -300,6 +310,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   consentRoute,
   tokensRoute,
+  mockupsRoute,
 ]);
 
 export interface AppRouterOptions {
