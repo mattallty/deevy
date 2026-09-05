@@ -96,6 +96,16 @@ to it, so the Docker runtime image carries `dist/` and the SPA only. `apps/web` 
 `DEEVY_TARGET=workers`, emitting `dist/deevy` (the bundle plus the `wrangler.json` a deploy uploads) beside
 `dist/client` (the SPA those assets are). A deploy uses that generated configuration, never `src/worker.ts`.
 
+## UI
+
+The SPA is being redesigned in slices from `docs/plans/ui-redesign.md`; the decisions it has made so far —
+Base UI only, which registries and items are allowed, markdown as the one format Documents are stored in, the
+design language, the keyboard model, and the accessible names the tests rely on — are the `deevy-ui` skill in
+`.claude/skills/deevy-ui/SKILL.md`. Read it before changing anything under `apps/web/src` or `apps/web/tests`;
+the vendored `shadcn` and `frontend-design` skills beside it are the component rules and the design process it
+leans on. To see the app without a GitHub OAuth App, run the `dev:stub` launch configuration and
+`DEEVY_DATABASE_PATH=./data/stub.sqlite vp run server#seed` (`docs/DEVELOPMENT.md`, "Running without an OAuth App").
+
 ## Dependencies
 
 Better Auth 1.7.x, Drizzle 1.0.0-rc.x, and oRPC 2.0.0-beta.x are pinned exactly in the catalog in

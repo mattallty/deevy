@@ -14,6 +14,15 @@ export interface ServerEnv {
   /** How often the background runner sweeps for silent Runs. */
   sweepIntervalSeconds: number;
   gateReminderHours: number;
+  /**
+   * Replace GitHub with the stub the acceptance walk signs in through
+   * (apps/web/scripts/stub-github.js), so a developer needs no OAuth App and
+   * the OAuth `code` is the email address. Development only, by construction:
+   * `readEnv` refuses it under `NODE_ENV=production` rather than ignoring it,
+   * because a flag that is silently dropped is a flag somebody will one day
+   * believe is on.
+   */
+  devStubGithub: boolean;
 }
 
 /** A positive number from the environment, or the default when it is absent or nonsense. */
@@ -23,6 +32,12 @@ function positive(value: string | undefined, fallback: number): number {
 }
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
+  const devStubGithub = env.DEEVY_DEV_STUB_GITHUB === "1";
+  if (devStubGithub && env.NODE_ENV === "production") {
+    throw new Error(
+      "DEEVY_DEV_STUB_GITHUB replaces GitHub sign-in and cannot be set in production",
+    );
+  }
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.
     port: Number(env.DEEVY_PORT ?? env.PORT ?? 3000),
@@ -41,5 +56,6 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
     sweepIntervalSeconds: positive(env.DEEVY_SWEEP_INTERVAL_SECONDS, 60),
     gateReminderHours: positive(env.DEEVY_GATE_REMINDER_HOURS, 4),
+    devStubGithub,
   };
 }

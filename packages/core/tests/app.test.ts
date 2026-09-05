@@ -45,6 +45,14 @@ describe("createApp", () => {
     expect(docs.headers.get("content-type")).toContain("text/html");
   });
 
+  it("tells a signed-out SPA whether sign-in is stubbed", async () => {
+    const context = anonymous();
+    const ping = async (app: ReturnType<typeof createApp>) =>
+      (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
+    expect((await ping(createApp({ db: context.db }))).devSignIn).toBe(false);
+    expect((await ping(createApp({ db: context.db, devSignIn: true }))).devSignIn).toBe(true);
+  });
+
   it("rejects session and member operations for anonymous callers", async () => {
     const context = anonymous();
     const client = createRouterClient(router, { context });

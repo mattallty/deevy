@@ -1314,11 +1314,15 @@
                     },
                     "time": {
                       "type": "string"
+                    },
+                    "devSignIn": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "ok",
-                    "time"
+                    "time",
+                    "devSignIn"
                   ],
                   "additionalProperties": false
                 }

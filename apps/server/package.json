@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vp pack --watch --on-success \"node --env-file-if-exists=../../.env dist/index.mjs\"",
     "build": "vp pack",
-    "start": "node dist/index.mjs"
+    "start": "node dist/index.mjs",
+    "seed": "vp pack && node --env-file-if-exists=../../.env dist/seed.mjs"
   },
   "dependencies": {
     "@deevy/adapters": "workspace:*",
     "@deevy/core": "workspace:*",
     "@deevy/db": "workspace:*",
     "@hono/node-server": "catalog:",
+    "@orpc/server": "catalog:",
     "hono": "catalog:"
   },
   "devDependencies": {

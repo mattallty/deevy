@@ -5,6 +5,13 @@ import { startRunner } from "./runner.ts";
 import { buildServer } from "./server.ts";
 
 const env = readEnv();
+if (env.devStubGithub) {
+  // The same file the acceptance walk and the Workers smoke prepend to their
+  // bundles, imported rather than copied so there is one stub to be wrong.
+  // Installed before anything holds a reference to the real `fetch`.
+  await import("../../web/scripts/stub-github.js");
+  console.warn("DEEVY_DEV_STUB_GITHUB=1: GitHub is a stub; the OAuth code is the email address");
+}
 const { app, db, close } = buildServer(env);
 
 const server = serve({ fetch: app.fetch, port: env.port }, (info) => {

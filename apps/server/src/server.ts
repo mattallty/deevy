@@ -44,7 +44,14 @@ export function buildServer(env: ServerEnv) {
   const origin = [env.webOrigin, env.baseURL].filter((o): o is string => Boolean(o));
   const identity = authEnv(env);
   const auth = createAuth({ db, env: identity });
-  const app = createApp({ db, auth, origin, baseURL: env.baseURL, secret: env.secret });
+  const app = createApp({
+    db,
+    auth,
+    origin,
+    baseURL: env.baseURL,
+    secret: env.secret,
+    devSignIn: env.devStubGithub,
+  });
   if (env.webDist) mountSpa(app, resolve(env.webDist));
-  return { app, db, close, authEnv: identity };
+  return { app, db, auth, close, authEnv: identity };
 }
