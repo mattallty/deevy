@@ -62,21 +62,60 @@ export const deniedTools = [
 ];
 
 /**
- * The environment the session's process gets: this one, minus the runtime's own
- * secrets.
+ * What the session's process is allowed to see of this one's environment.
  *
- * `Bash` plus `DEEVY_AGENT_KEY` is the tool allowlist with a hole in it — the
- * session could reach any operation the Agent may call over `curl`, including
- * the ones deliberately left out of `deevyTools`. The git credential goes for
- * the same reason: the supervisor clones and pushes, so the session has no use
- * for it (docs/plans/m4.md, slice 3's finding).
+ * An allowlist rather than a denylist, and that distinction was earned: the
+ * first version removed `DEEVY_AGENT_KEY` and the git token and passed
+ * everything else through, which meant a session with a shell inherited every
+ * other credential the operator happened to have — cloud tokens, registry
+ * tokens, and on a laptop the operator's own Anthropic credentials. It was
+ * found by setting `ANTHROPIC_API_KEY` to a deliberately invalid value and
+ * watching a live run succeed anyway, on host credentials nobody had passed it.
+ *
+ * A denylist can only remove what somebody thought of. This removes everything
+ * nobody named.
  */
-export const withheldFromSession = ["DEEVY_AGENT_KEY", "DEEVY_AGENT_GIT_TOKEN"];
+export const sessionEnvAllowed = [
+  // Enough to run a process and for git to find its own configuration.
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TERM",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+];
 
-export function sessionEnv(env: Record<string, string | undefined>): Record<string, string> {
+/**
+ * Prefixes allowed whole. `ANTHROPIC_` is how the SDK is given its credential
+ * and its endpoint, which is the one secret the session is *supposed* to hold.
+ * `CLAUDE_` is deliberately not here: that is the host tooling's own state, and
+ * inheriting it is what let a session authenticate as somebody's editor.
+ */
+export const sessionEnvAllowedPrefixes = ["ANTHROPIC_"];
+
+/**
+ * The environment a session runs with: the allowlist above, plus whatever the
+ * operator names in `DEEVY_AGENT_PASS_ENV`.
+ *
+ * The passthrough exists because an allowlist that cannot be extended gets
+ * worked around: a proxy, a private registry or a custom CA is a real need, and
+ * naming the variable is better than turning the list off.
+ */
+export function sessionEnv(
+  env: Record<string, string | undefined>,
+  alsoPass: ReadonlyArray<string> = [],
+): Record<string, string> {
+  const named = new Set([...sessionEnvAllowed, ...alsoPass]);
   const kept: Record<string, string> = {};
   for (const [name, value] of Object.entries(env)) {
-    if (value !== undefined && !withheldFromSession.includes(name)) kept[name] = value;
+    if (value === undefined) continue;
+    if (named.has(name) || sessionEnvAllowedPrefixes.some((p) => name.startsWith(p))) {
+      kept[name] = value;
+    }
   }
   return kept;
 }
@@ -114,7 +153,7 @@ export function sessionOptions(
     },
     allowedTools: config.repo ? [...deevyTools, ...repositoryTools] : deevyTools,
     disallowedTools: config.repo ? deniedTools : [],
-    env: sessionEnv(env),
+    env: sessionEnv(env, config.passEnv ?? []),
     // Nothing on disk configures this session. From slice 5 the working
     // directory holds a repository somebody else wrote, and a `.mcp.json` in it
     // must add no server while a `.claude/settings.json` must grant no

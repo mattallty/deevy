@@ -47,6 +47,11 @@ export interface Config {
   githubApi?: string;
   /** `owner/name`, when it cannot be read off the clone URL. */
   githubRepo?: string;
+  /**
+   * Environment variables to pass through to the session on top of the
+   * allowlist — a proxy, a private registry, a custom CA.
+   */
+  passEnv?: string[];
 }
 
 const efforts = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -94,5 +99,12 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     listenPort: positive(env.DEEVY_AGENT_PORT, 8787),
     ...(env.DEEVY_AGENT_GITHUB_API ? { githubApi: env.DEEVY_AGENT_GITHUB_API } : {}),
     ...(env.DEEVY_AGENT_GITHUB_REPO ? { githubRepo: env.DEEVY_AGENT_GITHUB_REPO } : {}),
+    ...(env.DEEVY_AGENT_PASS_ENV
+      ? {
+          passEnv: env.DEEVY_AGENT_PASS_ENV.split(",")
+            .map((name) => name.trim())
+            .filter(Boolean),
+        }
+      : {}),
   };
 }

@@ -6,7 +6,8 @@ import {
   readInstructions,
   sessionOptions,
   toSessionEvents,
-  withheldFromSession,
+  sessionEnv,
+  sessionEnvAllowed,
 } from "../src/sdk.ts";
 import { testConfig } from "./helpers.ts";
 
@@ -109,7 +110,44 @@ describe("the options a session runs under", () => {
     expect(options.env).toEqual({ PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-ant-x" });
     expect(JSON.stringify(options.env)).not.toContain("deevy_sk_secret");
     expect(JSON.stringify(options.env)).not.toContain("ghp_secret");
-    expect(withheldFromSession).toEqual(["DEEVY_AGENT_KEY", "DEEVY_AGENT_GIT_TOKEN"]);
+  });
+
+  it("passes only what is named, so a credential nobody thought of is not inherited", () => {
+    const hostile = {
+      PATH: "/usr/bin",
+      HOME: "/home/runtime",
+      ANTHROPIC_API_KEY: "sk-ant-x",
+      // The kind of thing that is simply present on a developer's machine, and
+      // that a denylist can only exclude if somebody thought of it first.
+      AWS_SECRET_ACCESS_KEY: "aws",
+      NPM_TOKEN: "npm",
+      GITHUB_TOKEN: "gh",
+      CLAUDE_CODE_OAUTH_SCOPES: "the host tooling's own session",
+      DEEVY_AGENT_KEY: "deevy_sk_secret",
+    };
+
+    expect(sessionEnv(hostile)).toEqual({
+      PATH: "/usr/bin",
+      HOME: "/home/runtime",
+      ANTHROPIC_API_KEY: "sk-ant-x",
+    });
+  });
+
+  it("passes what the operator names, and nothing more", () => {
+    const env = { PATH: "/usr/bin", HTTPS_PROXY: "http://proxy:3128", NPM_TOKEN: "npm" };
+
+    expect(sessionEnv(env, ["HTTPS_PROXY"])).toEqual({
+      PATH: "/usr/bin",
+      HTTPS_PROXY: "http://proxy:3128",
+    });
+  });
+
+  it("allows a process to run and git to find its own configuration", () => {
+    expect(sessionEnvAllowed).toContain("PATH");
+    expect(sessionEnvAllowed).toContain("HOME");
+    // The host tooling's own state is not the runtime's configuration, and
+    // inheriting it is what let a session authenticate as somebody's editor.
+    expect(sessionEnvAllowed.some((name) => name.startsWith("CLAUDE"))).toBe(false);
   });
 
   it("grants tools by name, so deevy widening is not this program widening", () => {

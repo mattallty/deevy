@@ -555,24 +555,25 @@ ever pushed to the base branch. A Run that changed nothing attaches nothing.
 
 ### Its configuration
 
-| Variable                          | Default                  | Without it                                                                                                               |
-| --------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `DEEVY_URL`                       | —                        | It will not start, and says so. The deevy origin, with no trailing slash.                                                |
-| `DEEVY_AGENT_KEY`                 | —                        | It will not start. The Agent's API key, and the whole of the runtime's identity.                                         |
-| `ANTHROPIC_API_KEY`               | —                        | Every session fails at once. Read by the Agent SDK, not by the runtime.                                                  |
-| `DEEVY_AGENT_POLL_SECONDS`        | 30                       | Nothing: it asks every thirty seconds, backing off to eight times that while there is nothing to do.                     |
-| `DEEVY_AGENT_RUN_TIMEOUT_SECONDS` | 1800                     | Nothing. It matches deevy's own stale window: a session allowed to outlive it would be called stale while working.       |
-| `DEEVY_AGENT_MODEL`               | `claude-opus-5`          | Nothing.                                                                                                                 |
-| `DEEVY_AGENT_EFFORT`              | `high`                   | Nothing. `low`, `medium`, `high`, `xhigh` or `max`; anything else is read as `high`.                                     |
-| `DEEVY_AGENT_MAX_TURNS`           | 100                      | Nothing: a backstop on a session that will not stop. The timeout is the real bound.                                      |
-| `DEEVY_AGENT_REPO`                | — no repository          | The session gets deevy's tools and an empty directory: no files, no shell, no web. Setting it grants all three.          |
-| `DEEVY_AGENT_GIT_TOKEN`           | —                        | A public repository can be cloned and nothing can be pushed, so no Run delivers anything.                                |
-| `DEEVY_AGENT_BASE_BRANCH`         | `main`                   | Nothing: the branch every Run starts from.                                                                               |
-| `DEEVY_AGENT_GITHUB_API`          | `https://api.github.com` | Nothing, unless the repository is on GitHub Enterprise or the acceptance run's local stub.                               |
-| `DEEVY_AGENT_GITHUB_REPO`         | read from the clone URL  | Nothing, unless the clone URL is not a github.com one: without a slug a Run pushes its branch and opens no pull request. |
-| `DEEVY_AGENT_WORKDIR`             | the system temporary     | Nothing: where per-Run working directories are made.                                                                     |
-| `DEEVY_AGENT_WEBHOOK_SECRET`      | — no deliveries          | It polls, and refuses every delivery. Set it to the secret the Agent's webhook URL was given.                            |
-| `DEEVY_AGENT_PORT`                | 8787                     | Nothing: `/healthz` always, and deevy's deliveries when a secret is set.                                                 |
+| Variable                          | Default                  | Without it                                                                                                                                                    |
+| --------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEEVY_URL`                       | —                        | It will not start, and says so. The deevy origin, with no trailing slash.                                                                                     |
+| `DEEVY_AGENT_KEY`                 | —                        | It will not start. The Agent's API key, and the whole of the runtime's identity.                                                                              |
+| `ANTHROPIC_API_KEY`               | —                        | Every session fails at once. Read by the Agent SDK, not by the runtime.                                                                                       |
+| `DEEVY_AGENT_POLL_SECONDS`        | 30                       | Nothing: it asks every thirty seconds, backing off to eight times that while there is nothing to do.                                                          |
+| `DEEVY_AGENT_RUN_TIMEOUT_SECONDS` | 1800                     | Nothing. It matches deevy's own stale window: a session allowed to outlive it would be called stale while working.                                            |
+| `DEEVY_AGENT_MODEL`               | `claude-opus-5`          | Nothing.                                                                                                                                                      |
+| `DEEVY_AGENT_EFFORT`              | `high`                   | Nothing. `low`, `medium`, `high`, `xhigh` or `max`; anything else is read as `high`.                                                                          |
+| `DEEVY_AGENT_MAX_TURNS`           | 100                      | Nothing: a backstop on a session that will not stop. The timeout is the real bound.                                                                           |
+| `DEEVY_AGENT_REPO`                | — no repository          | The session gets deevy's tools and an empty directory: no files, no shell, no web. Setting it grants all three.                                               |
+| `DEEVY_AGENT_GIT_TOKEN`           | —                        | A public repository can be cloned and nothing can be pushed, so no Run delivers anything.                                                                     |
+| `DEEVY_AGENT_BASE_BRANCH`         | `main`                   | Nothing: the branch every Run starts from.                                                                                                                    |
+| `DEEVY_AGENT_GITHUB_API`          | `https://api.github.com` | Nothing, unless the repository is on GitHub Enterprise or the acceptance run's local stub.                                                                    |
+| `DEEVY_AGENT_GITHUB_REPO`         | read from the clone URL  | Nothing, unless the clone URL is not a github.com one: without a slug a Run pushes its branch and opens no pull request.                                      |
+| `DEEVY_AGENT_WORKDIR`             | the system temporary     | Nothing: where per-Run working directories are made.                                                                                                          |
+| `DEEVY_AGENT_PASS_ENV`            | —                        | Nothing: a comma-separated list of extra environment variables the session may see, on top of the allowlist. For a proxy, a private registry, or a custom CA. |
+| `DEEVY_AGENT_WEBHOOK_SECRET`      | — no deliveries          | It polls, and refuses every delivery. Set it to the secret the Agent's webhook URL was given.                                                                 |
+| `DEEVY_AGENT_PORT`                | 8787                     | Nothing: `/healthz` always, and deevy's deliveries when a secret is set.                                                                                      |
 
 ### What is bounded, and what is not
 
@@ -587,8 +588,12 @@ each part does:
 - **The tool list is the surface.** Tools are granted by name, never by wildcard, so deevy gaining a
   twenty-first tool does not widen what the runtime may do. `settingSources` is empty and `strictMcpConfig`
   is on, so a `.mcp.json` or a `.claude/settings.json` in the cloned repository configures nothing.
-- **The session never holds the runtime's secrets.** `DEEVY_AGENT_KEY` and `DEEVY_AGENT_GIT_TOKEN` are
-  removed from the environment the session's process gets. Without that, a shell plus the Agent's key would be
+- **The session sees only the environment it is given.** Its process gets an allowlist — enough to run a
+  process and for git to find its own configuration, plus `ANTHROPIC_*` — and nothing else. That is an
+  allowlist rather than a list of secrets to remove, because a denylist can only exclude what somebody thought
+  of: the first version removed `DEEVY_AGENT_KEY` and the git token and passed everything else, so a session
+  with a shell inherited every other credential the operator happened to have. Name anything it genuinely
+  needs in `DEEVY_AGENT_PASS_ENV`. The Agent's own key is still the sharpest case — a shell plus that key is
   every operation the Agent may call, over `curl`, including the ones deliberately left out of the tool list.
 - **The credential is narrow, and the supervisor holds it.** Scope the git token to one repository, with
   permission to push a branch and open a pull request. The runtime clones and pushes; the session is refused

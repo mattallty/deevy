@@ -25,10 +25,18 @@ the runtime may do — that would be a change decided in a different pull reques
 `.mcp.json` or a `.claude/settings.json` in the cloned repository adds no server and grants no permission.
 Without those two flags, a repository could reconfigure the agent reading it.
 
-**The session never holds the runtime's secrets.** `DEEVY_AGENT_KEY` and `DEEVY_AGENT_GIT_TOKEN` are removed
-from the environment the session's process gets. This is the one that was nearly missed: a shell plus the
-Agent's key is every operation that Agent may call, over `curl`, including the ones deliberately left out of
-the tool list. An allowlist that a subprocess can walk around is not an allowlist.
+**The session's environment is an allowlist, not a scrub.** Its process gets enough to run and for git to find
+its configuration, plus `ANTHROPIC_*`, plus whatever the operator names in `DEEVY_AGENT_PASS_ENV`. Nothing
+else.
+
+This one was got wrong twice, which is why it is stated as a rule rather than a list. The first version passed
+the whole environment: a shell plus the Agent's key is every operation that Agent may call, over `curl`,
+including the ones deliberately left out of the tool list — an allowlist a subprocess can walk around is not
+an allowlist. The second version removed that key and the git token and passed everything else, which is a
+denylist, and a denylist can only exclude what somebody thought of. It was caught by setting
+`ANTHROPIC_API_KEY` to a deliberately invalid value and watching a live run succeed anyway, authenticated by
+host credentials nobody had passed it. On a developer's machine the same gap covers cloud tokens, registry
+tokens, and the credentials of whatever editor started the process.
 
 **The credential is narrow and the supervisor holds it.** The git token is scoped to one repository and needs
 only to push a branch and open a pull request. The runtime clones and pushes; the session is refused
