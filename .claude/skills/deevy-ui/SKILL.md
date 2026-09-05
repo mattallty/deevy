@@ -310,17 +310,6 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   never from an `aria-label` on the input.
 - **Screenshots** come from `vp run web#screens` (`apps/web/scripts/screens.ts`) against the seeded
   `dev:stub` instance, into `docs/screens/`; regenerate at milestones.
-- **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
-  itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
-  names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
-  `ol aria-label="Activity"`; day rows are `li role="presentation"`.
-- **Multi-select is a Base UI `Combobox multiple`** with `ComboboxChips`/`ComboboxChipsInput`, `items`,
-  `itemToStringLabel`, `isItemEqualToValue`, and `removeLabel` on each chip (`label-picker.tsx` is the
-  model; approvers reuse it). In a test: `fireEvent.change(input, …)` filters, `fireEvent.keyDown(input,
-{ key: "ArrowDown" })` opens, then `screen.findByRole("option", …)` — the popup is portalled.
-- **Selects:** `SelectContent` children go inside a `SelectGroup` (with `SelectLabel` when they have a
-  heading), as the Base UI shadcn docs show — in that build the group carries the list's padding, so bare
-  items sit flush against the popup edge. Round 2 found seven screens doing that.
 - **Live regions:** the Gate banner and the Run's "Needs your answer" band are `role="status"`. Nothing
   else announces; a new one needs a reason.
 - **Everything outside the shell** (`SignedOut`, `NotAMember`, `Suspended`) renders in `SignInFrame`
@@ -332,6 +321,40 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `aspect-ratio`, `menubar`, `navigation-menu`, `slider`, `progress`, `radio-group`, `drawer`,
   `context-menu`, `hover-card`, `pagination`, `accordion`, and `recharts`, `embla-carousel-react`,
   `react-day-picker`, `input-otp` from the catalog. Add one back with `pnpm dlx shadcn@latest add`.
+
+## What round 2 settled (Matt's critique of 2026-09-05; docs/plans/ui-redesign-2.md)
+
+- **The theme** is clean slate: see "Design language" above. `--face-*`, `--radius`, `--density` and
+  `--tracking` are the knobs; a candidate review is a dev-only switcher on `<html data-…>`, deleted after.
+- **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
+  itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
+  names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
+  `ol aria-label="Activity"`; day rows are `li role="presentation"`.
+- **Multi-select is a Base UI `Combobox multiple`** with `ComboboxChips`/`ComboboxChipsInput`, `items`,
+  `itemToStringLabel`, `isItemEqualToValue`, and `removeLabel` on each chip (`label-picker.tsx` is the
+  model; approvers reuse it). In a test: `fireEvent.change(input, …)` filters, `fireEvent.keyDown(input,
+{ key: "ArrowDown" })` opens, then `screen.findByRole("option", …)` — the popup is portalled.
+- **Selects:** `SelectContent` children go inside a `SelectGroup` (with `SelectLabel` when they have a
+  heading), as the Base UI shadcn docs show — in that build the group carries the list's padding, so bare
+  items sit flush against the popup edge. Round 2 found seven screens doing that.
+- **The Inbox** is one flat two-line list (`ul aria-label="Notifications"`): actor chip · verb · on KEY,
+  the Issue title, the quote. `lib/notification-text.ts` phrases it from the joined Event, actor and
+  comment; a checkbox per row and `x` select, a `toolbar "Selection"` marks several read.
+- **Any Issue list is also a board.** `view=board` in the URL, `lib/states.ts` `foldStates` for the
+  columns, `components/issue-board.tsx` for the board itself (`planDrop` decides move / ruling / refusal;
+  `IssueBoard` is the connected one both the Project Board and the Workspace board render). Never build a
+  second kanban.
+- **Forms save themselves** where a change is one field: `lib/autosave.ts` (`saveNow` on blur/Enter, a
+  `role="status"` line: Saving · Saved · error + Retry). The Workflow editor is the exception — a rewrite with
+  deletions keeps its explicit Save Workflow and counts unsaved changes in a sticky footer.
+- **The Workflow editor is master–detail**: `ul "States"` on the left (drag handle, `Edit <State>` row
+  button, unsaved dot), `form "<State>"` on the right with `StateFields` (`components/workflow-state-fields.tsx`),
+  the template in the markdown editor, approvers in `components/approvers-picker.tsx`.
+- **Lists are `DataTable`**, and a row opens on click (`onOpen`); the Projects list was the last raw table.
+- **A page that lays out its own panes declares `staticData: { bleed: true }`** on its route; the shell
+  reads it and adds no padding. Nothing else cancels the shell's `p-6`.
+- **Tests drive Base UI popups with keys**: `ArrowDown` opens a Combobox or Select in jsdom, `Escape` closes
+  it — and while one is open the rest of the page is inert, so close it before querying elsewhere.
 
 ## Test contracts
 
@@ -348,3 +371,9 @@ slice says otherwise: `Sign in with GitHub`; `New Issue` / `Create Issue` / `Add
 `Schedule for <name>`, `Grant a Project`, `Key name`, `Issue`, `Revoke DEV`, `Sponsored by`, `only time`;
 `Approvers for <State>`, `Save Workflow`, list `States`. Slices 1, 2, 4 and 8 of the plan change names on
 purpose and update the tests with them.
+
+Round 2 added these names: `list "Notifications"` with `checkbox "Select <verb>"` and `toolbar "Selection"`
+(Inbox); `button "List"` / `button "Board"` in `group "Filters"` and `region "<State>"` columns on the
+Workspace board; `combobox "Labels"` with `button "Remove <label>"` chips; `button "Edit <State>"`,
+`form "<State>"`, `combobox "Approvers for <State>"`, `textbox "Template for <State>"` (Source tab) and the
+`Save Workflow` / `Add State` / `Reset` footer in the Workflow editor; `status` on the Project settings form.

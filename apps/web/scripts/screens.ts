@@ -32,6 +32,7 @@ const shots: Shot[] = [
   { name: "sign-in", path: "/" }, // taken before signing in
   { name: "issues", path: "/" },
   { name: "issues-peek", path: "/?peek=DEV-21" },
+  { name: "issues-board", path: "/?view=board" },
   { name: "issue", path: "/issues/DEV-21" },
   { name: "inbox", path: "/inbox" },
   { name: "projects", path: "/projects" },
