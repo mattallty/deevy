@@ -1,0 +1,64 @@
+import type { Forge, PullRequest } from "./forge.ts";
+import type { Workspace } from "./workspace.ts";
+
+export interface Delivery {
+  branch: string;
+  commit: string;
+  pullRequest: PullRequest | null;
+}
+
+export interface DeliverOptions {
+  workspace: Workspace;
+  forge: Forge | null;
+  issueKey: string;
+  runId: string;
+  /** Who the commit is by. The Agent, because everything it does is its own. */
+  author: { name: string; email: string };
+}
+
+/**
+ * One Run's branch and its commit, named after the attempt that produced them.
+ *
+ * The Run's id is in the branch name so two attempts at one Issue cannot
+ * collide, and nothing is pushed to the base branch — the credential should not
+ * be able to, and this does not try. A Run that changed no file delivers
+ * nothing: an empty pull request is a worse record than none.
+ */
+export async function deliver(options: DeliverOptions): Promise<Delivery | null> {
+  const { workspace, issueKey, runId } = options;
+  const dirty = await workspace.git(["status", "--porcelain"]);
+  if (dirty === "") return null;
+
+  const branch = `deevy/${issueKey.toLowerCase()}-${runId.slice(0, 8)}`;
+  const base = workspace.repo?.baseBranch ?? "main";
+  await workspace.git(["checkout", "-b", branch]);
+  await workspace.git(["add", "-A"]);
+  await workspace.git([
+    "-c",
+    `user.name=${options.author.name}`,
+    "-c",
+    `user.email=${options.author.email}`,
+    "commit",
+    "--quiet",
+    "-m",
+    `${issueKey}: worked by a deevy Agent`,
+  ]);
+  const commit = await workspace.git(["rev-parse", "HEAD"]);
+  await workspace.git(["push", "--quiet", "origin", branch]);
+
+  const pullRequest = options.forge
+    ? await options.forge.open({
+        branch,
+        base,
+        title: `${issueKey}: worked by a deevy Agent`,
+        body: [
+          `Opened by a deevy Agent working ${issueKey}.`,
+          "",
+          `The Run that produced it is \`${runId}\`, and its Activity feed in deevy is the account`,
+          "of how it got here. A Human decides whether this ships.",
+        ].join("\n"),
+      })
+    : null;
+
+  return { branch, commit, pullRequest };
+}

@@ -28,5 +28,50 @@ services:
       retries: 5
       start_period: 20s
 
+  # The reference agent runtime (docs/plans/m4.md). It is not part of deevy:
+  # it holds one Agent's API key, which a Sponsor issues under Settings, Agents
+  # after the instance is up, so this service is off until you ask for it:
+  #
+  #     docker compose --profile agent up -d
+  #
+  # Read docs/OPERATIONS.md before you start one: it holds a shell in a checkout
+  # and reads text anyone with Project access wrote (ADR-0014).
+  agent:
+    profiles: ["agent"]
+    image: ghcr.io/mattallty/deevy-agent:latest
+    restart: unless-stopped
+    depends_on:
+      deevy:
+        condition: service_healthy
+    environment:
+      DEEVY_URL: ${DEEVY_AGENT_URL:-http://deevy:3000}
+      DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:?issue an API key for the Agent under Settings, Agents}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?the runtime runs Claude, and Claude needs a key}
+      DEEVY_AGENT_POLL_SECONDS: ${DEEVY_AGENT_POLL_SECONDS:-30}
+      DEEVY_AGENT_MODEL: ${DEEVY_AGENT_MODEL:-claude-opus-5}
+      # With a repository the session also gets file and shell tools, in a
+      # clone made fresh for each Run. Without one it has deevy's tools and an
+      # empty directory (docs/plans/m4.md). The container is the boundary
+      # either way, and the token below is the runtime's: the supervisor
+      # clones and pushes, and the session never sees it.
+      DEEVY_AGENT_REPO: ${DEEVY_AGENT_REPO:-}
+      DEEVY_AGENT_GIT_TOKEN: ${DEEVY_AGENT_GIT_TOKEN:-}
+      DEEVY_AGENT_BASE_BRANCH: ${DEEVY_AGENT_BASE_BRANCH:-main}
+      # Set it here and on the Agent's webhook URL, and a Run starts when it is
+      # assigned rather than at the next poll. Polling stays on either way.
+      DEEVY_AGENT_WEBHOOK_SECRET: ${DEEVY_AGENT_WEBHOOK_SECRET:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   deevy-data:

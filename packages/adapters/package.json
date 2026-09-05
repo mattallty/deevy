@@ -8,9 +8,7 @@
     "./workers": "./src/workers/index.ts",
     "./package.json": "./package.json"
   },
-  "scripts": {
-    "test": "vp test"
-  },
+  "scripts": {},
   "dependencies": {
     "@deevy/db": "workspace:*",
     "@hono/node-server": "catalog:",

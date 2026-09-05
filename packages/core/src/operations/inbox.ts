@@ -83,6 +83,13 @@ export const inbox = {
     method: "POST",
     path: "/inbox/read",
     auth: "member",
+    // An Agent told to find work through `inbox_list` with `unreadOnly` could
+    // never clear a row, so the same Notification came back on every pass and
+    // its unread count only grew (docs/plans/m4.md). No `mcp: true`: the
+    // caller is the loop keeping its own books rather than the model, PLAN.md
+    // promises twenty tools, and the same key reaches this over the HTTP API,
+    // which is the same authorisation through the other surface (ADR-0011).
+    agents: true,
     input: z.object({ ids: z.array(z.string()) }),
     output: z.object({ read: z.number().int() }),
     handler: async ({ input, context }) => {

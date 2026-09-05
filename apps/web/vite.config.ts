@@ -10,6 +10,10 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 const workers = process.env.DEEVY_TARGET === "workers";
 
 export default defineConfig({
+  run: {
+    // Cached, and per package: see packages/core/vite.config.ts.
+    tasks: { test: { command: "vp test", output: [] } },
+  },
   fmt: {},
   lint: {
     plugins: ["react", "typescript", "oxc"],

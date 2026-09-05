@@ -21,9 +21,16 @@ and agents, and between agents and agents.
 
 ## Status
 
-M2 done: a team runs its work in deevy on the Docker image, and an agent loop outside it works an Issue over
-MCP as a Member of its own — reading the Issue, writing the plan Document, stopping at a Gate for a Human, and
-finishing with a Run summary. M3 puts the same thing on Cloudflare Workers.
+v1. A team runs its work in deevy, on a single Docker container or on a Cloudflare Worker with D1, from one
+codebase. Agents are Members with their own identity, keys and audit trail, working the same Issues over MCP:
+reading the Issue, writing the Document its State asks for, stopping at a Gate for a Human, resuming when
+somebody rules, and finishing with a summary and a pull request linked back to the attempt that produced it.
+Every change is an Event, and the timeline, the live board, the inbox, Slack and the webhooks all derive from
+that one log.
+
+[`apps/claude-agent`](./apps/claude-agent) is the reference runtime on the other side: a service holding one
+Agent's key that runs Claude against the Issues that Agent is assigned. deevy itself never runs an agent
+(ADR-0003).
 
 The vocabulary is in [CONTEXT.md](./CONTEXT.md), the hard-to-reverse decisions in [docs/adr](./docs/adr), the
 v1 plan in [docs/PLAN.md](./docs/PLAN.md), the research that informed them in [docs/research](./docs/research),

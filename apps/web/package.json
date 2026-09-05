@@ -9,8 +9,7 @@
     "build:workers": "DEEVY_TARGET=workers vp build",
     "check:workers": "wrangler deploy --dry-run --config dist/deevy/wrangler.json --outdir dist/wrangler-dry-run",
     "test:workers": "node scripts/smoke-workers.ts",
-    "preview": "vp preview",
-    "test": "vp test"
+    "preview": "vp preview"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",

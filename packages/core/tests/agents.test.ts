@@ -57,6 +57,11 @@ describe("the Agent capability rule", () => {
       "documents.list",
       "documents.write",
       "inbox.list",
+      // Its own inbox, scoped to the caller in the same statement it updates
+      // with, so a loop that polls `unreadOnly` can stop finding the same work
+      // (docs/plans/m4.md). Not projected as a tool: the loop keeps its books,
+      // not the model.
+      "inbox.markRead",
       "issues.create",
       "issues.get",
       "issues.list",
@@ -484,7 +489,9 @@ describe("an Agent's own webhook", () => {
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     const asAdmin = createRouterClient(router, { context: admin });
-    const project = await asAdmin.projects.create({ key: "DEV", name: "deevy" });
+    // The Project has to exist for the Agent to be granted one; nothing here
+    // needs its id.
+    await asAdmin.projects.create({ key: "DEV", name: "deevy" });
     const created = await asAdmin.agents.create({ name: "Planner" });
 
     await asAdmin.agents.update({

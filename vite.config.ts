@@ -18,7 +18,18 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
     overrides: [
       {
+        // shadcn components are vendored: `shadcn add --overwrite` rewrites
+        // them wholesale (CLAUDE.md), so a finding in one is not something
+        // anybody can act on and comes back with the next update. The rule is
+        // off for that directory rather than the directory being ignored —
+        // `ignorePatterns` would take the files out of the typechecker too,
+        // and a real type error in a component we ship should still fail.
+        files: ["apps/web/src/components/ui/**"],
+        rules: { "typescript/restrict-template-expressions": "off" },
+      },
+      {
         files: [
+          "apps/claude-agent/**",
           "apps/server/**",
           "apps/web/scripts/**",
           "packages/adapters/src/node/**",

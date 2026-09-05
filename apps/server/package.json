@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vp pack --watch --on-success \"node --env-file-if-exists=../../.env dist/index.mjs\"",
     "build": "vp pack",
-    "start": "node dist/index.mjs",
-    "test": "vp test"
+    "start": "node dist/index.mjs"
   },
   "dependencies": {
     "@deevy/adapters": "workspace:*",

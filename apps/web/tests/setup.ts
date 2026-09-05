@@ -1,7 +1,9 @@
 /**
  * jsdom implements neither matchMedia nor ResizeObserver, which the shadcn
- * Sidebar (through use-mobile) and Sonner's Toaster both reach for on mount.
- * Stubbed here so component tests exercise the desktop layout.
+ * Sidebar (through use-mobile) and Sonner's Toaster both reach for on mount,
+ * nor scrollTo, which the router calls when it restores a position on
+ * navigation. Stubbed here so component tests exercise the desktop layout, and
+ * so a passing run says nothing.
  */
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
@@ -24,3 +26,9 @@ if (!globalThis.ResizeObserver) {
     disconnect() {}
   } as unknown as typeof ResizeObserver;
 }
+
+// scrollTo is the odd one out: jsdom does define it, so a guarded stub never
+// replaces it, and what it does is log "Not implemented" to the virtual console
+// once per navigation. jsdom has no layout, so there is nothing to scroll and
+// nothing any test could assert about it.
+window.scrollTo = (() => {}) as typeof window.scrollTo;

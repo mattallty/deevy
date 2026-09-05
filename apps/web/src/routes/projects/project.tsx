@@ -32,6 +32,9 @@ export function ProjectPage({ projectKey }: { projectKey: string }) {
           <Button
             variant="outline"
             size="sm"
+            // It renders a Link, so it is an anchor: Base UI assumes a native
+            // <button> otherwise and warns that the semantics are gone.
+            nativeButton={false}
             render={<Link to="/projects/$key/board" params={{ key }} />}
           >
             Board
@@ -39,6 +42,7 @@ export function ProjectPage({ projectKey }: { projectKey: string }) {
           <Button
             variant="ghost"
             size="sm"
+            nativeButton={false}
             render={<Link to="/projects/$key/settings/workflow" params={{ key }} />}
           >
             Workflow

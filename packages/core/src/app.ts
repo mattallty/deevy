@@ -1,7 +1,7 @@
 import { projectGrant, type Db } from "@deevy/db";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferenceHandlerPlugin } from "@orpc/openapi/plugins";
-import { onError } from "@orpc/server";
+import { COMMON_ERROR_STATUS_MAP, DEFAULT_ERROR_STATUS, ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { CORSHandlerPlugin } from "@orpc/server/plugins";
 import { eq } from "drizzle-orm";
@@ -45,8 +45,33 @@ export interface AppOptions {
    * Queues both do (docs/plans/m3.md slice 9).
    */
   jobs?: JobQueue;
-  /** Called with errors thrown by operations. */
+  /**
+   * Called with errors an operation threw that nobody expected. A refusal the
+   * handler chose — a `NOT_FOUND`, a `FORBIDDEN` — is not one of those and
+   * never reaches here (`isDefinedRefusal`).
+   */
   onError?: (error: unknown) => void;
+}
+
+/**
+ * Whether this is a refusal a handler chose rather than a failure nobody
+ * expected.
+ *
+ * The line is the status rather than the class: a handler throwing `NOT_FOUND`
+ * or `FORBIDDEN` has answered the request correctly, which is the operation
+ * working. A 5xx is the opposite, and an `INTERNAL_SERVER_ERROR` deevy raised
+ * on purpose still deserves a log — so what decides is what the caller ends up
+ * being told, not what was thrown.
+ */
+export function isDefinedRefusal(error: unknown): boolean {
+  if (!(error instanceof ORPCError)) return false;
+  // The status is filled in by the handler on its way out, so an error caught
+  // on the way there has only its code. oRPC's own map is what turns one into
+  // the other, and using it means a code this file has never heard of is
+  // classified exactly as the response to it will be.
+  const known: Record<string, number | undefined> = COMMON_ERROR_STATUS_MAP;
+  const status = known[error.code] ?? DEFAULT_ERROR_STATUS;
+  return status >= 400 && status < 500;
 }
 
 /**
@@ -64,6 +89,14 @@ export function createApp({
   jobs = discardingJobQueue(),
   onError: report = console.error,
 }: AppOptions) {
+  // A client asking for a Run that does not exist is a 404, not something for
+  // an operator to read. Reporting every refusal buried the ones that matter in
+  // stack traces, and dumped the whole oRPC context — the database handle and
+  // the caller's session included — into the log beside them.
+  const reportUnexpected = (error: unknown) => {
+    if (isDefinedRefusal(error)) return;
+    report(error);
+  };
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
 
   app.get("/healthz", (c) => c.json({ ok: true }));
@@ -87,7 +120,7 @@ export function createApp({
 
   // Before the oRPC handlers: the MCP surface builds its own context, because
   // an unauthenticated call there is a 401 challenge rather than an error body.
-  const mcp = createDeevyMcp({ db, auth, baseURL, secret, jobs, onError: report });
+  const mcp = createDeevyMcp({ db, auth, baseURL, secret, jobs, onError: reportUnexpected });
   app.all("/mcp", (c) => mcp.fetch(c.req.raw));
 
   // The origin a handler builds a link back into deevy from: what this
@@ -112,7 +145,10 @@ export function createApp({
   });
 
   const corsPlugin = new CORSHandlerPlugin<AppContext>({ origin, credentials: true });
-  const rpc = new RPCHandler(router, { plugins: [corsPlugin], interceptors: [onError(report)] });
+  const rpc = new RPCHandler(router, {
+    plugins: [corsPlugin],
+    interceptors: [onError(reportUnexpected)],
+  });
   const api = new OpenAPIHandler(router, {
     plugins: [
       corsPlugin,
@@ -122,7 +158,7 @@ export function createApp({
         spec: () => generateSpec(),
       }),
     ],
-    interceptors: [onError(report)],
+    interceptors: [onError(reportUnexpected)],
   });
 
   app.use("/rpc/*", async (c, next) => {
