@@ -1,21 +1,41 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxValue,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import { labelText } from "@/lib/labels";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 
+interface PickerLabel {
+  id: string;
+  scope: string | null;
+  name: string;
+  color: string;
+}
+
 interface PickerProps {
   issueKey: string;
-  labels: Array<{ id: string; scope: string | null; name: string; color: string }>;
-  /** The shortcut scope the Issue is shown in, so `l` reaches these Labels. */
+  labels: PickerLabel[];
+  /** The shortcut scope the Issue is shown in, so `l` reaches this picker. */
   shortcutScope?: string;
 }
 
 /**
- * Toggling a Label sends the whole selection, because the one-per-scope rule
- * is resolved server-side: choosing a second `epic:` replaces the first.
+ * The Issue's Labels as chips, and one box to add more from the Workspace's
+ * (docs/plans/ui-redesign-2.md slice E): a multi-select Combobox, typed into,
+ * instead of every Label laid out as a toggle — which stopped reading past a
+ * dozen. Choosing sends the whole selection, the chosen one last, because the
+ * one-per-scope rule is resolved server-side: a second `epic:` replaces the first.
  */
 export function LabelPicker({ issueKey, labels, shortcutScope = PAGE_SCOPE }: PickerProps) {
   const queryClient = useQueryClient();
@@ -25,52 +45,78 @@ export function LabelPicker({ issueKey, labels, shortcutScope = PAGE_SCOPE }: Pi
       onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.issues.key() }),
     }),
   );
+  const anchor = useComboboxAnchor();
+  const input = useRef<HTMLInputElement>(null);
+  useShortcut("l", () => input.current?.focus(), { scope: shortcutScope });
 
+  const options = [...(all.data?.labels ?? [])].sort(
+    (a, b) => (a.scope ?? "").localeCompare(b.scope ?? "") || a.name.localeCompare(b.name),
+  );
   const on = new Set(labels.map((label) => label.id));
-  const toggle = (id: string) => {
-    // The chosen one goes last, so it wins its scope.
-    const next = on.has(id)
-      ? labels.filter((label) => label.id !== id).map((label) => label.id)
-      : [...labels.map((label) => label.id), id];
-    setLabels.mutate({ key: issueKey, labelIds: next });
-  };
 
-  // `l` puts the keyboard on the first Label; Tab walks the rest, Space toggles.
-  const group = useRef<HTMLDivElement>(null);
-  useShortcut("l", () => group.current?.querySelector("button")?.focus(), {
-    scope: shortcutScope,
-  });
+  const choose = (next: PickerLabel[]) => {
+    // Whatever was just added goes last, so it wins its scope.
+    const kept = next.filter((label) => on.has(label.id)).map((label) => label.id);
+    const added = next.filter((label) => !on.has(label.id)).map((label) => label.id);
+    setLabels.mutate({ key: issueKey, labelIds: [...kept, ...added] });
+  };
 
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-medium text-muted-foreground">Labels</h2>
-      <div ref={group} role="group" aria-label="Labels" className="flex flex-wrap gap-2">
-        {all.data?.labels.map((label) => (
-          <Button
-            key={label.id}
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-auto p-0"
-            disabled={setLabels.isPending}
-            onClick={() => toggle(label.id)}
-          >
-            <Badge
-              variant={on.has(label.id) ? "default" : "outline"}
-              style={on.has(label.id) ? { backgroundColor: label.color, color: "#fff" } : undefined}
-            >
-              {labelText(label)}
-            </Badge>
-          </Button>
-        ))}
-        {all.data?.labels.length === 0 ? (
-          <span className="text-sm text-muted-foreground">
-            No Labels defined yet. Add some under Settings.
-          </span>
-        ) : null}
+      <div role="group" aria-label="Labels">
+        <Combobox
+          multiple
+          items={options}
+          value={labels}
+          onValueChange={(next) => choose(next as PickerLabel[])}
+          itemToStringLabel={(label: PickerLabel) => labelText(label)}
+          isItemEqualToValue={(a: PickerLabel, b: PickerLabel) => a.id === b.id}
+          disabled={setLabels.isPending}
+        >
+          <ComboboxChips ref={anchor}>
+            <ComboboxValue>
+              {(value: PickerLabel[]) =>
+                value.map((label) => (
+                  <ComboboxChip
+                    key={label.id}
+                    removeLabel={`Remove ${labelText(label)}`}
+                    style={{ borderLeft: `3px solid ${label.color}` }}
+                  >
+                    {labelText(label)}
+                  </ComboboxChip>
+                ))
+              }
+            </ComboboxValue>
+            <ComboboxChipsInput
+              ref={input}
+              aria-label="Labels"
+              placeholder={labels.length > 0 ? "Add…" : "Add a Label…"}
+            />
+          </ComboboxChips>
+          <ComboboxContent anchor={anchor}>
+            <ComboboxEmpty>
+              {all.data && all.data.labels.length === 0
+                ? "No Labels defined yet. Add some under Settings."
+                : "No Label matches."}
+            </ComboboxEmpty>
+            <ComboboxList>
+              {(label: PickerLabel) => (
+                <ComboboxItem key={label.id} value={label}>
+                  <span
+                    aria-hidden
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ background: label.color }}
+                  />
+                  {labelText(label)}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
       </div>
       {setLabels.error ? (
-        <p className="text-sm text-destructive">{setLabels.error.message}</p>
+        <p className="text-xs text-destructive">{setLabels.error.message}</p>
       ) : null}
     </section>
   );

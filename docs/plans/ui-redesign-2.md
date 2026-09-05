@@ -293,7 +293,7 @@ What shipped differently in D:
 - The Event log's **What** column sits between Actor and Subject; Subject is narrow; the payload still
   opens on click for the audit case.
 
-### E — Labels through a combobox (point 10)
+### E — Labels through a combobox (point 10) — shipped
 
 `components/label-picker.tsx` stops listing every Label. The rail shows the Issue's Labels as chips and one
 control: a **multi-select Base UI Combobox** (`ui/combobox.tsx`, already vendored, imported nowhere yet;
@@ -305,6 +305,12 @@ aria-label="Labels"`, options named by `labelText(label)`, chips with `aria-labe
 `labels.test.tsx` migrates from `getByRole("button", { name: "epic: Checkout" })` to typing "epic" and
 choosing the option; the assertion on `labelIds: ["l1","l2"]` stays. The same Combobox pattern is what slice
 H reuses for approvers.
+
+What shipped differently in E: the options are one flat list sorted by scope then name (the `scope: name`
+text groups them visibly; Base UI's grouped collections were not needed); each chip carries its Label's
+colour as a left rule and each option a dot. Under jsdom, typing filters but `ArrowDown` opens the popup —
+the recipe `labels.test.tsx` and `deevy-ui` now record. `ComboboxChip` gained `removeLabel` so the remove
+button has a name ("Remove backend").
 
 ### G — Project settings autosave (point 18)
 

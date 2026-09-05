@@ -103,10 +103,9 @@ describe("the keyboard on an Issue", () => {
   it("l lands on the first Label and p opens the Parent picker", async () => {
     isGate.value = false;
     await mountIssue();
-    await screen.findByRole("button", { name: "backend" });
+    const box = await screen.findByRole("combobox", { name: "Labels" });
     press("l");
-    const labels = screen.getByRole("group", { name: "Labels" });
-    expect(labels.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(box);
     press("p");
     expect(await screen.findByRole("combobox", { name: "Parent" })).toBeTruthy();
     expect(await screen.findByRole("option", { name: /DEV-2/ })).toBeTruthy();

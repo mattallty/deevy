@@ -96,7 +96,13 @@ describe("the Label picker on an Issue", () => {
     await mountAt("/issues/DEV-1");
 
     await screen.findByRole("group", { name: "Labels" });
-    fireEvent.click(await screen.findByRole("button", { name: "epic: Checkout" }));
+    // The Issue's own Label is a chip; the rest are found by typing.
+    expect(screen.getByRole("button", { name: "Remove backend" })).toBeTruthy();
+    // Typing filters; ArrowDown is what opens the Base UI popup under jsdom.
+    const box = screen.getByRole("combobox", { name: "Labels" });
+    fireEvent.change(box, { target: { value: "epic" } });
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "epic: Checkout" }));
 
     await waitFor(() =>
       expect(stub.set).toContainEqual(
