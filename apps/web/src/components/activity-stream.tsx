@@ -1,71 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNowStrict } from "date-fns";
-import { useMemo, useState, type ReactNode } from "react";
+import { format, formatDistanceToNowStrict, isToday, isYesterday } from "date-fns";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { MemberChip, type ChipMember } from "@/components/member-chip";
+import {
+  Timeline,
+  TimelineContent,
+  TimelineHeader,
+  TimelineIndicator,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineTitle,
+} from "@/components/reui/timeline";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { describeEvent, type EventText, type EventTone } from "@/lib/event-text";
 import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-
-/**
- * What an Event says, in a sentence with the actor as its subject. Unknown
- * kinds still render as their name, so the stream never goes blank on an
- * Event it has not met.
- */
-function phrase(kind: string, payload: Record<string, unknown> | null): string {
-  const p = payload ?? {};
-  switch (kind) {
-    case "issue.created":
-      return "created this Issue";
-    case "issue.updated":
-      return "edited this Issue";
-    case "issue.assigned":
-      return "changed the Assignee";
-    case "issue.reparented":
-      return "changed the parent";
-    case "issue.moved":
-      return typeof p.from === "string" && typeof p.to === "string"
-        ? `moved it from ${p.from} to ${p.to}`
-        : "moved this Issue";
-    case "issue.labels_changed":
-      return "changed the Labels";
-    case "issue.link_added":
-      return "added a link";
-    case "issue.link_removed":
-      return "removed a link";
-    case "document.created":
-      return typeof p.name === "string" ? `opened the ${p.name} Document` : "opened a Document";
-    case "document.updated":
-      return typeof p.name === "string"
-        ? `wrote ${p.name}${typeof p.version === "number" ? ` v${String(p.version)}` : ""}`
-        : "wrote a Document";
-    case "gate.approved":
-      return "approved the Gate";
-    case "gate.rejected":
-      return "rejected the Gate";
-    case "gate.requested":
-      return "asked for a ruling";
-    case "run.started":
-      return "started a Run";
-    case "run.awaiting_input":
-      return "is waiting on a Human";
-    case "run.answered":
-      return "answered the Run";
-    case "run.finished":
-      return "finished the Run";
-    case "run.failed":
-      return "failed the Run";
-    case "run.stale":
-      return "went quiet";
-    default:
-      return kind;
-  }
-}
 
 function ago(value: Date | string): string {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -73,25 +29,89 @@ function ago(value: Date | string): string {
   return formatDistanceToNowStrict(date, { addSuffix: true });
 }
 
-type Entry =
-  | {
-      id: string;
-      at: Date;
-      kind: "comment";
-      author: ChipMember | null;
-      body: string;
-      deleted: boolean;
-      edited: boolean;
-    }
-  | { id: string; at: Date; kind: "event"; actor: ChipMember | null; text: string };
+function dayLabel(date: Date): string {
+  if (isToday(date)) return "Today";
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "EEEE d MMMM");
+}
+
+type CommentEntry = {
+  id: string;
+  at: Date;
+  kind: "comment";
+  author: ChipMember | null;
+  body: string;
+  deleted: boolean;
+  edited: boolean;
+};
+type EventEntry = {
+  id: string;
+  at: Date;
+  kind: "event";
+  actor: ChipMember | null;
+  said: EventText;
+};
+type Entry = CommentEntry | EventEntry;
+type Row =
+  | { type: "day"; id: string; label: string }
+  | { type: "entry"; entry: Entry }
+  | { type: "fold"; id: string; entries: EventEntry[] };
 
 type Filter = "all" | "comments" | "changes";
 
+/** The dot's colour by what the item is: a Gate amber, an Agent teal, a Human copper. */
+const dot: Record<EventTone, string> = {
+  human: "border-human bg-human/15",
+  agent: "border-agent bg-agent/15",
+  gate: "border-gate bg-gate/25",
+  muted: "border-border bg-muted",
+  destructive: "border-destructive bg-destructive/15",
+};
+
 /**
- * One stream for what was said and what happened, in time order: comments
- * and Events read from the log and folded together (docs/plans/ui-redesign.md
- * slice 4). Comment Events are left out, since the comment itself is here.
- * The composer at the bottom is the inline editor with `@` mentions.
+ * Fold an Agent's run of routine steps — a Run started, a Document written —
+ * into one line, so a Human's comment and a ruling are not lost among them.
+ * A question, an answer, a ruling and anything with words in it stays whole.
+ */
+function fold(entries: Entry[]): Row[] {
+  const rows: Row[] = [];
+  let day = "";
+  let run: EventEntry[] = [];
+  const flush = () => {
+    if (run.length >= 2) rows.push({ type: "fold", id: `fold-${run[0]!.id}`, entries: run });
+    else for (const entry of run) rows.push({ type: "entry", entry });
+    run = [];
+  };
+  for (const entry of entries) {
+    const label = dayLabel(entry.at);
+    if (label !== day) {
+      flush();
+      day = label;
+      rows.push({ type: "day", id: `day-${label}`, label });
+    }
+    const routine =
+      entry.kind === "event" &&
+      entry.actor?.kind === "agent" &&
+      entry.said.routine &&
+      entry.said.detail === null;
+    if (routine) {
+      if (run.length > 0 && run[0]!.actor?.id !== entry.actor?.id) flush();
+      run.push(entry);
+    } else {
+      flush();
+      rows.push({ type: "entry", entry });
+    }
+  }
+  flush();
+  return rows;
+}
+
+/**
+ * One stream for what was said and what happened, in time order, on a
+ * timeline (docs/plans/ui-redesign-2.md slice D): comments and Events read
+ * from the log, grouped by day, an Agent's routine steps folded. Comment
+ * Events are left out, since the comment itself is here. The composer at the
+ * bottom is the inline editor with `@` mentions.
  */
 export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKey: string }) {
   const queryClient = useQueryClient();
@@ -102,6 +122,7 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
     }),
   );
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
   const mentionables = useMentionables();
   const [filter, setFilter] = useState<Filter>("all");
   const [body, setBody] = useState("");
@@ -124,6 +145,16 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
     () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
     [members.data],
   );
+  const labelById = useMemo(
+    () =>
+      new Map(
+        (labels.data?.labels ?? []).map((label) => [
+          label.id,
+          label.scope ? `${label.scope}: ${label.name}` : label.name,
+        ]),
+      ),
+    [labels.data],
+  );
 
   const entries = useMemo<Entry[]>(() => {
     const list: Entry[] = [];
@@ -140,28 +171,38 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
     }
     for (const event of events.data?.events ?? []) {
       if (event.kind.startsWith("comment.")) continue;
+      const actor = event.actorMemberId ? (memberById.get(event.actorMemberId) ?? null) : null;
+      const said = describeEvent(
+        { kind: event.kind, payload: event.payload, actorKind: actor?.kind ?? null },
+        {
+          memberName: (id) => memberById.get(id)?.user.name,
+          labelName: (id) => labelById.get(id),
+        },
+      );
+      if (!said) continue;
       list.push({
         id: `event-${String(event.seq)}`,
         at: new Date(event.createdAt),
         kind: "event",
-        actor: event.actorMemberId ? (memberById.get(event.actorMemberId) ?? null) : null,
-        text: phrase(
-          event.kind,
-          event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
-            ? (event.payload as Record<string, unknown>)
-            : null,
-        ),
+        actor,
+        said,
       });
     }
     return list.sort((a, b) => a.at.getTime() - b.at.getTime());
-  }, [comments.data, events.data, memberById]);
+  }, [comments.data, events.data, memberById, labelById]);
 
-  const shown = entries.filter((entry) =>
-    filter === "all"
-      ? true
-      : filter === "comments"
-        ? entry.kind === "comment"
-        : entry.kind === "event",
+  const rows = useMemo(
+    () =>
+      fold(
+        entries.filter((entry) =>
+          filter === "all"
+            ? true
+            : filter === "comments"
+              ? entry.kind === "comment"
+              : entry.kind === "event",
+        ),
+      ),
+    [entries, filter],
   );
 
   const submit = () => {
@@ -204,74 +245,40 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
       ) : null}
 
       {comments.data && events.data ? (
-        <ol aria-label="Activity" className="flex flex-col">
-          {shown.length === 0 ? (
+        <Timeline
+          value={0}
+          orientation="vertical"
+          render={<ol aria-label="Activity" />}
+          className="pl-1"
+        >
+          {rows.length === 0 ? (
             <li className="py-2 text-sm text-muted-foreground">Nothing yet.</li>
           ) : null}
-          {shown.map((entry) =>
-            entry.kind === "comment" ? (
-              <li key={entry.id} className="flex gap-3 py-3">
-                <Rail>
-                  {entry.author ? (
-                    <MemberChip
-                      member={entry.author}
-                      size="md"
-                      className="[&>span:last-child]:sr-only"
-                    />
-                  ) : (
-                    <span className="size-7 rounded-full bg-muted" aria-hidden />
-                  )}
-                </Rail>
-                <div className="flex min-w-0 flex-1 flex-col gap-1 rounded-md border bg-card px-3 py-2">
-                  <div className="flex items-baseline gap-2 text-xs text-muted-foreground">
-                    <span className="text-sm font-medium text-foreground">
-                      {entry.author?.user.name ?? "Someone"}
-                    </span>
-                    <span>{ago(entry.at)}</span>
-                    {entry.edited ? <span>edited</span> : null}
-                    <span className="flex-1" />
-                    {entry.deleted ? null : (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        disabled={remove.isPending}
-                        onClick={() =>
-                          remove.mutate({ commentId: entry.id.replace(/^comment-/, "") })
-                        }
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-                  {entry.deleted ? (
-                    <p className="text-sm italic text-muted-foreground">
-                      This comment was withdrawn.
-                    </p>
-                  ) : (
-                    <Markdown>{entry.body}</Markdown>
-                  )}
-                </div>
+          {rows.map((row, index) =>
+            row.type === "day" ? (
+              <li
+                key={row.id}
+                role="presentation"
+                className="flex items-center gap-3 pt-2 pb-3 text-xs font-medium text-muted-foreground"
+              >
+                <span>{row.label}</span>
+                <span aria-hidden className="h-px flex-1 bg-border" />
               </li>
+            ) : row.type === "fold" ? (
+              <FoldedSteps key={row.id} step={index + 1} entries={row.entries} />
+            ) : row.entry.kind === "comment" ? (
+              <CommentItem
+                key={row.entry.id}
+                step={index + 1}
+                entry={row.entry}
+                onDelete={() => remove.mutate({ commentId: row.entry.id.replace(/^comment-/, "") })}
+                deleting={remove.isPending}
+              />
             ) : (
-              <li key={entry.id} className="flex items-center gap-3 py-1.5 text-sm">
-                <Rail>
-                  <span aria-hidden className="block size-1.5 rounded-full bg-border" />
-                </Rail>
-                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5">
-                  {entry.actor ? (
-                    <MemberChip member={entry.actor} size="xs" />
-                  ) : (
-                    <span className="text-muted-foreground">deevy</span>
-                  )}
-                  <span className="text-muted-foreground">{entry.text}</span>
-                  <span className="font-mono text-xs text-muted-foreground/70">
-                    {ago(entry.at)}
-                  </span>
-                </span>
-              </li>
+              <EventItem key={row.entry.id} step={index + 1} entry={row.entry} />
             ),
           )}
-        </ol>
+        </Timeline>
       ) : null}
 
       <form
@@ -304,10 +311,133 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
   );
 }
 
-function Rail({ children, className }: { children: ReactNode; className?: string }) {
+function Who({ member }: { member: ChipMember | null }) {
+  return member ? (
+    <MemberChip member={member} size="xs" />
+  ) : (
+    <span className="text-muted-foreground">deevy</span>
+  );
+}
+
+function EventItem({ step, entry }: { step: number; entry: EventEntry }) {
+  const { said } = entry;
   return (
-    <span className={cn("flex w-7 shrink-0 items-start justify-center pt-0.5", className)}>
-      {children}
-    </span>
+    <TimelineItem step={step} render={<li />} className="not-last:pb-4">
+      <TimelineHeader>
+        <TimelineSeparator className="bg-border" />
+        <TimelineTitle
+          render={<div />}
+          className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-normal"
+        >
+          <Who member={entry.actor} />
+          <span
+            className={cn(
+              said.tone === "gate" || said.tone === "destructive"
+                ? "font-medium"
+                : "text-muted-foreground",
+            )}
+          >
+            {said.text}
+          </span>
+          <span className="font-mono text-xs text-muted-foreground/70">{ago(entry.at)}</span>
+        </TimelineTitle>
+        <TimelineIndicator className={dot[said.tone]} />
+      </TimelineHeader>
+      {said.detail ? (
+        <TimelineContent
+          className={cn(
+            "mt-1 text-sm",
+            said.tone === "gate" || said.tone === "destructive"
+              ? "rounded-md border border-gate/40 bg-gate/5 px-3 py-2 text-foreground"
+              : "text-muted-foreground italic",
+          )}
+        >
+          “{said.detail}”
+        </TimelineContent>
+      ) : null}
+    </TimelineItem>
+  );
+}
+
+function FoldedSteps({ step, entries }: { step: number; entries: EventEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const first = entries[0]!;
+  const last = entries[entries.length - 1]!;
+  return (
+    <TimelineItem step={step} render={<li />} className="not-last:pb-4">
+      <TimelineHeader>
+        <TimelineSeparator className="bg-border" />
+        <TimelineTitle
+          render={<div />}
+          className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-normal"
+        >
+          <Who member={first.actor} />
+          <button
+            type="button"
+            aria-expanded={open}
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            onClick={() => setOpen((current) => !current)}
+          >
+            {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {entries.length} steps
+          </button>
+          <span className="font-mono text-xs text-muted-foreground/70">{ago(last.at)}</span>
+        </TimelineTitle>
+        <TimelineIndicator className={dot.agent} />
+      </TimelineHeader>
+      {open ? (
+        <TimelineContent className="mt-1 flex flex-col gap-0.5 text-sm text-muted-foreground">
+          {entries.map((entry) => (
+            <span key={entry.id}>
+              {entry.said.text}{" "}
+              <span className="font-mono text-xs text-muted-foreground/70">{ago(entry.at)}</span>
+            </span>
+          ))}
+        </TimelineContent>
+      ) : null}
+    </TimelineItem>
+  );
+}
+
+function CommentItem({
+  step,
+  entry,
+  onDelete,
+  deleting,
+}: {
+  step: number;
+  entry: CommentEntry;
+  onDelete: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <TimelineItem step={step} render={<li />} className="not-last:pb-4">
+      <TimelineHeader>
+        <TimelineSeparator className="bg-border" />
+        <TimelineTitle
+          render={<div />}
+          className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-normal"
+        >
+          <Who member={entry.author} />
+          <span className="text-muted-foreground">commented</span>
+          <span className="font-mono text-xs text-muted-foreground/70">{ago(entry.at)}</span>
+          {entry.edited ? <span className="text-xs text-muted-foreground">edited</span> : null}
+          <span className="flex-1" />
+          {entry.deleted ? null : (
+            <Button variant="ghost" size="xs" disabled={deleting} onClick={onDelete}>
+              Delete
+            </Button>
+          )}
+        </TimelineTitle>
+        <TimelineIndicator className={dot.human} />
+      </TimelineHeader>
+      <TimelineContent className="mt-1 rounded-md border bg-card px-3 py-2 text-sm text-foreground">
+        {entry.deleted ? (
+          <p className="text-sm text-muted-foreground italic">This comment was withdrawn.</p>
+        ) : (
+          <Markdown>{entry.body}</Markdown>
+        )}
+      </TimelineContent>
+    </TimelineItem>
   );
 }

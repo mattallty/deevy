@@ -7,6 +7,7 @@ import { SettingsPage } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
+import { describeEvent } from "@/lib/event-text";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,17 @@ export function EventLogPage() {
   );
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
+  const labelById = useMemo(
+    () =>
+      new Map(
+        (labels.data?.labels ?? []).map((label) => [
+          label.id,
+          label.scope ? `${label.scope}: ${label.name}` : label.name,
+        ]),
+      ),
+    [labels.data],
+  );
   const memberById = useMemo(
     () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
     [members.data],
@@ -113,6 +125,30 @@ export function EventLogPage() {
       className: "w-44",
     },
     {
+      id: "what",
+      header: "What",
+      cell: (row) => {
+        const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
+        const said = describeEvent(
+          { kind: row.kind, payload: row.payload, actorKind: actor?.kind ?? null },
+          {
+            memberName: (id) => memberById.get(id)?.user.name,
+            labelName: (id) => labelById.get(id),
+          },
+        );
+        if (!said) return <span className="text-xs text-muted-foreground">a Run step</span>;
+        return (
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-sm">{said.text}</span>
+            {said.detail ? (
+              <span className="truncate text-xs text-muted-foreground">“{said.detail}”</span>
+            ) : null}
+          </span>
+        );
+      },
+      className: "max-w-0 w-full",
+    },
+    {
       id: "subject",
       header: "Subject",
       cell: (row) => {
@@ -134,14 +170,14 @@ export function EventLogPage() {
           </span>
         );
       },
-      className: "max-w-0 w-full",
+      className: "w-56",
     },
   ];
 
   return (
     <SettingsPage
       title="Event log"
-      description="Every change in this Workspace, newest first: what changed, which Member did it, and when. The timeline, the live stream and the inbox all derive from this."
+      description="Every change in this Workspace, newest first: who did what, to which Issue or Project, and when. The Activity, the live stream and the inbox all derive from this; a row opens its raw payload."
     >
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
         <NativeSelect

@@ -252,7 +252,7 @@ What shipped differently in C:
 - Core: `inbox.list` rows gain `actor` (the Event's Member with user) and `comment` (`{ id, body | null }`)
   through two batched lookups, no N+1; snapshots regenerated.
 
-### D — Activity timeline and a truthful Event log (points 9, 12; mockup first)
+### D — Activity timeline and a truthful Event log (points 9, 12; mockup first) — shipped
 
 **Data (core, additive, self-describing Events).** New Events carry names beside ids so the log needs no
 lookups: `issue.labels_changed` payload adds `addedNames`/`removedNames`; `issue.reparented` adds
@@ -276,6 +276,22 @@ full-width amber cards. Matt picks; `activity-stream.tsx` is rebuilt on it, keep
 
 **Event log**: a **What** column from `describeEvent` (actor already there) replaces the click-to-see JSON
 as the first thing you read; the payload `<pre>` stays behind a "Payload" toggle per row for the audit case.
+
+What shipped differently in D:
+
+- `describeEvent` returns `{ text, detail, tone, routine }` (not `verb/object`): one sentence, the words
+  someone wrote as detail, and `routine` marking the steps an Agent's day is made of (Run started, Document
+  written, a link added) so the stream can fold them. `run.activity` describes to `null` — the Run card
+  shows those — and the stream and the log skip it.
+- Matt picked **by day, Agents folded**: the stream is a ReUI `Timeline` rendered as `ol aria-label=
+"Activity"`, day separators as `li role="presentation"` so `listitem` counts hold, and consecutive
+  routine Events by one Agent fold into "n steps" behind `aria-expanded`. A ruling or a failure is a
+  card on the rail with its note; a comment is a card with its Markdown.
+- Core payloads gained `addedNames`/`removedNames`, `fromName`/`toName`, `fromKey`/`toKey` (also on the
+  State-rule assignment and the Label-deletion cascade); `events.test.ts` "self-describing payloads" pins
+  them. Older Events resolve through the members and labels maps the screens already load.
+- The Event log's **What** column sits between Actor and Subject; Subject is narrow; the payload still
+  opens on click for the audit case.
 
 ### E — Labels through a combobox (point 10)
 

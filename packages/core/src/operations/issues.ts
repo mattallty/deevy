@@ -233,12 +233,26 @@ export const issues = {
         oneLabelPerScope(ordered).map((label) => label.id),
       );
       if (change.added.length > 0 || change.removed.length > 0) {
+        // Names beside the ids, so the log reads without a lookup (docs/plans/ui-redesign-2.md D).
+        const removedLabels =
+          change.removed.length > 0
+            ? await context.db.query.label.findMany({ where: { id: { in: change.removed } } })
+            : [];
+        const text = (label: { scope: string | null; name: string }) =>
+          label.scope ? `${label.scope}: ${label.name}` : label.name;
         await appendEvent(context, {
           kind: "issue.labels_changed",
           subjectType: "issue",
           subjectId: issue.id,
           projectId: project.id,
-          payload: change,
+          payload: {
+            ...change,
+            addedNames: change.added.flatMap((id) => {
+              const label = chosen.find((candidate) => candidate.id === id);
+              return label ? [text(label)] : [];
+            }),
+            removedNames: removedLabels.map(text),
+          },
         });
       }
       return loadIssue(context, issue.id);
@@ -334,17 +348,52 @@ export const issues = {
         });
       }
       if (assigneeChanged) {
+        // Names beside the ids, so the log reads without a lookup (docs/plans/ui-redesign-2.md D).
+        const ids = [found.assigneeMemberId, input.assigneeMemberId ?? null].filter(
+          (id): id is string => id !== null,
+        );
+        const people =
+          ids.length > 0
+            ? await context.db.query.member.findMany({
+                where: { id: { in: ids } },
+                with: { user: true },
+              })
+            : [];
+        const nameOf = (id: string | null) =>
+          id ? (people.find((person) => person.id === id)?.user.name ?? null) : null;
         await appendEvent(context, {
           kind: "issue.assigned",
           ...subject,
-          payload: { from: found.assigneeMemberId, to: input.assigneeMemberId ?? null },
+          payload: {
+            from: found.assigneeMemberId,
+            to: input.assigneeMemberId ?? null,
+            fromName: nameOf(found.assigneeMemberId),
+            toName: nameOf(input.assigneeMemberId ?? null),
+          },
         });
       }
       if (parentChanged) {
+        const ids = [found.parentId, parentId ?? null].filter((id): id is string => id !== null);
+        const related =
+          ids.length > 0
+            ? await context.db.query.issue.findMany({
+                where: { id: { in: ids } },
+                with: { project: true },
+              })
+            : [];
+        const keyOf = (id: string | null) => {
+          const row = id ? related.find((candidate) => candidate.id === id) : undefined;
+          return row ? issueKey(row.project.key, row.number) : null;
+        };
         await appendEvent(context, {
           kind: "issue.reparented",
           ...subject,
-          payload: { from: found.parentId, to: parentId ?? null },
+          payload: {
+            from: found.parentId,
+            to: parentId ?? null,
+            fromKey: keyOf(found.parentId),
+            toKey: keyOf(parentId ?? null),
+          },
         });
       }
       return loadIssue(context, found.id);

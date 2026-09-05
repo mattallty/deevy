@@ -310,6 +310,10 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   never from an `aria-label` on the input.
 - **Screenshots** come from `vp run web#screens` (`apps/web/scripts/screens.ts`) against the seeded
   `dev:stub` instance, into `docs/screens/`; regenerate at milestones.
+- **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
+  itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
+  names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
+  `ol aria-label="Activity"`; day rows are `li role="presentation"`.
 - **Selects:** `SelectContent` children go inside a `SelectGroup` (with `SelectLabel` when they have a
   heading), as the Base UI shadcn docs show — in that build the group carries the list's padding, so bare
   items sit flush against the popup edge. Round 2 found seven screens doing that.

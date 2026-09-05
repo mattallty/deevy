@@ -146,7 +146,12 @@ export const labels = {
           subjectType: "issue",
           subjectId: issue.id,
           projectId: issue.projectId,
-          payload: { added: [], removed: [found.id] },
+          payload: {
+            added: [],
+            removed: [found.id],
+            addedNames: [],
+            removedNames: [found.scope ? `${found.scope}: ${found.name}` : found.name],
+          },
         });
       }
       return { deleted: true as const };

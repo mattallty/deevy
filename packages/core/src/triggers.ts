@@ -75,12 +75,21 @@ async function stateRule(db: Db, event: Event): Promise<EventInput[]> {
     .update(issueTable)
     .set({ assigneeMemberId: agentMemberId, updatedAt: new Date() })
     .where(eq(issueTable.id, found.id));
+  const agent = await db.query.member.findFirst({
+    where: { id: agentMemberId },
+    with: { user: true },
+  });
   events.push({
     kind: "issue.assigned",
     subjectType: "issue",
     subjectId: found.id,
     projectId: event.projectId,
-    payload: { from: found.assigneeMemberId, to: agentMemberId, byStateRule: true },
+    payload: {
+      from: found.assigneeMemberId,
+      to: agentMemberId,
+      toName: agent?.user.name ?? null,
+      byStateRule: true,
+    },
   });
   return events;
 }
