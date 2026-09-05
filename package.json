@@ -6,9 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vp run -r --parallel dev",
-    "ready": "vp check && vp run -r test && vp run -r build"
+    "ready": "vp check && vp run -r test && vp run -r build",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

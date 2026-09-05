@@ -1,0 +1,15 @@
+set -e
+. "$(dirname -- "$0")/vp.sh"
+
+# Format, lint and typecheck the tree. Four seconds cold and nothing at all
+# when Vite+'s task cache is warm, which is cheap enough that nobody should
+# want to skip it.
+#
+# This exists because reading `vp check`'s output is not the same as running
+# it: a `| tail -1` once showed "Formatting completed" while the typechecker
+# was reporting two errors, and the branch went to CI red. A hook fails the
+# commit rather than printing a line somebody has to read correctly.
+#
+# It checks the working tree, not the index. A partial `git add` can still
+# commit something that does not compile; the pre-push hook is the net for it.
+vp check
