@@ -52,7 +52,7 @@ export function AllowlistPage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Allowlist</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Allowlist</h1>
         <p className="text-sm text-muted-foreground">
           A sign-in matching any rule below joins this Workspace as a Member.
         </p>

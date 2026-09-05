@@ -37,7 +37,7 @@ export function TeamsPage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Teams</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Teams</h1>
         <p className="text-sm text-muted-foreground">
           A Team owns Projects and can be mentioned. Every Human still sees every Project.
         </p>

@@ -104,7 +104,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Workflow</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Workflow</h1>
         <p className="text-sm text-muted-foreground">
           The States {projectKey} Issues move through, in order. A Gate is one an Issue cannot leave
           without a Human&apos;s approval, and a State that names an Agent hands it the Issue and

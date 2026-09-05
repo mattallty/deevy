@@ -94,7 +94,7 @@ export function BoardPage({ projectKey }: { projectKey: string }) {
     <section className="flex flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Board</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Board</h1>
           <p className="text-sm text-muted-foreground">
             {projectKey} by State. Cards sort by when they last changed.
           </p>

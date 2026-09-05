@@ -132,4 +132,13 @@ describe("the app shell", () => {
     });
     expect(router.state.location.pathname).toBe("/settings/workspace");
   });
+
+  it("opens the Member menu with the theme and sign-out in it", async () => {
+    await mountAt("/");
+
+    fireEvent.click(within(sidebar()).getByRole("button", { name: "Ada Lovelace" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: /Sign out/ })).toBeTruthy();
+    expect(within(menu).getByRole("menuitemradio", { name: /Dark/ })).toBeTruthy();
+  });
 });

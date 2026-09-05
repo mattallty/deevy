@@ -28,7 +28,7 @@ export function ProjectPage({ projectKey }: { projectKey: string }) {
           {archivedAt ? <Badge variant="outline">Archived</Badge> : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="flex-1 text-2xl font-semibold">{name}</h1>
+          <h1 className="flex-1 text-xl font-semibold tracking-tight">{name}</h1>
           <Button
             variant="outline"
             size="sm"

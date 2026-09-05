@@ -97,7 +97,7 @@ export function ChannelsPage() {
   return (
     <section className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">Channels</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Channels</h1>
         <p className="text-sm text-muted-foreground">
           Where Notifications are delivered. Every Human has an inbox; a Slack Channel is an
           incoming webhook this Workspace posts to.

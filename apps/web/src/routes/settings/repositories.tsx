@@ -42,7 +42,7 @@ export function RepositoriesPage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Repositories</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Repositories</h1>
         <p className="text-sm text-muted-foreground">
           Where the code lives. A Link pasted on an Issue is matched to one of these by its URL.
         </p>

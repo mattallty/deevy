@@ -90,9 +90,12 @@ only submit key. `src/lib/shortcuts.ts` owns a scope stack: an open Sheet, Dialo
 
 ## What slice 1 settled (tokens, frame, palette, shortcuts)
 
-- **One size lever.** `html { font-size: 106.25% }` in `index.css`: the whole rem scale — text, buttons,
-  inputs, rows, icons — moves together. Plex reads smaller than Inter at the same pixel size and the plan's
-  14px base was too small on the owner's screen; `text-sm` is ≈15px, `text-base` 17px. Tune it there only.
+- **Sizes live in `components/ui`.** shadcn's `base-mira` is the compact style — 12px controls, 10px badges
+  and kbd, 28px buttons. deevy resizes those files (button, input, textarea, native-select, select, label,
+  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights; the
+  root stays 16px so 1rem is 16px everywhere. Scale: `text-xs` 12px for meta and badges, `text-sm` 14px for
+  everything a person operates or reads in a row, `text-base` 16px for prose, `text-xl` 20px for a page
+  title. A `shadcn add --overwrite` of one of those files brings the compact sizes back — re-apply them.
 - **Theme is a class.** `next-themes` (`attribute="class"`, system default) sets `.dark` on `<html>`; tokens
   live on `:root` and `.dark`, never in a media query. The Member menu in the sidebar footer holds the toggle.
 - **Shortcuts** go through `src/lib/shortcuts.ts` — `useShortcut("g i", …)`, `useShortcut("mod+k", …,
@@ -106,6 +109,10 @@ string` erases the literal and every typed `to` in the app stops compiling.
   its children straight into the Dialog, so the cmdk `<Command>` root is ours to add inside it. cmdk itself
   depends on `@radix-ui/react-dialog` and friends — the one sanctioned transitive Radix dependency, because
   it is what shadcn ships for Base UI projects too; nothing under `apps/web/src` imports Radix directly.
+- **Base UI menus.** A `DropdownMenuLabel` must sit inside a `DropdownMenuGroup` (or a radio group) or the
+  menu throws the moment it opens. Make a menu's trigger the DOM button itself (`DropdownMenuTrigger
+className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}`: a `tooltip` there turns
+  the button into a Tooltip wrapper and the click has nowhere to land. `tests/shell.test.tsx` opens the menu.
 - **Layout facts.** shadcn's `SidebarInset` _is_ the `<main>` landmark — a page never renders another. Under
   768px the sidebar is a Sheet behind the trigger; review screens at ≥1280px. The New Issue dialog is owned
   by `NewIssueProvider` in the shell, so the button, the palette and `c` open the same one (`useNewIssue()`).

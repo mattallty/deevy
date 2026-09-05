@@ -32,7 +32,7 @@ export function WorkspacePage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Workspace</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Workspace</h1>
         <p className="text-sm text-muted-foreground">
           This instance serves one Workspace. Renaming it changes what everyone sees in the sidebar.
         </p>

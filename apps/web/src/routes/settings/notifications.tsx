@@ -56,7 +56,7 @@ export function NotificationsPage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Notifications</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Notifications</h1>
         <p className="text-sm text-muted-foreground">
           What reaches you, and where. Slack only arrives for the Channels this Workspace routes a
           kind to; turning it off here stops it either way.

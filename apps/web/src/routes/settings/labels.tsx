@@ -41,7 +41,7 @@ export function LabelsPage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Labels</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Labels</h1>
         <p className="text-sm text-muted-foreground">
           Plain like <code>backend</code>, or scoped like <code>epic: Checkout rewrite</code>. An
           Issue carries at most one Label per scope.

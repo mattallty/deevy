@@ -364,8 +364,10 @@ refetch. Tests: `shell.test.tsx` asserts Inbox / My Issues / All Issues / Projec
 sidebar and Members / Agents / Allowlist inside the Settings sidebar at `/settings/workspace`;
 `inbox.test.tsx` "2 unread" unchanged. **Stop here for review of the frame, both themes, the swatch page.**
 
-What shipped differently in slice 1: the root font size is `106.25%` rather than the plan's 14px base — Plex
-reads smaller than the face the scale was written for, and the owner asked for larger; the sidebar's "My
+What shipped differently in slice 1: the type scale is set in `components/ui` rather than by tokens alone —
+shadcn's `base-mira` style is the compact one (12px controls, 10px badges) and read too small, so those files
+are resized to 14px controls with 32px heights while the root stays 16px; New Issue sits in the page's top bar
+rather than the sidebar, where the owner looked for it; the sidebar's "My
 Issues" and "My Agents' Issues" wait for the Issues home in slice 2, since they would link to a screen that
 does not exist yet; and the palette navigates and creates only, as planned, with its Issue search arriving
 with `issues.list`'s `q`. cmdk's transitive Radix dependency is recorded in `deevy-ui` as the one exception

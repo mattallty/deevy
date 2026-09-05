@@ -87,7 +87,7 @@ export function WebhooksPage() {
   return (
     <section className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">Webhooks</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Webhooks</h1>
         <p className="text-sm text-muted-foreground">
           Where deevy delivers its Events. Every POST is signed with the subscription&apos;s secret
           in a <code>deevy-signature</code> header, and retried until it lands or is given up on.

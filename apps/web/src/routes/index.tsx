@@ -41,7 +41,7 @@ export function ProjectsPage() {
     <section className="flex flex-col gap-4">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Projects</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground">
             Each Project has a key, a Workflow, and optionally a Team that owns it.
           </p>

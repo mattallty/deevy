@@ -36,7 +36,7 @@ export function McpClientsPage() {
   return (
     <section className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold">MCP clients</h1>
+        <h1 className="text-xl font-semibold tracking-tight">MCP clients</h1>
         <p className="text-sm text-muted-foreground">
           The clients you have let act as you. Each one reaches deevy as you, with everything you
           can do — except deciding a Gate, which happens here, in deevy, or not at all.

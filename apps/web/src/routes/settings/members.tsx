@@ -42,7 +42,7 @@ export function MembersPage() {
   return (
     <section className="flex flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold">Members</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Members</h1>
         <p className="text-sm text-muted-foreground">
           Everyone in this Workspace. Add an allowlist rule to let more people in.
         </p>

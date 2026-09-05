@@ -144,7 +144,7 @@ function SignedIn() {
 export function NotAMember({ email }: { email: string }) {
   return (
     <Centered>
-      <h1 className="text-2xl font-semibold">Signed in, not yet a Member</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Signed in, not yet a Member</h1>
       <p className="text-muted-foreground">
         {email} is not a Member of this Workspace. Ask an admin to add an allowlist rule that
         matches your email domain or your GitHub organization, then sign in again.
@@ -159,7 +159,7 @@ export function NotAMember({ email }: { email: string }) {
 export function Suspended({ email }: { email: string }) {
   return (
     <Centered>
-      <h1 className="text-2xl font-semibold">Your membership is suspended</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Your membership is suspended</h1>
       <p className="text-muted-foreground">
         {email} is a Member of this Workspace but is suspended. An admin can reinstate you.
       </p>

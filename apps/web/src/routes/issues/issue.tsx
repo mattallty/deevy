@@ -96,7 +96,7 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
           />
         ) : (
           <div className="flex items-start gap-3">
-            <h1 className="flex-1 text-2xl font-semibold">{title}</h1>
+            <h1 className="flex-1 text-xl font-semibold tracking-tight">{title}</h1>
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
               Edit
             </Button>

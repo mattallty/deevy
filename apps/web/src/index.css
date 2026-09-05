@@ -145,14 +145,12 @@
     @apply border-border outline-ring/50;
   }
   /*
-   * The scale in the plan (12 / 13 / 14 / 16 / 20 / 28) was written for a
-   * face like Inter; Plex has a smaller x-height and read too small on the
-   * owner's screen. Everything is rem-based — text, buttons, inputs, rows,
-   * icons — so one number moves all of it together: 17px here makes
-   * text-sm ≈ 15px and text-base 17px. Tune it here and nowhere else.
+   * The type scale lives in the components: shadcn's base-mira style is the
+   * compact one (12px controls, 10px badges), and deevy resizes those files
+   * to a 14px control size with heights to match rather than moving the root
+   * (.claude/skills/deevy-ui). The root stays 16px, so 1rem is 16px everywhere.
    */
   html {
-    font-size: 106.25%;
     color-scheme: light;
   }
   html.dark {

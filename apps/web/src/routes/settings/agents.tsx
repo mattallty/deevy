@@ -74,7 +74,7 @@ export function AgentsPage() {
     <section className="flex flex-col gap-4">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Agents</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Agents</h1>
           <p className="text-sm text-muted-foreground">
             Every Agent works under its own identity, with exactly one Human accountable for it. A
             schedule wakes an Agent on the Issues assigned to it, whether or not anything happened.

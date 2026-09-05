@@ -31,7 +31,7 @@ export function AgentPage({ memberId }: { memberId: string }) {
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{agent.user.name}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{agent.user.name}</h1>
         <p className="text-sm text-muted-foreground">
           {agent.handle ? `@${agent.handle} · ` : ""}
           Sponsored by{" "}

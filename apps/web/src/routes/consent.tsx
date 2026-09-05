@@ -79,7 +79,7 @@ export function ConsentPage({ search }: ConsentPageProps = {}) {
   return (
     <section className="mx-auto flex max-w-md flex-col gap-6 py-16">
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Let {name} act as you?</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Let {name} act as you?</h1>
         <p className="text-sm text-muted-foreground">
           It will reach deevy as you, with the Projects and Issues you can see. It can never approve
           a Gate on your behalf: that happens here, in deevy.

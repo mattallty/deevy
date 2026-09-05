@@ -45,11 +45,13 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  sidebarMenuButtonVariants,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { useLiveEvents } from "@/lib/live";
 import { orpc } from "@/lib/orpc";
 import { useShortcut } from "@/lib/shortcuts";
+import { cn } from "@/lib/utils";
 
 export interface ShellProps {
   workspaceName: string;
@@ -117,9 +119,6 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
                   <span className="text-muted-foreground">Search or jump…</span>
                   <Shortcut keys="mod+k" className="ml-auto" />
                 </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <NewIssueButton variant="outline" size="sm" withShortcut />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarHeader>
@@ -190,10 +189,12 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
         </Sidebar>
 
         <SidebarInset>
-          <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
             <span className="flex-1" />
+            {/* In the top bar, so it is one click from anywhere and `c` from anywhere. */}
+            <NewIssueButton variant="default" size="default" withShortcut />
           </div>
           {/* SidebarInset is the <main>; this is the page inside it. */}
           <div className="min-w-0 flex-1 p-6">
@@ -240,21 +241,31 @@ function MemberMenu({
   const { theme, setTheme } = useTheme();
   return (
     <DropdownMenu>
+      {/* The trigger is the button itself, dressed as a sidebar item: handing a
+          SidebarMenuButton to the trigger's `render` loses the click on the way
+          through two render layers, and a menu that does not open is worse than
+          a tooltip that is missing. */}
       <DropdownMenuTrigger
-        render={<SidebarMenuButton size="lg" tooltip={me.user.name} className="min-w-0" />}
+        data-slot="sidebar-menu-button"
+        data-size="lg"
+        aria-label={me.user.name}
+        className={cn(sidebarMenuButtonVariants({ size: "lg" }), "min-w-0")}
       >
         <MemberChip member={me} size="md" className="min-w-0 flex-1" />
         <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56">
-        <DropdownMenuLabel className="flex flex-col">
-          <span>{me.user.name}</span>
-          {me.handle ? (
-            <span className="font-mono text-xs font-normal text-muted-foreground">
-              @{me.handle}
-            </span>
-          ) : null}
-        </DropdownMenuLabel>
+        {/* A Base UI menu label lives inside a group, or the menu throws as it opens. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col">
+            <span>{me.user.name}</span>
+            {me.handle ? (
+              <span className="font-mono text-xs font-normal text-muted-foreground">
+                @{me.handle}
+              </span>
+            ) : null}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs text-muted-foreground">Theme</DropdownMenuLabel>
