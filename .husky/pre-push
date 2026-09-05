@@ -1,0 +1,23 @@
+set -e
+. "$(dirname -- "$0")/vp.sh"
+
+# Everything CI runs, in CI's order, before anything leaves the machine.
+# Warm, this is close to instant because each step was cached by the last run;
+# cold it is about a minute, which is the right price for a push.
+vp check
+vp run -r test
+vp run -r build
+vp run web#build:workers
+vp run web#check:workers
+vp run db#check:migrations
+
+# The two snapshots are generated artefacts that CI diffs (ADR-0009), so a
+# stale one fails a build for a reason nobody enjoys reading. Regenerate them
+# and insist the tree already agreed.
+vp run core#snapshot:openapi
+vp run core#snapshot:mcp-tools
+if ! git diff --quiet -- packages/core/openapi.json packages/core/mcp-tools.json; then
+  echo "husky: the API snapshots were stale and have been regenerated." >&2
+  echo "  Commit packages/core/openapi.json and packages/core/mcp-tools.json, then push." >&2
+  exit 1
+fi
