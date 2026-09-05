@@ -28,5 +28,26 @@ services:
       retries: 5
       start_period: 20s
 
+  # The reference agent runtime (docs/plans/m4.md). It is not part of deevy:
+  # it holds one Agent's API key, which a Sponsor issues under Settings, Agents
+  # after the instance is up, so this service is off until you ask for it:
+  #
+  #     docker compose --profile agent up -d
+  #
+  # Build it with `docker build -f apps/claude-agent/Dockerfile -t deevy-agent .`
+  agent:
+    profiles: ["agent"]
+    image: deevy-agent
+    restart: unless-stopped
+    depends_on:
+      deevy:
+        condition: service_healthy
+    environment:
+      DEEVY_URL: ${DEEVY_AGENT_URL:-http://deevy:3000}
+      DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:?issue an API key for the Agent under Settings, Agents}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?the runtime runs Claude, and Claude needs a key}
+      DEEVY_AGENT_POLL_SECONDS: ${DEEVY_AGENT_POLL_SECONDS:-30}
+      DEEVY_AGENT_MODEL: ${DEEVY_AGENT_MODEL:-claude-opus-5}
+
 volumes:
   deevy-data:

@@ -132,7 +132,7 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
       if (event.type === "done" && !event.ok) failure = event.detail;
     }
   } catch (error) {
-    failure = describe(error, timeout.aborted ? "The session ran past its timeout" : null);
+    failure = describe(error, stopped(timeout, options.signal));
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
@@ -167,6 +167,17 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
 async function close(deevy: Deevy, runId: string, detail: string): Promise<void> {
   await deevy.postActivity(runId, "error", detail).catch(() => undefined);
   await deevy.finishRun(runId, "failed", detail).catch(() => undefined);
+}
+
+/**
+ * Why the session stopped, when the runtime is the one that stopped it. An
+ * abort's own error says nothing a Human could act on, and these two reasons
+ * are the difference between "it took too long" and "we were shutting down".
+ */
+function stopped(timeout: AbortSignal, process?: AbortSignal): string | null {
+  if (process?.aborted) return "The runtime stopped while this Run was in flight";
+  if (timeout.aborted) return "The session ran past its timeout";
+  return null;
 }
 
 function describe(error: unknown, instead: string | null): string {

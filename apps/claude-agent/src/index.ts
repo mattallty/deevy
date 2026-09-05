@@ -24,3 +24,4 @@ export {
   sessionOptions,
   toSessionEvents,
 } from "./sdk.ts";
+export { startLoop, type Loop, type LoopOptions } from "./loop.ts";
