@@ -25,16 +25,23 @@ const projectTabs: Record<string, string> = {
   settings: "Settings",
 };
 
+/** What the trail can name instead of an id or a key: Projects, and Members on their detail pages. */
+export interface CrumbNames {
+  project: (key: string) => string | undefined;
+  member?: (id: string) => string | undefined;
+}
+
 /**
  * The trail for a URL, in CONTEXT.md's words: where you are, and the places
  * above it you can go back to. A pure function of the path and the search, so
- * a test can read it without a router; Project names come from the caller.
+ * a test can read it without a router; the names come from the caller.
  */
 export function crumbsFor(
   pathname: string,
   search: Record<string, unknown>,
-  projectName: (key: string) => string | undefined,
+  names: CrumbNames,
 ): Crumb[] {
+  const projectName = names.project;
   const parts = pathname.split("/").filter(Boolean);
   const [head, second, third] = parts;
 
@@ -75,8 +82,13 @@ export function crumbsFor(
       .sort((a, b) => b.to.length - a.to.length)[0];
     if (!page) return [settings];
     if (pathname === page.to) return [settings, { label: page.label }];
-    // Below a page: an Agent's detail, a Channel's routing.
-    return [settings, { label: page.label, to: page.to }, { label: labelOf(parts.at(-1) ?? "") }];
+    // Below a page: an Agent's or a Member's detail is named, never its id.
+    const tail = parts.at(-1) ?? "";
+    const named =
+      page.to === "/settings/agents" || page.to === "/settings/members"
+        ? names.member?.(tail)
+        : undefined;
+    return [settings, { label: page.label, to: page.to }, { label: named ?? labelOf(tail) }];
   }
   return parts.map((part, index) =>
     index === parts.length - 1
@@ -98,11 +110,11 @@ export function AppBreadcrumb() {
     }),
   });
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
-  const crumbs = crumbsFor(
-    pathname,
-    search,
-    (key) => projects.data?.projects.find((project) => project.key === key)?.name,
-  );
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const crumbs = crumbsFor(pathname, search, {
+    project: (key) => projects.data?.projects.find((project) => project.key === key)?.name,
+    member: (id) => members.data?.members.find((member) => member.id === id)?.user.name,
+  });
 
   return (
     <Breadcrumb className="min-w-0">
