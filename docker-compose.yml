@@ -56,6 +56,21 @@ services:
       DEEVY_AGENT_REPO: ${DEEVY_AGENT_REPO:-}
       DEEVY_AGENT_GIT_TOKEN: ${DEEVY_AGENT_GIT_TOKEN:-}
       DEEVY_AGENT_BASE_BRANCH: ${DEEVY_AGENT_BASE_BRANCH:-main}
+      # Set it here and on the Agent's webhook URL, and a Run starts when it is
+      # assigned rather than at the next poll. Polling stays on either way.
+      DEEVY_AGENT_WEBHOOK_SECRET: ${DEEVY_AGENT_WEBHOOK_SECRET:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   deevy-data:

@@ -18,6 +18,7 @@ describe("configuration", () => {
       effort: "high",
       maxTurns: 100,
       repo: null,
+      listenPort: 8787,
       // deevy calls a Run stale after thirty minutes of silence, so a session
       // allowed to outlive that would be reported stale while still working.
       runTimeoutSeconds: 1800,

@@ -25,4 +25,6 @@ RUN npm install --omit=dev --no-package-lock @anthropic-ai/claude-agent-sdk@0.3.
 # it. The container is the boundary (docs/plans/m4.md).
 RUN useradd --create-home --uid 10001 runtime
 USER runtime
+# /healthz always, and deevy's deliveries when a webhook secret is configured.
+EXPOSE 8787
 CMD ["node", "dist/main.mjs"]

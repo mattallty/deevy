@@ -16,10 +16,18 @@ export interface Loop {
   stop(): Promise<void>;
   /** Resolves when the loop has stopped. */
   done: Promise<void>;
+  /**
+   * Cuts the current wait short, so the next pass happens now.
+   *
+   * Slice 8's webhook calls it. A wake carries no authority: the pass that
+   * follows re-reads `runs.list` and decides for itself, so the worst a
+   * spurious one costs is a poll.
+   */
+  wake(): void;
 }
 
-/** Waits, unless the wait is cut short by the loop stopping. */
-function waitFor(ms: number, signal: AbortSignal): Promise<void> {
+/** Waits, unless the wait is cut short by the loop stopping or being woken. */
+export function waitFor(ms: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
     const timer = setTimeout(finish, ms);
@@ -55,22 +63,30 @@ export function startLoop(options: LoopOptions): Loop {
   } = options;
   const stopping = new AbortController();
   const signal = work.signal ? AbortSignal.any([stopping.signal, work.signal]) : stopping.signal;
+  // A wake ends the current wait and nothing else, so it can never interrupt a
+  // pass or start a second one.
+  let woken = new AbortController();
 
   const done = (async () => {
     let waitMs = pollSeconds * 1000;
     while (!signal.aborted) {
       const pass = await runOnce({ ...work, signal });
       onPass?.(pass);
-      const busy = pass.worked.length > 0 || pass.takenUp.length > 0;
+      const busy = pass.worked.length > 0 || pass.resumed.length > 0 || pass.takenUp.length > 0;
       waitMs = busy ? pollSeconds * 1000 : Math.min(waitMs * 2, maxPollSeconds * 1000);
-      await sleep(waitMs, signal);
+      woken = new AbortController();
+      await sleep(waitMs, AbortSignal.any([signal, woken.signal]));
     }
   })();
 
   return {
     done,
+    wake() {
+      woken.abort();
+    },
     async stop() {
       stopping.abort();
+      woken.abort();
       // A pass that failed has already been reported by whoever is watching
       // `done`; stopping is not the moment to fail on it again.
       await done.catch(() => undefined);

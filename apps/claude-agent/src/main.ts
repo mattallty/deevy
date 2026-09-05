@@ -1,6 +1,7 @@
 import { readConfig } from "./config.ts";
 import { DeevyError, createDeevy } from "./deevy.ts";
 import { forgeFor } from "./forge.ts";
+import { createReceiver, startListener } from "./receiver.ts";
 import { startLoop } from "./loop.ts";
 import { buildSession } from "./sdk.ts";
 import { runOnce } from "./work.ts";
@@ -74,6 +75,20 @@ const loop = startLoop({
   },
 });
 
+// Polling stays on whatever this does: a runtime that only worked when a
+// delivery arrived would lose a Run to every missed one.
+const listener = await startListener({
+  port: config.listenPort,
+  ...(config.webhookSecret
+    ? { receiver: createReceiver({ secret: config.webhookSecret, wake: () => loop.wake() }) }
+    : {}),
+});
+console.log(
+  config.webhookSecret
+    ? `listening on ${listener.port}: /healthz, and deliveries from deevy`
+    : `listening on ${listener.port}: /healthz only, no webhook secret is set`,
+);
+
 // A stop with a Run in flight aborts the session, and `workRun` then writes the
 // error Activity and fails the Run before this resolves. A container restart
 // must not leave a Run `active` and silent for half an hour until deevy's sweep
@@ -81,7 +96,7 @@ const loop = startLoop({
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     console.log(`${signal}: finishing the Run in flight`);
-    void loop.stop().then(() => process.exit(0));
+    void Promise.all([loop.stop(), listener.close()]).then(() => process.exit(0));
   });
 }
 

@@ -34,6 +34,15 @@ export interface Config {
   repo: RepoConfig | null;
   /** Where per-Run working directories are made. */
   workdir?: string;
+  /**
+   * The secret deevy signs its webhooks with, chosen when the Agent's webhook
+   * URL was set. Absent means the runtime polls and listens to nobody, which is
+   * the default: a delivery is an accelerator, never the only way work arrives
+   * (docs/plans/m4.md).
+   */
+  webhookSecret?: string;
+  /** The port the listener binds. Zero picks one, which is only useful in a test. */
+  listenPort: number;
 }
 
 const efforts = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -77,5 +86,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
         }
       : null,
     ...(env.DEEVY_AGENT_WORKDIR ? { workdir: env.DEEVY_AGENT_WORKDIR } : {}),
+    ...(env.DEEVY_AGENT_WEBHOOK_SECRET ? { webhookSecret: env.DEEVY_AGENT_WEBHOOK_SECRET } : {}),
+    listenPort: positive(env.DEEVY_AGENT_PORT, 8787),
   };
 }

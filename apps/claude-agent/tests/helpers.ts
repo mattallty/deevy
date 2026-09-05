@@ -25,6 +25,7 @@ export const testConfig: Config = {
   effort: "high",
   maxTurns: 10,
   repo: null,
+  listenPort: 0,
 };
 
 /**
