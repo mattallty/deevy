@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 
 /**
@@ -59,6 +60,7 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
   const document = useQuery(
     orpc.documents.get.queryOptions({ input: { issueKey, name, version: reading } }),
   );
+  const mentionables = useMentionables();
   const write = useMutation(
     orpc.documents.write.mutationOptions({
       onSuccess: async () => {
@@ -131,16 +133,15 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
             write.mutate({ issueKey, name, body: draft });
           }}
         >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`body-${name}`}>Body</Label>
-            <Textarea
-              id={`body-${name}`}
-              aria-label="Body"
-              rows={16}
-              value={draft}
-              onChange={(changed) => setDraft(changed.target.value)}
-            />
-          </div>
+          <MarkdownEditor
+            id={`body-${name}`}
+            value={draft}
+            onChange={setDraft}
+            mentions={mentionables}
+            rows={16}
+            placeholder={`Write the ${name}…`}
+            onSubmit={() => write.mutate({ issueKey, name, body: draft })}
+          />
           <div className="flex gap-2">
             <Button type="submit" disabled={write.isPending}>
               Save version

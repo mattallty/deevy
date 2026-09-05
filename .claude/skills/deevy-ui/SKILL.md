@@ -142,6 +142,29 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
 - The sidebar has My Issues (`/?assignee=me`), My Agents' Issues (Sponsors only), All Issues (`/`) and
   Projects (`/projects`); `g m` / `g a` / `g p`. The palette searches Issues from two characters.
 
+## What slice 3 settled (the editor)
+
+- **`components/markdown-editor.tsx`** is the one editor: markdown in, markdown out, `mode="block"`
+  (Documents, descriptions) or `"inline"` (comments, notes, answers), Edit/Source tabs. The Source view is a
+  plain `Textarea` with `aria-label="Body"`, always mounted (hidden by class), so tests type there and a
+  Human can always see the text as an Agent wrote it. `⌘Enter` submits in both views (`onSubmit`).
+- **`components/tiptap-editor.tsx`** (lazy) is Tiptap 3.31 with `@tiptap/markdown` (GFM), StarterKit,
+  `TableKit`, `TaskList`/`TaskItem`, lowlight code blocks, Placeholder. It emits `editor.getMarkdown()` only
+  on a user transaction; a `value` changed from outside is loaded with `emitUpdate: false`, so an untouched
+  load never re-serializes. `editorExtensions()` and `toMarkdown()` are exported so a test round-trips
+  through a headless `Editor` with exactly the component's extensions.
+- **Mentions are text.** `@` opens a `@tiptap/suggestion` popup (`role="listbox" aria-label="Mentions"`)
+  fed by `useMentionables()` (`lib/mentions.ts`: Members and Teams by handle) and inserts `@handle ` as plain
+  text — no Mention node, so markdown round-trips exactly and the server resolves handles as before. `/` at a
+  line start opens the block menu (`aria-label="Commands"`) the same way. Two suggestion plugins need two
+  `PluginKey`s or ProseMirror throws.
+- **Highlighting is lowlight in both places**: `rehype-highlight` in `components/markdown.tsx`, the code
+  block extension in the editor, colours from the palette in `index.css` (`.hljs-*`). Not shiki: its rehype
+  plugin is async and `react-markdown` runs its pipeline synchronously. `proseClassName` is shared by the
+  reader and the editor so switching does not reflow.
+- **jsdom** needs `Range.prototype.getClientRects/getBoundingClientRect` and `document.elementFromPoint`
+  stubbed for ProseMirror to mount (`tests/setup.ts`).
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

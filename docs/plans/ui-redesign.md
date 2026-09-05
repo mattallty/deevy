@@ -392,7 +392,7 @@ groups and a selected row, not a grid; `issues.list` moved from `/projects/{proj
 because a path parameter cannot be optional (nothing outside the repository called the old path); and the
 filter bar is single-select controls, with the multi-select chips deferred until a list needs them.
 
-### 3 — MarkdownEditor and renderer
+### 3 — MarkdownEditor and renderer (shipped)
 
 `components/markdown-editor.tsx` as specified above (Tiptap v3 + `@tiptap/markdown`, block and inline
 modes, Mention extension fed by `members.list` + `teams.list`, slash menu on `ui/command`, Source tab as a
@@ -405,6 +405,12 @@ modes, Mention extension fed by `members.list` + `teams.list`, slash menu on `ui
 composer switches in slice 4. Tests: `documents.test.tsx` drives the Source tab (`Body`), so it stays
 green in jsdom; new `markdown-editor.test.tsx` covers markdown in → markdown out for headings, lists,
 tables, code, task items, mentions (`@ada` → `@ada`), and that an untouched load saves nothing.
+
+What shipped differently in slice 3: mentions are plain `@handle` text inserted by a suggestion popup rather
+than Tiptap's Mention node, because a node is a second representation of the same thing and the text is
+what the server resolves; code is highlighted by lowlight on both sides (`rehype-highlight` in the reader)
+rather than shiki, whose rehype plugin is async where `react-markdown` is synchronous; and the comment
+composer, Gate note and Run answer switch to the inline editor in slice 4 as planned.
 
 ### 4 — Issue panel: two columns, ruling card, Activity stream
 

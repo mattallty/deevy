@@ -11,6 +11,20 @@ allowBuilds:
 # ADR-0007, ADR-0008, ADR-0009). Upgrade them on purpose, all packages of a line together.
 # `shadcn add` rewrites this file and strips comments; put them back when it does.
 catalog:
+  # Tiptap 3.31.x, pinned exactly and moved as a whole like oRPC: the editor is one
+  # package family and a mismatch between them is a runtime error, not a type one.
+  "@tiptap/core": 3.31.3
+  "@tiptap/extension-code-block-lowlight": 3.31.3
+  "@tiptap/extension-list": 3.31.3
+  "@tiptap/extension-placeholder": 3.31.3
+  "@tiptap/extension-table": 3.31.3
+  "@tiptap/markdown": 3.31.3
+  "@tiptap/pm": 3.31.3
+  "@tiptap/react": 3.31.3
+  "@tiptap/starter-kit": 3.31.3
+  "@tiptap/suggestion": 3.31.3
+  lowlight: ^3.3.0
+  rehype-highlight: ^7.0.2
   "@fontsource-variable/ibm-plex-sans": 5.3.0
   "@fontsource/ibm-plex-mono": 5.3.0
   husky: ^9.1.7

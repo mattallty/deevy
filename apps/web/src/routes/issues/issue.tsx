@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { useMentionables } from "@/lib/mentions";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc.ts";
 
@@ -206,6 +207,7 @@ interface EditIssueProps {
 function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueProps) {
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftDescription, setDraftDescription] = useState(description ?? "");
+  const mentionables = useMentionables();
 
   return (
     <form
@@ -228,12 +230,20 @@ function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueP
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="issue-description">Description</Label>
-        <Textarea
+        <MarkdownEditor
           id="issue-description"
-          rows={10}
+          aria-label="Description"
           value={draftDescription}
-          placeholder="Markdown."
-          onChange={(changed) => setDraftDescription(changed.target.value)}
+          onChange={setDraftDescription}
+          mentions={mentionables}
+          rows={10}
+          placeholder="What this Issue is, and why."
+          onSubmit={() =>
+            onSave({
+              title: draftTitle.trim(),
+              description: draftDescription.trim() === "" ? null : draftDescription,
+            })
+          }
         />
       </div>
       <div className="flex gap-2">

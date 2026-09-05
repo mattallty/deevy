@@ -165,3 +165,72 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/*
+ * Code, coloured by lowlight in both the reader (rehype-highlight) and the
+ * editor (the code block extension), from the palette rather than a theme file:
+ * one accent per token family, quiet by design.
+ */
+@layer components {
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-built_in,
+  .hljs-doctag,
+  .hljs-meta {
+    color: var(--primary);
+  }
+  .hljs-string,
+  .hljs-attr,
+  .hljs-template-tag,
+  .hljs-addition,
+  .hljs-regexp {
+    color: var(--agent);
+  }
+  .hljs-number,
+  .hljs-literal,
+  .hljs-symbol,
+  .hljs-variable,
+  .hljs-template-variable,
+  .hljs-deletion {
+    color: var(--human);
+  }
+  .hljs-title,
+  .hljs-section,
+  .hljs-name,
+  .hljs-type,
+  .hljs-class .hljs-title {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: 600;
+  }
+
+  /* The editor's empty line says what it is for; ProseMirror's own chrome stays out. */
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--muted-foreground);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+  .tiptap .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: color-mix(in oklch, var(--primary) 10%, transparent);
+    pointer-events: none;
+  }
+  .tiptap td,
+  .tiptap th {
+    position: relative;
+  }
+}
