@@ -250,3 +250,22 @@ describe("an Agent's own inbox", () => {
     expect((await asPlanner.inbox.list({ unreadOnly: true })).notifications).toHaveLength(1);
   });
 });
+
+describe("what a Notification carries", () => {
+  it("names who did it and quotes the comment a mention came from", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { bob, asAlice, asBob } = await workspace(db);
+    await asAlice.issues.create({ projectKey: "DEV", title: "Ship it" });
+    await asAlice.comments.create({ issueKey: "DEV-1", body: "Look at this, @bob" });
+    await asAlice.issues.update({ key: "DEV-1", assigneeMemberId: bob.member.id });
+
+    const rows = (await asBob.inbox.list({})).notifications;
+    const mention = rows.find((row) => row.kind === "mention");
+    expect(mention?.actor?.user.name).toBe("Alice");
+    expect(mention?.comment?.body).toBe("Look at this, @bob");
+    const assignment = rows.find((row) => row.kind === "assignment");
+    expect(assignment?.actor?.user.name).toBe("Alice");
+    expect(assignment?.comment).toBeNull();
+  });
+});

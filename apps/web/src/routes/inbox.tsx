@@ -5,20 +5,24 @@ import {
   AtSign,
   Bot,
   CircleCheck,
-  CircleHelp,
+  CircleX,
+  Diamond,
   ExternalLink,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Shortcut } from "@/components/kbd-hint";
+import { MemberChip } from "@/components/member-chip";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { describeNotification, type NotificationTone } from "@/lib/notification-text";
 import { orpc } from "@/lib/orpc";
 import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
@@ -40,26 +44,21 @@ export function parseInboxSearch(search: Record<string, unknown>): InboxSearch {
   };
 }
 
-const kindText = {
-  mention: "mentioned you",
-  assignment: "assigned this to you",
-  gate_awaiting: "a Gate is waiting",
-  run_awaiting_input: "a Run is waiting on you",
-  run_finished: "a Run finished",
-  // A Human never receives this one — it is owed to the Agent that asked, and
-  // an Agent reads its inbox over MCP rather than here. The map covers it
-  // because `inbox.list` answers both audiences with the same shape.
-  run_answered: "a Gate your Agent asked about was decided",
-} as const;
-
-/** One glyph per kind, in the hue of what is owed: a Gate, an Agent, a Human. */
-const kindLook: Record<string, { icon: LucideIcon; className: string }> = {
-  mention: { icon: AtSign, className: "text-human" },
-  assignment: { icon: UserPlus, className: "text-human" },
-  gate_awaiting: { icon: CircleHelp, className: "text-gate-foreground dark:text-gate" },
-  run_awaiting_input: { icon: Bot, className: "text-agent" },
-  run_finished: { icon: CircleCheck, className: "text-agent" },
-  run_answered: { icon: CircleCheck, className: "text-muted-foreground" },
+/** One glyph per row, in the hue of what is owed: a Gate, an Agent, a Human. */
+function glyphFor(kind: string, tone: NotificationTone): LucideIcon {
+  if (tone === "destructive") return CircleX;
+  if (tone === "gate") return Diamond;
+  if (kind === "mention") return AtSign;
+  if (kind === "assignment") return UserPlus;
+  if (kind === "run_awaiting_input") return Bot;
+  return CircleCheck;
+}
+const toneClass: Record<NotificationTone, string> = {
+  human: "text-human",
+  agent: "text-agent",
+  gate: "text-gate-foreground dark:text-gate",
+  muted: "text-muted-foreground",
+  destructive: "text-destructive",
 };
 
 function ago(value: Date | string): string {
@@ -86,7 +85,9 @@ function useNarrow(breakpoint = 1024): boolean {
  * ui-redesign.md slice 6). Selecting a Notification opens its Issue in the
  * right pane — with the ruling card in front when a Gate is waiting, the
  * waiting Run first when an Agent asked — and marks it read, because reading
- * is what was owed. Grouped by Issue, because that is the thing you act on.
+ * is what was owed. One flat list, newest first, each row a sentence: who did
+ * what on which Issue, and what they wrote (lib/notification-text.ts). A
+ * checkbox per row selects several to mark read at once.
  */
 export function InboxPage({
   search,
@@ -104,22 +105,24 @@ export function InboxPage({
   const markAllRead = useMutation(orpc.inbox.markAllRead.mutationOptions({ onSuccess: refresh }));
 
   const all = inbox.data?.notifications ?? [];
-  const shown = useMemo(
+  const flat = useMemo(
     () => (search.unread === "1" ? all.filter((row) => !row.readAt) : all),
     [all, search.unread],
   );
-  // Grouped by Issue, in the order the newest Notification of each arrives.
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof shown>();
-    for (const notification of shown) {
-      const key = notification.issue?.key ?? "Elsewhere";
-      map.set(key, [...(map.get(key) ?? []), notification]);
-    }
-    return [...map.entries()];
-  }, [shown]);
-  const flat = useMemo(() => groups.flatMap(([, rows]) => rows), [groups]);
   const selected =
     flat.find((row) => row.id === search.n) ?? all.find((row) => row.id === search.n);
+
+  // Several rows at once: the checkboxes, `x` on the focused row, then one Mark read.
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const togglePicked = (id: string) =>
+    setPicked((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const markPickedRead = () =>
+    markRead.mutate({ ids: [...picked] }, { onSuccess: () => setPicked(new Set()) });
 
   const open = (id: string) => {
     onSearch({ n: id });
@@ -137,6 +140,7 @@ export function InboxPage({
   useShortcut("arrowdown", () => move(1));
   useShortcut("arrowup", () => move(-1));
   useShortcut("e", () => selected && !selected.readAt && markRead.mutate({ ids: [selected.id] }));
+  useShortcut("x", () => selected && togglePicked(selected.id));
   useShortcut("shift+e", () => markAllRead.mutate({}));
   useShortcut(
     "o",
@@ -156,15 +160,27 @@ export function InboxPage({
         title={<span id="inbox-heading">Inbox</span>}
         description="Mentions, assignments, and Gates waiting on a Human."
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={markAllRead.isPending || all.every((row) => row.readAt)}
-            onClick={() => markAllRead.mutate({})}
-          >
-            Mark all read
-            <Shortcut keys="shift+e" />
-          </Button>
+          picked.size > 0 ? (
+            <div role="toolbar" aria-label="Selection" className="flex items-center gap-2">
+              <span className="text-sm font-medium">{picked.size} selected</span>
+              <Button size="sm" disabled={markRead.isPending} onClick={markPickedRead}>
+                Mark read
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setPicked(new Set())}>
+                Clear
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={markAllRead.isPending || all.every((row) => row.readAt)}
+              onClick={() => markAllRead.mutate({})}
+            >
+              Mark all read
+              <Shortcut keys="shift+e" />
+            </Button>
+          )
         }
       >
         <ToggleGroup
@@ -184,7 +200,7 @@ export function InboxPage({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {inbox.isPending ? <Skeleton className="m-4 h-64" /> : null}
-        {inbox.data && shown.length === 0 ? (
+        {inbox.data && flat.length === 0 ? (
           <Empty className="m-4">
             <EmptyHeader>
               <EmptyTitle>Nothing waiting</EmptyTitle>
@@ -194,79 +210,84 @@ export function InboxPage({
             </EmptyHeader>
           </Empty>
         ) : null}
-        {groups.map(([issueKey, notifications]) => (
-          <article key={issueKey} className="flex flex-col border-b py-2">
-            <header className="flex items-baseline gap-2 px-4 py-1 text-sm">
-              {notifications[0]?.issue ? (
-                <Link
-                  to="/issues/$issueKey"
-                  params={{ issueKey }}
-                  className="min-w-0 truncate font-medium hover:underline"
+        <ul aria-label="Notifications" className="flex flex-col divide-y">
+          {flat.map((notification) => {
+            const said = describeNotification(notification);
+            const Icon = glyphFor(notification.kind, said.tone);
+            const isSelected = notification.id === search.n;
+            const isPicked = picked.has(notification.id);
+            return (
+              <li
+                key={notification.id}
+                data-selected={isSelected ? "true" : undefined}
+                className={cn(
+                  "flex items-start gap-2 py-2 pr-2 pl-4 text-sm hover:bg-accent/60",
+                  isSelected && "bg-accent",
+                  isPicked && "bg-accent/40",
+                )}
+              >
+                <Checkbox
+                  className="mt-0.5"
+                  aria-label={`Select ${said.verb}`}
+                  checked={isPicked}
+                  onCheckedChange={() => togglePicked(notification.id)}
+                />
+                {/* The row opens the Notification; the checkbox and Mark read sit beside it. */}
+                <button
+                  type="button"
+                  aria-current={isSelected ? "true" : undefined}
+                  className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-left outline-none focus-visible:underline"
+                  onClick={() => open(notification.id)}
                 >
-                  <span className="font-mono text-xs text-muted-foreground">{issueKey}</span>{" "}
-                  {notifications[0].issue.title}
-                </Link>
-              ) : (
-                <span className="font-medium">{issueKey}</span>
-              )}
-            </header>
-            <ul aria-label={`Notifications for ${issueKey}`} className="flex flex-col">
-              {notifications.map((notification) => {
-                const look = kindLook[notification.kind] ?? kindLook.run_answered!;
-                const Icon = look.icon;
-                const isSelected = notification.id === search.n;
-                return (
-                  <li
-                    key={notification.id}
-                    data-selected={isSelected ? "true" : undefined}
-                    className={cn(
-                      "flex items-center gap-1 pr-2 text-sm hover:bg-accent/60",
-                      isSelected && "bg-accent",
-                    )}
-                  >
-                    {/* The whole row opens the Notification; "Mark read" sits beside it. */}
-                    <button
-                      type="button"
-                      aria-current={isSelected ? "true" : undefined}
-                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-4 py-1.5 text-left outline-none focus-visible:bg-accent"
-                      onClick={() => open(notification.id)}
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "size-1.5 shrink-0 rounded-full",
-                          notification.readAt ? "bg-transparent" : "bg-gate",
-                        )}
-                      />
-                      <Icon className={cn("size-4 shrink-0", look.className)} aria-hidden />
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 truncate",
-                          !notification.readAt && "font-medium",
-                        )}
-                      >
-                        {kindText[notification.kind as keyof typeof kindText] ?? notification.kind}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
+                  <Icon
+                    className={cn("mt-0.5 size-4 shrink-0", toneClass[said.tone])}
+                    aria-hidden
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex flex-wrap items-baseline gap-x-1.5">
+                      {notification.actor ? (
+                        <MemberChip member={notification.actor} size="xs" />
+                      ) : (
+                        <span className="text-muted-foreground">deevy</span>
+                      )}
+                      <span className={cn(!notification.readAt && "font-medium")}>{said.verb}</span>
+                      {notification.issue ? (
+                        <>
+                          <span className="text-muted-foreground">on</span>
+                          <span className="font-mono text-xs">{notification.issue.key}</span>
+                        </>
+                      ) : null}
+                      <span className="ml-auto font-mono text-xs text-muted-foreground">
                         {ago(notification.createdAt)}
                       </span>
-                    </button>
-                    {notification.readAt ? null : (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        disabled={markRead.isPending}
-                        onClick={() => markRead.mutate({ ids: [notification.id] })}
-                      >
-                        Mark read
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </article>
-        ))}
+                    </span>
+                    {notification.issue ? (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {notification.issue.title}
+                      </span>
+                    ) : null}
+                    {said.excerpt ? (
+                      <span className="line-clamp-2 text-muted-foreground">“{said.excerpt}”</span>
+                    ) : null}
+                  </span>
+                </button>
+                {notification.readAt ? null : (
+                  <span className="flex items-center gap-1">
+                    <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-gate" />
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      disabled={markRead.isPending}
+                      onClick={() => markRead.mutate({ ids: [notification.id] })}
+                    >
+                      Mark read
+                    </Button>
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

@@ -208,7 +208,7 @@ Groundwork that shipped with them: `components/workflow-state-fields.tsx` (`Stat
 `newDraftState`) extracted from the Workflow editor with its tests untouched, and `@reui/timeline` vendored
 as `components/reui/timeline.tsx` (MIT, Base UI).
 
-### C — Inbox that says what happened (points 4, 5; mockup first)
+### C — Inbox that says what happened (points 4, 5; mockup first) — shipped
 
 **Data.** `inbox.list` (core) additionally returns, per row, `comment: { id, body } | null` (joined when the
 Event is `comment.created|edited`) and `actor: MemberWithUser | null` (the Event's actor), so a row can quote
@@ -238,6 +238,19 @@ grouped by Issue with the Issue header carrying State and Assignee. Matt picks; 
 row is selected: "N selected · Mark read · Clear". Calls the existing `inbox.markRead({ ids })`. "Mark all
 read" and `⇧E` stay. Tests in `inbox.test.tsx`: precise text for each kind, select two → mark read sends
 both ids.
+
+What shipped differently in C:
+
+- Matt picked the **two-line flat list**, not the grouped one, so the Inbox is one `ul aria-label=
+"Notifications"` newest first; each row says actor · verb · on KEY, then the Issue title, then the quote.
+  The tests moved from "Notifications for DEV-1" to that one list.
+- `describeNotification` takes no label map (nothing in a Notification names a Label); it reads the Event
+  kind and payload, the Issue's State name, and the joined `comment`. A withdrawn comment reads "(the
+  comment was withdrawn)".
+- The selection toolbar is `role="toolbar" aria-label="Selection"` in the page header's action slot; `x`
+  toggles the focused row; ranges with shift-click were not built.
+- Core: `inbox.list` rows gain `actor` (the Event's Member with user) and `comment` (`{ id, body | null }`)
+  through two batched lookups, no N+1; snapshots regenerated.
 
 ### D — Activity timeline and a truthful Event log (points 9, 12; mockup first)
 
