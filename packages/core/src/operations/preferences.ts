@@ -1,4 +1,4 @@
-import { notificationKinds, notificationPreference } from "@deevy/db";
+import { humanNotificationKinds, notificationPreference } from "@deevy/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { NoInput, defineOperation } from "./registry.ts";
@@ -18,7 +18,7 @@ import { NoInput, defineOperation } from "./registry.ts";
  */
 
 const PreferenceView = z.object({
-  kind: z.enum(notificationKinds),
+  kind: z.enum(humanNotificationKinds),
   inbox: z.boolean(),
   slack: z.boolean(),
 });
@@ -41,7 +41,7 @@ export const preferences = {
       // everything, and the SPA renders the matrix from this rather than
       // knowing the default itself.
       return {
-        preferences: notificationKinds.map((kind) => ({
+        preferences: humanNotificationKinds.map((kind) => ({
           kind,
           inbox: saved.get(kind)?.inbox ?? true,
           slack: saved.get(kind)?.slack ?? true,
@@ -56,7 +56,7 @@ export const preferences = {
     method: "PUT",
     path: "/preferences",
     auth: "member",
-    input: z.object({ preferences: z.array(PreferenceView).max(notificationKinds.length) }),
+    input: z.object({ preferences: z.array(PreferenceView).max(humanNotificationKinds.length) }),
     output: z.object({ preferences: z.array(PreferenceView) }),
     handler: async ({ input, context }) => {
       const changed = [...new Map(input.preferences.map((row) => [row.kind, row])).values()];
@@ -88,7 +88,7 @@ export const preferences = {
       });
       const saved = new Map(rows.map((row) => [row.kind, row]));
       return {
-        preferences: notificationKinds.map((kind) => ({
+        preferences: humanNotificationKinds.map((kind) => ({
           kind,
           inbox: saved.get(kind)?.inbox ?? true,
           slack: saved.get(kind)?.slack ?? true,

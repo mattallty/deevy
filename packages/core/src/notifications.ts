@@ -171,6 +171,19 @@ const runNotificationKinds: Partial<Record<Event["kind"], Notification["kind"]>>
   "run.failed": "run_finished",
 };
 
+/**
+ * The one Event whose Notification is owed to the Agent rather than to a Human.
+ *
+ * ADR-0003 says an Agent without a webhook polls its inbox over MCP, and until
+ * now the one thing it waits for never arrived there: a Gate ruling resumed its
+ * Run and told nobody, so the Agent learned of it only by thinking to call
+ * `runs.list` again. Everything else in this file routes to Humans because
+ * everything else concerns them; this concerns the Agent, and the Human who
+ * decided it is the actor and is never told about their own action
+ * (docs/plans/m3.md).
+ */
+const AGENT_ANSWERED: Event["kind"] = "run.answered";
+
 /** The Events that mean a Gate is waiting, whichever way the Issue arrived in one. */
 const gateEventKinds = new Set<Event["kind"]>([
   "issue.created",
@@ -193,6 +206,7 @@ export function notificationKindOf(event: Event): Notification["kind"] | null {
   // the Event says so by carrying the Gate, and that is what the Human is
   // being asked for (docs/plans/m2.md).
   if (gateStateAsked(event)) return "gate_awaiting";
+  if (event.kind === AGENT_ANSWERED) return "run_answered";
   return runNotificationKinds[event.kind] ?? null;
 }
 
@@ -250,6 +264,19 @@ async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
   // make (ADR-0004), and the Sponsor may not be one of its approvers.
   const askedAbout = gateStateAsked(event);
   if (askedAbout) return gateRecipients(db, event, askedAbout);
+
+  // A ruling is owed to whoever asked for it, and that is the Agent.
+  if (event.kind === AGENT_ANSWERED && event.subjectType === "run") {
+    const found = await db.query.run.findFirst({
+      where: { id: event.subjectId },
+      columns: { agentMemberId: true },
+    });
+    if (!found || found.agentMemberId === event.actorMemberId) return [];
+    return (await active(db, [found.agentMemberId], event)).map((memberId) => ({
+      memberId,
+      kind: "run_answered" as const,
+    }));
+  }
 
   // A Run belongs to the Human behind it: the Member that triggered it, or the
   // Sponsor accountable for the Agent when an Agent triggered its own work

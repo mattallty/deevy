@@ -14,7 +14,25 @@ export const notificationKinds = [
   "run_awaiting_input",
   /** A Run ended, completed or failed. */
   "run_finished",
+  /**
+   * A Gate an Agent's Run was waiting on has been decided, and the Run is live
+   * again. The one Notification whose recipient is an Agent rather than a
+   * Human: ADR-0003 says an Agent without a webhook polls its inbox, and until
+   * this existed the thing it waits for never arrived there (docs/plans/m3.md).
+   */
+  "run_answered",
 ] as const;
+
+/**
+ * The kinds a Human can be sent, which is every kind but one: `run_answered`
+ * is owed to the Agent that asked, so offering a Human a preference or a
+ * routing rule for it would describe a message they will never receive. The
+ * column takes `notificationKinds`; the preference matrix and the Workspace's
+ * routing rules take this (docs/plans/m3.md).
+ */
+export const humanNotificationKinds = notificationKinds.filter(
+  (kind) => kind !== "run_answered",
+) as ReadonlyArray<(typeof notificationKinds)[number]>;
 
 /**
  * A message to a Human derived from Events (CONTEXT.md): a mention, an
