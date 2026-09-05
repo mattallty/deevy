@@ -41,9 +41,11 @@ describe("ThemeCandidateSwitcher", () => {
     flags.devSignIn = true;
     mount();
     const select = await screen.findByLabelText("Theme candidate");
-    fireEvent.change(select, { target: { value: "graphite" } });
-    await waitFor(() => expect(document.documentElement.dataset.themeCandidate).toBe("graphite"));
-    expect(localStorage.getItem("deevy.theme-candidate")).toBe("graphite");
+    fireEvent.change(select, { target: { value: "slate-indigo-roomy" } });
+    await waitFor(() =>
+      expect(document.documentElement.dataset.themeCandidate).toBe("slate-indigo-roomy"),
+    );
+    expect(localStorage.getItem("deevy.theme-candidate")).toBe("slate-indigo-roomy");
     fireEvent.change(select, { target: { value: "plex-warm" } });
     await waitFor(() => expect(document.documentElement.dataset.themeCandidate).toBeUndefined());
   });

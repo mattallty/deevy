@@ -1,6 +1,6 @@
 # deevy UI, round 2: Matt's critique of the redesign
 
-Status: slice A shipped (theme candidates live behind the dev switcher; the pick is pending). Slices B–H
+Status: slice A shipped; round one of the pick chose the clean-slate direction and the switcher now holds six variations of it (the pick between them is pending). Slices B–H
 follow in the order below. The approved plan of 2026-09-05, kept here as the record; each slice's
 "what shipped differently" is appended to it as it lands.
 
@@ -136,6 +136,12 @@ What shipped differently:
   `vite.config.ts` lets that one file through) and `theme-switcher.test.tsx`, not in `kit`/`shell`.
 - The evaluation fonts are `devDependencies` of `apps/web`, in the catalog under a comment saying they
   leave with the review.
+- **Round one of the pick (2026-09-05):** Matt chose the _clean slate_ direction "but not as is" and asked
+  for variations on colours and spacing. The six far-apart candidates were replaced by six variations of
+  clean slate — three action-colour treatments (indigo as published; a clearer cobalt; a quiet ink-blue on
+  neutrals with half the chroma) crossed with two scales (roomy: 8px corners, `--density` 0.2625rem;
+  compact: 6px, 0.2375rem) — all on Inter + JetBrains Mono. Geist and DM Sans left with the losers; Plex
+  stays as the reference row until the winner is merged.
 
 ### B — Polish batch (points 1, 2, 3, 6, 11, 13, 14, 16)
 
