@@ -167,7 +167,7 @@ main + sticky 300px rail. Cards only where a thing is a card (a Run, a Channel);
 
 ```
 ┌──────────────────────┐
-│ ◆ Flippable Team   ▾ │  Workspace name; menu: Settings, Theme, Sign out
+│ ◆ Acme Team   ▾ │  Workspace name; menu: Settings, Theme, Sign out
 │ [⌘K  Search or jump] │  opens the command palette
 │ [+ New Issue      c] │
 ├──────────────────────┤

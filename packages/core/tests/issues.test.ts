@@ -234,7 +234,7 @@ describe("issues.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { admin, client } = await withProject(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const issue = await client.issues.create({ projectKey: "DEV", title: "Draft" });
 
     await client.issues.update({ key: "DEV-1", assigneeMemberId: admin.member.id });

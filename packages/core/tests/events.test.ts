@@ -179,7 +179,7 @@ describe("the Event log after bootstrap", () => {
       { userId: "u1", email: "ada@example.com" },
       {
         adminEmail: "ada@example.com",
-        workspaceName: "Flippable Team",
+        workspaceName: "Acme Team",
       },
     );
 
@@ -233,7 +233,7 @@ describe("self-describing payloads", () => {
     const { db, close } = testDb();
     closers.push(close);
     const alice = await memberContext(db, { role: "admin", name: "Alice" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const asAlice = createRouterClient(router, { context: alice });
     await asAlice.projects.create({ name: "deevy", key: "DEV" });
     const backend = await asAlice.labels.create({ name: "backend", color: "#333" });

@@ -13,7 +13,7 @@ describe("members.list", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: admin });
     const { members } = await client.members.list({});
@@ -31,7 +31,7 @@ describe("members.list", () => {
     const { db, close } = testDb();
     closers.push(close);
     await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: bob });
     expect((await client.members.list({})).members).toHaveLength(2);
@@ -43,7 +43,7 @@ describe("members.updateRole", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: admin });
     expect(
@@ -64,7 +64,7 @@ describe("members.updateRole", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: bob });
     await expect(
@@ -76,7 +76,7 @@ describe("members.updateRole", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: admin });
     await expect(
@@ -101,7 +101,7 @@ describe("members.suspend and members.reinstate", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const client = createRouterClient(router, { context: admin });
 
     const suspended = await client.members.suspend({ memberId: bob.member.id });
@@ -125,7 +125,7 @@ describe("members.suspend and members.reinstate", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: admin });
     await expect(client.members.suspend({ memberId: admin.member.id })).rejects.toMatchObject({
@@ -137,7 +137,7 @@ describe("members.suspend and members.reinstate", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: bob });
     await expect(client.members.suspend({ memberId: admin.member.id })).rejects.toMatchObject({

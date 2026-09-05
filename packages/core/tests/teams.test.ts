@@ -43,7 +43,7 @@ describe("teams.create", () => {
     const { db, close } = testDb();
     closers.push(close);
     await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: bob });
     await expect(client.teams.create({ name: "Platform" })).rejects.toMatchObject({
@@ -57,7 +57,7 @@ describe("a Team's Members", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const client = createRouterClient(router, { context: admin });
     const team = await client.teams.create({ name: "Platform" });
 
@@ -73,7 +73,7 @@ describe("a Team's Members", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const client = createRouterClient(router, { context: admin });
     const team = await client.teams.create({ name: "Platform" });
     await client.teams.addMember({ teamId: team.id, memberId: bob.member.id });
@@ -108,7 +108,7 @@ describe("teams.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const owner = createRouterClient(router, { context: admin });
     const team = await owner.teams.create({ name: "Platform" });
     await owner.teams.addMember({ teamId: team.id, memberId: bob.member.id });
@@ -123,7 +123,7 @@ describe("teams.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const team = await createRouterClient(router, { context: admin }).teams.create({
       name: "Platform",
     });
@@ -154,7 +154,7 @@ describe("teams.delete", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const owner = createRouterClient(router, { context: admin });
     const team = await owner.teams.create({ name: "Platform" });
     await owner.teams.addMember({ teamId: team.id, memberId: bob.member.id });

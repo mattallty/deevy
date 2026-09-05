@@ -84,7 +84,7 @@ export function AllowlistPage() {
           <Input
             id="rule-value"
             value={value}
-            placeholder={kind === "email_domain" ? "flippable.net" : "flippable"}
+            placeholder={kind === "email_domain" ? "example.com" : "acme"}
             onChange={(changed) => setValue(changed.target.value)}
           />
         </div>

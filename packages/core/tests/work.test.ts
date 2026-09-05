@@ -471,7 +471,7 @@ describe("remindAboutGates", () => {
     const { db, close } = testDb();
     closers.push(close);
     const ada = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const asAda = createRouterClient(router, { context: ada });
     const project = await asAda.projects.create({ name: "deevy", key: "DEV" });
     const agent = await agentContext(db, { sponsor: ada.member, grants: [project.id] });

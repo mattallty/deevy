@@ -113,7 +113,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 async function mountAt(path: string) {
   const router = createAppRouter(
     {
-      workspaceName: "Flippable Team",
+      workspaceName: "Acme Team",
       memberName: "Ada Lovelace",
       member: { ...ada, image: null },
     },

@@ -67,7 +67,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountIssue(path = "/issues/DEV-1") {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { memory: true, initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

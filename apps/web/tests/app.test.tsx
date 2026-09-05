@@ -57,14 +57,14 @@ describe("DevSignIn", () => {
     const navigate = vi.fn();
     mount(<DevSignIn navigate={navigate} />);
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ada@flippable.net" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ada@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in as this email" }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
     const landed = new URL(navigate.mock.calls[0]?.[0] as string);
     expect(landed.pathname).toBe("/api/auth/callback/github");
     expect(landed.searchParams.get("state")).toBe("s3cret");
-    expect(landed.searchParams.get("code")).toBe("ada@flippable.net");
+    expect(landed.searchParams.get("code")).toBe("ada@example.com");
 
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/auth/sign-in/social");
@@ -78,7 +78,7 @@ describe("DevSignIn", () => {
     );
     const navigate = vi.fn();
     mount(<DevSignIn navigate={navigate} />);
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ada@flippable.net" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ada@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in as this email" }));
     expect(await screen.findByText(/did not start a sign-in/)).toBeTruthy();
     expect(navigate).not.toHaveBeenCalled();

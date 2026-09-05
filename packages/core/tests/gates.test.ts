@@ -161,8 +161,8 @@ describe("the approvers a Gate names", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { admin, client, state } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
-    const carol = await memberContext(db, { name: "Carol", email: "carol@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
+    const carol = await memberContext(db, { name: "Carol", email: "carol@example.com" });
     const states = (await client.workflow.get({ projectKey: "DEV" })).states;
     await client.workflow.update({
       projectKey: "DEV",
@@ -190,7 +190,7 @@ describe("the approvers a Gate names", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const asBob = createRouterClient(router, { context: bob });
     const named = (approverMemberIds: string[]) =>
       client.workflow.get({ projectKey: "DEV" }).then(({ states }) =>

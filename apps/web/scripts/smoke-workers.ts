@@ -59,7 +59,7 @@ const database = "deevy";
  */
 const baseURL = "https://deevy.example.test";
 /** The email DEEVY_ADMIN_EMAIL names, whose first sign-in bootstraps the Workspace. */
-const adminEmail = "ada@flippable.net";
+const adminEmail = "ada@example.com";
 
 const childEnv = { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" };
 
@@ -1557,7 +1557,7 @@ try {
         GITHUB_CLIENT_ID: "stub-client-id",
         GITHUB_CLIENT_SECRET: "stub-client-secret",
         DEEVY_ADMIN_EMAIL: adminEmail,
-        DEEVY_WORKSPACE_NAME: "Flippable",
+        DEEVY_WORKSPACE_NAME: "Acme",
       },
     },
     aHumanSignsIn,
@@ -1579,7 +1579,7 @@ try {
         GITHUB_CLIENT_ID: "stub-client-id",
         GITHUB_CLIENT_SECRET: "stub-client-secret",
         DEEVY_ADMIN_EMAIL: adminEmail,
-        DEEVY_WORKSPACE_NAME: "Flippable",
+        DEEVY_WORKSPACE_NAME: "Acme",
       },
     },
     backgroundWorkOnACronTrigger,
@@ -1600,7 +1600,7 @@ try {
         GITHUB_CLIENT_ID: "stub-client-id",
         GITHUB_CLIENT_SECRET: "stub-client-secret",
         DEEVY_ADMIN_EMAIL: adminEmail,
-        DEEVY_WORKSPACE_NAME: "Flippable",
+        DEEVY_WORKSPACE_NAME: "Acme",
         DEEVY_STREAM_SECONDS: String(streamSeconds),
       },
     },
@@ -1624,7 +1624,7 @@ try {
         GITHUB_CLIENT_ID: "stub-client-id",
         GITHUB_CLIENT_SECRET: "stub-client-secret",
         DEEVY_ADMIN_EMAIL: adminEmail,
-        DEEVY_WORKSPACE_NAME: "Flippable",
+        DEEVY_WORKSPACE_NAME: "Acme",
       },
     },
     theAgentLoopOnWorkerd,
@@ -1647,7 +1647,7 @@ try {
           GITHUB_CLIENT_ID: "stub-client-id",
           GITHUB_CLIENT_SECRET: "stub-client-secret",
           DEEVY_ADMIN_EMAIL: adminEmail,
-          DEEVY_WORKSPACE_NAME: "Flippable",
+          DEEVY_WORKSPACE_NAME: "Acme",
         },
       },
       (origin) => queuesForAnAccountThatHasThem(origin, far),
@@ -1668,7 +1668,7 @@ try {
           GITHUB_CLIENT_ID: "stub-client-id",
           GITHUB_CLIENT_SECRET: "stub-client-secret",
           DEEVY_ADMIN_EMAIL: adminEmail,
-          DEEVY_WORKSPACE_NAME: "Flippable",
+          DEEVY_WORKSPACE_NAME: "Acme",
         },
       },
       (origin) => theCronPathAlone(origin, far),

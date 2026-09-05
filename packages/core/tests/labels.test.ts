@@ -118,7 +118,7 @@ describe("labels.delete", () => {
     closers.push(close);
     const { client } = await withProject(db);
     const backend = await client.labels.create({ name: "backend", color: "#1" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const asBob = createRouterClient(router, { context: bob });
     await expect(asBob.labels.delete({ labelId: backend.id })).rejects.toMatchObject({

@@ -353,7 +353,7 @@ describe("runs.requestApproval", () => {
 
   it("asks the Humans the Gate names, and not the Sponsor behind the Run", async () => {
     const { db, admin, asAdmin, asAgent } = await workspaceWithAgent();
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const states = (await asAdmin.workflow.get({ projectKey: "DEV" })).states;
     await asAdmin.workflow.update({
       projectKey: "DEV",

@@ -23,7 +23,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { memory: true, initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -47,8 +47,8 @@ describe("the app shell", () => {
   it("names the Workspace and the signed-in Human, and links to the work", async () => {
     await mountAt("/");
 
-    await screen.findByText("Flippable Team");
-    expect(within(sidebar()).getByText("Flippable Team")).toBeTruthy();
+    await screen.findByText("Acme Team");
+    expect(within(sidebar()).getByText("Acme Team")).toBeTruthy();
     expect(within(sidebar()).getByText("Ada Lovelace")).toBeTruthy();
     expect(within(sidebar()).getByRole("link", { name: /Inbox/ }).getAttribute("href")).toBe(
       "/inbox",

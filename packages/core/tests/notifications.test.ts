@@ -26,7 +26,7 @@ async function workspace() {
   const { db, close } = testDb();
   closers.push(close);
   const alice = await memberContext(db, { role: "admin", name: "Alice" });
-  const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+  const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
   const asAlice = createRouterClient(router, { context: alice });
   const project = await asAlice.projects.create({ name: "deevy", key: "DEV" });
   return { db, alice, bob, asAlice, project, workspaceId: alice.workspace.id };
@@ -84,7 +84,7 @@ describe("routing a Gate Notification", () => {
     const channelId = await slackChannel(db, { workspaceId, kind: "gate_awaiting" });
     // A third Human, so the Gate concerns two of them and the room still hears
     // once: a Slack Channel is a room, not a person.
-    await memberContext(db, { name: "Carol", email: "carol@flippable.net" });
+    await memberContext(db, { name: "Carol", email: "carol@example.com" });
 
     await asAlice.issues.create({ projectKey: "DEV", title: "Needs a decision" });
 
@@ -122,7 +122,7 @@ describe("routing a Gate Notification", () => {
   it("still reaches the room when only one of the two Humans turned Slack off", async () => {
     const { db, bob, asAlice, workspaceId } = await workspace();
     await slackChannel(db, { workspaceId, kind: "gate_awaiting" });
-    await memberContext(db, { name: "Carol", email: "carol@flippable.net" });
+    await memberContext(db, { name: "Carol", email: "carol@example.com" });
     await db.insert(notificationPreference).values({
       memberId: bob.member.id,
       kind: "gate_awaiting",

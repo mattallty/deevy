@@ -19,7 +19,7 @@ async function withIssue(db: MemberContext["db"]) {
 
 describe("extractHandles", () => {
   it("finds @handles and ignores an email address", () => {
-    expect(extractHandles("ping @bob and @core, not bob@flippable.net")).toEqual(["bob", "core"]);
+    expect(extractHandles("ping @bob and @core, not bob@example.com")).toEqual(["bob", "core"]);
     expect(extractHandles("nothing here")).toEqual([]);
     expect(extractHandles("@bob @bob")).toEqual(["bob"]);
   });
@@ -30,8 +30,8 @@ describe("comments.create", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { admin, client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
-    const carol = await memberContext(db, { name: "Carol", email: "carol@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
+    const carol = await memberContext(db, { name: "Carol", email: "carol@example.com" });
     await db
       .update((await import("@deevy/db")).member)
       .set({ handle: "bob" })
@@ -79,7 +79,7 @@ describe("comments.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const comment = await client.comments.create({ issueKey: "DEV-1", body: "first" });
 
     const edited = await client.comments.update({ commentId: comment.id, body: "second" });
@@ -98,7 +98,7 @@ describe("comments.delete", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const asBob = createRouterClient(router, { context: bob });
     const mine = await client.comments.create({ issueKey: "DEV-1", body: "mine" });
     const theirs = await asBob.comments.create({ issueKey: "DEV-1", body: "theirs" });
@@ -117,7 +117,7 @@ describe("comments.delete", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const mine = await client.comments.create({ issueKey: "DEV-1", body: "mine" });
 
     const asBob = createRouterClient(router, { context: bob });
@@ -132,7 +132,7 @@ describe("mentions in an Issue description", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     await db
       .update((await import("@deevy/db")).member)
       .set({ handle: "bob" })

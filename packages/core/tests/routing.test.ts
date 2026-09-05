@@ -14,7 +14,7 @@ async function workspace() {
   const { db, close } = testDb();
   closers.push(close);
   const admin = await memberContext(db, { role: "admin", name: "Alice" });
-  const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+  const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
   const asAdmin = createRouterClient(router, { context: admin });
   const project = await asAdmin.projects.create({ name: "deevy", key: "DEV" });
   const channel = await asAdmin.channels.create({ name: "#deevy", webhookUrl });

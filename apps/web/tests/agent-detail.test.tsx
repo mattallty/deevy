@@ -17,7 +17,7 @@ const stub = vi.hoisted(() => ({
       kind: "human",
       handle: "ada",
       suspendedAt: null,
-      user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net", image: null },
+      user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com", image: null },
     },
     webhookUrl: null,
     scheduleMinutes: null,
@@ -82,7 +82,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

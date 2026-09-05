@@ -12,7 +12,7 @@ const stub = vi.hoisted(() => {
     id: "m-ada",
     role: "admin",
     handle: "ada",
-    user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net" },
+    user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com" },
   };
   const epic = {
     id: "i1",
@@ -115,7 +115,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

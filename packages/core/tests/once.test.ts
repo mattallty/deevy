@@ -32,7 +32,7 @@ async function workspace() {
   const { db, close } = testDb();
   closers.push(close);
   const alice = await memberContext(db, { role: "admin", name: "Alice" });
-  const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+  const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
   const asAlice = createRouterClient(router, { context: alice });
   const project = await asAlice.projects.create({ name: "deevy", key: "DEV" });
   const subscriptionId = crypto.randomUUID();

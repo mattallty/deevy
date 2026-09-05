@@ -121,7 +121,7 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    a `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
 
    ```jsonc
-   "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Flippable" },
+   "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Acme" },
    ```
 
    Deploying a public fork, put `DEEVY_ADMIN_EMAIL` in with `wrangler secret put` instead. It is not a

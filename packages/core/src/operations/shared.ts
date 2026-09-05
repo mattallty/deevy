@@ -88,7 +88,7 @@ export const HandleInput = z
   .regex(/^[a-z0-9][a-z0-9-]*$/, "A handle is lowercase letters, digits and hyphens");
 
 /**
- * An email domain (`flippable.net`) or a GitHub organization login. Both are
+ * An email domain (`example.com`) or a GitHub organization login. Both are
  * stored lowercased so a rule matches whatever case the sign-in arrives in.
  */
 export const AllowlistValue = z
@@ -97,7 +97,7 @@ export const AllowlistValue = z
   .toLowerCase()
   .min(1)
   .max(255)
-  .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)*$/, "A domain such as flippable.net, or an organization login");
+  .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)*$/, "A domain such as example.com, or an organization login");
 
 /** Strict on the way in: `dev` is a mistake worth reporting, not something to correct silently. */
 export const ProjectKey = z
