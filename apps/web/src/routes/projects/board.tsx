@@ -225,7 +225,8 @@ function GateDialog({ issue, onClose }: { issue: BoardIssue | null; onClose: () 
   const done = async () => {
     setNote("");
     onClose();
-    await queryClient.invalidateQueries();
+    await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
+    await queryClient.invalidateQueries({ queryKey: orpc.inbox.key() });
   };
   const approve = useMutation(orpc.gates.approve.mutationOptions({ onSuccess: done }));
   const reject = useMutation(orpc.gates.reject.mutationOptions({ onSuccess: done }));

@@ -1,7 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { Shortcut } from "@/components/kbd-hint";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { orpc } from "@/lib/orpc";
+import { useShortcut, useShortcutScope } from "@/lib/shortcuts";
 
 /**
  * Creating an Issue, from wherever the Human happens to be.
@@ -26,49 +28,54 @@ import { orpc } from "@/lib/orpc";
  * would have hit. The Project-page form stays — it is the right thing when you
  * are already looking at a Project and know the answer — and this is the one
  * that does not ask you to go somewhere first.
+ *
+ * The dialog is owned by a provider in the shell, so the sidebar button, the
+ * command palette and the `c` shortcut all open the same one.
  */
-export function NewIssueButton() {
-  const [open, setOpen] = useState(false);
+const NewIssueContext = createContext<{ open: () => void } | null>(null);
 
-  useNewIssueShortcut(() => setOpen(true));
+export function NewIssueProvider({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  // `c` opens it, the key Linear, Jira and GitHub all use for the same thing.
+  // lib/shortcuts.ts ignores it while the Human is typing: a shortcut that eats
+  // a letter out of a title is worse than no shortcut.
+  useShortcut("c", show);
+  // While it is open the page behind it goes quiet, `c` included.
+  useShortcutScope("new-issue", open);
 
   return (
-    <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <Plus />
-        New Issue
-      </Button>
+    <NewIssueContext.Provider value={{ open: show }}>
+      {children}
       <NewIssueDialog open={open} onOpenChange={setOpen} />
-    </>
+    </NewIssueContext.Provider>
   );
 }
 
-/**
- * `c` opens it, the key Linear, Jira and GitHub all use for the same thing.
- *
- * Ignored while the Human is typing: a shortcut that eats a letter out of a
- * title is worse than no shortcut, and the Project page's own New Issue field
- * is one keystroke away from this one.
- */
-function useNewIssueShortcut(open: () => void) {
-  useEffect(() => {
-    function onKeyDown(pressed: KeyboardEvent) {
-      if (pressed.key !== "c") return;
-      if (pressed.metaKey || pressed.ctrlKey || pressed.altKey) return;
-      if (isTyping(pressed.target)) return;
-      pressed.preventDefault();
-      open();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+/** How to open the New Issue dialog from anywhere under the provider. */
+export function useNewIssue() {
+  const context = useContext(NewIssueContext);
+  if (!context) throw new Error("useNewIssue needs a NewIssueProvider above it");
+  return context;
 }
 
-/** Whether the keystroke belongs to something the Human is writing in. */
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+export function NewIssueButton({
+  variant = "outline",
+  size = "sm",
+  withShortcut = false,
+}: {
+  variant?: "outline" | "default" | "ghost";
+  size?: "sm" | "default";
+  withShortcut?: boolean;
+}) {
+  const { open } = useNewIssue();
+  return (
+    <Button variant={variant} size={size} onClick={open}>
+      <Plus />
+      New Issue
+      {withShortcut ? <Shortcut keys="c" className="ml-auto" /> : null}
+    </Button>
+  );
 }
 
 function NewIssueDialog({

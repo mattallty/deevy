@@ -1,71 +1,109 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Self-hosted: a self-hosted AGPL app does not phone Google for its typeface. */
+@import "@fontsource-variable/ibm-plex-sans/wght.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn/ui "new-york" tokens, slate base. Both themes are defined so the
-   Workspace follows the operating system's setting. */
+/*
+ * deevy's tokens (docs/plans/ui-redesign.md, .claude/skills/deevy-ui/SKILL.md).
+ *
+ * Paper and ink are warm neutrals rather than slate. Three saturated slots
+ * carry the one idea the UI has: --human for a Human Member, --agent for an
+ * Agent, --gate for a Gate State and anything waiting on a Human's ruling.
+ * Nothing else on a screen is saturated except --primary, the one action
+ * colour, and --destructive. The theme is a class (`.dark` on <html>, set by
+ * next-themes from the System/Light/Dark toggle), so the toggle wins in both
+ * directions and the OS setting is the default.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
+  --radius: 0.375rem;
+
+  --background: oklch(0.975 0.004 85);
+  --foreground: oklch(0.21 0.012 70);
+  --card: oklch(0.992 0.002 85);
+  --card-foreground: oklch(0.21 0.012 70);
+  --popover: oklch(0.992 0.002 85);
+  --popover-foreground: oklch(0.21 0.012 70);
+  --primary: oklch(0.34 0.075 255);
+  --primary-foreground: oklch(0.985 0.003 85);
+  --secondary: oklch(0.94 0.006 85);
+  --secondary-foreground: oklch(0.21 0.012 70);
+  --muted: oklch(0.94 0.006 85);
+  --muted-foreground: oklch(0.5 0.016 70);
+  --accent: oklch(0.925 0.008 85);
+  --accent-foreground: oklch(0.21 0.012 70);
+  --destructive: oklch(0.5 0.16 30);
+  --destructive-foreground: oklch(0.985 0.003 85);
+  --border: oklch(0.89 0.008 85);
+  --input: oklch(0.87 0.009 85);
+  --ring: oklch(0.6 0.06 255);
+  --sidebar: oklch(0.955 0.005 85);
+  --sidebar-foreground: oklch(0.21 0.012 70);
+  --sidebar-accent: oklch(0.915 0.008 85);
+  --sidebar-accent-foreground: oklch(0.21 0.012 70);
+  --sidebar-border: oklch(0.88 0.008 85);
+
+  --human: oklch(0.52 0.14 45);
+  --human-foreground: oklch(0.985 0.003 85);
+  --agent: oklch(0.5 0.09 175);
+  --agent-foreground: oklch(0.985 0.003 85);
+  --gate: oklch(0.62 0.13 75);
+  --gate-foreground: oklch(0.21 0.012 70);
+  --state-backlog: oklch(0.62 0.012 70);
+  --state-active: oklch(0.55 0.06 255);
+  --state-done: oklch(0.55 0.12 150);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: oklch(0.129 0.042 264.695);
-    --foreground: oklch(0.984 0.003 247.858);
-    --card: oklch(0.208 0.042 265.755);
-    --card-foreground: oklch(0.984 0.003 247.858);
-    --popover: oklch(0.208 0.042 265.755);
-    --popover-foreground: oklch(0.984 0.003 247.858);
-    --primary: oklch(0.929 0.013 255.508);
-    --primary-foreground: oklch(0.208 0.042 265.755);
-    --secondary: oklch(0.279 0.041 260.031);
-    --secondary-foreground: oklch(0.984 0.003 247.858);
-    --muted: oklch(0.279 0.041 260.031);
-    --muted-foreground: oklch(0.704 0.04 256.788);
-    --accent: oklch(0.279 0.041 260.031);
-    --accent-foreground: oklch(0.984 0.003 247.858);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.984 0.003 247.858);
-    --border: oklch(1 0 0 / 12%);
-    --input: oklch(1 0 0 / 18%);
-    --ring: oklch(0.551 0.027 264.364);
-    --sidebar: oklch(0.208 0.042 265.755);
-    --sidebar-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-accent: oklch(0.279 0.041 260.031);
-    --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-border: oklch(1 0 0 / 12%);
-  }
+.dark {
+  --background: oklch(0.17 0.006 70);
+  --foreground: oklch(0.93 0.008 85);
+  --card: oklch(0.205 0.007 70);
+  --card-foreground: oklch(0.93 0.008 85);
+  --popover: oklch(0.205 0.007 70);
+  --popover-foreground: oklch(0.93 0.008 85);
+  --primary: oklch(0.74 0.08 255);
+  --primary-foreground: oklch(0.17 0.006 70);
+  --secondary: oklch(0.26 0.008 70);
+  --secondary-foreground: oklch(0.93 0.008 85);
+  --muted: oklch(0.26 0.008 70);
+  --muted-foreground: oklch(0.68 0.012 80);
+  --accent: oklch(0.28 0.009 70);
+  --accent-foreground: oklch(0.93 0.008 85);
+  --destructive: oklch(0.68 0.15 30);
+  --destructive-foreground: oklch(0.17 0.006 70);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.6 0.06 255);
+  --sidebar: oklch(0.15 0.006 70);
+  --sidebar-foreground: oklch(0.93 0.008 85);
+  --sidebar-accent: oklch(0.24 0.008 70);
+  --sidebar-accent-foreground: oklch(0.93 0.008 85);
+  --sidebar-border: oklch(1 0 0 / 8%);
+
+  --human: oklch(0.72 0.13 45);
+  --human-foreground: oklch(0.17 0.006 70);
+  --agent: oklch(0.74 0.1 175);
+  --agent-foreground: oklch(0.17 0.006 70);
+  --gate: oklch(0.78 0.13 80);
+  --gate-foreground: oklch(0.17 0.006 70);
+  --state-backlog: oklch(0.6 0.01 70);
+  --state-active: oklch(0.7 0.07 255);
+  --state-done: oklch(0.7 0.12 150);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  --font-sans:
+    "IBM Plex Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -90,13 +128,42 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+
+  --color-human: var(--human);
+  --color-human-foreground: var(--human-foreground);
+  --color-agent: var(--agent);
+  --color-agent-foreground: var(--agent-foreground);
+  --color-gate: var(--gate);
+  --color-gate-foreground: var(--gate-foreground);
+  --color-state-backlog: var(--state-backlog);
+  --color-state-active: var(--state-active);
+  --color-state-done: var(--state-done);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  /*
+   * The scale in the plan (12 / 13 / 14 / 16 / 20 / 28) was written for a
+   * face like Inter; Plex has a smaller x-height and read too small on the
+   * owner's screen. Everything is rem-based — text, buttons, inputs, rows,
+   * icons — so one number moves all of it together: 17px here makes
+   * text-sm ≈ 15px and text-base 17px. Tune it here and nowhere else.
+   */
+  html {
+    font-size: 106.25%;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans text-sm antialiased;
+  }
+  /* Keys, seqs and times line up when their digits share a width. */
+  .font-mono,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }

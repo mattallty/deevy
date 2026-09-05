@@ -1,11 +1,79 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { client, orpc } from "@/lib/orpc";
+
+/** What one Event may have changed on screen, by what it was about. */
+export interface LiveEvent {
+  subjectType: string;
+  projectId: string | null;
+}
+
+/**
+ * The queries an Event could have changed. Every Event touches the log; what
+ * else it touches follows from its subject, so a Run's Activity re-reads Runs
+ * and the inbox and nothing about Members. The list errs towards re-reading:
+ * an Issue Event covers its comments, Documents and Links too, because those
+ * are shown on the same screen and their Events are Issue Events.
+ */
+export function keysFor(event: LiveEvent): QueryKey[] {
+  const keys: QueryKey[] = [orpc.events.key()];
+  switch (event.subjectType) {
+    case "issue":
+      keys.push(
+        orpc.issues.key(),
+        orpc.comments.key(),
+        orpc.documents.key(),
+        orpc.links.key(),
+        orpc.inbox.key(),
+      );
+      break;
+    case "run":
+      keys.push(orpc.runs.key(), orpc.inbox.key());
+      break;
+    case "project":
+      keys.push(orpc.projects.key(), orpc.workflow.key(), orpc.issues.key());
+      break;
+    case "member":
+      keys.push(orpc.members.key(), orpc.agents.key(), orpc.inbox.key());
+      break;
+    case "team":
+      keys.push(orpc.teams.key());
+      break;
+    case "allowlist_rule":
+      keys.push(orpc.allowlist.key());
+      break;
+    case "label":
+      keys.push(orpc.labels.key(), orpc.issues.key());
+      break;
+    case "repository":
+      keys.push(orpc.repositories.key(), orpc.links.key());
+      break;
+    case "channel":
+      keys.push(orpc.channels.key(), orpc.routing.key());
+      break;
+    case "webhook":
+      keys.push(orpc.webhooks.key());
+      break;
+    case "workspace":
+      keys.push(orpc.workspace.key());
+      break;
+    default:
+      if (event.projectId) keys.push(orpc.issues.key());
+  }
+  return keys;
+}
+
+/** How long invalidations are gathered before one pass re-reads each key once. */
+export const COALESCE_MS = 16;
 
 /**
  * Keeps this browser in step with the Workspace by reading the Event log as it
  * happens (docs/plans/m1.md slice 7). Every Event invalidates the queries that
  * could show it, so nothing here decides what changed: the Event log does.
+ *
+ * Invalidations are coalesced: an Agent posting an Activity a second while a
+ * list, a peek and the inbox are all mounted must cost one refetch per key per
+ * tick, not one per Event per key (docs/plans/ui-redesign.md, slice 1).
  */
 export function useLiveEvents(enabled: boolean) {
   const queryClient = useQueryClient();
@@ -15,6 +83,18 @@ export function useLiveEvents(enabled: boolean) {
     if (!enabled) return;
     const controller = new AbortController();
     let stopped = false;
+
+    const pending = new Map<string, QueryKey>();
+    let flush: ReturnType<typeof setTimeout> | null = null;
+    function invalidateLater(keys: QueryKey[]) {
+      for (const key of keys) pending.set(JSON.stringify(key), key);
+      flush ??= setTimeout(() => {
+        flush = null;
+        const batch = [...pending.values()];
+        pending.clear();
+        void Promise.all(batch.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+      }, COALESCE_MS);
+    }
 
     async function run() {
       // Reconnect from the last seq seen, so a drop costs nothing.
@@ -41,7 +121,7 @@ export function useLiveEvents(enabled: boolean) {
               continue;
             }
             cursor.current = message.event.seq;
-            await invalidateFor(message.event);
+            invalidateLater(keysFor(message.event));
           }
           if (delivered > 0) continue;
         } catch {
@@ -52,33 +132,11 @@ export function useLiveEvents(enabled: boolean) {
       }
     }
 
-    async function invalidateFor(event: { subjectType: string; projectId: string | null }) {
-      const invalidations = [queryClient.invalidateQueries({ queryKey: orpc.events.key() })];
-      if (event.subjectType === "issue" || event.projectId) {
-        invalidations.push(queryClient.invalidateQueries({ queryKey: orpc.issues.key() }));
-      }
-      if (event.subjectType === "project") {
-        invalidations.push(
-          queryClient.invalidateQueries({ queryKey: orpc.projects.key() }),
-          queryClient.invalidateQueries({ queryKey: orpc.workflow.key() }),
-        );
-      }
-      if (event.subjectType === "member") {
-        invalidations.push(queryClient.invalidateQueries({ queryKey: orpc.members.key() }));
-      }
-      if (event.subjectType === "team") {
-        invalidations.push(queryClient.invalidateQueries({ queryKey: orpc.teams.key() }));
-      }
-      if (event.subjectType === "allowlist_rule") {
-        invalidations.push(queryClient.invalidateQueries({ queryKey: orpc.allowlist.key() }));
-      }
-      await Promise.all(invalidations);
-    }
-
     void run();
     return () => {
       stopped = true;
       controller.abort();
+      if (flush) clearTimeout(flush);
     };
   }, [enabled, queryClient]);
 }

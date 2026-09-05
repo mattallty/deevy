@@ -350,7 +350,7 @@ boolean`; `buildServer` passes it. `vp run core#snapshot:openapi`, commit `opena
   flag), `packages/core/tests/app.test.ts` (`health.ping.devSignIn`), `apps/web/tests/app.test.tsx` (dev
   form only when reported). `vp run claude-agent#acceptance` still passes.
 
-### 1 — Tokens, type, theme, frame, palette, shortcuts (checkpoint)
+### 1 — Tokens, type, theme, frame, palette, shortcuts (checkpoint; shipped)
 
 `index.css` slots above + `--font-sans`/`--font-mono` via `@theme inline`; fontsource packages into the
 catalog; `main.tsx` mounts `ThemeProvider`; `/dev/tokens` swatch/type page behind the dev flag. New
@@ -363,6 +363,13 @@ inside the frame unchanged. `live.ts`: coalesce invalidations per frame, key `is
 refetch. Tests: `shell.test.tsx` asserts Inbox / My Issues / All Issues / Project links in the primary
 sidebar and Members / Agents / Allowlist inside the Settings sidebar at `/settings/workspace`;
 `inbox.test.tsx` "2 unread" unchanged. **Stop here for review of the frame, both themes, the swatch page.**
+
+What shipped differently in slice 1: the root font size is `106.25%` rather than the plan's 14px base — Plex
+reads smaller than the face the scale was written for, and the owner asked for larger; the sidebar's "My
+Issues" and "My Agents' Issues" wait for the Issues home in slice 2, since they would link to a screen that
+does not exist yet; and the palette navigates and creates only, as planned, with its Issue search arriving
+with `issues.list`'s `q`. cmdk's transitive Radix dependency is recorded in `deevy-ui` as the one exception
+to the no-Radix rule.
 
 ### 2 — Issues home, filters, side peek
 

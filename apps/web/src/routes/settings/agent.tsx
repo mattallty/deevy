@@ -17,7 +17,8 @@ export function AgentPage({ memberId }: { memberId: string }) {
   const queryClient = useQueryClient();
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
   const refresh = async () => {
-    await queryClient.invalidateQueries();
+    await queryClient.invalidateQueries({ queryKey: orpc.agents.key() });
+    await queryClient.invalidateQueries({ queryKey: orpc.members.key() });
   };
 
   if (agents.isPending) return <Skeleton className="h-40 w-full" />;

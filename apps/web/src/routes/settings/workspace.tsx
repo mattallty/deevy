@@ -18,7 +18,7 @@ export function WorkspacePage() {
 
   const save = useMutation(
     orpc.workspace.update.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries(),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.workspace.key() }),
     }),
   );
 

@@ -52,7 +52,7 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
     orpc.issues.update.mutationOptions({
       onSuccess: async () => {
         setEditing(false);
-        await queryClient.invalidateQueries();
+        await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
       },
     }),
   );

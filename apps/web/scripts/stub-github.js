@@ -22,7 +22,8 @@ function profileFor(email) {
     node_id: login,
     name: login.charAt(0).toUpperCase() + login.slice(1),
     email,
-    avatar_url: `https://avatars.example.test/${login}`,
+    // No picture: a host that does not resolve is a red line in every dev console.
+    avatar_url: null,
   };
 }
 

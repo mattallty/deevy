@@ -65,7 +65,9 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
         setDraft(null);
         setRemoved([]);
         setMoveIssuesTo(null);
-        await queryClient.invalidateQueries();
+        await queryClient.invalidateQueries({ queryKey: orpc.workflow.key() });
+        await queryClient.invalidateQueries({ queryKey: orpc.projects.key() });
+        await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
       },
     }),
   );

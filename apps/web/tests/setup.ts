@@ -32,3 +32,10 @@ if (!globalThis.ResizeObserver) {
 // once per navigation. jsdom has no layout, so there is nothing to scroll and
 // nothing any test could assert about it.
 window.scrollTo = (() => {}) as typeof window.scrollTo;
+
+// cmdk scrolls the selected item into view as the palette opens; jsdom has no
+// layout and no scrollIntoView. A default that does nothing, which a test that
+// cares (gates.test.tsx) replaces with a spy of its own.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

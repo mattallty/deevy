@@ -3,9 +3,11 @@ import {
   createRoute,
   createRouter,
   createMemoryHistory,
+  redirect,
 } from "@tanstack/react-router";
 import { ProjectsPage } from "./routes/index.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
+import { TokensPage } from "./routes/dev/tokens.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
@@ -13,6 +15,7 @@ import { ProjectPage } from "./routes/projects/project.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { ChannelsPage } from "./routes/settings/channels.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
+import { SettingsLayout } from "./routes/settings/layout.tsx";
 import { NotificationsPage } from "./routes/settings/notifications.tsx";
 import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
@@ -73,73 +76,97 @@ const issueRoute = createRoute({
     return <IssuePage issueKey={issueRoute.useParams().issueKey} />;
   },
 });
-const workspaceRoute = createRoute({
+
+// The Settings area: one layout route with its own navigation, and the pages
+// as its children so `/settings/<page>` keeps every URL it had.
+const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/workspace",
+  path: "/settings",
+  component: SettingsLayout,
+});
+const settingsIndexRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "/",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/workspace" });
+  },
+});
+// Each declared with its literal path, so the router's types know every `to`.
+const workspaceRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "workspace",
   component: WorkspacePage,
 });
 const teamsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/teams",
+  getParentRoute: () => settingsRoute,
+  path: "teams",
   component: TeamsPage,
 });
 const labelsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/labels",
+  getParentRoute: () => settingsRoute,
+  path: "labels",
   component: LabelsPage,
 });
 const repositoriesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/repositories",
+  getParentRoute: () => settingsRoute,
+  path: "repositories",
   component: RepositoriesPage,
 });
 const membersRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/members",
+  getParentRoute: () => settingsRoute,
+  path: "members",
   component: MembersPage,
 });
 const agentsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/agents",
+  getParentRoute: () => settingsRoute,
+  path: "agents",
   component: AgentsPage,
 });
 const channelsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/channels",
+  getParentRoute: () => settingsRoute,
+  path: "channels",
   component: ChannelsPage,
 });
 const webhooksRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/webhooks",
+  getParentRoute: () => settingsRoute,
+  path: "webhooks",
   component: WebhooksPage,
 });
 const notificationsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/notifications",
+  getParentRoute: () => settingsRoute,
+  path: "notifications",
   component: NotificationsPage,
 });
+const allowlistRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "allowlist",
+  component: AllowlistPage,
+});
+const mcpClientsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "mcp-clients",
+  component: McpClientsPage,
+});
 const agentRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/agents/$memberId",
+  getParentRoute: () => settingsRoute,
+  path: "agents/$memberId",
   component: function AgentRoute() {
     return <AgentPage memberId={agentRoute.useParams().memberId} />;
   },
 });
-const allowlistRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/allowlist",
-  component: AllowlistPage,
-});
-const mcpClientsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/mcp-clients",
-  component: McpClientsPage,
-});
+
 // Where the OAuth provider sends a Human mid-authorization (packages/core/src/auth.ts).
 const consentRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/consent",
   component: ConsentPage,
+});
+// The design tokens, drawn: a page for reviewing the palette and the type
+// scale in both themes. Not linked from anywhere; a developer knows the URL.
+const tokensRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dev/tokens",
+  component: TokensPage,
 });
 
 const routeTree = rootRoute.addChildren([
@@ -149,19 +176,23 @@ const routeTree = rootRoute.addChildren([
   boardRoute,
   workflowRoute,
   issueRoute,
-  workspaceRoute,
-  teamsRoute,
-  labelsRoute,
-  repositoriesRoute,
-  membersRoute,
-  agentsRoute,
-  agentRoute,
-  channelsRoute,
-  webhooksRoute,
-  notificationsRoute,
-  allowlistRoute,
-  mcpClientsRoute,
+  settingsRoute.addChildren([
+    settingsIndexRoute,
+    workspaceRoute,
+    teamsRoute,
+    labelsRoute,
+    repositoriesRoute,
+    membersRoute,
+    agentsRoute,
+    agentRoute,
+    channelsRoute,
+    webhooksRoute,
+    notificationsRoute,
+    allowlistRoute,
+    mcpClientsRoute,
+  ]),
   consentRoute,
+  tokensRoute,
 ]);
 
 export interface AppRouterOptions {

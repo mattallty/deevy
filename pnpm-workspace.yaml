@@ -11,6 +11,8 @@ allowBuilds:
 # ADR-0007, ADR-0008, ADR-0009). Upgrade them on purpose, all packages of a line together.
 # `shadcn add` rewrites this file and strips comments; put them back when it does.
 catalog:
+  "@fontsource-variable/ibm-plex-sans": 5.3.0
+  "@fontsource/ibm-plex-mono": 5.3.0
   husky: ^9.1.7
   # The reference runtime's one runtime dependency, pinned exactly for the same
   # reason as the lines below: a 0.x moves, and what it moves is the options

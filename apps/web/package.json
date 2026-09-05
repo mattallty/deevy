@@ -17,6 +17,8 @@
     "@deevy/core": "workspace:*",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/utilities": "catalog:",
+    "@fontsource-variable/ibm-plex-sans": "catalog:",
+    "@fontsource/ibm-plex-mono": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/tanstack-query": "catalog:",

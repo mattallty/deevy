@@ -88,6 +88,33 @@ Settings (own area with its own sidebar: Workspace / Work / Agents and delivery 
 `a`/`s`/`l`/`p` pickers on a focused Issue; `⇧A`/`⇧R` open the ruling card (never commit); `⌘Enter` is the
 only submit key. `src/lib/shortcuts.ts` owns a scope stack: an open Sheet, Dialog or palette owns the keys.
 
+## What slice 1 settled (tokens, frame, palette, shortcuts)
+
+- **One size lever.** `html { font-size: 106.25% }` in `index.css`: the whole rem scale — text, buttons,
+  inputs, rows, icons — moves together. Plex reads smaller than Inter at the same pixel size and the plan's
+  14px base was too small on the owner's screen; `text-sm` is ≈15px, `text-base` 17px. Tune it there only.
+- **Theme is a class.** `next-themes` (`attribute="class"`, system default) sets `.dark` on `<html>`; tokens
+  live on `:root` and `.dark`, never in a media query. The Member menu in the sidebar footer holds the toggle.
+- **Shortcuts** go through `src/lib/shortcuts.ts` — `useShortcut("g i", …)`, `useShortcut("mod+k", …,
+{ global: true })`, `useShortcutScope(name, active)` on anything modal — never a raw `keydown` listener.
+  Plain letters are ignored while typing; `mod+…` is not. `Shortcut keys="…"` (`kbd-hint.tsx`) draws one.
+- **Navigation.** The primary sidebar is `routes/shell.tsx`; the Settings area's nav is `settingsNav` in
+  `routes/settings/layout.tsx`, shared with the palette so a page has one name everywhere. Settings routes are
+  children of the `/settings` layout route, each declared with a literal path: a helper that takes `path:
+string` erases the literal and every typed `to` in the app stops compiling.
+- **Palette.** `components/command-palette.tsx` on `ui/command`. This shadcn version's `CommandDialog` puts
+  its children straight into the Dialog, so the cmdk `<Command>` root is ours to add inside it. cmdk itself
+  depends on `@radix-ui/react-dialog` and friends — the one sanctioned transitive Radix dependency, because
+  it is what shadcn ships for Base UI projects too; nothing under `apps/web/src` imports Radix directly.
+- **Layout facts.** shadcn's `SidebarInset` _is_ the `<main>` landmark — a page never renders another. Under
+  768px the sidebar is a Sheet behind the trigger; review screens at ≥1280px. The New Issue dialog is owned
+  by `NewIssueProvider` in the shell, so the button, the palette and `c` open the same one (`useNewIssue()`).
+- **Live updates.** `lib/live.ts` maps an Event's `subjectType` to the query keys it may have changed
+  (`keysFor`) and coalesces invalidations per 16ms; mutations invalidate by key, never `invalidateQueries()`
+  bare. `QueryClient` has `staleTime: 5_000`.
+- **jsdom stubs** live in `tests/setup.ts`: `matchMedia`, `ResizeObserver`, `scrollTo`, and
+  `Element.prototype.scrollIntoView` (cmdk needs it).
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

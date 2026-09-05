@@ -39,7 +39,13 @@ interface GateControlsProps {
 export function GateControls({ issueKey, projectKey, state, decisions }: GateControlsProps) {
   const queryClient = useQueryClient();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
-  const refresh = () => queryClient.invalidateQueries();
+  // A ruling changes the Issue, what the inbox owes, and the Run that asked.
+  const refresh = () =>
+    Promise.all(
+      [orpc.issues.key(), orpc.inbox.key(), orpc.runs.key()].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
 
   const approve = useMutation(orpc.gates.approve.mutationOptions({ onSuccess: refresh }));
   const reject = useMutation(orpc.gates.reject.mutationOptions({ onSuccess: refresh }));

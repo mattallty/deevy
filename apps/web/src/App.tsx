@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth.ts";
 import { orpc } from "@/lib/orpc.ts";
 import { createAppRouter } from "@/router.tsx";
+import type { ShellProps } from "@/routes/shell.tsx";
 
 export default function App() {
   const { data: session, isPending } = authClient.useSession();
@@ -112,9 +113,20 @@ export function DevSignIn({
 
 function SignedIn() {
   const me = useQuery(orpc.me.get.queryOptions());
-  const context = {
+  const context: ShellProps = {
     workspaceName: me.data?.workspace?.name ?? "deevy",
     memberName: me.data?.user.name ?? "",
+    ...(me.data?.member
+      ? {
+          member: {
+            id: me.data.member.id,
+            kind: me.data.member.kind,
+            handle: me.data.member.handle,
+            role: me.data.member.role,
+            image: me.data.user.image,
+          },
+        }
+      : {}),
   };
   // The router is built once; its context is refreshed as `me` resolves.
   const router = useMemo(() => createAppRouter(context), []);

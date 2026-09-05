@@ -57,7 +57,8 @@ export function AgentsPage() {
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
   const [creating, setCreating] = useState(false);
   const refresh = async () => {
-    await queryClient.invalidateQueries();
+    await queryClient.invalidateQueries({ queryKey: orpc.agents.key() });
+    await queryClient.invalidateQueries({ queryKey: orpc.members.key() });
   };
   const update = useMutation(orpc.agents.update.mutationOptions({ onSuccess: refresh }));
   const suspend = useMutation(orpc.agents.suspend.mutationOptions({ onSuccess: refresh }));

@@ -141,7 +141,8 @@ describe("the Project page", () => {
     await mountAt("/projects/DEV");
 
     expect(await screen.findByRole("heading", { name: "deevy" })).toBeTruthy();
-    expect(screen.getByText("DEV")).toBeTruthy();
+    // The sidebar lists the Projects too, so the page is asked, not the document.
+    expect(within(screen.getByRole("main")).getByText("DEV")).toBeTruthy();
     const workflow = screen.getByRole("list", { name: "Workflow" });
     expect(
       within(workflow)
