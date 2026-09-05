@@ -201,7 +201,7 @@ straight into `SelectContent`, so they sat flush against the popup edge. Every `
 items in `SelectGroup` (a ground rule in `deevy-ui`). Also seen in the diff and left alone: upstream's
 newest style carries `cn-menu-target cn-menu-translucent` on the popup, which ours predates.
 
-### Mockups — up, pick pending (checkpoint 2)
+### Mockups — picked (checkpoint 2, 2026-09-06): Inbox 2, Activity 2, Kanban 1, Workflow 3
 
 `/dev/mockups/{inbox,activity,kanban,workflow}` from `src/dev/fixtures.ts`, variants numbered per screen.
 Groundwork that shipped with them: `components/workflow-state-fields.tsx` (`StateFields`, `DraftState`,

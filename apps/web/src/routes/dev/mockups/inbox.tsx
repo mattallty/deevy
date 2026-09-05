@@ -37,9 +37,22 @@ function Glyph({ row }: { row: FixtureNotification }) {
   return <Icon className={cn("size-4 shrink-0", tone[row.tone])} aria-hidden />;
 }
 
-function Sentence({ row, withKey = true }: { row: FixtureNotification; withKey?: boolean }) {
+function Sentence({
+  row,
+  withKey = true,
+  nowrap = false,
+}: {
+  row: FixtureNotification;
+  withKey?: boolean;
+  nowrap?: boolean;
+}) {
   return (
-    <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+    <span
+      className={cn(
+        "flex min-w-0 items-baseline gap-x-1.5",
+        nowrap ? "shrink-0 whitespace-nowrap" : "flex-wrap",
+      )}
+    >
       {row.actor ? <MemberChip member={row.actor} size="xs" /> : <span>deevy</span>}
       <span className={cn(!row.read && "font-medium")}>{row.verb}</span>
       {withKey ? (
@@ -123,8 +136,8 @@ function OneLine() {
               )}
             />
             <Glyph row={row} />
-            <span className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate">
-              <Sentence row={row} />
+            <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden whitespace-nowrap">
+              <Sentence row={row} nowrap />
               {row.excerpt ? (
                 <span className="truncate text-muted-foreground">— “{row.excerpt}”</span>
               ) : null}
