@@ -499,6 +499,121 @@ Slack messages link back to the Issue, so they are only sent when the instance k
 `BETTER_AUTH_URL` the rows are written and wait** rather than going out with a dead link; the first tick after
 the instance is given an origin sends them.
 
+## The reference agent runtime
+
+deevy never runs an agent (ADR-0003). `apps/claude-agent` is the thing on the other side: a service that
+holds one Agent's API key, asks deevy what that Agent has been assigned, and runs Claude against it through
+the Claude Agent SDK. It is not part of deevy and does not have to be run at all — an instance with no
+runtime is a Workspace where the Humans do the work.
+
+It reaches deevy over HTTP and MCP like any third party, so it does not care which deployment it is talking
+to. Point it at a Docker instance or at a `workers.dev` origin and the only thing that changes is `DEEVY_URL`.
+
+### Setting one up
+
+1. **Create the Agent.** Settings, Agents. The Human who creates it is its Sponsor and is accountable for it.
+2. **Grant it the Projects it should work in.** An Agent starts with none, and one it was not granted does
+   not exist to it.
+3. **Issue an API key.** The plaintext is shown once. It becomes `DEEVY_AGENT_KEY`.
+4. **Give it somewhere to work**, if it should write code: `DEEVY_AGENT_REPO` and a `DEEVY_AGENT_GIT_TOKEN`
+   scoped to that one repository, with permission to push a branch and open a pull request and nothing else.
+   Leave both unset and the runtime works Documents, Gates and Runs only.
+5. **Run it.** `docker compose --profile agent up -d`, or the image directly:
+
+```bash
+docker build -f apps/claude-agent/Dockerfile -t deevy-agent .
+```
+
+6. **Optionally, tell it rather than let it ask.** Set the Agent's webhook URL to the runtime's listener and
+   choose a secret; give the runtime the same secret as `DEEVY_AGENT_WEBHOOK_SECRET`. A delivery then starts a
+   Run when it is assigned instead of at the next poll. Polling stays on either way, so a missed delivery
+   costs latency and never a Run.
+
+### What it does with a Run
+
+`runs.list` with no arguments is its queue: for an Agent that means its own Runs, `pending` being work to do.
+Its inbox is the other way in, and the two together are the polling fallback ADR-0003 promises an Agent with
+no webhook URL. It takes up one Run at a time, gives the session a working directory, and lets the model read
+the Issue and its Documents, write the Document the State asks for, narrate through `runs_post_activity`, and
+stop at a Gate.
+
+A Run stopped at a Gate is not the runtime's any more. deevy moves it back to `active` the moment a Human
+rules and tells the Agent so, and that Notification is what hands it back — so the runtime never polls a Gate
+and never asks the same question twice. A rejected Gate comes back with the note, and the next session is
+told to read it and revise rather than to ask again.
+
+Whatever the session does, the Run does not rot. A session that crashes, hangs or simply stops gets an error
+Activity and a failed Run, because a Run left `active` and silent tells a Human nothing until the sweep calls
+it `stale` half an hour later.
+
+### What it produces
+
+A Run that changed files gets a branch named after the attempt, a commit, a push, and a pull request. The
+pull request's URL becomes a Link on the Issue carrying the Run's id, which is what makes "this pull request
+came from that attempt" a fact rather than a coincidence, and a comment on the Issue names both. Nothing is
+ever pushed to the base branch. A Run that changed nothing attaches nothing.
+
+### Its configuration
+
+| Variable                          | Default              | Without it                                                                                                         |
+| --------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DEEVY_URL`                       | —                    | It will not start, and says so. The deevy origin, with no trailing slash.                                          |
+| `DEEVY_AGENT_KEY`                 | —                    | It will not start. The Agent's API key, and the whole of the runtime's identity.                                   |
+| `ANTHROPIC_API_KEY`               | —                    | Every session fails at once. Read by the Agent SDK, not by the runtime.                                            |
+| `DEEVY_AGENT_POLL_SECONDS`        | 30                   | Nothing: it asks every thirty seconds, backing off to eight times that while there is nothing to do.               |
+| `DEEVY_AGENT_RUN_TIMEOUT_SECONDS` | 1800                 | Nothing. It matches deevy's own stale window: a session allowed to outlive it would be called stale while working. |
+| `DEEVY_AGENT_MODEL`               | `claude-opus-5`      | Nothing.                                                                                                           |
+| `DEEVY_AGENT_EFFORT`              | `high`               | Nothing. `low`, `medium`, `high`, `xhigh` or `max`; anything else is read as `high`.                               |
+| `DEEVY_AGENT_MAX_TURNS`           | 100                  | Nothing: a backstop on a session that will not stop. The timeout is the real bound.                                |
+| `DEEVY_AGENT_REPO`                | — no repository      | The session gets deevy's tools and an empty directory: no files, no shell, no web. Setting it grants all three.    |
+| `DEEVY_AGENT_GIT_TOKEN`           | —                    | A public repository can be cloned and nothing can be pushed, so no Run delivers anything.                          |
+| `DEEVY_AGENT_BASE_BRANCH`         | `main`               | Nothing: the branch every Run starts from.                                                                         |
+| `DEEVY_AGENT_WORKDIR`             | the system temporary | Nothing: where per-Run working directories are made.                                                               |
+| `DEEVY_AGENT_WEBHOOK_SECRET`      | — no deliveries      | It polls, and refuses every delivery. Set it to the secret the Agent's webhook URL was given.                      |
+| `DEEVY_AGENT_PORT`                | 8787                 | Nothing: `/healthz` always, and deevy's deliveries when a secret is set.                                           |
+
+### What is bounded, and what is not
+
+**Issue text is untrusted input.** Descriptions, Documents, comments and other Agents' Activities are written
+by anyone with access to the Project, and all of it reaches a session that — with a repository configured —
+holds a shell. No prompt makes that safe. What bounds it is structural, and it is worth knowing exactly what
+each part does:
+
+- **The container is the sandbox.** It runs as a non-root user and holds a clone and nothing else. A runtime
+  run directly on a laptop has no boundary at all, which is fine for trying it out and is not a way to run it
+  against a Workspace other people write in.
+- **The tool list is the surface.** Tools are granted by name, never by wildcard, so deevy gaining a
+  twenty-first tool does not widen what the runtime may do. `settingSources` is empty and `strictMcpConfig`
+  is on, so a `.mcp.json` or a `.claude/settings.json` in the cloned repository configures nothing.
+- **The session never holds the runtime's secrets.** `DEEVY_AGENT_KEY` and `DEEVY_AGENT_GIT_TOKEN` are
+  removed from the environment the session's process gets. Without that, a shell plus the Agent's key would be
+  every operation the Agent may call, over `curl`, including the ones deliberately left out of the tool list.
+- **The credential is narrow, and the supervisor holds it.** Scope the git token to one repository, with
+  permission to push a branch and open a pull request. The runtime clones and pushes; the session is refused
+  `git push`, `git remote`, `git config` and `gh`, and the token is passed as a header git does not persist,
+  so it is not in the working directory the session can read.
+- **A Gate is the last line.** An Agent can never approve one (ADR-0004), so nothing an agent proposes ships
+  without a Human deciding it did.
+
+What is _not_ bounded: a session with a shell can run whatever the repository's own build runs, reach the
+network, and spend tokens. Give the runtime a repository you would give a new contractor, and read the pull
+requests.
+
+### What it costs
+
+Nothing here is measured, and these are the knobs that move the bill rather than numbers to plan against.
+
+| Knob                              | Which way                                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `DEEVY_AGENT_MODEL`               | The largest single lever.                                                                              |
+| `DEEVY_AGENT_EFFORT`              | Thinking depth per session. `xhigh` suits code work; `low` suits a runtime that only writes Documents. |
+| `DEEVY_AGENT_RUN_TIMEOUT_SECONDS` | The ceiling on one Run. A session stopped at the timeout has still spent what it spent.                |
+| `DEEVY_AGENT_REPO`                | A repository means file and shell tools, which means longer sessions.                                  |
+| `DEEVY_AGENT_POLL_SECONDS`        | Costs deevy requests, not tokens. A poll that finds nothing spends nothing.                            |
+
+Runs are triggered by assignment, mention, a workflow rule, or an Agent's schedule. A schedule on an Agent is
+the one that can spend money while nobody is watching.
+
 ## The volume
 
 Everything is in one SQLite file under `/data`. Migrations are applied at startup, so a new image on an old

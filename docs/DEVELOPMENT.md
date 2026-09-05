@@ -168,6 +168,40 @@ serves the SPA when `DEEVY_WEB_DIST` names a built one, which is how the Docker 
 Unset `BETTER_AUTH_URL` and the OAuth server is simply not there — a resource identifier is an absolute URL
 and there is nothing to build one from. Everything else, an Agent's API key included, works unchanged.
 
+## The reference agent runtime
+
+`apps/claude-agent` is the service on the other side of the MCP endpoint (docs/plans/m4.md). It is in the
+workspace so `vp check` and `vp run -r test` cover it, and it may not import `packages/core` or take a
+`workspace:*` runtime dependency — it talks to deevy the way a stranger does, which is what makes its tests a
+test of the surfaces rather than a second view of the same objects. A test asserts that.
+
+Against the dev server:
+
+```bash
+vp run claude-agent#build
+```
+
+```bash
+DEEVY_URL=http://localhost:3000 DEEVY_AGENT_KEY=<the key> node apps/claude-agent/dist/main.mjs --once
+```
+
+Create the Agent, grant it a Project and issue its key under Settings, Agents first. `--once` makes one pass
+and exits; without it the loop stays up.
+
+**Working on it without an Anthropic key.** Every test in the package runs against a real deevy — built
+in-process, reached through the app's own fetch handler — with a _scripted session_: an async generator that
+yields the four events the runtime reads and calls back into deevy exactly as the model would. That is the
+seam the whole package hangs off, and it means the loop, the envelope, the Gate round trip and the delivery
+are all testable for free. `tests/helpers.ts` has the harness.
+
+One test does call the model, and it is skipped unless you ask for it:
+
+```bash
+DEEVY_AGENT_LIVE=1 vp run claude-agent#test tests/live.test.ts
+```
+
+CI never sets it. A milestone whose suite needs a paid key is a milestone nobody runs twice.
+
 ## Docker
 
 ```bash
