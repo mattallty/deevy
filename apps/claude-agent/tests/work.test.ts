@@ -181,6 +181,30 @@ describe("the envelope", () => {
     });
   });
 
+  it("quotes what the session said went wrong, when it left the Run open", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    const session = scripted([
+      async () => {
+        const [run] = await it.deevy.runs("pending");
+        await it.deevy.postActivity(run.id, "thought", "Reading the intent");
+      },
+      // What `toSessionEvents` makes of an SDK result that is not a success.
+      { type: "done", ok: false, detail: "The session ended: error_during_execution" },
+    ]);
+
+    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+
+    expect(pass.worked[0]).toMatchObject({
+      status: "failed",
+      failedBy: "The session ended: error_during_execution",
+    });
+    const feed = await it.asAda.runs.get({ runId: pass.worked[0].runId });
+    expect(feed.activities.at(-1)).toMatchObject({
+      kind: "error",
+      body: "The session ended: error_during_execution",
+    });
+  });
+
   it("leaves a Run the session finished alone, whatever the session then reported", async () => {
     const it = await deevyWithAnAssignedIssue();
     const session = scripted([

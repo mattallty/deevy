@@ -17,6 +17,19 @@ export interface Config {
   pollSeconds: number;
   /** How long one Run may take before the session working it is aborted. */
   runTimeoutSeconds: number;
+  /** The model the session runs on. */
+  model: string;
+  /** How hard it thinks. Raise it for work that is more than a Document. */
+  effort: "low" | "medium" | "high" | "xhigh" | "max";
+  /** A backstop on a session that will not stop. The timeout is the real bound. */
+  maxTurns: number;
+}
+
+const efforts = ["low", "medium", "high", "xhigh", "max"] as const;
+
+function effort(value: string | undefined): Config["effort"] {
+  const found = efforts.find((level) => level === value);
+  return found ?? "high";
 }
 
 /** A positive number from the environment, or the default when it is absent or nonsense. */
@@ -40,5 +53,8 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     // allowed to outlive it would be reported stale by the sweep while it was
     // still working, and the Human watching would be told the wrong thing.
     runTimeoutSeconds: positive(env.DEEVY_AGENT_RUN_TIMEOUT_SECONDS, 30 * 60),
+    model: env.DEEVY_AGENT_MODEL ?? "claude-opus-5",
+    effort: effort(env.DEEVY_AGENT_EFFORT),
+    maxTurns: positive(env.DEEVY_AGENT_MAX_TURNS, 100),
   };
 }

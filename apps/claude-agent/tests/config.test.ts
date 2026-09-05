@@ -14,6 +14,9 @@ describe("configuration", () => {
       url: "https://deevy.example.com",
       key: "deevy_sk_x",
       pollSeconds: 30,
+      model: "claude-opus-5",
+      effort: "high",
+      maxTurns: 100,
       // deevy calls a Run stale after thirty minutes of silence, so a session
       // allowed to outlive that would be reported stale while still working.
       runTimeoutSeconds: 1800,

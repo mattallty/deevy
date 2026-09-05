@@ -16,3 +16,11 @@ export {
   type WorkOptions,
   type WorkResult,
 } from "./work.ts";
+export {
+  buildSession,
+  deevyTools,
+  linkAbort,
+  readInstructions,
+  sessionOptions,
+  toSessionEvents,
+} from "./sdk.ts";

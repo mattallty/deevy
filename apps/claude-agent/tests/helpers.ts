@@ -1,3 +1,4 @@
+import { serve } from "@hono/node-server";
 import { createApp } from "@deevy/core/app";
 import { createAuth, type Session as AuthSession } from "@deevy/core/auth";
 import { router } from "@deevy/core/router";
@@ -13,6 +14,17 @@ const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url
 // Better Auth refuses a plain-http MCP resource that is not loopback, and this
 // origin is what tokens and Gate URLs are built from either way.
 const baseURL = "http://localhost:3000";
+
+/** The knobs a test never varies, so a test that does vary one says why. */
+export const testConfig: Config = {
+  url: baseURL,
+  key: "unset",
+  pollSeconds: 1,
+  runTimeoutSeconds: 60,
+  model: "claude-opus-5",
+  effort: "high",
+  maxTurns: 10,
+};
 
 /**
  * A real deevy, and an Agent with a real key pointed at it.
@@ -46,12 +58,7 @@ export async function instance() {
     body: { userId: planner.member.userId, name: "runtime" },
   });
 
-  const config: Config = {
-    url: baseURL,
-    key: issued.key,
-    pollSeconds: 1,
-    runTimeoutSeconds: 60,
-  };
+  const config: Config = { ...testConfig, url: baseURL, key: issued.key };
   return {
     db,
     close,
@@ -73,6 +80,20 @@ export async function instance() {
       });
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
       return (await res.json()) as unknown;
+    },
+    /**
+     * The same deevy on a real port. Only the live test needs one: a session
+     * that spawns Claude is a subprocess, and a subprocess cannot reach a
+     * handler that lives in this process's memory.
+     */
+    listen: async () => {
+      const server = serve({ fetch: app.fetch, port: 0 });
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      return {
+        url: `http://localhost:${port}`,
+        close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+      };
     },
     asAda,
     ada: ada.member,

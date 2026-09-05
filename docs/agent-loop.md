@@ -5,9 +5,10 @@ back; the running happens outside. This is one worked example of the outside par
 picks up an Issue assigned to it, writes the plan Document, stops at the Plan Gate, and carries on once a
 Human approves in deevy.
 
-It is an example, not a product. The reference runtime — Claude Code headless in a GitHub Action and as a
-local loop, with a webhook receiver — is M4. Everything here is configuration and prose you can copy, and
-every tool named is in `packages/core/mcp-tools.json`.
+It is an example, not a product, and it is the CLI configuration a person can copy. The runtime that ships is
+`apps/claude-agent`, a service built on the Claude Agent SDK (docs/plans/m4.md); it configures the same MCP
+server in code so the key never lands in a file, and it carries the same instructions. Every tool named here
+is in `packages/core/mcp-tools.json`.
 
 ## What the Human sets up first
 
@@ -63,7 +64,9 @@ is display. The refusal is the same one the HTTP API gives, in the same middlewa
 
 ## The `CLAUDE.md` snippet
 
-This is what tells the loop how to work an Issue. Put it in the loop's repository, not in deevy.
+This is what tells the loop how to work an Issue. Put it in the loop's repository, not in deevy. The original
+is `apps/claude-agent/src/instructions.md`, which the shipped runtime appends to its system prompt; the copy
+below is here to be read.
 
 ```markdown
 ## Working an Issue in deevy

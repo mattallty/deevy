@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { DeevyError, createDeevy } from "../src/deevy.ts";
-import { instance } from "./helpers.ts";
+import { instance, testConfig } from "./helpers.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -37,7 +37,7 @@ describe("the client", () => {
   it("does not ask deevy to mark nothing read", async () => {
     let calls = 0;
     const deevy = createDeevy({
-      config: { url: "http://localhost:3000", key: "k", pollSeconds: 1, runTimeoutSeconds: 1 },
+      config: { ...testConfig, key: "k" },
       fetch: async () => {
         calls += 1;
         return new Response("{}");
@@ -50,7 +50,7 @@ describe("the client", () => {
 
   it("keeps a body that is not JSON rather than pretending it was", async () => {
     const deevy = createDeevy({
-      config: { url: "http://localhost:3000", key: "k", pollSeconds: 1, runTimeoutSeconds: 1 },
+      config: { ...testConfig, key: "k" },
       fetch: async () => new Response("<html>502 from a proxy</html>", { status: 502 }),
     });
 
