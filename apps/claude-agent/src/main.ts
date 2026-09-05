@@ -66,7 +66,7 @@ const loop = startLoop({
   ...work,
   pollSeconds: config.pollSeconds,
   onPass: (pass) => {
-    for (const result of pass.worked) {
+    for (const result of [...pass.resumed, ...pass.worked]) {
       console.log(
         `${result.issueKey} ${result.status}${result.failedBy ? `: ${result.failedBy}` : ""}`,
       );

@@ -5,6 +5,7 @@ export {
   type ActivityKind,
   type Deevy,
   type Notification,
+  type Ruling,
   type Run,
 } from "./deevy.ts";
 export { deevyIsReachable, type Session, type SessionEvent, type SessionInput } from "./session.ts";

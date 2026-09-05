@@ -32,6 +32,21 @@ export interface Notification {
     | "run_finished"
     | "run_answered";
   issue: { key: string } | null;
+  /** The Event it derives from. A `run.answered` names the Run in `subjectId`. */
+  event: { kind: string; subjectType: string; subjectId: string };
+}
+
+/**
+ * What a Human decided about the Gate a Run stopped at.
+ *
+ * `awaiting` means nobody has: the question is asked and the answer is a
+ * Human's to give, however long that takes (docs/agent-loop.md).
+ */
+export interface Ruling {
+  status: "awaiting" | "approved" | "rejected";
+  stateName: string;
+  note: string | null;
+  decidedByMemberId: string | null;
 }
 
 /** A refusal deevy explained, carrying the code the supervisor branches on. */
@@ -55,6 +70,8 @@ export interface Deevy {
   startRun(issueKey: string): Promise<Run>;
   postActivity(runId: string, kind: ActivityKind, body: string): Promise<void>;
   finishRun(runId: string, status: "completed" | "failed", summary: string): Promise<void>;
+  /** Asks about the Gate this Run stopped at, and reports what was decided. */
+  requestApproval(runId: string): Promise<Ruling>;
   /** Says something to the Humans watching the Issue, in prose. */
   comment(issueKey: string, body: string): Promise<void>;
   /** Attaches evidence to the Issue, attributed to the Run that produced it. */
@@ -135,6 +152,9 @@ export function createDeevy({ config, fetch = globalThis.fetch }: DeevyOptions):
     },
     async finishRun(runId, status, summary) {
       await post(`/runs/${encodeURIComponent(runId)}/finish`, { status, summary });
+    },
+    async requestApproval(runId) {
+      return (await post(`/runs/${encodeURIComponent(runId)}/request-approval`)) as Ruling;
     },
     async comment(issueKey, body) {
       await post(`/issues/${encodeURIComponent(issueKey)}/comments`, { body });

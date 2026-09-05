@@ -1,4 +1,4 @@
-import { DeevyError, type Deevy, type Run } from "./deevy.ts";
+import { DeevyError, type Deevy, type Ruling, type Run } from "./deevy.ts";
 import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
 import { deevyIsReachable, type Session } from "./session.ts";
@@ -18,6 +18,8 @@ export interface WorkResult {
 export interface Pass {
   /** Runs this pass drove to a conclusion, in the order it took them. */
   worked: WorkResult[];
+  /** Runs a Human's ruling put back in this pass's hands. */
+  resumed: WorkResult[];
   /** Runs waiting on a Human. Slice 7 acts on these; this pass only counts them. */
   waiting: Run[];
   /** Issues taken up from the inbox this pass. */
@@ -50,11 +52,31 @@ export interface WorkOptions {
  * carries (docs/agent-loop.md), which are the same on every Run; what changes
  * is which Run this is, and the model reads the rest for itself over MCP.
  */
-export function promptFor(run: Run): string {
+export function promptFor(run: Run, ruling?: Ruling): string {
+  if (!ruling) {
+    return [
+      `Work Run ${run.id} on Issue ${run.issueKey}.`,
+      `It was opened by a ${run.trigger} trigger.`,
+      "Read the Issue and the Document its State asks for before you write anything.",
+    ].join(" ");
+  }
+  // A resumed Run gets a fresh session, so the prompt says what happened while
+  // it was stopped and nothing else: the Issue, its Documents and the Run's own
+  // feed are all in deevy, and reading them back is the model's first job
+  // (docs/plans/m4.md).
+  const note = ruling.note ? ` They said: "${ruling.note}"` : "";
+  if (ruling.status === "rejected") {
+    return [
+      `Carry on with Run ${run.id} on Issue ${run.issueKey}.`,
+      `A Human rejected the ${ruling.stateName} Gate.${note}`,
+      "Read the note, read the Document it is about, and revise it.",
+      "Ask for the Gate again only once you have written a new version.",
+    ].join(" ");
+  }
   return [
-    `Work Run ${run.id} on Issue ${run.issueKey}.`,
-    `It was opened by a ${run.trigger} trigger.`,
-    "Read the Issue and the Document its State asks for before you write anything.",
+    `Carry on with Run ${run.id} on Issue ${run.issueKey}.`,
+    `A Human approved the ${ruling.stateName} Gate.${note}`,
+    "Read the Issue for the State it is in now, and do what that State asks for.",
   ].join(" ");
 }
 
@@ -69,7 +91,13 @@ export function promptFor(run: Run): string {
  */
 export async function runOnce(options: WorkOptions): Promise<Pass> {
   const { deevy } = options;
-  const takenUp = await takeUpAssignments(deevy);
+  const { takenUp, answered } = await takeUpInbox(deevy);
+
+  const resumed: WorkResult[] = [];
+  for (const runId of answered) {
+    if (options.signal?.aborted) break;
+    resumed.push(await resumeRun(options, runId));
+  }
 
   const worked: WorkResult[] = [];
   for (const run of await deevy.runs("pending")) {
@@ -77,7 +105,32 @@ export async function runOnce(options: WorkOptions): Promise<Pass> {
     worked.push(await workRun(options, run));
   }
 
-  return { worked, waiting: await deevy.runs("awaiting_input"), takenUp };
+  return { worked, resumed, waiting: await deevy.runs("awaiting_input"), takenUp };
+}
+
+/**
+ * Pick a Run back up because a Human ruled on the Gate it stopped at.
+ *
+ * deevy moved the Run from `awaiting_input` to `active` when the ruling landed
+ * and told the Agent so, which is what `run_answered` exists for. So the
+ * runtime never polls a Gate: it is told once, per ruling, and asking
+ * `requestApproval` here is how it learns which way and with what note — the
+ * same call the worked example gives the model, answering rather than asking
+ * because the question is already settled.
+ */
+export async function resumeRun(options: WorkOptions, runId: string): Promise<WorkResult> {
+  const { deevy } = options;
+  const run = await deevy.run(runId);
+  if (run.status !== "active") {
+    return { runId: run.id, issueKey: run.issueKey, status: run.status };
+  }
+  const ruling = await deevy.requestApproval(run.id);
+  if (ruling.status === "awaiting") {
+    // Nobody has decided after all. Leave it: a Run waiting on a Human does not
+    // time out, and deevy asks the approvers again on its own.
+    return { runId: run.id, issueKey: run.issueKey, status: run.status };
+  }
+  return workRun(options, run, ruling);
 }
 
 /**
@@ -89,22 +142,28 @@ export async function runOnce(options: WorkOptions): Promise<Pass> {
  * failure — it is deevy saying the Issue already has an open Run, which is the
  * answer that makes two hosts sharing one key safe.
  */
-async function takeUpAssignments(deevy: Deevy): Promise<string[]> {
-  const taken: string[] = [];
+async function takeUpInbox(deevy: Deevy): Promise<{ takenUp: string[]; answered: string[] }> {
+  const takenUp: string[] = [];
+  const answered: string[] = [];
   const clear: string[] = [];
   for (const notification of await deevy.unread()) {
+    if (notification.kind === "run_answered" && notification.event.subjectType === "run") {
+      answered.push(notification.event.subjectId);
+      clear.push(notification.id);
+      continue;
+    }
     if (notification.kind !== "assignment" || !notification.issue) continue;
     const issueKey = notification.issue.key;
     try {
       await deevy.startRun(issueKey);
-      taken.push(issueKey);
+      takenUp.push(issueKey);
     } catch (error) {
       if (!(error instanceof DeevyError) || error.code !== "CONFLICT") throw error;
     }
     clear.push(notification.id);
   }
   await deevy.markRead(clear);
-  return taken;
+  return { takenUp, answered };
 }
 
 /**
@@ -117,14 +176,20 @@ async function takeUpAssignments(deevy: Deevy): Promise<string[]> {
  * itself, because a Run left `active` and silent tells a Human nothing until
  * the sweep calls it `stale` half an hour later.
  */
-export async function workRun(options: WorkOptions, run: Run): Promise<WorkResult> {
+export async function workRun(
+  options: WorkOptions,
+  run: Run,
+  ruling?: Ruling,
+): Promise<WorkResult> {
   const { deevy, session, runTimeoutMs } = options;
 
   // Only a `pending` Run is taken up. deevy moves a Run to `active` on its first
   // Activity, so an `active` one is being driven by whoever posted it. The
   // window between listing and posting is not closed by this, and one service
   // per key is the supported shape; what this does close is the common case.
-  if (run.status !== "pending") {
+  // A resumed Run is the exception, and it is `active` because deevy put it
+  // there when the ruling landed.
+  if (run.status !== (ruling ? "active" : "pending")) {
     return { runId: run.id, issueKey: run.issueKey, status: run.status };
   }
 
@@ -154,7 +219,8 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
   let delivered: Delivery | null = null;
 
   try {
-    for await (const event of session({ prompt: promptFor(run), cwd: workspace.cwd, signal })) {
+    const prompt = promptFor(run, ruling);
+    for await (const event of session({ prompt, cwd: workspace.cwd, signal })) {
       if (event.type === "ready" && !deevyIsReachable(event)) {
         // A session that cannot reach deevy has no way to read the Issue or
         // record what it did, and will fill the gap by guessing. Stop here,
