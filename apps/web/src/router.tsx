@@ -93,8 +93,21 @@ const inboxRoute = createRoute({
 const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$key/board",
+  validateSearch: (search: Record<string, unknown>) => parseIssuesSearch(search),
   component: function Board() {
-    return <BoardPage projectKey={boardRoute.useParams().key} />;
+    const search = boardRoute.useSearch();
+    const navigate = boardRoute.useNavigate();
+    return (
+      <BoardPage
+        projectKey={boardRoute.useParams().key}
+        search={search}
+        onSearch={(patch) =>
+          void navigate({
+            search: (previous) => parseIssuesSearch({ ...previous, ...patch }),
+          })
+        }
+      />
+    );
   },
 });
 const workflowRoute = createRoute({

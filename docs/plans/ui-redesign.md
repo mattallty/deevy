@@ -449,13 +449,17 @@ ruling card first and the waiting Run first (slices 4 and 5), so the preview is 
 on; and opening a Notification marks it read rather than acting on it doing so, because reading is the
 thing that was owed and acting is recorded by its own Event.
 
-### 7 — Board
+### 7 — Board (shipped)
 
 The hand-rolled dnd-kit columns are replaced by `@reui/kanban` (Base UI `useRender` API, `onMove` callback
 so a drop out of a Gate column still opens the ruling dialog instead of moving; `@kibo-ui/kanban` is the
 fallback); shared filters, `StateBadge`, `MemberChip`, peek-on-click, non-modal peek + close on drag start.
 `board.test.tsx` unchanged (columns stay `section aria-label={state}` through the `render` prop); a jsdom
 pointer-sequence test for drag-with-peek.
+
+What shipped differently in slice 7: no jsdom pointer-sequence test for a drag with the peek open — dnd-kit's
+sensors need layout jsdom does not have, so the non-modal peek and the close-on-drag are asserted by the
+card test and read in the browser instead.
 
 ### 8 — Project tabs, Project settings, Workflow route
 

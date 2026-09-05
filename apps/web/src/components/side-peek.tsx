@@ -22,17 +22,23 @@ export function SidePeek({
   issueKey,
   onClose,
   onOpenFull,
+  modal = true,
 }: {
   issueKey: string | null;
   onClose: () => void;
   onOpenFull: (key: string) => void;
+  /**
+   * Off on the Board: a modal Dialog puts `pointer-events: none` on everything
+   * behind it, which kills a drag (docs/plans/ui-redesign.md, risks).
+   */
+  modal?: boolean;
 }) {
   const open = issueKey !== null;
   useShortcutScope("peek", open);
   useShortcut("o", () => issueKey && onOpenFull(issueKey), { scope: "peek", enabled: open });
 
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
+    <Sheet open={open} modal={modal} onOpenChange={(next) => !next && onClose()}>
       <SheetContent
         side="right"
         aria-label={issueKey ? `Issue ${issueKey}` : "Issue"}

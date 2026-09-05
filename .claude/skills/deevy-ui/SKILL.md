@@ -214,6 +214,20 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **`Shortcut` hints are `aria-hidden`** (`data-slot="shortcut"`, `data-keys`), so a hint inside a button
   never joins its accessible name. Tests reach one by `data-slot`, never by label.
 
+## What slice 7 settled (the Board)
+
+- **`components/reui/kanban.tsx`** is `@reui/kanban` (Base UI build, MIT, header says so), edited once:
+  `process.env.NODE_ENV` became `import.meta.env.DEV` because the browser tsconfig has no Node types. Registry
+  files live under `components/<registry>/`, not `ui/`, so a re-add cannot clobber shadcn's own.
+- **The Board** (`routes/projects/board.tsx`) gives the kanban `value` (a `Record<stateId, Issue[]>`) and an
+  `onMove` callback, so it never applies a move itself: a card leaving a Gate column opens the ruling dialog
+  ("Decide the <State> Gate on <key>", dialog with Approve/Reject) and anything else is `issues.move`.
+  Columns are `KanbanColumn render={<section data-slot="board-column" aria-label={state.name}/>}` with the
+  `StateBadge` header (visible "Gate"), `disabled` so columns do not reorder. A click on a card opens the
+  peek (`?peek=`); the peek is `modal={false}` here and `onDragStart` closes it.
+- **Filters** are the shared `IssueFilters` with `hideProject` and `nativeAssignee` — the Assignee is a plain
+  `<select>` on the Board because its test drives it with a change event.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /** The filters, as they ride in the URL: a view is a link (docs/plans/ui-redesign.md). */
@@ -73,6 +74,7 @@ export function IssueFilters({
   members,
   sponsorsAgents,
   hideProject = false,
+  nativeAssignee = false,
 }: {
   value: IssuesSearch;
   onChange: (patch: Partial<IssuesSearch>) => void;
@@ -82,6 +84,8 @@ export function IssueFilters({
   /** Whether the signed-in Human sponsors any Agent, which is when "My Agents" is offered. */
   sponsorsAgents: boolean;
   hideProject?: boolean;
+  /** A plain `<select>` for the Assignee: the Board's test drives it with a change event. */
+  nativeAssignee?: boolean;
 }) {
   const humans = members.filter((member) => member.kind === "human");
   const agents = members.filter((member) => member.kind === "agent");
@@ -139,57 +143,78 @@ export function IssueFilters({
         </SelectContent>
       </Select>
 
-      <Select
-        value={value.assignee ?? ANY}
-        onValueChange={(next) =>
-          onChange({ assignee: next === ANY || next === null ? undefined : next })
-        }
-      >
-        <SelectTrigger aria-label="Assignee" className="w-44">
-          <SelectValue>
-            {(selected: string) => {
-              if (selected === ANY) return "Anyone";
-              if (selected === "me") return "Me";
-              if (selected === "agents:me") return "My Agents";
-              if (selected === "none") return "Unassigned";
-              const member = memberById.get(selected);
-              return member ? <MemberChip member={member} size="xs" /> : selected;
-            }}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>Anyone</SelectItem>
-          <SelectItem value="me">Me</SelectItem>
-          {sponsorsAgents ? <SelectItem value="agents:me">My Agents</SelectItem> : null}
-          <SelectItem value="none">Unassigned</SelectItem>
-          {humans.length > 0 ? (
-            <>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>Humans</SelectLabel>
-                {humans.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    <MemberChip member={member} size="xs" />
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </>
-          ) : null}
-          {agents.length > 0 ? (
-            <>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>Agents</SelectLabel>
-                {agents.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    <MemberChip member={member} size="xs" />
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </>
-          ) : null}
-        </SelectContent>
-      </Select>
+      {nativeAssignee ? (
+        <NativeSelect
+          aria-label="Assignee"
+          className="w-44"
+          value={value.assignee ?? ANY}
+          onChange={(changed) =>
+            onChange({ assignee: changed.target.value === ANY ? undefined : changed.target.value })
+          }
+        >
+          <option value={ANY}>Anyone</option>
+          <option value="me">Me</option>
+          {sponsorsAgents ? <option value="agents:me">My Agents</option> : null}
+          <option value="none">Unassigned</option>
+          {members.map((member) => (
+            <option key={member.id} value={member.id}>
+              {member.user.name}
+            </option>
+          ))}
+        </NativeSelect>
+      ) : (
+        <Select
+          value={value.assignee ?? ANY}
+          onValueChange={(next) =>
+            onChange({ assignee: next === ANY || next === null ? undefined : next })
+          }
+        >
+          <SelectTrigger aria-label="Assignee" className="w-44">
+            <SelectValue>
+              {(selected: string) => {
+                if (selected === ANY) return "Anyone";
+                if (selected === "me") return "Me";
+                if (selected === "agents:me") return "My Agents";
+                if (selected === "none") return "Unassigned";
+                const member = memberById.get(selected);
+                return member ? <MemberChip member={member} size="xs" /> : selected;
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>Anyone</SelectItem>
+            <SelectItem value="me">Me</SelectItem>
+            {sponsorsAgents ? <SelectItem value="agents:me">My Agents</SelectItem> : null}
+            <SelectItem value="none">Unassigned</SelectItem>
+            {humans.length > 0 ? (
+              <>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Humans</SelectLabel>
+                  {humans.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <MemberChip member={member} size="xs" />
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            ) : null}
+            {agents.length > 0 ? (
+              <>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Agents</SelectLabel>
+                  {agents.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <MemberChip member={member} size="xs" />
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            ) : null}
+          </SelectContent>
+        </Select>
+      )}
 
       <ToggleGroup
         value={[value.kind ?? ANY]}

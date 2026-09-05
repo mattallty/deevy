@@ -14,6 +14,7 @@ const stub = vi.hoisted(() => {
   ];
   const ada = {
     id: "m-ada",
+    kind: "human",
     role: "admin",
     handle: "ada",
     user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net" },
@@ -30,6 +31,7 @@ const stub = vi.hoisted(() => {
         state: states[0],
         assignee: ada,
         assigneeMemberId: ada.id,
+        labels: [],
         closedAt: null,
         updatedAt: new Date(),
       },
@@ -41,6 +43,7 @@ const stub = vi.hoisted(() => {
         state: states[3],
         assignee: null,
         assigneeMemberId: null,
+        labels: [],
         closedAt: null,
         updatedAt: new Date(),
       },
@@ -163,5 +166,18 @@ describe("moving a card out of a Gate column", () => {
       expect(stub.approved).toContainEqual(expect.objectContaining({ key: "DEV-1" })),
     );
     expect(stub.moved).toEqual([]);
+  });
+});
+
+describe("a card", () => {
+  it("opens beside the board when clicked, with the peek non-modal so a drag still works", async () => {
+    await mountAt("/projects/DEV/board");
+    const columns = await findColumns();
+
+    fireEvent.click(within(columns[3]!).getByText("In Build"));
+    const peek = await screen.findByRole("dialog", { name: /DEV-2/ });
+    expect(peek).toBeTruthy();
+    // Non-modal: the board behind it is still there to drag.
+    expect(document.querySelectorAll('[data-slot="board-column"]')).toHaveLength(6);
   });
 });
