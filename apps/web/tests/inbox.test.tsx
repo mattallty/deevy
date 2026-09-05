@@ -37,7 +37,33 @@ const stub = vi.hoisted(() => ({
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
+  const gateState = { id: "s1", name: "Intent", position: 0, isGate: true, category: "backlog" };
   const client = stubClient({
+    // The Issue a Gate Notification opens: in a Gate, so the ruling card shows.
+    issues: {
+      get: async ({ key }: { key: string }) => ({
+        id: key === "DEV-2" ? "i2" : "i1",
+        key,
+        number: key === "DEV-2" ? 2 : 1,
+        title: key === "DEV-2" ? "Needs a decision" : "Ship it",
+        description: null,
+        state:
+          key === "DEV-2"
+            ? gateState
+            : { ...gateState, id: "s4", name: "Build", isGate: false, category: "active" },
+        assignee: null,
+        assigneeMemberId: null,
+        parent: null,
+        parentId: null,
+        children: [],
+        gateDecisions: [],
+        labels: [],
+        closedAt: null,
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        project: { id: "p1", key: "DEV", name: "deevy" },
+      }),
+    },
     inbox: {
       list: async () => ({ notifications: stub.notifications, nextCursor: 7 }),
       unreadCount: async () => ({ unread: 2 }),
@@ -102,6 +128,28 @@ describe("the inbox", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Mark all read" }));
 
     await waitFor(() => expect(stub.allRead).toBeGreaterThan(0));
+  });
+
+  it("opens the Issue a Notification is about beside the list, marks it read, and puts the Gate in front", async () => {
+    await mountAt("/inbox");
+
+    const second = await screen.findByRole("list", { name: "Notifications for DEV-2" });
+    fireEvent.click(within(second).getByText("a Gate is waiting"));
+
+    // Reading is what was owed, so opening marks it read.
+    await waitFor(() => expect(stub.read).toContainEqual({ ids: ["n3"] }));
+    // The Issue, with the ruling card and the banner a Gate Notification earns.
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
+    expect((await screen.findByRole("status")).textContent).toMatch(/Waiting on your ruling/);
+  });
+
+  it("shows only what is unread when asked", async () => {
+    await mountAt("/inbox?unread=1");
+
+    const first = await screen.findByRole("list", { name: "Notifications for DEV-1" });
+    // n2 is read, so DEV-1 keeps one row.
+    expect(within(first).getAllByRole("listitem")).toHaveLength(1);
   });
 });
 

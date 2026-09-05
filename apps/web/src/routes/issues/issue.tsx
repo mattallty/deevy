@@ -28,7 +28,14 @@ import { orpc } from "@/lib/orpc.ts";
 const UNASSIGNED = "unassigned";
 
 /** One Issue: its title and description, its State, its family, and its timeline. */
-export function IssuePage({ issueKey }: { issueKey: string }) {
+export function IssuePage({
+  issueKey,
+  focusGate = false,
+}: {
+  issueKey: string;
+  /** Put the ruling in front of the reader, as `?gate=` does: the Inbox opens a Gate Notification this way. */
+  focusGate?: boolean;
+}) {
   const queryClient = useQueryClient();
   const issue = useQuery(orpc.issues.get.queryOptions({ input: { key: issueKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
@@ -43,7 +50,9 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
     unknown
   >;
   const askedGate = typeof search.gate === "string" ? search.gate : null;
-  const gateFocused = askedGate !== null && askedGate === issue.data?.state.id;
+  const gateFocused =
+    (askedGate !== null && askedGate === issue.data?.state.id) ||
+    (focusGate && issue.data?.state.isGate === true);
   const gatePanel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (gateFocused) gatePanel.current?.scrollIntoView({ behavior: "smooth", block: "center" });

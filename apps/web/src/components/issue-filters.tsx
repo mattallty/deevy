@@ -30,8 +30,10 @@ export interface IssuesSearch {
 
 /** Reads the URL's search into the filters, dropping anything it does not know. */
 export function parseIssuesSearch(search: Record<string, unknown>): IssuesSearch {
+  // A raw URL's `open=0` parses as the number 0; navigate() hands over "0".
   const text = (key: keyof IssuesSearch) => {
     const value = search[key];
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
     return typeof value === "string" && value.length > 0 ? value : undefined;
   };
   const kind = text("kind");

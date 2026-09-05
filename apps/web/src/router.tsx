@@ -10,7 +10,7 @@ import { IssuesPage } from "./routes/issues/list.tsx";
 import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
 import { TokensPage } from "./routes/dev/tokens.tsx";
-import { InboxPage } from "./routes/inbox.tsx";
+import { InboxPage, parseInboxSearch } from "./routes/inbox.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectPage } from "./routes/projects/project.tsx";
@@ -76,7 +76,19 @@ const projectRoute = createRoute({
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/inbox",
-  component: InboxPage,
+  validateSearch: (search: Record<string, unknown>) => parseInboxSearch(search),
+  component: function InboxRoute() {
+    const search = inboxRoute.useSearch();
+    const navigate = inboxRoute.useNavigate();
+    return (
+      <InboxPage
+        search={search}
+        onSearch={(patch) =>
+          void navigate({ search: (previous) => parseInboxSearch({ ...previous, ...patch }) })
+        }
+      />
+    );
+  },
 });
 const boardRoute = createRoute({
   getParentRoute: () => rootRoute,

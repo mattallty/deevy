@@ -438,11 +438,16 @@ What shipped differently in slice 5: the answer box stays a plain textarea rathe
 the Runs tests ask for one textbox on the waiting Run, and an answer to an Agent is a sentence, not a
 Document; ⌘Enter sends either way.
 
-### 6 — Inbox that you act from
+### 6 — Inbox that you act from (shipped)
 
 Two panes, act bar, `e`/`⇧E`. `inbox.test.tsx` unchanged; new cases: `gate_awaiting` row → Approve/Reject
 in the preview, approving calls `gates.approve` then `inbox.markRead`; `run_awaiting_input` row → "Answer
 this Run".
+
+What shipped differently in slice 6: there is no separate "act bar" — the Issue page already puts the
+ruling card first and the waiting Run first (slices 4 and 5), so the preview is that page with `focusGate`
+on; and opening a Notification marks it read rather than acting on it doing so, because reading is the
+thing that was owed and acting is recorded by its own Event.
 
 ### 7 — Board
 

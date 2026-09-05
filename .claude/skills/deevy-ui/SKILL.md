@@ -200,6 +200,20 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - `MarkdownEditor`'s Source textarea is hidden with the HTML attribute, so it is never a second textbox to a
   role query while a label still finds it.
 
+## What slice 6 settled (the Inbox)
+
+- **Two panes** (`ui/resizable`, `orientation="horizontal"`, sizes in percent) above 1024px: the list on the
+  left, the selected Notification's Issue on the right as the full `IssuePage` with `focusGate` when the
+  kind is `gate_awaiting`, so the ruling card and its banner are in front. Below 1024px the preview is the
+  `SidePeek`. The selection and the Unread filter ride in the URL (`?n=`, `?unread=1`).
+- **Opening marks read** — reading is what was owed — and `e` / `⇧E` / `j` / `k` / `o` work on the list.
+  Rows keep `Notifications for <key>` lists, `Mark read` (unread only, `stopPropagation` so it does not also
+  open) and `Mark all read`; the kind glyph is coloured by what is owed (Gate, Agent, Human).
+- **Search parsing**: TanStack Router parses a raw URL's `?unread=1` / `?open=0` as numbers and `navigate()`
+  hands strings; every `parse*Search` reads both.
+- **`Shortcut` hints are `aria-hidden`** (`data-slot="shortcut"`, `data-keys`), so a hint inside a button
+  never joins its accessible name. Tests reach one by `data-slot`, never by label.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

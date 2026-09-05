@@ -28,7 +28,13 @@ export function keyLabel(key: string): string {
 export function Shortcut({ keys, className }: { keys: string; className?: string }) {
   const chord = keys.split(" ");
   return (
-    <KbdGroup aria-label={`Shortcut ${keys}`} className={cn("font-mono", className)}>
+    // Decoration: a hint must not become part of the button's name.
+    <KbdGroup
+      aria-hidden
+      data-slot="shortcut"
+      data-keys={keys}
+      className={cn("font-mono", className)}
+    >
       {chord.map((combo, index) => (
         <span key={`${combo}-${String(index)}`} className="flex items-center gap-0.5">
           {index > 0 ? <span className="text-muted-foreground/60">then</span> : null}

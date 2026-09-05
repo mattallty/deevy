@@ -58,10 +58,13 @@ describe("RunStatus", () => {
 
 describe("Shortcut", () => {
   it("draws a chord as two keys in sequence", () => {
-    render(<Shortcut keys="g i" />);
-    expect(screen.getByLabelText("Shortcut g i").textContent).toContain("G");
-    expect(screen.getByLabelText("Shortcut g i").textContent).toContain("I");
-    expect(screen.getByLabelText("Shortcut g i").textContent).toContain("then");
+    const { container } = render(<Shortcut keys="g i" />);
+    const hint = container.querySelector('[data-slot="shortcut"]');
+    expect(hint?.textContent).toContain("G");
+    expect(hint?.textContent).toContain("I");
+    expect(hint?.textContent).toContain("then");
+    // Decoration only: it never joins a button's accessible name.
+    expect(hint?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("spells mod for the platform", () => {
