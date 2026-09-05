@@ -95,6 +95,28 @@ describe("events.list from a cursor", () => {
   });
 });
 
+describe("events.list newest first", () => {
+  it("orders by seq descending on request and pages back with before", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const context = await memberContext(db, { role: "admin" });
+    const client = createRouterClient(router, { context });
+    for (const kind of ["workspace.created", "member.joined", "issue.created"] as const) {
+      await appendEvent(context, {
+        kind,
+        subjectType: "workspace",
+        subjectId: context.workspace.id,
+      });
+    }
+
+    const newest = await client.events.list({ order: "desc", limit: 2 });
+    expect(newest.events.map((event) => event.kind)).toEqual(["issue.created", "member.joined"]);
+    const older = await client.events.list({ order: "desc", before: newest.nextCursor ?? 0 });
+    expect(older.events.map((event) => event.kind)).toEqual(["workspace.created"]);
+    expect(older.nextCursor).toBe(older.events[0]?.seq ?? null);
+  });
+});
+
 describe("events.list scoping", () => {
   it("never returns Events belonging to another Workspace", async () => {
     const { db, close } = testDb();

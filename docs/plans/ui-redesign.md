@@ -485,7 +485,7 @@ What shipped differently in slice 9: the native selects stay wherever a test dri
 plain select is the keyboard's friend; and the lists stay on `ui/table` rather than moving to `DataTable`,
 since none of them sorts, folds or has a keyboard row.
 
-### 10 — Event log
+### 10 — Event log (shipped)
 
 `routes/settings/events.tsx`, `events.list` `before` input + snapshot, `docs/OPERATIONS.md` points at it.
 New `event-log.test.tsx`.

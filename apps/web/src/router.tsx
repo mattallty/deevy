@@ -18,6 +18,7 @@ import { ProjectIssuesTab, ProjectLayout } from "./routes/projects/project.tsx";
 import { ProjectSettingsPage } from "./routes/projects/project-settings.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { ChannelsPage } from "./routes/settings/channels.tsx";
+import { EventLogPage } from "./routes/settings/events.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
 import { SettingsLayout } from "./routes/settings/layout.tsx";
 import { NotificationsPage } from "./routes/settings/notifications.tsx";
@@ -234,6 +235,11 @@ const mcpClientsRoute = createRoute({
   path: "mcp-clients",
   component: McpClientsPage,
 });
+const eventLogRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "events",
+  component: EventLogPage,
+});
 const agentRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "agents/$memberId",
@@ -282,6 +288,7 @@ const routeTree = rootRoute.addChildren([
     notificationsRoute,
     allowlistRoute,
     mcpClientsRoute,
+    eventLogRoute,
   ]),
   consentRoute,
   tokensRoute,

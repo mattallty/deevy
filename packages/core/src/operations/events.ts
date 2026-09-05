@@ -1,4 +1,4 @@
-import { and, asc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import { z } from "zod";
 import { event as eventTable } from "@deevy/db";
 import { EventSchema } from "../schemas.ts";
@@ -9,13 +9,20 @@ import { defineOperation, defineStreamOperation } from "./registry.ts";
 export const events = {
   list: defineOperation({
     name: "events.list",
-    summary: "Events in this Workspace, oldest first, from a cursor",
+    summary: "Events in this Workspace from a cursor, oldest first unless asked otherwise",
     method: "GET",
     path: "/events",
     auth: "member",
     input: z.object({
       /** Return Events after this seq. Pass back the previous page's nextCursor. */
       after: z.coerce.number().int().nonnegative().optional(),
+      /**
+       * Return Events before this seq: the page an Event log read newest-first
+       * turns to next (docs/plans/ui-redesign.md slice 10).
+       */
+      before: z.coerce.number().int().positive().optional(),
+      /** Oldest first is the stream's order; newest first is a log's. */
+      order: z.enum(["asc", "desc"]).default("asc"),
       subjectType: z.string().optional(),
       subjectId: z.string().optional(),
       projectId: z.string().optional(),
@@ -34,6 +41,7 @@ export const events = {
           and(
             eq(eventTable.workspaceId, context.workspace.id),
             input.after === undefined ? undefined : gt(eventTable.seq, input.after),
+            input.before === undefined ? undefined : lt(eventTable.seq, input.before),
             input.subjectType === undefined
               ? undefined
               : eq(eventTable.subjectType, input.subjectType),
@@ -41,8 +49,10 @@ export const events = {
             input.projectId === undefined ? undefined : eq(eventTable.projectId, input.projectId),
           ),
         )
-        .orderBy(asc(eventTable.seq))
+        .orderBy(input.order === "desc" ? desc(eventTable.seq) : asc(eventTable.seq))
         .limit(input.limit);
+      // The cursor is the last row's seq either way: `after` it going forward,
+      // `before` it going back.
       return { events: rows, nextCursor: rows.at(-1)?.seq ?? null };
     },
   }),

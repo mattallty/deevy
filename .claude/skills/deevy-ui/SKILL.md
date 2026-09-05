@@ -258,6 +258,14 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `Change Sponsor` select in the header (`agents.setSponsor`). The Agents table keeps its own
   `Schedule for <name>` select, which its test drives.
 
+## What slice 10 settled (the Event log)
+
+- **`events.list` takes `before` and `order`** (`asc` default, the stream's; `desc` for a log). The cursor
+  is the last row's seq either way. `routes/settings/events.tsx` reads `order: "desc"`, pages back with
+  `before`, filters by Project and subject on the server and by kind prefix on the page, and shows a row's
+  payload as JSON when clicked. It is under Settings › Workspace › Event log; admins' reading.
+- `DataTable` without groups is the plain table with a keyboard row; the Event log is its first flat use.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with
