@@ -412,7 +412,7 @@ what the server resolves; code is highlighted by lowlight on both sides (`rehype
 rather than shiki, whose rehype plugin is async where `react-markdown` is synchronous; and the comment
 composer, Gate note and Run answer switch to the inline editor in slice 4 as planned.
 
-### 4 — Issue panel: two columns, ruling card, Activity stream
+### 4 — Issue panel: two columns, ruling card, Activity stream (shipped)
 
 `issue.tsx` thins to `IssuePanel` page mode; `gate-controls.tsx` → `gate-ruling-card.tsx` (Note via the
 inline editor); `issue-timeline.tsx` + `issue-comments.tsx` → `activity-stream.tsx`/`activity-item.tsx`,
@@ -422,6 +422,12 @@ into the editor's contenteditable — decide in the slice, keep the "Comment" bu
 rail `Popover`+`Command`; `issue-links.tsx` → rail; approver and children avatars as
 `@kibo-ui/avatar-stack` of `MemberChip`s. Tests: `issues.test.tsx` and `comments.test.tsx` query within
 "Activity"; `gates`, `links`, `labels`, `documents` unchanged; new `?gate=` banner case.
+
+What shipped differently in slice 4: there is no separate `issue-panel.tsx` — `routes/issues/issue.tsx`
+is that component, shaped by a container query so the same file is the page and the peek; the label picker
+stays an inline toggle group rather than a `Popover`+`Command`, because that is what the labels test drives
+and a 300px rail holds it; and the avatar stack for approvers and children waits for the approver rule to
+be shown at all (slice 5).
 
 ### 5 — Runs
 

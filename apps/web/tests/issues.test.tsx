@@ -178,7 +178,7 @@ describe("the Issue page", () => {
   it("renders the timeline from the Event log", async () => {
     await mountAt("/issues/DEV-1");
 
-    const timeline = await screen.findByRole("list", { name: "Timeline" });
+    const timeline = await screen.findByRole("list", { name: "Activity" });
     expect(within(timeline).getAllByRole("listitem")).toHaveLength(2);
   });
 

@@ -94,7 +94,7 @@ describe("the comment thread", () => {
   it("shows each comment with its author, and marks a withdrawn one", async () => {
     await mountAt("/issues/DEV-1");
 
-    const thread = await screen.findByRole("list", { name: "Comments" });
+    const thread = await screen.findByRole("list", { name: "Activity" });
     const entries = within(thread).getAllByRole("listitem");
     expect(entries).toHaveLength(2);
     expect(within(entries[0]!).getByText("First thought")).toBeTruthy();

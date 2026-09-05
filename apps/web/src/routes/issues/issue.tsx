@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { ActivityStream } from "@/components/activity-stream";
 import { GateControls } from "@/components/gate-controls";
-import { IssueComments } from "@/components/issue-comments";
+import { MemberChip } from "@/components/member-chip";
+import { StateBadge } from "@/components/state-badge";
 import { IssueDocuments } from "@/components/issue-documents";
 import { IssueLinks } from "@/components/issue-links";
 import { IssueRuns } from "@/components/issue-runs";
 import { LabelPicker } from "@/components/label-picker";
-import { IssueTimeline } from "@/components/issue-timeline.tsx";
 import { Markdown } from "@/components/markdown.tsx";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,129 +69,167 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
 
   const { id, key, title, description, state, assignee, parent, children, gateDecisions, labels } =
     issue.data;
+  const badgeState = {
+    name: state.name,
+    isGate: state.isGate,
+    category: state.category as "backlog" | "active" | "done",
+  };
 
   return (
-    <article className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{key}</Badge>
-          <Badge variant={state.isGate ? "outline" : "default"}>{state.name}</Badge>
-          {parent ? (
-            <Link
-              to="/issues/$issueKey"
-              params={{ issueKey: parent.key }}
-              className="text-sm text-muted-foreground hover:underline"
-            >
-              parent {parent.key}
-            </Link>
-          ) : null}
+    <article className="@container flex flex-col gap-6">
+      {gateFocused ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-3 rounded-md border border-gate/50 bg-gate/10 px-4 py-2 text-sm"
+        >
+          <span>
+            Waiting on your ruling at the <strong>{state.name}</strong> Gate.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => {
+              gatePanel.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              document.getElementById("gate-note")?.focus();
+            }}
+          >
+            Rule now
+          </Button>
         </div>
-
-        {editing ? (
-          <EditIssue
-            title={title}
-            description={description}
-            pending={update.isPending}
-            onCancel={() => setEditing(false)}
-            onSave={(next) => update.mutate({ key, ...next })}
-          />
-        ) : (
-          <div className="flex items-start gap-3">
-            <h1 className="flex-1 text-xl font-semibold tracking-tight">{title}</h1>
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-          </div>
-        )}
-        {update.error ? <p className="text-sm text-destructive">{update.error.message}</p> : null}
-      </header>
-
-      {!editing && description ? <Markdown>{description}</Markdown> : null}
-      {!editing && !description ? (
-        <p className="text-sm text-muted-foreground">No description yet.</p>
       ) : null}
 
-      <LabelPicker issueKey={key} labels={labels} />
-
-      <IssueDocuments issueKey={key} />
-
-      <div
-        ref={gatePanel}
-        role="group"
-        aria-label={state.isGate ? `${state.name} Gate` : `${state.name} State`}
-        {...(gateFocused ? { "data-focused": "true" } : {})}
-        className={cn(
-          "rounded-lg",
-          gateFocused && "ring-2 ring-primary ring-offset-4 ring-offset-background",
-        )}
-      >
-        <GateControls
-          issueKey={key}
-          projectKey={issue.data.project.key}
-          state={state}
-          decisions={gateDecisions}
-        />
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Assignee</h2>
-        <Select
-          value={assignee?.id ?? UNASSIGNED}
-          disabled={update.isPending}
-          onValueChange={(next) =>
-            update.mutate({ key, assigneeMemberId: next === UNASSIGNED ? null : next })
-          }
-        >
-          <SelectTrigger aria-label="Assignee" className="w-64">
-            <SelectValue>
-              {(selected: string) =>
-                selected === UNASSIGNED
-                  ? "Unassigned"
-                  : (members.data?.members.find((member) => member.id === selected)?.user.name ??
-                    "Unassigned")
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-            {members.data?.members.map((member) => (
-              <SelectItem key={member.id} value={member.id}>
-                {member.user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </section>
-
-      {children.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Children</h2>
-          <ul className="flex flex-col gap-1">
-            {children.map((child) => (
-              <li key={child.id} className="text-sm">
+      <div className="grid grid-cols-1 gap-8 @3xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <header className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="font-mono text-muted-foreground">{key}</span>
+              <StateBadge state={badgeState} />
+              {parent ? (
                 <Link
                   to="/issues/$issueKey"
-                  params={{ issueKey: child.key }}
-                  className="hover:underline"
+                  params={{ issueKey: parent.key }}
+                  className="text-muted-foreground hover:underline"
                 >
-                  <span className="text-muted-foreground">{child.key}</span> {child.title}
+                  parent {parent.key}
                 </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+              ) : null}
+            </div>
 
-      <IssueRuns issueKey={key} decisions={gateDecisions} />
+            {editing ? (
+              <EditIssue
+                title={title}
+                description={description}
+                pending={update.isPending}
+                onCancel={() => setEditing(false)}
+                onSave={(next) => update.mutate({ key, ...next })}
+              />
+            ) : (
+              <div className="flex items-start gap-3">
+                <h1 className="flex-1 text-xl font-semibold tracking-tight">{title}</h1>
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  Edit
+                </Button>
+              </div>
+            )}
+            {update.error ? (
+              <p className="text-sm text-destructive">{update.error.message}</p>
+            ) : null}
+          </header>
 
-      <IssueLinks issueKey={key} />
+          {!editing && description ? <Markdown>{description}</Markdown> : null}
+          {!editing && !description ? (
+            <p className="text-sm text-muted-foreground">No description yet.</p>
+          ) : null}
 
-      <IssueComments issueKey={key} />
+          <IssueDocuments issueKey={key} />
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Timeline</h2>
-        <IssueTimeline issueId={id} />
-      </section>
+          <IssueRuns issueKey={key} decisions={gateDecisions} />
+
+          <ActivityStream issueId={id} issueKey={key} />
+        </div>
+
+        <aside className="flex flex-col gap-5 @3xl:order-none -order-1">
+          <div
+            ref={gatePanel}
+            role="group"
+            aria-label={state.isGate ? `${state.name} Gate` : `${state.name} State`}
+            {...(gateFocused ? { "data-focused": "true" } : {})}
+            className={cn(
+              "rounded-lg",
+              state.isGate && "border border-gate/40 bg-gate/5 p-3",
+              gateFocused && "ring-2 ring-gate ring-offset-2 ring-offset-background",
+            )}
+          >
+            <GateControls
+              issueKey={key}
+              projectKey={issue.data.project.key}
+              state={state}
+              decisions={gateDecisions}
+            />
+          </div>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-xs font-medium text-muted-foreground">Assignee</h2>
+            <Select
+              value={assignee?.id ?? UNASSIGNED}
+              disabled={update.isPending}
+              onValueChange={(next) =>
+                update.mutate({ key, assigneeMemberId: next === UNASSIGNED ? null : next })
+              }
+            >
+              <SelectTrigger aria-label="Assignee" className="w-full">
+                <SelectValue>
+                  {(selected: string) => {
+                    const member = members.data?.members.find((m) => m.id === selected);
+                    return selected === UNASSIGNED || !member ? (
+                      "Unassigned"
+                    ) : (
+                      <MemberChip member={member} size="xs" />
+                    );
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                {members.data?.members.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    <MemberChip member={member} size="xs" />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </section>
+
+          <LabelPicker issueKey={key} labels={labels} />
+
+          {children.length > 0 ? (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-xs font-medium text-muted-foreground">Children</h2>
+              <ul className="flex flex-col gap-1">
+                {children.map((child) => (
+                  <li key={child.id} className="text-sm">
+                    <Link
+                      to="/issues/$issueKey"
+                      params={{ issueKey: child.key }}
+                      className="hover:underline"
+                    >
+                      <span className="font-mono text-xs text-muted-foreground">{child.key}</span>{" "}
+                      {child.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <IssueLinks issueKey={key} />
+
+          <p className="font-mono text-xs text-muted-foreground">
+            updated {new Date(issue.data.updatedAt).toLocaleString()}
+          </p>
+        </aside>
+      </div>
     </article>
   );
 }

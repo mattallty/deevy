@@ -1,5 +1,6 @@
 import { lazy, Suspense, useId, useState } from "react";
 import type { EditorMode, Mentionable } from "@/components/tiptap-editor";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,6 +105,49 @@ export function MarkdownEditor({
           view !== "source" && "hidden",
         )}
       />
+      {mentions ? <SourceMentions value={value} onChange={onChange} mentions={mentions} /> : null}
     </div>
+  );
+}
+
+/**
+ * The same `@` help in the Source view as in the rich one: a handle being
+ * typed at the end of the text offers the Members and Teams it could be.
+ */
+function SourceMentions({
+  value,
+  onChange,
+  mentions,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  mentions: Mentionable[];
+}) {
+  const typing = /(?:^|[^\w@/])@([a-z0-9-]*)$/i.exec(value)?.[1];
+  if (typing === undefined) return null;
+  const q = typing.toLowerCase();
+  const found = mentions.filter((entry) => entry.handle.toLowerCase().startsWith(q)).slice(0, 8);
+  if (found.length === 0) return null;
+  return (
+    <ul
+      role="listbox"
+      aria-label="Mentions"
+      className="m-1 flex flex-col rounded-md border bg-popover p-1 text-sm shadow-md"
+    >
+      {found.map((entry) => (
+        <li key={entry.handle}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={() => onChange(value.replace(/@([a-z0-9-]*)$/i, `@${entry.handle} `))}
+          >
+            <span className="font-medium">@{entry.handle}</span>
+            <span className="text-muted-foreground">{entry.name}</span>
+          </Button>
+        </li>
+      ))}
+    </ul>
   );
 }

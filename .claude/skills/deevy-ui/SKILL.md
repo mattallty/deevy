@@ -165,6 +165,26 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
 - **jsdom** needs `Range.prototype.getClientRects/getBoundingClientRect` and `document.elementFromPoint`
   stubbed for ProseMirror to mount (`tests/setup.ts`).
 
+## What slice 4 settled (the Issue view)
+
+- **One component, two shapes.** `routes/issues/issue.tsx` renders the Issue page and the peek. The root is
+  `@container`; the grid is one column below `@3xl` (the 720px peek) and `minmax(0,1fr) 300px` above. In one
+  column the rail comes first (`-order-1`), so the Gate ruling is still the first thing seen.
+- **The Gate ruling card is the top of the rail, always** — `GateControls` inside `role="group"
+aria-label="<State> Gate|State"`, with `data-focused` and a `role="status"` banner ("Waiting on your
+  ruling…", button "Rule now") when `?gate=` names the current State. Then Assignee (a `Select` of
+  `MemberChip`s, `aria-label="Assignee"`), `LabelPicker` (`role="group" aria-label="Labels"`, toggles named
+  by label text), children, `IssueLinks` (lists named by kind, `Add a link`).
+- **`components/activity-stream.tsx`** folds `comments.list` and `events.list` (subject issue) into one
+  `<ol aria-label="Activity">` in time order, skipping `comment.*` Events; a filter All / Comments / Changes;
+  the composer is the inline `MarkdownEditor` with `id="new-comment"` and `aria-label="Comment"`, button
+  "Comment". The lists once named "Timeline" and "Comments" are gone; tests query within "Activity".
+- **Mentions in Source too.** `MarkdownEditor` given `mentions` shows the same `role="listbox"
+aria-label="Mentions"` under its textarea when `@handle` is being typed there, so the Source view and the
+  comments test both have it.
+- **Sheet width.** shadcn's `SheetContent` sets `data-[side=right]:sm:max-w-sm`; to widen it, use the same
+  variant chain (`data-[side=right]:sm:max-w-[720px]`) or the narrower class wins.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

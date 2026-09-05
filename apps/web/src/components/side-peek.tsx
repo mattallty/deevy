@@ -36,7 +36,8 @@ export function SidePeek({
       <SheetContent
         side="right"
         aria-label={issueKey ? `Issue ${issueKey}` : "Issue"}
-        className="w-full gap-0 overflow-y-auto p-0 text-sm sm:max-w-[720px]"
+        // The same variant chain as the base's `data-[side=right]:sm:max-w-sm`, so this one replaces it.
+        className="w-full gap-0 overflow-y-auto p-0 text-sm data-[side=right]:sm:max-w-[720px]"
       >
         <SheetHeader className="flex-row items-center gap-2 border-b px-4 py-2 pr-12 text-left">
           <SheetTitle className="font-mono text-sm font-medium">{issueKey}</SheetTitle>
