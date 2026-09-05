@@ -1,4 +1,5 @@
 import {
+  humanNotificationKinds,
   delivery as deliveryTable,
   issue as issueTable,
   notification as notificationTable,
@@ -6,6 +7,7 @@ import {
   workflowState,
   type Db,
   type Event,
+  type HumanNotificationKind,
   type Notification,
 } from "@deevy/db";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
@@ -74,6 +76,23 @@ export async function deriveNotifications(db: Db, event: Event): Promise<void> {
 
 export type Recipient = { memberId: string; kind: Notification["kind"] };
 
+/** A Recipient owed one of the kinds a Human is sent, and so one with a preference and a rule. */
+type HumanRecipient = { memberId: string; kind: HumanNotificationKind };
+
+/** Whether a Human is ever sent this kind, and so whether Slack can say it. */
+export function isHumanNotificationKind(kind: Notification["kind"]): kind is HumanNotificationKind {
+  return (humanNotificationKinds as ReadonlyArray<string>).includes(kind);
+}
+
+/**
+ * Whether this Notification is a Human's. A guard on the Recipient rather than
+ * on its kind, so filtering narrows what the preference lookup and the Slack
+ * rules are handed rather than leaving them to trust a comment.
+ */
+function isHumanRecipient(recipient: Recipient): recipient is HumanRecipient {
+  return isHumanNotificationKind(recipient.kind);
+}
+
 /** One Slack Channel a Notification of this kind is due to reach. */
 export interface SlackTarget {
   channelId: string;
@@ -106,18 +125,26 @@ export async function routeEvent(db: Db, event: Event): Promise<Routing> {
   const recipients = await recipientsFor(db, event);
   if (recipients.length === 0) return noRouting;
 
+  // An Agent's Notification takes neither road. The preference matrix and the
+  // Workspace's routing rules are a Human's answer to "what do I want to hear
+  // about, and where", and an Agent has no preferences and no Slack: its inbox
+  // is the endpoint ADR-0003 promised it (schema/notification.ts).
+  const forAgents = recipients.filter((recipient) => !isHumanRecipient(recipient));
+  const forHumans = recipients.filter(isHumanRecipient);
+  if (forHumans.length === 0) return { inbox: forAgents, slack: [] };
+
   const preferences = await db.query.notificationPreference.findMany({
-    where: { memberId: { in: recipients.map((recipient) => recipient.memberId) } },
+    where: { memberId: { in: forHumans.map((recipient) => recipient.memberId) } },
   });
   const wanted = new Map(preferences.map((row) => [`${row.memberId}:${row.kind}`, row] as const));
   // A Member who has never said otherwise wants everything, in both places:
   // the row is a preference, and its absence is the default (schema/channel.ts).
-  const wants = (recipient: Recipient, where: "inbox" | "slack") =>
+  const wants = (recipient: HumanRecipient, where: "inbox" | "slack") =>
     wanted.get(`${recipient.memberId}:${recipient.kind}`)?.[where] ?? true;
 
-  const inbox = recipients.filter((recipient) => wants(recipient, "inbox"));
+  const inbox = [...forAgents, ...forHumans.filter((recipient) => wants(recipient, "inbox"))];
   const kinds = new Set(
-    recipients.filter((recipient) => wants(recipient, "slack")).map((recipient) => recipient.kind),
+    forHumans.filter((recipient) => wants(recipient, "slack")).map((recipient) => recipient.kind),
   );
   if (kinds.size === 0) return { inbox, slack: [] };
 
@@ -132,7 +159,7 @@ export async function routeEvent(db: Db, event: Event): Promise<Routing> {
 async function slackTargets(
   db: Db,
   event: Event,
-  kinds: Set<Notification["kind"]>,
+  kinds: Set<HumanNotificationKind>,
 ): Promise<SlackTarget[]> {
   const rules = await db.query.routingRule.findMany({
     where: { workspaceId: event.workspaceId },

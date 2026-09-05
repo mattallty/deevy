@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { notificationKinds } from "./notification.ts";
+import { humanNotificationKinds } from "./notification.ts";
 import { project } from "./project.ts";
 import { member, workspace } from "./workspace.ts";
 
@@ -37,7 +37,7 @@ export const routingRule = sqliteTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
-    notificationKind: text("notification_kind", { enum: notificationKinds }),
+    notificationKind: text("notification_kind", { enum: humanNotificationKinds }),
     projectId: text("project_id").references(() => project.id, { onDelete: "cascade" }),
     channelId: text("channel_id")
       .notNull()
@@ -54,7 +54,7 @@ export const notificationPreference = sqliteTable(
     memberId: text("member_id")
       .notNull()
       .references(() => member.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: notificationKinds }).notNull(),
+    kind: text("kind", { enum: humanNotificationKinds }).notNull(),
     inbox: integer("inbox", { mode: "boolean" }).default(true).notNull(),
     slack: integer("slack", { mode: "boolean" }).default(true).notNull(),
   },

@@ -15,7 +15,12 @@ import {
 } from "@deevy/db";
 import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { EventKind } from "./events.ts";
-import { deriveNotifications, issueOf, notificationKindOf } from "./notifications.ts";
+import {
+  deriveNotifications,
+  isHumanNotificationKind,
+  issueOf,
+  notificationKindOf,
+} from "./notifications.ts";
 import { openStatuses } from "./runs.ts";
 import { postSlackMessage, slackMessage, type FetchLike, type SlackPayload } from "./slack.ts";
 import { deriveWebhookDeliveriesForMany, postWebhook } from "./webhooks.ts";
@@ -761,7 +766,16 @@ export async function deliverDueChannelMessages({
     const event = eventBySeq.get(row.eventSeq);
     const webhookUrl = webhookOf.get(row.targetId);
     const kind = event ? notificationKindOf(event) : null;
-    if (!event || !kind || typeof webhookUrl !== "string" || webhookUrl.length === 0) {
+    // An Agent's kind among these would be a message Slack has no words for,
+    // and a routing rule cannot name one, so it joins the deleted Channel as
+    // something to retire rather than retry (notifications.ts).
+    if (
+      !event ||
+      !kind ||
+      !isHumanNotificationKind(kind) ||
+      typeof webhookUrl !== "string" ||
+      webhookUrl.length === 0
+    ) {
       undeliverable.push(row.id);
       continue;
     }
