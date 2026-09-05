@@ -27,6 +27,13 @@ export type SessionEvent =
   | { type: "ready"; tools: string[]; servers: Array<{ name: string; status: string }> }
   /** A tool the session called, by its namespaced name. */
   | { type: "tool"; name: string }
+  /**
+   * A tool the session asked for and was refused. With no approval surface
+   * every unlisted tool lands here, and a Human reading the Run should see that
+   * the agent reached for something it may not do — the model itself only sees
+   * an error and will often report it as something else.
+   */
+  | { type: "denied"; name: string; reason: string }
   /** Something the session said. Kept for the log; the Run's own narration is the model's. */
   | { type: "text"; text: string }
   /** The session ended. `ok` is whether it ended on purpose. */

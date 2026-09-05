@@ -25,6 +25,62 @@ export const deevyTools = [
   "runs_finish",
 ].map((tool) => `mcp__deevy__${tool}`);
 
+/**
+ * What the session gets on top of deevy when it has a repository to work in.
+ *
+ * Each one is here for a reason: the file tools for the checkout, `Bash` for
+ * the build and the tests, and the web tools for documentation an Issue points
+ * at. Without a repository none of these are granted — a shell with nothing to
+ * run is not a default worth having, and the tool surface following the
+ * configuration means nobody gets one by forgetting (docs/plans/m4.md).
+ */
+export const repositoryTools = [
+  "Read",
+  "Write",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Bash",
+  "WebSearch",
+  "WebFetch",
+];
+
+/**
+ * What is refused even where it would otherwise be reachable.
+ *
+ * The supervisor owns git and the credential to use it, so a session reaching
+ * for a push or a pull request is a bug rather than initiative, and denying it
+ * makes that ownership enforced instead of hoped for. Nothing else is listed:
+ * a denylist beside an allowlist invites the belief that the allowlist has
+ * holes this patches, and it does not.
+ */
+export const deniedTools = [
+  "Bash(git push:*)",
+  "Bash(git remote:*)",
+  "Bash(git config:*)",
+  "Bash(gh:*)",
+];
+
+/**
+ * The environment the session's process gets: this one, minus the runtime's own
+ * secrets.
+ *
+ * `Bash` plus `DEEVY_AGENT_KEY` is the tool allowlist with a hole in it — the
+ * session could reach any operation the Agent may call over `curl`, including
+ * the ones deliberately left out of `deevyTools`. The git credential goes for
+ * the same reason: the supervisor clones and pushes, so the session has no use
+ * for it (docs/plans/m4.md, slice 3's finding).
+ */
+export const withheldFromSession = ["DEEVY_AGENT_KEY", "DEEVY_AGENT_GIT_TOKEN"];
+
+export function sessionEnv(env: Record<string, string | undefined>): Record<string, string> {
+  const kept: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value !== undefined && !withheldFromSession.includes(name)) kept[name] = value;
+  }
+  return kept;
+}
+
 let instructions: string | null = null;
 
 /** The instructions every session carries, read once per process. */
@@ -44,6 +100,7 @@ export function sessionOptions(
   config: Config,
   input: SessionInput,
   appendedInstructions: string,
+  env: Record<string, string | undefined> = process.env,
 ): Options {
   return {
     // The same endpoint and the same credential a person puts in a `.mcp.json`,
@@ -55,8 +112,9 @@ export function sessionOptions(
         headers: { Authorization: `Bearer ${config.key}` },
       },
     },
-    allowedTools: deevyTools,
-    disallowedTools: [],
+    allowedTools: config.repo ? [...deevyTools, ...repositoryTools] : deevyTools,
+    disallowedTools: config.repo ? deniedTools : [],
+    env: sessionEnv(env),
     // Nothing on disk configures this session. From slice 5 the working
     // directory holds a repository somebody else wrote, and a `.mcp.json` in it
     // must add no server while a `.claude/settings.json` must grant no
@@ -86,6 +144,15 @@ export function sessionOptions(
 export function toSessionEvents(message: SDKMessage): SessionEvent[] {
   if (message.type === "system" && message.subtype === "init") {
     return [{ type: "ready", tools: message.tools, servers: message.mcp_servers }];
+  }
+  if (message.type === "system" && message.subtype === "permission_denied") {
+    return [
+      {
+        type: "denied",
+        name: message.tool_name,
+        reason: message.decision_reason ?? message.message,
+      },
+    ];
   }
   if (message.type === "assistant") {
     const events: SessionEvent[] = [];

@@ -48,6 +48,14 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?the runtime runs Claude, and Claude needs a key}
       DEEVY_AGENT_POLL_SECONDS: ${DEEVY_AGENT_POLL_SECONDS:-30}
       DEEVY_AGENT_MODEL: ${DEEVY_AGENT_MODEL:-claude-opus-5}
+      # With a repository the session also gets file and shell tools, in a
+      # clone made fresh for each Run. Without one it has deevy's tools and an
+      # empty directory (docs/plans/m4.md). The container is the boundary
+      # either way, and the token below is the runtime's: the supervisor
+      # clones and pushes, and the session never sees it.
+      DEEVY_AGENT_REPO: ${DEEVY_AGENT_REPO:-}
+      DEEVY_AGENT_GIT_TOKEN: ${DEEVY_AGENT_GIT_TOKEN:-}
+      DEEVY_AGENT_BASE_BRANCH: ${DEEVY_AGENT_BASE_BRANCH:-main}
 
 volumes:
   deevy-data:

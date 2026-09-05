@@ -17,6 +17,7 @@ describe("configuration", () => {
       model: "claude-opus-5",
       effort: "high",
       maxTurns: 100,
+      repo: null,
       // deevy calls a Run stale after thirty minutes of silence, so a session
       // allowed to outlive that would be reported stale while still working.
       runTimeoutSeconds: 1800,

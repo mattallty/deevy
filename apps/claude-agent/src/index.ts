@@ -19,9 +19,20 @@ export {
 export {
   buildSession,
   deevyTools,
+  deniedTools,
   linkAbort,
+  repositoryTools,
+  sessionEnv,
+  withheldFromSession,
   readInstructions,
   sessionOptions,
   toSessionEvents,
 } from "./sdk.ts";
 export { startLoop, type Loop, type LoopOptions } from "./loop.ts";
+export {
+  authArgs,
+  openWorkspace,
+  type RepoConfig,
+  type Workspace,
+  type WorkspaceOptions,
+} from "./workspace.ts";

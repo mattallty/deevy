@@ -3,6 +3,7 @@ import { DeevyError, createDeevy } from "./deevy.ts";
 import { startLoop } from "./loop.ts";
 import { buildSession } from "./sdk.ts";
 import { runOnce } from "./work.ts";
+import { openWorkspace } from "./workspace.ts";
 
 /**
  * The reference runtime, as a process.
@@ -30,6 +31,12 @@ const work = {
   deevy,
   session: buildSession(config),
   runTimeoutMs: config.runTimeoutSeconds * 1000,
+  workspace: (options: { runId: string }) =>
+    openWorkspace({
+      ...options,
+      repo: config.repo,
+      ...(config.workdir ? { root: config.workdir } : {}),
+    }),
 };
 
 /**

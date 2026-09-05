@@ -23,6 +23,17 @@ export interface Config {
   effort: "low" | "medium" | "high" | "xhigh" | "max";
   /** A backstop on a session that will not stop. The timeout is the real bound. */
   maxTurns: number;
+  /**
+   * The repository this runtime works in, or null.
+   *
+   * It is the runtime's configuration and not deevy's data: deevy's Repository
+   * rows exist so an Issue can point at code, they carry no credential, and
+   * they are not a checkout instruction. One service works one repository,
+   * which is also how a coding agent is actually deployed (docs/plans/m4.md).
+   */
+  repo: RepoConfig | null;
+  /** Where per-Run working directories are made. */
+  workdir?: string;
 }
 
 const efforts = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -31,6 +42,8 @@ function effort(value: string | undefined): Config["effort"] {
   const found = efforts.find((level) => level === value);
   return found ?? "high";
 }
+
+import type { RepoConfig } from "./workspace.ts";
 
 /** A positive number from the environment, or the default when it is absent or nonsense. */
 function positive(value: string | undefined, fallback: number): number {
@@ -56,5 +69,13 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     model: env.DEEVY_AGENT_MODEL ?? "claude-opus-5",
     effort: effort(env.DEEVY_AGENT_EFFORT),
     maxTurns: positive(env.DEEVY_AGENT_MAX_TURNS, 100),
+    repo: env.DEEVY_AGENT_REPO
+      ? {
+          url: env.DEEVY_AGENT_REPO,
+          ...(env.DEEVY_AGENT_GIT_TOKEN ? { token: env.DEEVY_AGENT_GIT_TOKEN } : {}),
+          baseBranch: env.DEEVY_AGENT_BASE_BRANCH ?? "main",
+        }
+      : null,
+    ...(env.DEEVY_AGENT_WORKDIR ? { workdir: env.DEEVY_AGENT_WORKDIR } : {}),
   };
 }

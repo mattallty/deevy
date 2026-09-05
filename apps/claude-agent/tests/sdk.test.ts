@@ -6,6 +6,7 @@ import {
   readInstructions,
   sessionOptions,
   toSessionEvents,
+  withheldFromSession,
 } from "../src/sdk.ts";
 import { testConfig } from "./helpers.ts";
 
@@ -15,14 +16,27 @@ const input = {
   signal: AbortSignal.abort(),
 };
 
+/** A deterministic environment, so the options a test reads are the same twice. */
+const env = {
+  PATH: "/usr/bin",
+  ANTHROPIC_API_KEY: "sk-ant-x",
+  DEEVY_AGENT_KEY: "deevy_sk_secret",
+  DEEVY_AGENT_GIT_TOKEN: "ghp_secret",
+};
+
+const withRepo = {
+  ...testConfig,
+  repo: { url: "https://github.com/owner/repo.git", token: "ghp_secret", baseBranch: "main" },
+};
+
 describe("the options a session runs under", () => {
   /**
    * Asserted whole, never sampled. Every field here is a decision about what an
    * agent holding a shell may do, and a test that checks most of them passes
    * while the one that matters goes missing (docs/plans/m4.md, convention 21).
    */
-  it("is the whole security boundary, and this is all of it", async () => {
-    const options = sessionOptions(testConfig, input, "INSTRUCTIONS");
+  it("is the whole security boundary, and this is all of it", () => {
+    const options = sessionOptions(testConfig, input, "INSTRUCTIONS", env);
 
     expect(options).toEqual({
       mcpServers: {
@@ -46,7 +60,11 @@ describe("the options a session runs under", () => {
         "mcp__deevy__comments_create",
         "mcp__deevy__runs_finish",
       ],
+      // No repository, so no shell: a session with nothing to run has no use
+      // for one, and the tool surface follows the configuration rather than a
+      // flag somebody has to remember.
       disallowedTools: [],
+      env: { PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-ant-x" },
       strictMcpConfig: true,
       settingSources: [],
       permissionPrompts: "none",
@@ -59,6 +77,41 @@ describe("the options a session runs under", () => {
     });
   });
 
+  it("adds the file and shell tools only when there is a repository to use them on", () => {
+    const options = sessionOptions(withRepo, input, "", env);
+
+    expect(options.allowedTools).toEqual([
+      ...deevyTools,
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebSearch",
+      "WebFetch",
+    ]);
+    // The supervisor owns git and the credential to use it, so the session
+    // reaching for a push is a bug rather than initiative.
+    expect(options.disallowedTools).toEqual([
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(git config:*)",
+      "Bash(gh:*)",
+    ]);
+  });
+
+  it("never hands the session the secrets that would make the allowlist a suggestion", () => {
+    const options = sessionOptions(withRepo, input, "", env);
+
+    // `Bash` plus the Agent's key is every operation the Agent may call, over
+    // curl, including the ones deliberately left out of the tool list.
+    expect(options.env).toEqual({ PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-ant-x" });
+    expect(JSON.stringify(options.env)).not.toContain("deevy_sk_secret");
+    expect(JSON.stringify(options.env)).not.toContain("ghp_secret");
+    expect(withheldFromSession).toEqual(["DEEVY_AGENT_KEY", "DEEVY_AGENT_GIT_TOKEN"]);
+  });
+
   it("grants tools by name, so deevy widening is not this program widening", () => {
     // A wildcard would make `mcp-tools.json` gaining a tool a change to what
     // this runtime may do, decided by a different pull request.
@@ -68,7 +121,7 @@ describe("the options a session runs under", () => {
   });
 
   it("never asks for the permission mode that turns the allowlist off", () => {
-    const options = sessionOptions(testConfig, input, "");
+    const options = sessionOptions(testConfig, input, "", env);
 
     expect(options.permissionMode).not.toBe("bypassPermissions");
     expect(options.permissionPrompts).toBe("none");

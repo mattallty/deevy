@@ -1,8 +1,6 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DeevyError, type Deevy, type Run } from "./deevy.ts";
 import { deevyIsReachable, type Session } from "./session.ts";
+import { openWorkspace, type Workspace, type WorkspaceOptions } from "./workspace.ts";
 
 export interface WorkResult {
   runId: string;
@@ -28,6 +26,11 @@ export interface WorkOptions {
   /** Aborted when the process is stopping, on top of each Run's own timeout. */
   signal?: AbortSignal;
   runTimeoutMs: number;
+  /**
+   * The working directory a Run gets. Defaults to an empty one, and a runtime
+   * with a repository configured passes one that holds a clone of it.
+   */
+  workspace?: (options: WorkspaceOptions) => Promise<Workspace>;
 }
 
 /**
@@ -115,13 +118,32 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
     return { runId: run.id, issueKey: run.issueKey, status: run.status };
   }
 
-  const cwd = await mkdtemp(join(tmpdir(), "deevy-run-"));
+  // Before the session, so a repository that cannot be cloned fails the Run
+  // with a reason rather than handing the model an empty directory and letting
+  // it improvise about why nothing is there.
+  let workspace: Workspace;
+  try {
+    workspace = await (options.workspace ?? openWorkspace)({ runId: run.id });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    await close(deevy, run.id, detail);
+    return {
+      runId: run.id,
+      issueKey: run.issueKey,
+      status: (await deevy.run(run.id)).status,
+      failedBy: detail,
+    };
+  }
+
   const timeout = AbortSignal.timeout(runTimeoutMs);
   const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
   let failure: string | null = null;
+  // Enough for a Human to see the shape of what was refused, and not so many
+  // that a session in a loop fills the feed with them.
+  let denialsLeft = 5;
 
   try {
-    for await (const event of session({ prompt: promptFor(run), cwd, signal })) {
+    for await (const event of session({ prompt: promptFor(run), cwd: workspace.cwd, signal })) {
       if (event.type === "ready" && !deevyIsReachable(event)) {
         // A session that cannot reach deevy has no way to read the Issue or
         // record what it did, and will fill the gap by guessing. Stop here,
@@ -129,12 +151,21 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
         failure = "The session could not reach deevy, so it was stopped before it started";
         break;
       }
+      if (event.type === "denied" && denialsLeft > 0) {
+        denialsLeft -= 1;
+        // Not a failure: the session is told and carries on, and this is the
+        // one thing in the feed the model cannot report accurately about
+        // itself, because all it sees is an error.
+        await deevy
+          .postActivity(run.id, "error", `Refused ${event.name}: ${event.reason}`)
+          .catch(() => undefined);
+      }
       if (event.type === "done" && !event.ok) failure = event.detail;
     }
   } catch (error) {
     failure = describe(error, stopped(timeout, options.signal));
   } finally {
-    await rm(cwd, { recursive: true, force: true });
+    await workspace.release();
   }
 
   // deevy writes before it answers, so what the session managed to do counts

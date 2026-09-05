@@ -263,6 +263,88 @@ describe("the envelope", () => {
   });
 });
 
+describe("a repository the Run cannot have", () => {
+  it("fails the Run before the session starts, naming what could not be cloned", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    let started = false;
+
+    const pass = await runOnce({
+      ...options,
+      deevy: it.deevy,
+      workspace: () => Promise.reject(new Error("Could not clone https://example.test/repo.git")),
+      session: scripted([
+        () => {
+          started = true;
+          return Promise.resolve();
+        },
+        finished,
+      ]),
+    });
+
+    expect(started).toBe(false);
+    expect(pass.worked[0]).toMatchObject({
+      status: "failed",
+      failedBy: "Could not clone https://example.test/repo.git",
+    });
+    const feed = await it.asAda.runs.get({ runId: pass.worked[0].runId });
+    expect(feed.activities.at(-1)).toMatchObject({ kind: "error" });
+  });
+});
+
+describe("a tool the session may not call", () => {
+  it("is recorded in the feed, and the Run carries on", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    // Held before the pass: the supervisor's own denial Activity moves the Run
+    // to `active`, exactly as the model's first Activity would, so a session
+    // looking for a `pending` Run after one has already been recorded finds
+    // none.
+    const [waiting] = await it.deevy.runs("pending");
+
+    const pass = await runOnce({
+      ...options,
+      deevy: it.deevy,
+      session: scripted([
+        { type: "denied", name: "Bash", reason: "no approval surface" },
+        async () => {
+          await it.deevy.finishRun(waiting.id, "completed", "Did it another way");
+        },
+        finished,
+      ]),
+    });
+
+    expect(pass.worked[0]).toMatchObject({ status: "completed" });
+    const feed = await it.asAda.runs.get({ runId: pass.worked[0].runId });
+    expect(feed.activities.map((activity) => activity.body)).toContain(
+      "Refused Bash: no approval surface",
+    );
+  });
+
+  it("stops filling the feed once a session is only being refused", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    const denials = Array.from({ length: 12 }, () => ({
+      type: "denied" as const,
+      name: "Bash",
+      reason: "no approval surface",
+    }));
+    const [waiting] = await it.deevy.runs("pending");
+
+    const pass = await runOnce({
+      ...options,
+      deevy: it.deevy,
+      session: scripted([
+        ...denials,
+        async () => {
+          await it.deevy.finishRun(waiting.id, "completed", "Gave up on the shell");
+        },
+        finished,
+      ]),
+    });
+
+    const feed = await it.asAda.runs.get({ runId: pass.worked[0].runId });
+    expect(feed.activities.filter((a) => a.body.startsWith("Refused "))).toHaveLength(5);
+  });
+});
+
 describe("a Run that is not ours to drive", () => {
   it("is left where it is", async () => {
     const it = await deevyWithAnAssignedIssue();

@@ -24,6 +24,7 @@ export const testConfig: Config = {
   model: "claude-opus-5",
   effort: "high",
   maxTurns: 10,
+  repo: null,
 };
 
 /**
