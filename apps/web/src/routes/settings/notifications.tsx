@@ -80,19 +80,23 @@ export function NotificationsPage() {
             {draft.map((row) => (
               <TableRow key={row.kind}>
                 <TableCell className="font-medium">{labels[row.kind] ?? row.kind}</TableCell>
-                <TableCell className="text-center">
-                  <Checkbox
-                    aria-label={`${labels[row.kind] ?? row.kind} in the inbox`}
-                    checked={row.inbox}
-                    onCheckedChange={() => toggle(row.kind, "inbox")}
-                  />
+                <TableCell className="w-24">
+                  <div className="flex justify-center">
+                    <Checkbox
+                      aria-label={`${labels[row.kind] ?? row.kind} in the inbox`}
+                      checked={row.inbox}
+                      onCheckedChange={() => toggle(row.kind, "inbox")}
+                    />
+                  </div>
                 </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox
-                    aria-label={`${labels[row.kind] ?? row.kind} in Slack`}
-                    checked={row.slack}
-                    onCheckedChange={() => toggle(row.kind, "slack")}
-                  />
+                <TableCell className="w-24">
+                  <div className="flex justify-center">
+                    <Checkbox
+                      aria-label={`${labels[row.kind] ?? row.kind} in Slack`}
+                      checked={row.slack}
+                      onCheckedChange={() => toggle(row.kind, "slack")}
+                    />
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

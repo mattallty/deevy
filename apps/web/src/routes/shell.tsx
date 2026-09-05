@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, useMatches, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bot,
@@ -50,6 +50,7 @@ import {
   SidebarRail,
   SidebarTrigger,
   sidebarMenuButtonVariants,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { useLiveEvents } from "@/lib/live";
@@ -80,6 +81,8 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   // Mounted once for the whole signed-in app, so one stream serves every page.
   useLiveEvents(true);
   const navigate = useNavigate();
+  // A page that lays out its own panes (the Inbox) opts out of the shell's padding.
+  const bleed = useMatches().some((match) => match.staticData.bleed === true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
@@ -254,7 +257,7 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
             <NewIssueButton variant="default" size="default" withShortcut />
           </div>
           {/* SidebarInset is the <main>; this is the page inside it. */}
-          <div className="min-w-0 flex-1 p-6">
+          <div className={cn("min-w-0 flex-1", bleed ? "flex min-h-0 flex-col" : "p-6")}>
             <Outlet />
           </div>
         </SidebarInset>
@@ -298,6 +301,8 @@ function MemberMenu({
   };
 }) {
   const { theme, setTheme } = useTheme();
+  // Folded to icons (the Settings area does this), the trigger is the avatar alone.
+  const folded = useSidebar().state === "collapsed";
   return (
     <DropdownMenu>
       {/* The trigger is the button itself, dressed as a sidebar item: handing a
@@ -308,10 +313,13 @@ function MemberMenu({
         data-slot="sidebar-menu-button"
         data-size="lg"
         aria-label={me.user.name}
-        className={cn(sidebarMenuButtonVariants({ size: "lg" }), "min-w-0")}
+        className={cn(
+          sidebarMenuButtonVariants({ size: "lg" }),
+          "min-w-0 group-data-[collapsible=icon]:justify-center",
+        )}
       >
-        <MemberChip member={me} size="md" className="min-w-0 flex-1" />
-        <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+        <MemberChip member={me} size="md" className="min-w-0 flex-1" avatarOnly={folded} />
+        <ChevronsUpDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56">
         {/* A Base UI menu label lives inside a group, or the menu throws as it opens. */}

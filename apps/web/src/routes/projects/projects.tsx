@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,22 +21,62 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { orpc } from "@/lib/orpc.ts";
 
 const NO_TEAM = "none";
+
+interface ProjectRow {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  team: { name: string } | null;
+}
 
 /** Every Project in the Workspace, and the dialog that starts a new one. */
 export function ProjectsPage() {
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const columns: DataColumn<ProjectRow>[] = [
+    {
+      id: "key",
+      header: "Key",
+      cell: (project) => <Badge variant="secondary">{project.key}</Badge>,
+      className: "w-24",
+    },
+    {
+      id: "name",
+      header: "Project",
+      cell: (project) => (
+        <div className="flex min-w-0 flex-col">
+          <Link
+            to="/projects/$key"
+            params={{ key: project.key }}
+            className="font-medium hover:underline"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {project.name}
+          </Link>
+          {project.description ? (
+            <span className="truncate text-xs text-muted-foreground">{project.description}</span>
+          ) : null}
+        </div>
+      ),
+      sortValue: (project) => project.name,
+      className: "max-w-0 w-full",
+    },
+    {
+      id: "team",
+      header: "Team",
+      cell: (project) => (
+        <span className="text-muted-foreground">{project.team ? project.team.name : "—"}</span>
+      ),
+      sortValue: (project) => project.team?.name ?? "",
+      className: "w-48",
+    },
+  ];
 
   return (
     <section className="flex flex-col gap-4">
@@ -51,52 +92,20 @@ export function ProjectsPage() {
 
       <NewProjectDialog open={open} onOpenChange={setOpen} />
 
-      {projects.isPending ? <p className="text-muted-foreground">Loading Projects…</p> : null}
       {projects.isError ? (
         <p className="text-destructive">Could not load Projects: {projects.error.message}</p>
-      ) : null}
-
-      {projects.data?.projects.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No Projects yet. Create one to give the work a home.
-        </p>
-      ) : null}
-
-      {projects.data && projects.data.projects.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Key</TableHead>
-              <TableHead>Project</TableHead>
-              <TableHead>Team</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {projects.data.projects.map((project) => (
-              <TableRow key={project.id}>
-                <TableCell>
-                  <Badge variant="secondary">{project.key}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Link
-                    to="/projects/$key"
-                    params={{ key: project.key }}
-                    className="font-medium hover:underline"
-                  >
-                    {project.name}
-                  </Link>
-                  {project.description ? (
-                    <div className="text-xs text-muted-foreground">{project.description}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {project.team ? project.team.name : "—"}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
+      ) : (
+        // The whole row opens the Project; the name stays a link for a middle click.
+        <DataTable
+          aria-label="Projects"
+          columns={columns}
+          rows={projects.data?.projects ?? []}
+          getRowId={(project) => project.key}
+          onOpen={(key) => void navigate({ to: "/projects/$key", params: { key } })}
+          loading={projects.isPending}
+          empty={{ title: "No Projects yet", description: "Create one to give the work a home." }}
+        />
+      )}
     </section>
   );
 }

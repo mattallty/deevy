@@ -75,7 +75,7 @@ export function SettingsLayout() {
         {settingsNav.map(({ group, pages }) => (
           <div key={group} className="flex flex-col gap-1">
             <div className="px-2 text-xs font-medium text-muted-foreground">{group}</div>
-            <ul className="flex flex-col">
+            <ul className="flex flex-col gap-0.5">
               {pages.map((page) => {
                 const active = pathname === page.to || pathname.startsWith(`${page.to}/`);
                 return (
@@ -84,7 +84,7 @@ export function SettingsLayout() {
                       to={page.to}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex h-7 items-center rounded-md px-2 text-sm hover:bg-accent",
+                        "flex h-8 items-center rounded-md px-2.5 text-sm hover:bg-accent",
                         active ? "bg-accent font-medium" : "text-foreground/80",
                       )}
                     >

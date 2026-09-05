@@ -6,6 +6,13 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+
+declare module "@tanstack/react-router" {
+  interface StaticDataRouteOption {
+    /** The page owns its padding and height — the Inbox's two panes — so the shell adds none. */
+    bleed?: boolean;
+  }
+}
 import { parseIssuesSearch, type IssuesSearch } from "./components/issue-filters.tsx";
 import { IssuesPage } from "./routes/issues/list.tsx";
 import { ProjectsPage } from "./routes/projects/projects.tsx";
@@ -111,6 +118,7 @@ const projectIssuesRoute = createRoute({
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/inbox",
+  staticData: { bleed: true },
   validateSearch: (search: Record<string, unknown>) => parseInboxSearch(search),
   component: function InboxRoute() {
     const search = inboxRoute.useSearch();

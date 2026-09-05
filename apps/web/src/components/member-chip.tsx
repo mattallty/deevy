@@ -38,6 +38,7 @@ export function MemberChip({
   showHandle = false,
   sponsorName,
   className,
+  avatarOnly = false,
 }: {
   member: ChipMember;
   size?: keyof typeof sizes;
@@ -46,6 +47,8 @@ export function MemberChip({
   /** The Human accountable for this Agent, for the tooltip. */
   sponsorName?: string | null;
   className?: string;
+  /** Only the avatar, where there is no room for a name: the folded sidebar. */
+  avatarOnly?: boolean;
 }) {
   const agent = member.kind === "agent";
   const suspended = Boolean(member.suspendedAt);
@@ -92,14 +95,14 @@ export function MemberChip({
             )}
           </AvatarFallback>
         </Avatar>
-        <span className={cn("truncate", style.text)}>{member.user.name}</span>
+        {avatarOnly ? null : <span className={cn("truncate", style.text)}>{member.user.name}</span>}
         {showHandle && member.handle ? (
           <span className={cn("truncate font-mono text-muted-foreground", style.text)}>
             @{member.handle}
           </span>
         ) : null}
       </TooltipTrigger>
-      <TooltipContent>{title}</TooltipContent>
+      <TooltipContent>{avatarOnly ? `${member.user.name} · ${title}` : title}</TooltipContent>
     </Tooltip>
   );
 }

@@ -148,7 +148,7 @@ What shipped differently:
   the variables a future review would retune. The candidates file, the switcher, their tests, the
   `vite.config.ts` exception and Plex are gone; Inter and JetBrains Mono are dependencies.
 
-### B — Polish batch (points 1, 2, 3, 6, 11, 13, 14, 16)
+### B — Polish batch (points 1, 2, 3, 6, 11, 13, 14, 16) — shipped
 
 One commit of small, certain fixes; no mockups.
 
@@ -174,6 +174,23 @@ One commit of small, certain fixes; no mockups.
   group), keeps the avatar centred, and gains the `Tooltip` the other footer items have.
 - **Projects list**: `DataTable` rows get `onOpen` → navigate to the Project (whole row clickable, cursor
   pointer, Enter opens); the name stays a Link for middle-click.
+
+What shipped differently:
+
+- **The checkbox misalignment was not the padding rule.** Base UI's Checkbox root is a block-level button,
+  so `text-center` on the cell never centred it; the fix is a `flex justify-center` wrapper per cell. The
+  `:has([role=checkbox])` padding rule in `ui/table.tsx` was still scoped to a first column, which is what
+  shadcn meant by it.
+- **Full-bleed pages** are declared, not hacked: `inboxRoute` carries `staticData: { bleed: true }` (typed by
+  a `StaticDataRouteOption` augmentation in `router.tsx`) and the shell's page wrapper reads it through
+  `useMatches()`; the Inbox lost its `-m-6` and pads its own header (`PageHeader className="px-4 pt-4"`), so
+  the header, the rows and every other page's header share one left edge.
+- **The Projects page was not on `DataTable`** (a raw `ui/table`); it is now, with `aria-label="Projects"`,
+  sortable Project and Team columns, the shared loading and empty states, and the row opening on click.
+- **Sizes**: `Toggle` is `text-sm` with `h-8`/`h-7`/`h-9` sizes matching `Button`; `TabsTrigger` is
+  `text-sm px-2.5`. Under the roomy density these all measure 34px beside 34px selects.
+- **The folded avatar**: `MemberChip` gained `avatarOnly` (tooltip then carries the name), and the member
+  menu passes it when `useSidebar().state === "collapsed"`; the chevron hides at icon width.
 
 ### C — Inbox that says what happened (points 4, 5; mockup first)
 

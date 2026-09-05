@@ -152,6 +152,7 @@ export function InboxPage({
   const list = (
     <section className="flex h-full min-h-0 flex-col" aria-labelledby="inbox-heading">
       <PageHeader
+        className="px-4 pt-4"
         title={<span id="inbox-heading">Inbox</span>}
         description="Mentions, assignments, and Gates waiting on a Human."
         actions={
@@ -217,42 +218,45 @@ export function InboxPage({
                 return (
                   <li
                     key={notification.id}
-                    aria-selected={isSelected}
                     data-selected={isSelected ? "true" : undefined}
                     className={cn(
-                      "flex cursor-default items-center gap-2 px-4 py-1.5 text-sm hover:bg-accent/60",
+                      "flex items-center gap-1 pr-2 text-sm hover:bg-accent/60",
                       isSelected && "bg-accent",
                     )}
-                    onClick={() => open(notification.id)}
                   >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "size-1.5 shrink-0 rounded-full",
-                        notification.readAt ? "bg-transparent" : "bg-gate",
-                      )}
-                    />
-                    <Icon className={cn("size-4 shrink-0", look.className)} aria-hidden />
-                    <span
-                      className={cn(
-                        "min-w-0 flex-1 truncate",
-                        !notification.readAt && "font-medium",
-                      )}
+                    {/* The whole row opens the Notification; "Mark read" sits beside it. */}
+                    <button
+                      type="button"
+                      aria-current={isSelected ? "true" : undefined}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-4 py-1.5 text-left outline-none focus-visible:bg-accent"
+                      onClick={() => open(notification.id)}
                     >
-                      {kindText[notification.kind as keyof typeof kindText] ?? notification.kind}
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {ago(notification.createdAt)}
-                    </span>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "size-1.5 shrink-0 rounded-full",
+                          notification.readAt ? "bg-transparent" : "bg-gate",
+                        )}
+                      />
+                      <Icon className={cn("size-4 shrink-0", look.className)} aria-hidden />
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate",
+                          !notification.readAt && "font-medium",
+                        )}
+                      >
+                        {kindText[notification.kind as keyof typeof kindText] ?? notification.kind}
+                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {ago(notification.createdAt)}
+                      </span>
+                    </button>
                     {notification.readAt ? null : (
                       <Button
                         variant="ghost"
                         size="xs"
                         disabled={markRead.isPending}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          markRead.mutate({ ids: [notification.id] });
-                        }}
+                        onClick={() => markRead.mutate({ ids: [notification.id] })}
                       >
                         Mark read
                       </Button>
@@ -319,7 +323,7 @@ export function InboxPage({
   }
 
   return (
-    <ResizablePanelGroup orientation="horizontal" className="-m-6 h-[calc(100vh-2.75rem)]">
+    <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-2.75rem)]">
       <ResizablePanel defaultSize={34} minSize={24} className="min-w-0">
         {list}
       </ResizablePanel>
