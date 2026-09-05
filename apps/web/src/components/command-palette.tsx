@@ -1,5 +1,16 @@
 import { useNavigate } from "@tanstack/react-router";
-import { FolderKanban, GitBranch, Inbox, Kanban, Plus, Settings } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  CircleUser,
+  FolderKanban,
+  GitBranch,
+  Inbox,
+  Kanban,
+  ListTodo,
+  Plus,
+  Settings,
+} from "lucide-react";
+import { useState } from "react";
 import { useNewIssue } from "@/components/new-issue";
 import {
   Command,
@@ -12,6 +23,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { orpc } from "@/lib/orpc";
 import { useShortcutScope } from "@/lib/shortcuts";
 import { settingsNav } from "@/routes/settings/layout";
 
@@ -21,9 +33,10 @@ export interface PaletteProject {
 }
 
 /**
- * ⌘K: everywhere in deevy by name, and the things you can make, from one box
- * (docs/plans/ui-redesign.md). Slice 1 navigates and creates; the actions on a
- * focused Issue and the search over Issues arrive with the Issues home.
+ * ⌘K: everywhere in deevy by name, the things you can make, and any Issue by
+ * key or title, from one box (docs/plans/ui-redesign.md). Issues come from
+ * `issues.list`'s `q`, one query per keystroke past the first; the actions on
+ * a focused Issue arrive with the Issue panel.
  */
 export function CommandPalette({
   open,
@@ -40,14 +53,26 @@ export function CommandPalette({
   // search box searches instead of jumping.
   useShortcutScope("palette", open);
 
+  // Two characters is a search; one is a shortcut hint being typed.
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length >= 2;
+  const found = useQuery({
+    ...orpc.issues.list.queryOptions({ input: { q: query.trim(), limit: 8 } }),
+    enabled: open && searching,
+  });
+
+  const close = () => {
+    onOpenChange(false);
+    setQuery("");
+  };
   // Every destination here is a route the router knows; the cast is what lets
   // one list of strings stand in for a dozen literal types.
   const goTo = (to: string) => {
-    onOpenChange(false);
+    close();
     void navigate({ to: to as "/" });
   };
   const goToProject = (key: string, where: "" | "/board" | "/settings/workflow") => {
-    onOpenChange(false);
+    close();
     if (where === "/board") void navigate({ to: "/projects/$key/board", params: { key } });
     else if (where === "/settings/workflow")
       void navigate({ to: "/projects/$key/settings/workflow", params: { key } });
@@ -57,19 +82,43 @@ export function CommandPalette({
   return (
     <CommandDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
       title="Search or jump"
-      description="Type where to go or what to make"
+      description="Type an Issue, where to go, or what to make"
     >
       {/* This CommandDialog puts its children straight into the dialog; the cmdk root is ours to add. */}
       <Command>
-        <CommandInput placeholder="Search or jump to…" />
+        <CommandInput
+          placeholder="Search Issues, or jump to…"
+          value={query}
+          onValueChange={setQuery}
+        />
         <CommandList>
-          <CommandEmpty>Nothing matches.</CommandEmpty>
+          <CommandEmpty>
+            {searching && found.isPending ? "Searching…" : "Nothing matches."}
+          </CommandEmpty>
+          {searching && found.data && found.data.issues.length > 0 ? (
+            <CommandGroup heading="Issues">
+              {found.data.issues.map((issue) => (
+                <CommandItem
+                  key={issue.key}
+                  value={`${issue.key} ${issue.title}`}
+                  onSelect={() => {
+                    close();
+                    void navigate({ to: "/issues/$issueKey", params: { issueKey: issue.key } });
+                  }}
+                >
+                  <span className="font-mono text-xs text-muted-foreground">{issue.key}</span>
+                  <span className="truncate">{issue.title}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{issue.state.name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           <CommandGroup heading="Create">
             <CommandItem
               onSelect={() => {
-                onOpenChange(false);
+                close();
                 newIssue();
               }}
             >
@@ -85,7 +134,27 @@ export function CommandPalette({
               Inbox
               <CommandShortcut>g i</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => goTo("/")}>
+            <CommandItem
+              onSelect={() => {
+                close();
+                void navigate({ to: "/", search: { assignee: "me" } });
+              }}
+            >
+              <CircleUser />
+              My Issues
+              <CommandShortcut>g m</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                close();
+                void navigate({ to: "/", search: {} });
+              }}
+            >
+              <ListTodo />
+              All Issues
+              <CommandShortcut>g a</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => goTo("/projects")}>
               <FolderKanban />
               Projects
               <CommandShortcut>g p</CommandShortcut>

@@ -8,7 +8,7 @@ import { assertLeavable, enterState } from "../workflow.ts";
 import { IssueDetailSchema, IssueSummarySchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
-import { defineOperation } from "./registry.ts";
+import { defineOperation, type ContextFor } from "./registry.ts";
 import {
   ProjectKeyLookup,
   QueryFlag,
@@ -88,13 +88,27 @@ export const issues = {
     name: "issues.list",
     summary: "A Project's Issues, by number, from a cursor",
     method: "GET",
-    path: "/projects/{projectKey}/issues",
+    // Not under /projects/{projectKey}: the Project is optional now, and a path
+    // parameter cannot be. Nothing outside this repository called the old path.
+    path: "/issues",
     auth: "member",
     agents: true,
     mcp: true,
     input: z.object({
-      projectKey: ProjectKeyLookup,
-      /** Return Issues numbered above this. Pass back the previous page's nextCursor. */
+      /**
+       * Left out, every Project the caller may see, newest change first, in
+       * one query: the Issues home and the command palette are Workspace-wide
+       * screens, and one list beats one per Project on D1's per-invocation
+       * budget (docs/plans/ui-redesign.md slice 2). Named, that Project's
+       * Issues in key order, paged by `after`.
+       */
+      projectKey: ProjectKeyLookup.optional(),
+      /**
+       * An Issue key (`DEV-12`), a number, or a word of the title. A key finds
+       * exactly that Issue; anything else matches titles, case-insensitively.
+       */
+      q: z.string().trim().min(1).max(200).optional(),
+      /** Return Issues numbered above this. Only meaningful with a projectKey. */
       after: z.coerce.number().int().nonnegative().optional(),
       stateId: z.string().optional(),
       assigneeMemberId: z.string().optional(),
@@ -109,10 +123,14 @@ export const issues = {
       nextCursor: z.number().int().nullable(),
     }),
     handler: async ({ input, context }) => {
-      const project = await requireProject(context, input.projectKey);
+      const projects = input.projectKey
+        ? [await requireProject(context, input.projectKey)]
+        : await visibleProjects(context);
+      const keyOf = new Map(projects.map((project) => [project.id, project.key]));
+      const only = projects.length === 1 ? projects[0] : undefined;
       const rows = await context.db.query.issue.findMany({
         where: {
-          projectId: project.id,
+          ...(only ? { projectId: only.id } : { projectId: { in: [...keyOf.keys()] } }),
           ...(input.after === undefined ? {} : { number: { gt: input.after } }),
           ...(input.stateId === undefined ? {} : { stateId: input.stateId }),
           ...(input.assigneeMemberId === undefined
@@ -120,14 +138,17 @@ export const issues = {
             : { assigneeMemberId: input.assigneeMemberId }),
           ...(input.open ? { closedAt: { isNull: true } } : {}),
           ...(input.labelId === undefined ? {} : { labels: { id: input.labelId } }),
+          ...(input.q === undefined ? {} : searchClause(input.q, projects)),
         },
         with: issueWith,
-        orderBy: { number: "asc" },
+        // A Project's list reads in key order and pages; the Workspace's reads
+        // as a feed, and a cursor over numbers means nothing across Projects.
+        orderBy: input.projectKey ? { number: "asc" } : { updatedAt: "desc" },
         limit: input.limit,
       });
       return {
-        issues: rows.map((row) => withKey(row, project.key)),
-        nextCursor: rows.at(-1)?.number ?? null,
+        issues: rows.map((row) => withKey(row, keyOf.get(row.projectId) ?? "")),
+        nextCursor: input.projectKey ? (rows.at(-1)?.number ?? null) : null,
       };
     },
   }),
@@ -330,3 +351,33 @@ export const issues = {
     },
   }),
 };
+
+/** The Projects a Workspace-wide list reads: every unarchived one, or an Agent's grants. */
+async function visibleProjects(context: ContextFor<"member">) {
+  const granted = context.grantedProjectIds;
+  return context.db.query.project.findMany({
+    where: {
+      workspaceId: context.workspace.id,
+      archivedAt: { isNull: true },
+      ...(granted ? { id: { in: granted } } : {}),
+    },
+    columns: { id: true, key: true },
+  });
+}
+
+/**
+ * What `q` means: `DEV-12` is exactly that Issue, a bare number is that number
+ * in any Project (or a title containing it), anything else is a word of the
+ * title. SQLite's LIKE is case-insensitive for ASCII, which is what a key or
+ * a title is.
+ */
+function searchClause(q: string, projects: Array<{ id: string; key: string }>) {
+  const asKey = /^([A-Za-z]{2,6})-(\d+)$/.exec(q);
+  if (asKey) {
+    const project = projects.find((candidate) => candidate.key === asKey[1]?.toUpperCase());
+    return project ? { projectId: project.id, number: Number(asKey[2]) } : { number: -1 };
+  }
+  const pattern = `%${q.replace(/[%_]/g, (char) => `\\${char}`)}%`;
+  if (/^\d+$/.test(q)) return { OR: [{ number: Number(q) }, { title: { like: pattern } }] };
+  return { title: { like: pattern } };
+}

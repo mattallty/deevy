@@ -73,8 +73,26 @@ describe("the app shell", () => {
     ).toBe("/projects/OPS");
   });
 
-  it("renders the Projects page at the root", async () => {
+  it("renders the Issues home at the root, and links the views", async () => {
     await mountAt("/");
+
+    expect(await screen.findByRole("heading", { name: "All Issues", level: 1 })).toBeTruthy();
+    expect(
+      within(sidebar())
+        .getByRole("link", { name: /My Issues/ })
+        .getAttribute("href"),
+    ).toBe("/?assignee=me");
+    expect(
+      within(sidebar())
+        .getByRole("link", { name: /Projects/ })
+        .getAttribute("href"),
+    ).toBe("/projects");
+    // Nobody sponsors an Agent in this Workspace, so the view is not offered.
+    expect(within(sidebar()).queryByRole("link", { name: /My Agents/ })).toBeNull();
+  });
+
+  it("renders the Projects table at /projects", async () => {
+    await mountAt("/projects");
 
     expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeTruthy();
   });
@@ -113,7 +131,7 @@ describe("the app shell", () => {
 
     fireEvent.keyDown(document.body, { key: "k", metaKey: true });
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByPlaceholderText("Search or jump to…")).toBeTruthy();
+    expect(within(dialog).getByPlaceholderText("Search Issues, or jump to…")).toBeTruthy();
 
     fireEvent.click(within(dialog).getByText("Inbox"));
     await act(async () => {

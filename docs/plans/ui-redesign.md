@@ -373,7 +373,7 @@ does not exist yet; and the palette navigates and creates only, as planned, with
 with `issues.list`'s `q`. cmdk's transitive Radix dependency is recorded in `deevy-ui` as the one exception
 to the no-Radix rule.
 
-### 2 — Issues home, filters, side peek
+### 2 — Issues home, filters, side peek (shipped)
 
 Core: `issues.list` gets optional `projectKey` (absent = whole Workspace, Agents still scoped to grants)
 and optional `q` (key or title substring) — one query per screen instead of a per-Project fan-out, which
@@ -385,6 +385,12 @@ both. SPA: `routes/issues/list.tsx`, `issue-filters.tsx` (filter chips after `@c
 table and `NewProjectDialog`; the palette's Issues group uses `q`. Tests: `shell.test.tsx`'s root h1 →
 "All Issues"; `projects.test.tsx` mounts `/projects` (names kept); new `issues-home.test.tsx` (filters in
 URL, group headers, `Enter` → peek, `o` → page).
+
+What shipped differently in slice 2: `data-table.tsx` is hand-rolled on `ui/table` rather than built on
+`@reui/data-grid` — TanStack Table moved to v9 with a reworked API and this list needs sorting, folding
+groups and a selected row, not a grid; `issues.list` moved from `/projects/{projectKey}/issues` to `/issues`
+because a path parameter cannot be optional (nothing outside the repository called the old path); and the
+filter bar is single-select controls, with the multi-select chips deferred until a list needs them.
 
 ### 3 — MarkdownEditor and renderer
 

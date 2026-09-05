@@ -1,9 +1,12 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Bot,
   ChevronsUpDown,
+  CircleUser,
   FolderKanban,
   Inbox,
+  ListTodo,
   LogOut,
   Monitor,
   Moon,
@@ -78,10 +81,17 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  // "My Agents' Issues" is offered to a Sponsor and to nobody else.
+  const sponsorsAgents = (members.data?.members ?? []).some(
+    (candidate) => candidate.kind === "agent" && candidate.sponsorId === member?.id,
+  );
 
   useShortcut("mod+k", () => setPaletteOpen((open) => !open), { global: true });
   useShortcut("g i", () => void navigate({ to: "/inbox" }));
-  useShortcut("g p", () => void navigate({ to: "/" }));
+  useShortcut("g m", () => void navigate({ to: "/", search: { assignee: "me" } }));
+  useShortcut("g a", () => void navigate({ to: "/", search: {} }));
+  useShortcut("g p", () => void navigate({ to: "/projects" }));
   useShortcut("g s", () => void navigate({ to: "/settings/workspace" }));
 
   const me = {
@@ -136,9 +146,53 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      tooltip="Projects"
-                      render={<Link to="/" activeOptions={{ exact: true }} />}
+                      tooltip="My Issues"
+                      render={
+                        <Link
+                          to="/"
+                          search={{ assignee: "me" }}
+                          activeOptions={{ exact: true, includeSearch: true }}
+                        />
+                      }
                     >
+                      <CircleUser />
+                      <span>My Issues</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  {sponsorsAgents ? (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        tooltip="My Agents' Issues"
+                        render={
+                          <Link
+                            to="/"
+                            search={{ assignee: "agents:me" }}
+                            activeOptions={{ exact: true, includeSearch: true }}
+                          />
+                        }
+                      >
+                        <Bot />
+                        <span>My Agents&apos; Issues</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ) : null}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip="All Issues"
+                      render={
+                        <Link
+                          to="/"
+                          search={{}}
+                          activeOptions={{ exact: true, includeSearch: true }}
+                        />
+                      }
+                    >
+                      <ListTodo />
+                      <span>All Issues</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Projects" render={<Link to="/projects" />}>
                       <FolderKanban />
                       <span>Projects</span>
                     </SidebarMenuButton>

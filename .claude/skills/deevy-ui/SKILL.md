@@ -122,6 +122,26 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
 - **jsdom stubs** live in `tests/setup.ts`: `matchMedia`, `ResizeObserver`, `scrollTo`, and
   `Element.prototype.scrollIntoView` (cmdk needs it).
 
+## What slice 2 settled (Issues home, filters, peek)
+
+- **`issues.list` is Workspace-wide when no `projectKey` is given** (newest change first, no cursor) and
+  takes `q` — an Issue key, a number, or a word of the title. Its REST path is `/issues`, with everything as
+  query parameters; MCP and RPC callers name it the same as before. One list per screen, never a fan-out.
+- **Filters live in the URL** (`components/issue-filters.tsx`: `IssuesSearch`, `parseIssuesSearch`), so a
+  view is a link and Back undoes a filter. The server filters Project, Assignee, open and `q`; State (by
+  name, folded across Projects), Human/Agent and "my Agents" fold client-side. `assignee=me` becomes the
+  Member id from `me.get`; `agents:me` is the Agents whose `sponsorId` is me.
+- **`components/data-table.tsx`** is hand-rolled on `ui/table`: client sort per column, group rows that
+  fold, skeleton, `Empty`, `aria-selected` on the keyboard row. No TanStack Table — it went to v9 with a new
+  API and this list needs none of a grid. A row's accessible name is its text.
+- **`components/side-peek.tsx`** renders the whole `IssuePage` in a right Sheet (`sm:max-w-[720px]`),
+  keyed by `?peek=`. Base UI names the dialog from `SheetTitle` (`aria-labelledby` beats `aria-label`), so
+  a test finds it by `/DEV-1/`. It pushes the `peek` shortcut scope; `o` opens the full page; `Esc` closes.
+- **Keyboard on a list**: `j`/`k`/arrows move `aria-selected`, `Enter` peeks, `o` opens, `Esc` clears — bound
+  by the page with `useShortcut`, not by the table.
+- The sidebar has My Issues (`/?assignee=me`), My Agents' Issues (Sponsors only), All Issues (`/`) and
+  Projects (`/projects`); `g m` / `g a` / `g p`. The palette searches Issues from two characters.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

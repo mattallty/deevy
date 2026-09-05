@@ -8303,21 +8303,31 @@
             }
           }
         }
-      }
-    },
-    "/projects/{projectKey}/issues": {
+      },
       "get": {
         "operationId": "issues.list",
         "summary": "A Project's Issues, by number, from a cursor",
         "parameters": [
           {
-            "in": "path",
-            "required": true,
+            "in": "query",
             "name": "projectKey",
             "schema": {
               "type": "string",
               "pattern": "^[A-Z]{2,6}$"
-            }
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
           },
           {
             "in": "query",

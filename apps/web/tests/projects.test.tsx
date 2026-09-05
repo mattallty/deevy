@@ -101,7 +101,7 @@ async function mountAt(path: string) {
 
 describe("the Projects page", () => {
   it("lists each Project by key, name, and owning Team", async () => {
-    await mountAt("/");
+    await mountAt("/projects");
 
     const table = await screen.findByRole("table");
     expect(within(table).getByText("DEV")).toBeTruthy();
@@ -111,7 +111,7 @@ describe("the Projects page", () => {
   });
 
   it("creates a Project from the dialog with the name and key typed in", async () => {
-    await mountAt("/");
+    await mountAt("/projects");
 
     fireEvent.click(await screen.findByRole("button", { name: "New Project" }));
     const dialog = await screen.findByRole("dialog");
@@ -125,7 +125,7 @@ describe("the Projects page", () => {
   });
 
   it("upper-cases the key as it is typed, so DEV is what gets sent", async () => {
-    await mountAt("/");
+    await mountAt("/projects");
 
     fireEvent.click(await screen.findByRole("button", { name: "New Project" }));
     const dialog = await screen.findByRole("dialog");

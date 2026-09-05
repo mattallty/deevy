@@ -5,7 +5,9 @@ import {
   createMemoryHistory,
   redirect,
 } from "@tanstack/react-router";
-import { ProjectsPage } from "./routes/index.tsx";
+import { parseIssuesSearch } from "./components/issue-filters.tsx";
+import { IssuesPage } from "./routes/issues/list.tsx";
+import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
 import { TokensPage } from "./routes/dev/tokens.tsx";
 import { InboxPage } from "./routes/inbox.tsx";
@@ -38,9 +40,30 @@ const rootRoute = createRootRouteWithContext<ShellProps>()({
   },
 });
 
+// Home is the Issues you may see; the filters and the peek ride in the URL, so
+// a view is a link and Back undoes a filter (docs/plans/ui-redesign.md slice 2).
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  validateSearch: (search: Record<string, unknown>) => parseIssuesSearch(search),
+  component: function Issues() {
+    const search = indexRoute.useSearch();
+    const navigate = indexRoute.useNavigate();
+    return (
+      <IssuesPage
+        search={search}
+        onSearch={(patch) =>
+          void navigate({
+            search: (previous) => parseIssuesSearch({ ...previous, ...patch }),
+          })
+        }
+      />
+    );
+  },
+});
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects",
   component: ProjectsPage,
 });
 const projectRoute = createRoute({
@@ -171,6 +194,7 @@ const tokensRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  projectsRoute,
   inboxRoute,
   projectRoute,
   boardRoute,
