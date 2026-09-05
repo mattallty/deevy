@@ -1,4 +1,6 @@
 import { DeevyError, type Deevy, type Run } from "./deevy.ts";
+import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
+import type { Forge } from "./forge.ts";
 import { deevyIsReachable, type Session } from "./session.ts";
 import { openWorkspace, type Workspace, type WorkspaceOptions } from "./workspace.ts";
 
@@ -9,6 +11,8 @@ export interface WorkResult {
   status: Run["status"];
   /** Set when the supervisor finished the Run itself, and why. */
   failedBy?: string;
+  /** The branch and pull request this Run produced, when it changed anything. */
+  delivered?: Delivery;
 }
 
 export interface Pass {
@@ -31,6 +35,12 @@ export interface WorkOptions {
    * with a repository configured passes one that holds a clone of it.
    */
   workspace?: (options: WorkspaceOptions) => Promise<Workspace>;
+  /** Where a pull request is opened, when the repository has one. */
+  forge?: Forge | null;
+  /** How a Run's work becomes a branch and a pull request. */
+  deliver?: (options: DeliverOptions) => Promise<Delivery | null>;
+  /** Who a commit is by. Defaults to the Agent, since everything it does is its own. */
+  author?: { name: string; email: string };
 }
 
 /**
@@ -141,6 +151,7 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
   // Enough for a Human to see the shape of what was refused, and not so many
   // that a session in a loop fills the feed with them.
   let denialsLeft = 5;
+  let delivered: Delivery | null = null;
 
   try {
     for await (const event of session({ prompt: promptFor(run), cwd: workspace.cwd, signal })) {
@@ -165,19 +176,45 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
   } catch (error) {
     failure = describe(error, stopped(timeout, options.signal));
   } finally {
+    // Before the directory goes: whatever the session left behind is the only
+    // evidence there will ever be that this attempt did anything.
+    if (workspace.repo && !failure) {
+      try {
+        delivered = await (options.deliver ?? deliver)({
+          workspace,
+          forge: options.forge ?? null,
+          issueKey: run.issueKey,
+          runId: run.id,
+          author: options.author ?? {
+            name: "deevy Agent",
+            email: "agent@deevy.invalid",
+          },
+        });
+      } catch (error) {
+        // The work happened; only the record of it failed. Say so in the feed
+        // and let the Run's own outcome stand.
+        const why = error instanceof Error ? error.message : String(error);
+        await deevy
+          .comment(
+            run.issueKey,
+            `The work on Run \`${run.id}\` is done and could not be delivered: ${why}`,
+          )
+          .catch(() => undefined);
+      }
+    }
     await workspace.release();
   }
+
+  if (delivered) await attach(deevy, run, delivered);
 
   // deevy writes before it answers, so what the session managed to do counts
   // whatever it reported (docs/agent-loop.md). Ask deevy rather than believe
   // the session: a Run it finished is finished, and one it left open is the
   // supervisor's to close.
+  const evidence = delivered ? { delivered } : {};
   const settled = await deevy.run(run.id);
-  if (settled.status === "completed" || settled.status === "failed") {
-    return { runId: run.id, issueKey: run.issueKey, status: settled.status };
-  }
-  if (settled.status === "awaiting_input") {
-    return { runId: run.id, issueKey: run.issueKey, status: settled.status };
+  if (settled.status !== "pending" && settled.status !== "active" && settled.status !== "stale") {
+    return { runId: run.id, issueKey: run.issueKey, status: settled.status, ...evidence };
   }
 
   const detail = failure ?? "The session ended without finishing this Run";
@@ -187,7 +224,36 @@ export async function workRun(options: WorkOptions, run: Run): Promise<WorkResul
     issueKey: run.issueKey,
     status: (await deevy.run(run.id)).status,
     failedBy: detail,
+    ...evidence,
   };
+}
+
+/**
+ * The evidence, attributed to the attempt that produced it.
+ *
+ * A comment rather than an Activity, and that is forced rather than chosen: the
+ * model finishes its own Run, and a finished Run takes no more Activities, so
+ * by the time there is a branch to name the feed is closed. The Link is the
+ * structured record and carries `runId`, which is what makes "this pull request
+ * came from that attempt" a fact rather than a coincidence (docs/plans/m3.md,
+ * slice 1); the comment is what a Human reads on the Issue.
+ */
+async function attach(deevy: Deevy, run: Run, delivered: Delivery): Promise<void> {
+  const { branch, pullRequest } = delivered;
+  if (pullRequest) {
+    await deevy
+      .addLink(run.issueKey, {
+        url: pullRequest.url,
+        kind: "pull_request",
+        title: `#${pullRequest.number} from ${branch}`,
+        runId: run.id,
+      })
+      .catch(() => undefined);
+  }
+  const said = pullRequest
+    ? `Run \`${run.id}\` pushed \`${branch}\` and opened ${pullRequest.url}`
+    : `Run \`${run.id}\` pushed \`${branch}\`; no pull request was opened for this repository`;
+  await deevy.comment(run.issueKey, said).catch(() => undefined);
 }
 
 /**

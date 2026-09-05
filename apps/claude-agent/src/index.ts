@@ -28,6 +28,15 @@ export {
   sessionOptions,
   toSessionEvents,
 } from "./sdk.ts";
+export { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
+export {
+  forgeFor,
+  githubForge,
+  githubSlug,
+  type Forge,
+  type PullRequest,
+  type PullRequestDraft,
+} from "./forge.ts";
 export { startLoop, type Loop, type LoopOptions } from "./loop.ts";
 export {
   authArgs,

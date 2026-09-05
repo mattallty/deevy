@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { runOnce, workRun } from "../src/work.ts";
+import type { Delivery } from "../src/deliver.ts";
 import type { Session, SessionEvent } from "../src/session.ts";
 import { finished, instance, scripted } from "./helpers.ts";
 
@@ -342,6 +343,106 @@ describe("a tool the session may not call", () => {
 
     const feed = await it.asAda.runs.get({ runId: pass.worked[0].runId });
     expect(feed.activities.filter((a) => a.body.startsWith("Refused "))).toHaveLength(5);
+  });
+});
+
+describe("the evidence a Run leaves on the Issue", () => {
+  /** A working directory that is already a repository with something in it. */
+  function delivering(delivered: Delivery | null) {
+    return {
+      workspace: () =>
+        Promise.resolve({
+          cwd: "/tmp/unused",
+          repo: { url: "https://github.com/owner/repo.git", baseBranch: "main" },
+          git: () => Promise.resolve(""),
+          release: () => Promise.resolve(),
+        }),
+      forge: null,
+      delivered,
+    };
+  }
+
+  it("attaches the pull request to the Run that produced it", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    const [waiting] = await it.deevy.runs("pending");
+    const shipped: Delivery = {
+      branch: "deevy/dev-1-run-abcd",
+      commit: "a".repeat(40),
+      pullRequest: { url: "https://github.com/owner/repo/pull/7", number: 7 },
+    };
+
+    const pass = await runOnce({
+      ...options,
+      ...delivering(shipped),
+      deevy: it.deevy,
+      deliver: () => Promise.resolve(shipped),
+      session: scripted([
+        async () => {
+          await it.deevy.finishRun(waiting.id, "completed", "Wrote the code");
+        },
+        finished,
+      ]),
+    });
+
+    expect(pass.worked[0]).toMatchObject({ status: "completed", delivered: shipped });
+    const links = await it.asAda.links.list({ issueKey: "DEV-1" });
+    expect(links.links).toHaveLength(1);
+    expect(links.links[0]).toMatchObject({
+      url: "https://github.com/owner/repo/pull/7",
+      kind: "pull_request",
+      runId: waiting.id,
+    });
+    // A comment rather than an Activity, because the model closed its own Run
+    // before there was a branch to name and a closed Run takes no more.
+    const said = await it.asAda.comments.list({ issueKey: "DEV-1" });
+    expect(said.comments.map((comment) => comment.body)).toContain(
+      `Run \`${waiting.id}\` pushed \`deevy/dev-1-run-abcd\` and opened https://github.com/owner/repo/pull/7`,
+    );
+  });
+
+  it("attaches nothing when the Run changed nothing", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    const [waiting] = await it.deevy.runs("pending");
+
+    await runOnce({
+      ...options,
+      ...delivering(null),
+      deevy: it.deevy,
+      deliver: () => Promise.resolve(null),
+      session: scripted([
+        async () => {
+          await it.deevy.finishRun(waiting.id, "completed", "Nothing needed doing");
+        },
+        finished,
+      ]),
+    });
+
+    expect((await it.asAda.links.list({ issueKey: "DEV-1" })).links).toEqual([]);
+    expect((await it.asAda.comments.list({ issueKey: "DEV-1" })).comments).toEqual([]);
+  });
+
+  it("says so in the feed when the work is done and the record is not", async () => {
+    const it = await deevyWithAnAssignedIssue();
+    const [waiting] = await it.deevy.runs("pending");
+
+    const pass = await runOnce({
+      ...options,
+      ...delivering(null),
+      deevy: it.deevy,
+      deliver: () => Promise.reject(new Error("the remote rejected the push")),
+      session: scripted([
+        async () => {
+          await it.deevy.finishRun(waiting.id, "completed", "Wrote the code");
+        },
+        finished,
+      ]),
+    });
+
+    // The Run's own outcome stands: the work happened, only the record of it
+    // failed, and a Human can see both.
+    expect(pass.worked[0]).toMatchObject({ status: "completed" });
+    const said = await it.asAda.comments.list({ issueKey: "DEV-1" });
+    expect(said.comments.at(-1)?.body).toContain("could not be delivered");
   });
 });
 

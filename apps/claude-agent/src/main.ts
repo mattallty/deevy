@@ -1,5 +1,6 @@
 import { readConfig } from "./config.ts";
 import { DeevyError, createDeevy } from "./deevy.ts";
+import { forgeFor } from "./forge.ts";
 import { startLoop } from "./loop.ts";
 import { buildSession } from "./sdk.ts";
 import { runOnce } from "./work.ts";
@@ -31,6 +32,7 @@ const work = {
   deevy,
   session: buildSession(config),
   runTimeoutMs: config.runTimeoutSeconds * 1000,
+  forge: forgeFor(config.repo),
   workspace: (options: { runId: string }) =>
     openWorkspace({
       ...options,

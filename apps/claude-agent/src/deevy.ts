@@ -55,6 +55,18 @@ export interface Deevy {
   startRun(issueKey: string): Promise<Run>;
   postActivity(runId: string, kind: ActivityKind, body: string): Promise<void>;
   finishRun(runId: string, status: "completed" | "failed", summary: string): Promise<void>;
+  /** Says something to the Humans watching the Issue, in prose. */
+  comment(issueKey: string, body: string): Promise<void>;
+  /** Attaches evidence to the Issue, attributed to the Run that produced it. */
+  addLink(
+    issueKey: string,
+    link: {
+      url: string;
+      kind: "pull_request" | "commit" | "branch" | "url";
+      title: string;
+      runId: string;
+    },
+  ): Promise<void>;
   unread(): Promise<Notification[]>;
   markRead(ids: string[]): Promise<number>;
 }
@@ -123,6 +135,12 @@ export function createDeevy({ config, fetch = globalThis.fetch }: DeevyOptions):
     },
     async finishRun(runId, status, summary) {
       await post(`/runs/${encodeURIComponent(runId)}/finish`, { status, summary });
+    },
+    async comment(issueKey, body) {
+      await post(`/issues/${encodeURIComponent(issueKey)}/comments`, { body });
+    },
+    async addLink(issueKey, link) {
+      await post(`/issues/${encodeURIComponent(issueKey)}/links`, link);
     },
     async unread() {
       const page = await call<{ notifications: Notification[] }>("/inbox?unreadOnly=true");
