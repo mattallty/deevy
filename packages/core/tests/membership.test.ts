@@ -161,7 +161,7 @@ describe("a github_org rule", () => {
     await joinWorkspace(
       db,
       { userId: "u-bob", email: "bob@example.org", name: "Bob" },
-      { listOrgs: async () => ["Acme"] },
+      { listOrgs: async () => ["Globex"] },
     );
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toBeUndefined();

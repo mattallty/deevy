@@ -15,7 +15,7 @@ describe("allowlist.add", () => {
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     const client = createRouterClient(router, { context: admin });
 
-    const rule = await client.allowlist.add({ kind: "email_domain", value: "Acme.net" });
+    const rule = await client.allowlist.add({ kind: "email_domain", value: "Example.COM" });
 
     expect(rule).toMatchObject({
       kind: "email_domain",
