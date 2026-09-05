@@ -107,6 +107,12 @@ Work one Issue at a time, in this order.
    Calling it again is the same question, not a second one. When a Human has decided, the same call answers
    `approved` or `rejected` with their note. Rejected means read the note and revise the Document; it does not
    mean ask again.
+
+   A Run waiting on a Gate does not time out. The stale sweep only touches Runs deevy is waiting on —
+   `pending` and `active` — because sweeping one that is waiting on a Human would strand their answer. So
+   there is nothing to reopen and nothing to rescue: if nobody rules on it, deevy asks the approvers again on
+   its own. Wait, or come back later and call the same tool.
+
 7. **Attach the evidence.** `links_add` with the Run's id and the pull request URL, so what you produced is
    attributed to the attempt that produced it. Use `comments_create` if a Human needs to be told something in
    prose; mention them by handle.
@@ -121,8 +127,9 @@ you were finished.
 
 If you cannot go on — a missing Document, a Project you cannot see, a tool that refuses — post
 `runs_post_activity` with `kind: "error"` saying exactly what stopped you, then `runs_finish` with
-`status: "failed"` and the same explanation. A Run left open goes `stale` after thirty minutes of silence,
-which tells a Human nothing about why.
+`status: "failed"` and the same explanation. A Run left `pending` or `active` goes `stale` after thirty
+minutes of silence, which tells a Human nothing about why. A Run in `awaiting_input` is the exception and
+never goes stale, because it is waiting on a Human rather than on you.
 
 A tool that refuses is not always work that failed. deevy writes before it answers, so a call that errors may
 already have done what it said: check with `runs_get` before you report a failure, and say what you found. A
