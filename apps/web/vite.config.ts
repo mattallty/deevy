@@ -43,8 +43,6 @@ export default defineConfig({
     },
   },
   test: {
-    // Vitest blanks CSS imports; this one is read as text by tests/theme-candidates.test.tsx (?raw).
-    css: { include: [/theme-candidates\.css/] },
     environment: "jsdom",
     include: ["tests/**/*.test.tsx"],
     setupFiles: ["./tests/setup.ts"],

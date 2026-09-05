@@ -241,16 +241,10 @@ catalogs:
     '@dnd-kit/utilities':
       specifier: ^3.2.2
       version: 3.2.2
-    '@fontsource-variable/ibm-plex-sans':
-      specifier: 5.3.0
-      version: 5.3.0
     '@fontsource-variable/inter':
       specifier: 5.3.0
       version: 5.3.0
     '@fontsource-variable/jetbrains-mono':
-      specifier: 5.3.0
-      version: 5.3.0
-    '@fontsource/ibm-plex-mono':
       specifier: 5.3.0
       version: 5.3.0
     '@hono/node-server':
@@ -521,10 +515,10 @@ importers:
       '@dnd-kit/utilities':
         specifier: 'catalog:'
         version: 3.2.2(react@19.2.8)
-      '@fontsource-variable/ibm-plex-sans':
+      '@fontsource-variable/inter':
         specifier: 'catalog:'
         version: 5.3.0
-      '@fontsource/ibm-plex-mono':
+      '@fontsource-variable/jetbrains-mono':
         specifier: 'catalog:'
         version: 5.3.0
       '@orpc/client':
@@ -627,12 +621,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 5.20260903.1
-      '@fontsource-variable/inter':
-        specifier: 'catalog:'
-        version: 5.3.0
-      '@fontsource-variable/jetbrains-mono':
-        specifier: 'catalog:'
-        version: 5.3.0
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.3(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.1)(esbuild@0.28.1)(jiti@2.7.0)(typescript@7.0.2))
@@ -1682,17 +1670,11 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@fontsource-variable/ibm-plex-sans@5.3.0':
-    resolution: {integrity: sha512-agG8tXFEo0hD9+J7npa4vbbWult52eMLVaQ6WQRlhs/iCAojrMAoejru85W9HTVXHfyUj96KM7gp/KGAS87XaQ==}
-
   '@fontsource-variable/inter@5.3.0':
     resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
   '@fontsource-variable/jetbrains-mono@5.3.0':
     resolution: {integrity: sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw==}
-
-  '@fontsource/ibm-plex-mono@5.3.0':
-    resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
 
   '@hey-api/spec-types@0.0.0-next-20260408030107':
     resolution: {integrity: sha512-P5DKr4dpZ7lmZpZt2bc2KWuzU9vl4GZcN7VrjchZF1WWKNGZFnwWhBxZo1t6P2muOCopIvqD2Fvp5os4QiitKA==}
@@ -5948,13 +5930,9 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@fontsource-variable/ibm-plex-sans@5.3.0': {}
-
   '@fontsource-variable/inter@5.3.0': {}
 
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
-
-  '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@hey-api/spec-types@0.0.0-next-20260408030107':
     dependencies:

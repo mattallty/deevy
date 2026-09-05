@@ -5,9 +5,6 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// The round-2 theme candidates ride along in development only (src/dev/theme-switcher.tsx).
-if (import.meta.env.DEV) void import("./dev/theme-candidates.css");
-
 // A list re-read within five seconds of the last read is the same list: the
 // live stream invalidates what an Event changed, so a mounted screen never
 // needs to refetch merely because a component remounted (lib/live.ts).

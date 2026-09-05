@@ -1,6 +1,6 @@
 # deevy UI, round 2: Matt's critique of the redesign
 
-Status: slice A shipped; round one of the pick chose the clean-slate direction and the switcher now holds six variations of it (the pick between them is pending). Slices B–H
+Status: slice A done — Matt picked _Indigo · roomy_, now baked into `index.css`; the switcher and candidates are gone. Slices B–H follow. Slices B–H
 follow in the order below. The approved plan of 2026-09-05, kept here as the record; each slice's
 "what shipped differently" is appended to it as it lands.
 
@@ -92,7 +92,7 @@ instance (and `vp run web#screens` regenerated at the end of the round). Order: 
 because every mockup after it should be judged in the chosen theme; the polish batch second because it is
 cheap and Matt sees it everywhere; then the data-backed screens with their mockups; the features last.
 
-### A — Theme spread (points 7, 8) — shipped, pick pending
+### A — Theme spread (points 7, 8) — shipped, picked, baked
 
 A dev-only **theme switcher** that applies a whole candidate — colours, fonts, radius, letter-spacing,
 density — to the real, seeded app while browsing, so Matt compares screens, not swatches.
@@ -141,7 +141,12 @@ What shipped differently:
   clean slate — three action-colour treatments (indigo as published; a clearer cobalt; a quiet ink-blue on
   neutrals with half the chroma) crossed with two scales (roomy: 8px corners, `--density` 0.2625rem;
   compact: 6px, 0.2375rem) — all on Inter + JetBrains Mono. Geist and DM Sans left with the losers; Plex
-  stays as the reference row until the winner is merged.
+  stayed as the reference row until the winner was merged.
+- **The pick (2026-09-05): Indigo · roomy** — clean slate as published (indigo action, blue-gray neutrals,
+  Inter + JetBrains Mono) at `--density: 0.2625rem` and `--radius: 0.5rem`, with deevy's six semantic slots.
+  Merged into `index.css` as the one `:root`/`.dark` pair; `--face-*`, `--density` and `--tracking` stay as
+  the variables a future review would retune. The candidates file, the switcher, their tests, the
+  `vite.config.ts` exception and Plex are gone; Inter and JetBrains Mono are dependencies.
 
 ### B — Polish batch (points 1, 2, 3, 6, 11, 13, 14, 16)
 
