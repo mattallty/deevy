@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../src/lib/orpc.ts", async () => {
@@ -23,7 +23,11 @@ async function mountAt(path: string) {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  await router.load();
+  // The router settles its matches in React state, so the load belongs
+  // inside act: `render` wraps its own work and cannot wrap this.
+  await act(async () => {
+    await router.load();
+  });
 }
 
 describe("the app shell", () => {

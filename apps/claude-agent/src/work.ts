@@ -1,4 +1,4 @@
-import { DeevyError, type Deevy, type Ruling, type Run } from "./deevy.ts";
+import { DeevyError, isOpen, type Deevy, type Ruling, type Run } from "./deevy.ts";
 import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
 import { deevyIsReachable, type Session } from "./session.ts";
@@ -154,10 +154,20 @@ async function takeUpInbox(deevy: Deevy): Promise<{ takenUp: string[]; answered:
     }
     if (notification.kind !== "assignment" || !notification.issue) continue;
     const issueKey = notification.issue.key;
+    // Ask before opening one. The trigger that wrote this Notification already
+    // opened a Run in the same Event, so starting one here would collide every
+    // single time — a request that is known to fail on the happy path, and an
+    // error in deevy's log on nothing going wrong.
+    if ((await deevy.runsOn(issueKey)).some(isOpen)) {
+      clear.push(notification.id);
+      continue;
+    }
     try {
       await deevy.startRun(issueKey);
       takenUp.push(issueKey);
     } catch (error) {
+      // Still caught, and now it means what it says: another host opened one
+      // between the question and the answer.
       if (!(error instanceof DeevyError) || error.code !== "CONFLICT") throw error;
     }
     clear.push(notification.id);

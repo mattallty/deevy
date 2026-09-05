@@ -61,13 +61,31 @@ export async function instance() {
   });
 
   const config: Config = { ...testConfig, url: baseURL, key: issued.key };
+  /**
+   * Every request the runtime made that deevy refused. A supervisor that asks
+   * for something it knows will fail leaves an error in an operator's log on
+   * nothing going wrong, and this is how a test can say it did not.
+   */
+  const refused: Array<{ method: string; path: string; status: number }> = [];
+
   return {
     db,
     close,
     config,
+    refused,
     deevy: createDeevy({
       config,
-      fetch: async (input, init) => app.request(input as string, init),
+      fetch: async (input, init) => {
+        const response = await app.request(input as string, init);
+        if (!response.ok) {
+          refused.push({
+            method: init?.method ?? "GET",
+            path: new URL(input as string).pathname,
+            status: response.status,
+          });
+        }
+        return response;
+      },
     }),
     /**
      * The Agent's key against a path the supervisor itself never calls. The

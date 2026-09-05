@@ -2,6 +2,7 @@ export { readConfig, type Config } from "./config.ts";
 export {
   createDeevy,
   DeevyError,
+  isOpen,
   type ActivityKind,
   type Deevy,
   type Notification,

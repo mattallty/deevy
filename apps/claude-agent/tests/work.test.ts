@@ -126,12 +126,36 @@ describe("taking work up from the inbox", () => {
     expect(await it.deevy.unread()).toEqual([]);
   });
 
-  it("treats an Issue somebody already has as somebody else's", async () => {
+  it("asks before opening a Run, rather than colliding with the trigger's", async () => {
     const it = await deevyWithAnAssignedIssue();
 
-    // The trigger's Run is still open, so `runs.start` is a CONFLICT: the rule
-    // is one open Run per Issue and Agent, and that is what makes two hosts
-    // sharing one key safe rather than lucky.
+    const pass = await runOnce({
+      ...options,
+      deevy: it.deevy,
+      session: scripted([
+        async () => {
+          const [run] = await it.deevy.runs("pending");
+          await it.deevy.finishRun(run.id, "completed", "Planned it");
+        },
+        finished,
+      ]),
+    });
+
+    // The trigger that wrote the Notification already opened the Run, in the
+    // same Event. Starting one here would collide on every assignment there has
+    // ever been: a request known to fail on the happy path, and an error in
+    // deevy's log on nothing going wrong.
+    expect(pass.takenUp).toEqual([]);
+    expect(pass.worked[0]).toMatchObject({ issueKey: "DEV-1", status: "completed" });
+    expect(it.refused).toEqual([]);
+  });
+
+  it("still treats a genuine collision as somebody else's Issue", async () => {
+    const it = await deevyWithAnAssignedIssue();
+
+    // Two hosts, one key: the second asks, is told there is nothing open
+    // because the first has not written yet, and loses the race. deevy's rule
+    // is what makes that safe rather than lucky, so the catch stays.
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
@@ -147,6 +171,32 @@ describe("taking work up from the inbox", () => {
     expect(pass.takenUp).toEqual([]);
     expect((await it.asAda.runs.list({ issueKey: "DEV-1" })).runs).toHaveLength(1);
     expect(await it.deevy.unread()).toEqual([]);
+  });
+
+  it("opens one when the Issue has none open, and asks only once", async () => {
+    const it = await instance();
+    closers.push(it.close);
+    await it.asAda.issues.create({ projectKey: "DEV", title: "Ship it" });
+    await it.asAda.issues.update({ key: "DEV-1", assigneeMemberId: it.planner.id });
+    const [opened] = await it.deevy.runs("pending");
+    await it.deevy.finishRun(opened.id, "failed", "An earlier attempt gave up");
+
+    const pass = await runOnce({
+      ...options,
+      deevy: it.deevy,
+      session: scripted([
+        async () => {
+          const [run] = await it.deevy.runs("pending");
+          await it.deevy.finishRun(run.id, "completed", "Second time lucky");
+        },
+        finished,
+      ]),
+    });
+
+    // A finished Run is not an open one, so this is the path that does start
+    // one — and it still does not cost a refusal.
+    expect(pass.takenUp).toEqual(["DEV-1"]);
+    expect(it.refused).toEqual([]);
   });
 });
 

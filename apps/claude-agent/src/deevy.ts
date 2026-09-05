@@ -22,6 +22,17 @@ export interface Run {
 
 export type ActivityKind = "thought" | "action" | "elicitation" | "response" | "error";
 
+/**
+ * The statuses deevy counts as open, and so the ones a second Run on the same
+ * Issue would collide with. `stale` is one of them: a Run that went quiet is
+ * recoverable rather than finished (packages/core/src/runs.ts).
+ */
+const openStatuses: ReadonlyArray<Run["status"]> = ["pending", "active", "awaiting_input", "stale"];
+
+export function isOpen(run: Run): boolean {
+  return openStatuses.includes(run.status);
+}
+
 export interface Notification {
   id: string;
   kind:
@@ -72,6 +83,12 @@ export interface Deevy {
   /** Who this key is, which is how the runtime learns its own Member id. */
   me(): Promise<{ memberId: string; kind: string }>;
   runs(status: Run["status"]): Promise<Run[]>;
+  /**
+   * This Agent's Runs on one Issue. deevy defaults the Agent to the caller and
+   * ANDs the two filters, so the answer is exactly what the
+   * one-open-Run-per-(Issue, Agent) rule is about.
+   */
+  runsOn(issueKey: string): Promise<Run[]>;
   run(runId: string): Promise<Run>;
   /** Opens a Run on an Issue. A `CONFLICT` means somebody already has one open. */
   startRun(issueKey: string): Promise<Run>;
@@ -146,6 +163,10 @@ export function createDeevy({ config, fetch = globalThis.fetch }: DeevyOptions):
       // No `agentMemberId`: for an Agent, asking for nothing in particular means
       // its own Runs, which is what makes this the work queue (docs/plans/m2.md).
       const page = await call<{ runs: Run[] }>(`/runs?status=${status}`);
+      return page.runs;
+    },
+    async runsOn(issueKey) {
+      const page = await call<{ runs: Run[] }>(`/runs?issueKey=${encodeURIComponent(issueKey)}`);
       return page.runs;
     },
     run(runId) {
