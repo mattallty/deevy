@@ -187,3 +187,32 @@ describe("keyboard help and the focused Issue", () => {
     expect(screen.queryByRole("option", { name: /Open full page/ })).toBeNull();
   });
 });
+
+describe("the breadcrumb in the top bar", () => {
+  const trail = () => screen.getByRole("navigation", { name: "breadcrumb" });
+
+  it("names the Issues view, and Board when the list is one", async () => {
+    await mountAt("/");
+    expect(within(trail()).getByText("All Issues")).toBeTruthy();
+  });
+
+  it("leads back from a Project's tab through the Project and Projects", async () => {
+    await mountAt("/projects/DEV/board");
+    const nav = trail();
+    // The Project's name arrives with projects.list; the key stands in until then.
+    expect(within(nav).getByRole("link", { name: "Projects" }).getAttribute("href")).toBe(
+      "/projects",
+    );
+    expect((await within(nav).findByRole("link", { name: "deevy" })).getAttribute("href")).toBe(
+      "/projects/DEV",
+    );
+    expect(within(nav).getByText("Board").getAttribute("aria-current")).toBe("page");
+  });
+
+  it("leads back from a Settings page to Settings", async () => {
+    await mountAt("/settings/allowlist");
+    const nav = trail();
+    expect(within(nav).getByRole("link", { name: "Settings" })).toBeTruthy();
+    expect(within(nav).getByText("Allowlist")).toBeTruthy();
+  });
+});

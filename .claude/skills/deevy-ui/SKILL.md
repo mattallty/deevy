@@ -350,6 +350,9 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **The Workflow editor is master–detail**: `ul "States"` on the left (drag handle, `Edit <State>` row
   button, unsaved dot), `form "<State>"` on the right with `StateFields` (`components/workflow-state-fields.tsx`),
   the template in the markdown editor, approvers in `components/approvers-picker.tsx`.
+- **The top bar carries a breadcrumb** (`components/app-breadcrumb.tsx`, shadcn `ui/breadcrumb`, `nav
+aria-label="breadcrumb"`): `crumbsFor(pathname, search, projectName)` is pure — Issues view by its filters,
+  Projects › Project › tab, Projects › Project › KEY for an Issue, Settings › page. A new route gets a case there.
 - **Lists are `DataTable`**, and a row opens on click (`onOpen`); the Projects list was the last raw table.
 - **A page that lays out its own panes declares `staticData: { bleed: true }`** on its route; the shell
   reads it and adds no padding. Nothing else cancels the shell's `p-6`.

@@ -201,6 +201,14 @@ straight into `SelectContent`, so they sat flush against the popup edge. Every `
 items in `SelectGroup` (a ground rule in `deevy-ui`). Also seen in the diff and left alone: upstream's
 newest style carries `cn-menu-target cn-menu-translucent` on the popup, which ours predates.
 
+### B″ — Breadcrumb (point 20) — shipped
+
+`components/app-breadcrumb.tsx` on the vendored shadcn `ui/breadcrumb` (Base UI `useRender`, already in the
+kit): `crumbsFor(pathname, search, projectName)` derives the trail — the Issues view by its filters (plus
+"Board" in board view), Inbox, Projects › Project › tab, Projects › Project › KEY for an Issue, Settings ›
+page › detail — and `AppBreadcrumb` renders it in the top bar between the sidebar trigger and New Issue,
+Project names from the `projects.list` the shell already holds.
+
 ### Mockups — picked (checkpoint 2, 2026-09-06): Inbox 2, Activity 2, Kanban 1, Workflow 3
 
 `/dev/mockups/{inbox,activity,kanban,workflow}` from `src/dev/fixtures.ts`, variants numbered per screen.

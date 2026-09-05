@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
+import { AppBreadcrumb } from "@/components/app-breadcrumb";
 import { CommandPalette } from "@/components/command-palette";
 import { Shortcut } from "@/components/kbd-hint";
 import { MemberChip } from "@/components/member-chip";
@@ -252,6 +253,7 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
           <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
+            <AppBreadcrumb />
             <span className="flex-1" />
             {/* In the top bar, so it is one click from anywhere and `c` from anywhere. */}
             <NewIssueButton variant="default" size="default" withShortcut />
