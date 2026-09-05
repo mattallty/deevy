@@ -57,6 +57,11 @@ describe("the Agent capability rule", () => {
       "documents.list",
       "documents.write",
       "inbox.list",
+      // Its own inbox, scoped to the caller in the same statement it updates
+      // with, so a loop that polls `unreadOnly` can stop finding the same work
+      // (docs/plans/m4.md). Not projected as a tool: the loop keeps its books,
+      // not the model.
+      "inbox.markRead",
       "issues.create",
       "issues.get",
       "issues.list",

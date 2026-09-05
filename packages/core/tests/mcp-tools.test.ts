@@ -57,14 +57,29 @@ describe("the committed tool manifest", () => {
       // answer to a free-form elicitation never reaches the loop that asked.
       "runs_get",
       // Not in PLAN.md's list, and needed: an Agent whose Run a trigger opened
-      // has no other way to find it, and its inbox is always empty because
-      // Notifications are derived for Humans. Without this the polling
-      // fallback ADR-0003 promises does not work (docs/plans/m2.md, slice 9).
+      // has no other way to find it, because it cannot learn its own Member id.
+      // Its inbox does carry the assignment and the ruling it waits for, but
+      // only `runs_list` answers once those have been read. Without this the
+      // polling fallback ADR-0003 promises does not work (docs/plans/m2.md,
+      // slice 9).
       "runs_list",
       "runs_post_activity",
       "runs_request_approval",
       "runs_start",
     ]);
+  });
+
+  it("keeps the inbox readable and its bookkeeping off the tool set", async () => {
+    const names = (await toolManifest()).map((tool) => tool.name);
+
+    // An Agent may clear its own inbox (docs/plans/m4.md, slice 1), and does it
+    // over the HTTP API with the same key: the caller is the loop keeping its
+    // own books rather than the model, so the twenty tools PLAN.md promises
+    // stay twenty.
+    expect(names).toContain("inbox_list");
+    expect(names).not.toContain("inbox_mark_read");
+    expect(names).not.toContain("inbox_mark_all_read");
+    expect(names).not.toContain("inbox_unread_count");
   });
 
   it("widens Labels and Links no further than that", async () => {

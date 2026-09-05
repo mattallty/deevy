@@ -9,7 +9,7 @@ milestone plan in `docs/PLAN.md`, setup and env vars in `docs/DEVELOPMENT.md`, r
 Worker in `docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen slices from
 `docs/plans/m1.md`; M2 (Agents) done, in nine slices from `docs/plans/m2.md`, with a worked agent loop in
 `docs/agent-loop.md`; M3 (Workers) built in ten slices from `docs/plans/m3.md`, its end-to-end walk written up
-in `docs/m3-acceptance.md` and **not yet run against a Cloudflare account**; M4 (Reference runtime) is next.
+in `docs/m3-acceptance.md`; M4 (Reference runtime) is next, planned in ten slices in `docs/plans/m4.md`.
 
 ## Commands
 

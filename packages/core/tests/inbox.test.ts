@@ -3,7 +3,7 @@ import { createRouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
-import { memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { agentContext, memberContext, testDb, type MemberContext } from "./helpers.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -173,5 +173,80 @@ describe("the inbox", () => {
 
     const carol = await asCarol.inbox.list({});
     expect(carol.notifications.every((n) => n.recipientMemberId !== bob.member.id)).toBe(true);
+  });
+});
+
+describe("an Agent's own inbox", () => {
+  async function agentWorkspace(db: MemberContext["db"]) {
+    const alice = await memberContext(db, { role: "admin", name: "Alice" });
+    const asAlice = createRouterClient(router, { context: alice });
+    const project = await asAlice.projects.create({ name: "deevy", key: "DEV" });
+    const planner = await agentContext(db, {
+      name: "Planner",
+      email: "planner@flippable.net",
+      sponsor: alice.member,
+      grants: [project.id],
+    });
+    return { alice, asAlice, planner, asPlanner: createRouterClient(router, { context: planner }) };
+  }
+
+  it("clears the Notifications it has taken up, so the next pass finds new work", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { asAlice, planner, asPlanner } = await agentWorkspace(db);
+    await asAlice.issues.create({ projectKey: "DEV", title: "One" });
+    await asAlice.issues.create({ projectKey: "DEV", title: "Two" });
+    await asAlice.issues.update({ key: "DEV-1", assigneeMemberId: planner.member.id });
+    await asAlice.issues.update({ key: "DEV-2", assigneeMemberId: planner.member.id });
+
+    const waiting = await asPlanner.inbox.list({ unreadOnly: true });
+    expect(waiting.notifications.map((n) => n.kind)).toEqual(["assignment", "assignment"]);
+    const read = await asPlanner.inbox.markRead({ ids: waiting.notifications.map((n) => n.id) });
+
+    expect(read.read).toBe(2);
+    expect((await asPlanner.inbox.list({ unreadOnly: true })).notifications).toEqual([]);
+    expect((await asPlanner.inbox.list({})).notifications).toHaveLength(2);
+  });
+
+  it("cannot read another Member's inbox by naming their ids", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { asAlice, planner, asPlanner } = await agentWorkspace(db);
+    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const asBob = createRouterClient(router, { context: bob });
+    await asAlice.issues.create({ projectKey: "DEV", title: "One" });
+    await asAlice.issues.create({ projectKey: "DEV", title: "Two" });
+    await asAlice.issues.update({ key: "DEV-1", assigneeMemberId: bob.member.id });
+    await asAlice.issues.update({ key: "DEV-2", assigneeMemberId: planner.member.id });
+    const bobs = await asBob.inbox.list({ unreadOnly: true });
+
+    const read = await asPlanner.inbox.markRead({ ids: bobs.notifications.map((n) => n.id) });
+
+    expect(read.read).toBe(0);
+    expect((await asBob.inbox.list({ unreadOnly: true })).notifications).toHaveLength(
+      bobs.notifications.length,
+    );
+    expect((await asPlanner.inbox.list({ unreadOnly: true })).notifications).toHaveLength(1);
+  });
+
+  it("is refused once its Sponsor has suspended it", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { asAlice, planner, asPlanner } = await agentWorkspace(db);
+    await asAlice.issues.create({ projectKey: "DEV", title: "One" });
+    await asAlice.issues.update({ key: "DEV-1", assigneeMemberId: planner.member.id });
+    const waiting = await asPlanner.inbox.list({ unreadOnly: true });
+
+    await asAlice.agents.suspend({ memberId: planner.member.id });
+    const suspended = (await db.query.member.findFirst({
+      where: { id: planner.member.id },
+    })) as MemberContext["member"];
+
+    await expect(
+      createRouterClient(router, { context: { ...planner, member: suspended } }).inbox.markRead({
+        ids: waiting.notifications.map((n) => n.id),
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect((await asPlanner.inbox.list({ unreadOnly: true })).notifications).toHaveLength(1);
   });
 });
