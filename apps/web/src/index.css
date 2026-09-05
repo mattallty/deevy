@@ -19,7 +19,18 @@
  * directions and the OS setting is the default.
  */
 :root {
+  /*
+   * Type, radius and density are variables a theme candidate can override
+   * (src/dev/theme-candidates.css, during the round-2 review): the families
+   * the utilities use, the corner radius everything derives from, the unit
+   * every spacing utility multiplies, and the body's letter-spacing.
+   */
+  --face-sans:
+    "IBM Plex Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --face-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 0.375rem;
+  --density: 0.25rem;
+  --tracking: 0em;
 
   --background: oklch(0.975 0.004 85);
   --foreground: oklch(0.21 0.012 70);
@@ -95,9 +106,10 @@
 }
 
 @theme inline {
-  --font-sans:
-    "IBM Plex Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--face-sans);
+  --font-mono: var(--face-mono);
+  /* Every spacing utility is calc(var(--density) * n), so one variable retunes the scale. */
+  --spacing: var(--density);
 
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
@@ -158,6 +170,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans text-sm antialiased;
+    letter-spacing: var(--tracking);
   }
   /* Keys, seqs and times line up when their digits share a width. */
   .font-mono,

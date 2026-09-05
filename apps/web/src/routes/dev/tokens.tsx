@@ -3,6 +3,7 @@ import { RunStatus, runStatusLabels, type RunStatusValue } from "@/components/ru
 import { Shortcut } from "@/components/kbd-hint";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
+import { themeCandidates, type ThemeCandidateId } from "@/dev/theme-candidates";
 import { cn } from "@/lib/utils";
 
 const slots = [
@@ -23,10 +24,12 @@ const slots = [
 const ada = { id: "a", kind: "human" as const, handle: "ada", user: { name: "Ada Lovelace" } };
 const planner = { id: "p", kind: "agent" as const, handle: "planner", user: { name: "Planner" } };
 
-function Sheet({ theme }: { theme: "light" | "dark" }) {
+function Sheet({ theme, candidate }: { theme: "light" | "dark"; candidate: ThemeCandidateId }) {
   return (
     <section
-      className={cn(theme, "flex flex-col gap-6 bg-background p-6 text-foreground")}
+      // The candidate's variables scope to this element, as they scope to <html> in the app.
+      {...(candidate === "plex-warm" ? {} : { "data-theme-candidate": candidate })}
+      className={cn(theme, "flex flex-col gap-6 bg-background p-6 font-sans text-foreground")}
       aria-label={`${theme} theme`}
     >
       <h2 className="text-base font-semibold">{theme === "dark" ? "Dark" : "Light"}</h2>
@@ -92,25 +95,39 @@ function Sheet({ theme }: { theme: "light" | "dark" }) {
   );
 }
 
-/** The tokens, drawn side by side in both themes, for the slice 1 review. */
+/**
+ * The tokens, drawn side by side in both themes — once per theme candidate
+ * during the round-2 review (docs/plans/ui-redesign-2.md, slice A), so the six
+ * can be compared on one page before being lived with in the app.
+ */
 export function TokensPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Tokens</h1>
         <p className="text-sm text-muted-foreground">
-          The palette and the type scale from docs/plans/ui-redesign.md, as the browser draws them.
-          Human, Agent and Gate are the only saturated colours on a screen.
+          The palette and the type scale, as the browser draws them, for each theme candidate.
+          Human, Agent and Gate are the only saturated colours on a screen, whatever the candidate.
         </p>
       </header>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-lg border">
-          <Sheet theme="light" />
-        </div>
-        <div className="overflow-hidden rounded-lg border">
-          <Sheet theme="dark" />
-        </div>
-      </div>
+      {themeCandidates.map((candidate) => (
+        <section key={candidate.id} aria-label={candidate.label} className="flex flex-col gap-3">
+          <h2 className="flex flex-wrap items-baseline gap-x-3 text-base font-semibold">
+            {candidate.label}
+            <span className="text-sm font-normal text-muted-foreground">
+              {candidate.font} · {candidate.mono} · {candidate.radiusPx}px · {candidate.note}
+            </span>
+          </h2>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="overflow-hidden rounded-lg border">
+              <Sheet theme="light" candidate={candidate.id} />
+            </div>
+            <div className="overflow-hidden rounded-lg border">
+              <Sheet theme="dark" candidate={candidate.id} />
+            </div>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
