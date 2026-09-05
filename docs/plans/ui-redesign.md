@@ -508,9 +508,21 @@ What shipped differently:
   Issues table's Label chips painted over the Assignee column because nothing clipped the title cell (now
   clipped, chips hidden below `sm`).
 - **Palette Issue actions are three, not nine.** The plan listed Assign, Move, Approve/Reject, Label, Parent,
-  Copy key, Copy link and Open full page. Only the last three are in the palette: the rest each need a picker
-  the rail already has, one keystroke away (`a`, `s`, `l`, `p`), and a palette that opened a second picker
-  was one step longer than the rail. The palette knows the focused Issue from the URL (`/issues/KEY`, else
+  Copy key, Copy link and Open full page. Only the last three are in the palette: the rest each have a picker
+  in the rail one keystroke away (`a`, `s`, `l`, `p`, below), and a palette that opened a second picker was
+  one step longer than the rail.
+- **The keyboard table's last three rows shipped in a follow-up commit**, found missing by an audit after
+  slice 11 was first committed: `a` opens the Assignee select, `s` the State select (on a Gate, the Note),
+  `l` puts focus on the first Label, `p` opens a new **Parent picker** (`components/parent-picker.tsx`, a
+  Popover over `issues.list` with `q`; the rail had shown a parent but had no way to set one, though
+  `issues.update` took `parentKey` since M1), `⇧A`/`⇧R` focus the Note with that ruling chosen so that
+  `⌘↵` there commits it (the chosen button is the filled one; nothing commits without that key or a
+  click), and `[`/`]` turn the Document tabs. Each component takes a `shortcutScope` so the peek's Issue,
+  not the list behind it, answers; `issue-keys.test.tsx` covers all of it.
+- **`docs/screens/` was made after all**, by `vp run web#screens` (`apps/web/scripts/screens.ts`): the
+  installed Chrome, headless, driven over the DevTools protocol with Node's own WebSocket, so it costs no
+  dependency. It signs in through the stub as the dev form does and walks every screen in light and dark
+  at 1280px and 390px. Regenerate it at a milestone, not per commit: it is 1.6 MB of PNG each time. The palette knows the focused Issue from the URL (`/issues/KEY`, else
   `?peek=`) through `focusedIssue()` in `command-palette.tsx`, so it needs no provider.
 - **The shortcuts sheet** (`components/shortcuts-sheet.tsx`, `?`, and "Keyboard shortcuts" under the
   palette's Help group) carries the keyboard map as data, so the map in `deevy-ui/SKILL.md` and the one on
@@ -526,9 +538,6 @@ What shipped differently:
   the catalog. Thirteen other unimported `ui/*` files stay (`popover`, `card`, `alert`, `switch`, `field`,
   `combobox`, `scroll-area`, …): they are the base kit the next screen reaches for, and cost nothing
   unimported.
-- **`docs/screens/` was not made.** The Browser pane returns screenshots to the session, not to disk, so a
-  checked-in gallery would have been retyped by hand and stale by the next slice. The seeded instance is
-  the gallery: `docs/DEVELOPMENT.md` "Running without an OAuth App" is how to open it.
 
 ## Risks and how the slices carry them
 

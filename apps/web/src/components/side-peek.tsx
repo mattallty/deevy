@@ -62,7 +62,9 @@ export function SidePeek({
             </Button>
           ) : null}
         </SheetHeader>
-        <div className="p-6">{issueKey ? <IssuePage issueKey={issueKey} /> : null}</div>
+        <div className="p-6">
+          {issueKey ? <IssuePage issueKey={issueKey} shortcutScope="peek" /> : null}
+        </div>
       </SheetContent>
     </Sheet>
   );

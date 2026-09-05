@@ -9,6 +9,7 @@ import { IssueDocuments } from "@/components/issue-documents";
 import { IssueLinks } from "@/components/issue-links";
 import { IssueRuns } from "@/components/run-card";
 import { LabelPicker } from "@/components/label-picker";
+import { ParentPicker } from "@/components/parent-picker";
 import { Markdown } from "@/components/markdown.tsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { useMentionables } from "@/lib/mentions";
+import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc.ts";
 
@@ -31,15 +33,21 @@ const UNASSIGNED = "unassigned";
 export function IssuePage({
   issueKey,
   focusGate = false,
+  shortcutScope = PAGE_SCOPE,
 }: {
   issueKey: string;
   /** Put the ruling in front of the reader, as `?gate=` does: the Inbox opens a Gate Notification this way. */
   focusGate?: boolean;
+  /** Where the Issue is shown, so `a`/`s`/`l`/`p` reach this one: the page, or the peek's scope. */
+  shortcutScope?: string;
 }) {
   const queryClient = useQueryClient();
   const issue = useQuery(orpc.issues.get.queryOptions({ input: { key: issueKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const [editing, setEditing] = useState(false);
+  // `a` opens the Assignee picker (docs/plans/ui-redesign.md, "Keyboard").
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  useShortcut("a", () => setAssigneeOpen(true), { scope: shortcutScope });
 
   // `?gate=<stateId>` is what an Agent's URL elicitation hands a Human
   // (docs/plans/m2.md): the Issue opens with the Gate it is waiting on in
@@ -114,15 +122,6 @@ export function IssuePage({
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span className="font-mono text-muted-foreground">{key}</span>
               <StateBadge state={badgeState} />
-              {parent ? (
-                <Link
-                  to="/issues/$issueKey"
-                  params={{ issueKey: parent.key }}
-                  className="text-muted-foreground hover:underline"
-                >
-                  parent {parent.key}
-                </Link>
-              ) : null}
             </div>
 
             {editing ? (
@@ -151,7 +150,7 @@ export function IssuePage({
             <p className="text-sm text-muted-foreground">No description yet.</p>
           ) : null}
 
-          <IssueDocuments issueKey={key} />
+          <IssueDocuments issueKey={key} shortcutScope={shortcutScope} />
 
           <IssueRuns issueKey={key} decisions={gateDecisions} />
 
@@ -175,6 +174,7 @@ export function IssuePage({
               projectKey={issue.data.project.key}
               state={state}
               decisions={gateDecisions}
+              shortcutScope={shortcutScope}
             />
           </div>
 
@@ -183,6 +183,8 @@ export function IssuePage({
             <Select
               value={assignee?.id ?? UNASSIGNED}
               disabled={update.isPending}
+              open={assigneeOpen}
+              onOpenChange={setAssigneeOpen}
               onValueChange={(next) =>
                 update.mutate({ key, assigneeMemberId: next === UNASSIGNED ? null : next })
               }
@@ -210,7 +212,14 @@ export function IssuePage({
             </Select>
           </section>
 
-          <LabelPicker issueKey={key} labels={labels} />
+          <LabelPicker issueKey={key} labels={labels} shortcutScope={shortcutScope} />
+
+          <ParentPicker
+            issueKey={key}
+            projectKey={issue.data.project.key}
+            parent={parent}
+            shortcutScope={shortcutScope}
+          />
 
           {children.length > 0 ? (
             <section className="flex flex-col gap-2">

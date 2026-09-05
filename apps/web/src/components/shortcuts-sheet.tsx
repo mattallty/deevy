@@ -35,6 +35,19 @@ const groups: Array<{ title: string; rows: Array<[keys: string, does: string]> }
     ],
   },
   {
+    title: "On an Issue",
+    rows: [
+      ["a", "Assignee"],
+      ["s", "State, or the Note of the Gate it is in"],
+      ["l", "Labels"],
+      ["p", "Parent"],
+      ["shift+a", "Approve: the Note, with Approve chosen for ⌘↵"],
+      ["shift+r", "Reject: the same, with Reject chosen"],
+      ["[", "Previous Document"],
+      ["]", "Next Document"],
+    ],
+  },
+  {
     title: "In the Inbox",
     rows: [
       ["e", "Mark the selected Notification read"],

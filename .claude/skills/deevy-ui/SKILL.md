@@ -296,6 +296,15 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **The palette knows the focused Issue from the URL**, `focusedIssue(pathname, search)` in
   `command-palette.tsx`: `/issues/KEY` first, else `?peek=`. Its group is Open full page (peek only), Copy
   key, Copy link. Actions that need a picker stay in the rail behind `a`/`s`/`l`/`p`.
+- **Letters on an Issue reach the Issue in front.** `IssuePage`, `GateControls`, `LabelPicker`,
+  `ParentPicker` and `IssueDocuments` take `shortcutScope` (default the page; the peek passes `"peek"`),
+  and bind `a` (Assignee select, controlled `open`), `s` (State select, or the Gate's Note), `l` (focus the
+  first Label), `p` (Parent Popover), `⇧A`/`⇧R` (Note focused, that ruling chosen, `⌘↵` commits it — the
+  chosen button is the filled one, `data-ruling` says which), `[`/`]` (Document tabs). A picker opened by
+  a key is a controlled Base UI popup, not a synthetic click. cmdk names its input from `<Command label>`,
+  never from an `aria-label` on the input.
+- **Screenshots** come from `vp run web#screens` (`apps/web/scripts/screens.ts`) against the seeded
+  `dev:stub` instance, into `docs/screens/`; regenerate at milestones.
 - **Live regions:** the Gate banner and the Run's "Needs your answer" band are `role="status"`. Nothing
   else announces; a new one needs a reason.
 - **Everything outside the shell** (`SignedOut`, `NotAMember`, `Suspended`) renders in `SignInFrame`

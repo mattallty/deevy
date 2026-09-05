@@ -9,14 +9,31 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
+import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 
 /**
  * The Documents on an Issue: intent, spec, plan, whichever the Workflow asked
  * for. Writes are versions, so an older one stays readable (CONTEXT.md).
  */
-export function IssueDocuments({ issueKey }: { issueKey: string }) {
+export function IssueDocuments({
+  issueKey,
+  shortcutScope = PAGE_SCOPE,
+}: {
+  issueKey: string;
+  /** The shortcut scope the Issue is shown in, so `[` and `]` turn these tabs. */
+  shortcutScope?: string;
+}) {
   const documents = useQuery(orpc.documents.list.queryOptions({ input: { issueKey } }));
   const [active, setActive] = useState<string | null>(null);
+  const names = (documents.data?.documents ?? []).map((doc) => doc.name);
+  const current = active && names.includes(active) ? active : names[0];
+  const turn = (by: -1 | 1) => {
+    if (!current || names.length < 2) return;
+    const at = names.indexOf(current);
+    setActive(names[(at + by + names.length) % names.length] ?? null);
+  };
+  useShortcut("[", () => turn(-1), { scope: shortcutScope });
+  useShortcut("]", () => turn(1), { scope: shortcutScope });
 
   if (documents.isPending) return <Skeleton className="h-40 w-full" />;
   if (documents.isError) {
@@ -24,9 +41,8 @@ export function IssueDocuments({ issueKey }: { issueKey: string }) {
   }
   if (documents.data.documents.length === 0) return null;
 
-  const names = documents.data.documents.map((doc) => doc.name);
-  const current = active && names.includes(active) ? active : names[0]!;
-  const document = documents.data.documents.find((doc) => doc.name === current)!;
+  const document = documents.data.documents.find((doc) => doc.name === current);
+  if (!current || !document) return null;
 
   return (
     <section className="flex flex-col gap-3">

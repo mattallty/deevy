@@ -1,19 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { labelText } from "@/lib/labels";
 import { orpc } from "@/lib/orpc";
+import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 
 interface PickerProps {
   issueKey: string;
   labels: Array<{ id: string; scope: string | null; name: string; color: string }>;
+  /** The shortcut scope the Issue is shown in, so `l` reaches these Labels. */
+  shortcutScope?: string;
 }
 
 /**
  * Toggling a Label sends the whole selection, because the one-per-scope rule
  * is resolved server-side: choosing a second `epic:` replaces the first.
  */
-export function LabelPicker({ issueKey, labels }: PickerProps) {
+export function LabelPicker({ issueKey, labels, shortcutScope = PAGE_SCOPE }: PickerProps) {
   const queryClient = useQueryClient();
   const all = useQuery(orpc.labels.list.queryOptions({ input: {} }));
   const setLabels = useMutation(
@@ -31,10 +35,16 @@ export function LabelPicker({ issueKey, labels }: PickerProps) {
     setLabels.mutate({ key: issueKey, labelIds: next });
   };
 
+  // `l` puts the keyboard on the first Label; Tab walks the rest, Space toggles.
+  const group = useRef<HTMLDivElement>(null);
+  useShortcut("l", () => group.current?.querySelector("button")?.focus(), {
+    scope: shortcutScope,
+  });
+
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-medium text-muted-foreground">Labels</h2>
-      <div role="group" aria-label="Labels" className="flex flex-wrap gap-2">
+      <div ref={group} role="group" aria-label="Labels" className="flex flex-wrap gap-2">
         {all.data?.labels.map((label) => (
           <Button
             key={label.id}

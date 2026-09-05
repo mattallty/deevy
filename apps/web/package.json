@@ -9,6 +9,7 @@
     "build:workers": "DEEVY_TARGET=workers vp build",
     "check:workers": "wrangler deploy --dry-run --config dist/deevy/wrangler.json --outdir dist/wrangler-dry-run",
     "test:workers": "node scripts/smoke-workers.ts",
+    "screens": "node --env-file-if-exists=../../.env scripts/screens.ts",
     "preview": "vp preview"
   },
   "dependencies": {
