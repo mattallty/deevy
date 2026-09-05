@@ -6,8 +6,9 @@ then runs again on the Docker image built from the same commit. Two deployment s
 claim [ADR-0006](./adr/0006-runtime-agnostic-core-node-first.md) makes, and this walk is the only thing that
 checks it.
 
-**Status: parts 1 to 5 walked on 2026-09-04, on a free account, from the branch rather than from a tag.
-Part 6, the container, has not been walked.**
+**Status: walked. Parts 1 to 5 on 2026-09-04 against a free Cloudflare account, from the branch rather than
+from a tag; part 6 on 2026-09-05 against `v0.3.0`, deevy's first tag. Both halves of ADR-0006's claim have now
+been checked by a person rather than by CI.**
 
 What ran. A Worker deployed to `deevy.matthias-etienne.workers.dev` with D1, GitHub sign-in and the Cron
 Trigger; a Workspace bootstrapped by the admin's first sign-in; the `planner` Agent, its Project grant and its
@@ -26,10 +27,34 @@ Fixed and covered by a ninth test in `packages/core/tests/elicitation.test.ts`. 
 with it: a Workspace Event log view that does not exist, an Issues section that does not exist, and a
 `wrangler d1 create` step that is not needed.
 
-What did not run, and is not claimed. Part 6: no `v0.3.0` tag was cut and the container was never walked, so
-ADR-0006's two-shapes claim still rests on CI rather than on a person. `links_add` was never exercised — the
-loop ran from a scratch repository with no remote, so there was no pull request URL to attach, and a summary
-naming two commits attached no evidence.
+Part 6 found four more, none of them reachable by a test. The **first release published an image nobody can
+pull**, and the workflow reported success while this document's opening command was broken for every reader.
+The loop's instructions had **two dead ends** — a Document already written at a Gate nobody had been asked
+about, and a Run that ended terminally on an Issue still assigned — each of which made it decide it was
+finished while a Human waited; both were hit within an hour. It **believed a Run in `awaiting_input` goes
+stale**, which it does not and cannot, because this repository's own instructions said so without naming the
+statuses. And **an Agent's inbox never carried the ruling it waits for**, so ADR-0003's promise that an Agent
+without a webhook polls its inbox was not true until `run_answered` existed. That last one was found by a
+Human having to tell the agent by hand that its Gate had been decided.
+
+Part 6, the container. `v0.3.0` was tagged and the Release workflow ran for the first time in deevy's life:
+verify, the image build and its smoke, then eight minutes of multi-arch push. A container from that commit
+answered `/healthz` in one second with its migrations applied, served the API as `401 application/json`, the
+SPA as `<!doctype html>` and the MCP challenge naming its own origin — the same three answers the Worker gave —
+and survived a stop, a remove and a restart on the same volume. Then the same loop, against
+`http://localhost:3000`: assignment opened a `pending` Run before anything woke up, the Agent found it, wrote
+`intent` v2 over an unfilled template, stopped at the Intent Gate, resumed on the ruling, wrote `spec` v2,
+stopped again. The Event log reads `gate.approved`, `run.answered`, `document.created`, `gate.approved`.
+Nothing about the runtime leaked into behaviour, which is the whole of what the claim says.
+
+What did not run, and is not claimed. The **published image** was never pulled: a new GHCR package is private,
+deevy stays pre-release, and `docker pull` answers `unauthorized`. Part 6 therefore ran against an image built
+locally from the tagged commit — the same commit and the same Dockerfile, native arm64 rather than QEMU — so
+the published artifact itself remains unverified. The walk also never reached a plan Document or a finished
+Run on the container: the Plan Gate was approved while the plan was still its unfilled template, which deevy
+allows, so the loop was stopped rather than followed to `runs_finish`. And `links_add` was never exercised on
+either runtime — both loops ran from scratch repositories with no remote, so there was no pull request URL to
+attach, and a summary naming two commits attached no evidence.
 
 The Cron Trigger did run, and proving it took a functional test rather than a log. Three `wrangler tail`
 windows over about ten minutes showed request traffic and no `scheduled` invocation at all, which reads exactly
