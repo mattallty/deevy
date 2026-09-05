@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { labelText } from "@/lib/labels";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
 /** Labels are defined once for the Workspace; an Issue carries at most one per scope. */
@@ -39,17 +40,17 @@ export function LabelsPage() {
   const failed = create.error ?? remove.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Labels</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Labels"
+      description={
+        <>
           Plain like <code>backend</code>, or scoped like <code>epic: Checkout rewrite</code>. An
           Issue carries at most one Label per scope.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) {
@@ -128,6 +129,6 @@ export function LabelsPage() {
       {labels.data?.labels.length === 0 ? (
         <p className="text-sm text-muted-foreground">No Labels yet.</p>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

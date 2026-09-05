@@ -245,6 +245,19 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   the "Move up/down" buttons stay for the keyboard and the tests. New draft States carry a `uid`.
 - Under a Project the Workflow editor's heading is an `h2`: the Project's name is the page's `h1`.
 
+## What slice 9 settled (Settings)
+
+- **`components/settings-page.tsx`**: `SettingsPage` (the h1 via `PageHeader`, a description, the page's
+  action on the right) and `SettingsSection` (a card with an optional title/description, `aria-label` for
+  a landmark, `tone="danger"` for what suspends, revokes or archives). All eleven pages use them; their
+  h1s and control names are unchanged.
+- **Native selects stay in Settings** where a test drives them with a change event (schedules, routing
+  rules, providers, approvers). Members and Agents tables show `MemberChip`s; the Sponsor is a chip.
+- **The Agent detail** has Projects and API keys (regions kept), a Schedule section (`Wake`), Recent Runs
+  (`runs.list({ agentMemberId })`), a danger section to Suspend/Reinstate, and — for an admin — a
+  `Change Sponsor` select in the header (`agents.setSponsor`). The Agents table keeps its own
+  `Schedule for <name>` select, which its test drives.
+
 ## Test contracts
 
 Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` with

@@ -22,6 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MemberChip } from "@/components/member-chip";
+import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 /** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
@@ -71,32 +73,25 @@ export function AgentsPage() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Agents</h1>
-          <p className="text-sm text-muted-foreground">
-            Every Agent works under its own identity, with exactly one Human accountable for it. A
-            schedule wakes an Agent on the Issues assigned to it, whether or not anything happened.
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>New Agent</Button>
-      </header>
-
+    <SettingsPage
+      title="Agents"
+      description="Every Agent works under its own identity, with exactly one Human accountable for it. A schedule wakes an Agent on the Issues assigned to it, whether or not anything happened."
+      actions={<Button onClick={() => setCreating(true)}>New Agent</Button>}
+    >
       <NewAgent open={creating} onOpenChange={setCreating} />
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
-      <section aria-label="Connect an Agent" className="flex flex-col gap-2 rounded-md border p-4">
-        <h2 className="text-sm font-medium">Connect an Agent</h2>
-        <p className="text-sm text-muted-foreground">
-          An Agent reaches deevy over MCP with the key its Sponsor issued. The endpoint is
-        </p>
+      <SettingsSection
+        aria-label="Connect an Agent"
+        title="Connect an Agent"
+        description="An Agent reaches deevy over MCP with the key its Sponsor issued. The endpoint is"
+      >
         <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
         <p className="text-sm text-muted-foreground">and Claude Code adds it with</p>
         <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
           {`claude mcp add --transport http deevy ${mcpEndpoint()} --header "Authorization: Bearer <the key>"`}
         </code>
-      </section>
+      </SettingsSection>
 
       <Table>
         <TableHeader>
@@ -122,17 +117,26 @@ export function AgentsPage() {
                 <Link
                   to="/settings/agents/$memberId"
                   params={{ memberId: agent.id }}
-                  className="font-medium underline-offset-4 hover:underline"
+                  className="underline-offset-4 hover:underline"
                 >
-                  {agent.user.name}
+                  <MemberChip
+                    member={{
+                      id: agent.id,
+                      kind: "agent",
+                      handle: agent.handle,
+                      suspendedAt: agent.suspendedAt,
+                      user: agent.user,
+                    }}
+                    showHandle
+                  />
                 </Link>
-                {agent.handle ? (
-                  <span className="text-muted-foreground"> @{agent.handle}</span>
-                ) : null}
               </TableCell>
               <TableCell>
                 {agent.sponsor ? (
-                  agent.sponsor.user.name
+                  <MemberChip
+                    member={{ id: agent.sponsor.id, kind: "human", user: agent.sponsor.user }}
+                    size="xs"
+                  />
                 ) : (
                   <span className="text-destructive">No Sponsor</span>
                 )}
@@ -175,7 +179,7 @@ export function AgentsPage() {
                   </>
                 ) : (
                   <>
-                    <Badge variant="secondary">Working</Badge>
+                    <Badge variant="secondary">Active</Badge>
                     <Button
                       size="sm"
                       variant="outline"
@@ -191,7 +195,7 @@ export function AgentsPage() {
           ))}
         </TableBody>
       </Table>
-    </section>
+    </SettingsPage>
   );
 }
 

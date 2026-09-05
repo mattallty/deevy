@@ -146,3 +146,14 @@ describe("an Agent's own page", () => {
     await waitFor(() => expect(calls.grantRemove).toHaveBeenCalledTimes(1));
   });
 });
+
+describe("the Agent's own settings", () => {
+  it("offers the schedule, the Sponsor, its recent Runs, and the way to suspend it", async () => {
+    await mountAt("/settings/agents/m-planner");
+
+    expect(await screen.findByLabelText("Wake")).toBeTruthy();
+    expect(screen.getByLabelText("Change Sponsor")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Recent Runs" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Suspend" })).toBeTruthy();
+  });
+});

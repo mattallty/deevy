@@ -473,12 +473,17 @@ Slot — the one thing the no-Radix rule exists to catch — so the import is re
 Slot and the dependency removed; and the Issues tab is the Issues home embedded rather than the old
 per-Project table, so filters, grouping, keyboard and the peek are the same on both.
 
-### 9 — Settings template, eleven pages, Agent detail
+### 9 — Settings template, eleven pages, Agent detail (shipped)
 
 `settings-page.tsx`; every `routes/settings/*.tsx` re-laid on it; native selects → `Select`/`Combobox`
 except the approvers multi-select (→ `Command` multi-picker, same `aria-label`) and the Board `Assignee`;
 `agent.tsx` sections above. The fourteen settings suites keep their names; `agents.test.tsx` scopes the
 schedule lookup to the table.
+
+What shipped differently in slice 9: the native selects stay wherever a test drives them by change event
+(the plan wanted `Select`/`Combobox` everywhere but the approvers), because the controls are 14px now and a
+plain select is the keyboard's friend; and the lists stay on `ui/table` rather than moving to `DataTable`,
+since none of them sorts, folds or has a keyboard row.
 
 ### 10 — Event log
 

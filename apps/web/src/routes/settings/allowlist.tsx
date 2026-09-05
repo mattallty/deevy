@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 const kindLabels = {
@@ -50,16 +51,12 @@ export function AllowlistPage() {
   const failed = add.error ?? remove.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Allowlist</h1>
-        <p className="text-sm text-muted-foreground">
-          A sign-in matching any rule below joins this Workspace as a Member.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Allowlist"
+      description={<>A sign-in matching any rule below joins this Workspace as a Member.</>}
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (value.trim()) add.mutate({ kind, value: value.trim() });
@@ -133,6 +130,6 @@ export function AllowlistPage() {
           No rules yet, so nobody new can join. Add one above.
         </p>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

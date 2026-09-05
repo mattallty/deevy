@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
 /** The Notification kinds a rule can name, in the words the API uses. */
@@ -95,17 +96,17 @@ export function ChannelsPage() {
   const failed = create.error ?? remove.error ?? test.error ?? save.error;
 
   return (
-    <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Channels</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Channels"
+      description={
+        <>
           Where Notifications are delivered. Every Human has an inbox; a Slack Channel is an
           incoming webhook this Workspace posts to.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim() && webhookUrl.trim()) {
@@ -182,15 +183,10 @@ export function ChannelsPage() {
         <p className="text-sm text-muted-foreground">No Channels yet.</p>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <header>
-          <h2 className="text-lg font-semibold">Routing</h2>
-          <p className="text-sm text-muted-foreground">
-            Which Notifications reach which Channel. A rule left on Any covers every kind or every
-            Project. Each Human still chooses what reaches them, under Notifications.
-          </p>
-        </header>
-
+      <SettingsSection
+        title="Routing"
+        description="Which Notifications reach which Channel. A rule left on Any covers every kind or every Project. Each Human still chooses what reaches them, under Notifications."
+      >
         {draft.map((rule, at) => (
           <div key={at} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
             <div className="flex flex-col gap-2">
@@ -287,7 +283,7 @@ export function ChannelsPage() {
             Save routing
           </Button>
         </div>
-      </section>
-    </section>
+      </SettingsSection>
+    </SettingsPage>
   );
 }

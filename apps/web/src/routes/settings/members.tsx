@@ -16,6 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MemberChip } from "@/components/member-chip";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 /**
@@ -40,14 +42,10 @@ export function MembersPage() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Members</h1>
-        <p className="text-sm text-muted-foreground">
-          Everyone in this Workspace. Add an allowlist rule to let more people in.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Members"
+      description={<>Everyone in this Workspace. Add an allowlist rule to let more people in.</>}
+    >
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       <Table>
@@ -63,8 +61,10 @@ export function MembersPage() {
           {members.data.members.map((member) => (
             <TableRow key={member.id}>
               <TableCell>
-                <div className="font-medium">{member.user.name}</div>
-                <div className="text-xs text-muted-foreground">{member.user.email}</div>
+                <div className="flex flex-col gap-0.5">
+                  <MemberChip member={member} />
+                  <span className="text-xs text-muted-foreground">{member.user.email}</span>
+                </div>
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {member.handle ? `@${member.handle}` : "—"}
@@ -117,6 +117,6 @@ export function MembersPage() {
           ))}
         </TableBody>
       </Table>
-    </section>
+    </SettingsPage>
   );
 }

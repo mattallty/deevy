@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
 /** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
@@ -34,21 +35,20 @@ export function McpClientsPage() {
   const rows = clients.data?.clients ?? [];
 
   return (
-    <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">MCP clients</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="MCP clients"
+      description={
+        <>
           The clients you have let act as you. Each one reaches deevy as you, with everything you
           can do — except deciding a Gate, which happens here, in deevy, or not at all.
-        </p>
-      </header>
-
-      <section
+        </>
+      }
+    >
+      <SettingsSection
         aria-label="Connect your MCP client"
-        className="flex flex-col gap-2 rounded-md border p-4"
+        title="Connect your MCP client"
+        description="The endpoint is"
       >
-        <h2 className="text-sm font-medium">Connect your MCP client</h2>
-        <p className="text-sm text-muted-foreground">The endpoint is</p>
         <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
         <p className="text-sm text-muted-foreground">
           and Claude Code adds it with no header at all — it signs you in through a browser and asks
@@ -57,7 +57,7 @@ export function McpClientsPage() {
         <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
           {`claude mcp add --transport http deevy ${mcpEndpoint()}`}
         </code>
-      </section>
+      </SettingsSection>
 
       {revoke.error ? <p className="text-sm text-destructive">{revoke.error.message}</p> : null}
       {clients.isPending ? <Skeleton className="h-24 w-full" /> : null}
@@ -120,6 +120,6 @@ export function McpClientsPage() {
           working until it expires, within the hour.
         </p>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

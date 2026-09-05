@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 /** Teams and who is on them. A Team owns Projects and can be mentioned; it is not a permission wall. */
@@ -35,16 +36,14 @@ export function TeamsPage() {
   const failed = create.error ?? remove.error ?? addMember.error ?? removeMember.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Teams</h1>
-        <p className="text-sm text-muted-foreground">
-          A Team owns Projects and can be mentioned. Every Human still sees every Project.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Teams"
+      description={
+        <>A Team owns Projects and can be mentioned. Every Human still sees every Project.</>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) create.mutate({ name: name.trim() });
@@ -121,7 +120,7 @@ export function TeamsPage() {
           </article>
         ))}
       </div>
-    </section>
+    </SettingsPage>
   );
 }
 
