@@ -12,6 +12,10 @@ const kindText = {
   gate_awaiting: "a Gate is waiting",
   run_awaiting_input: "a Run is waiting on you",
   run_finished: "a Run finished",
+  // A Human never receives this one — it is owed to the Agent that asked, and
+  // an Agent reads its inbox over MCP rather than here. The map covers it
+  // because `inbox.list` answers both audiences with the same shape.
+  run_answered: "a Gate your Agent asked about was decided",
 } as const;
 
 /** What needs you, derived from the Event log and grouped by Issue. */

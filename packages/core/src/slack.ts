@@ -1,4 +1,4 @@
-import type { Notification } from "@deevy/db";
+import type { HumanNotificationKind } from "@deevy/db";
 
 /**
  * Slack, the second Channel a Notification can reach (CONTEXT.md). An incoming
@@ -30,15 +30,24 @@ export interface SlackIssue {
 }
 
 export interface SlackMessageInput {
-  kind: Notification["kind"];
+  /**
+   * Human kinds only. A Slack message exists because a routing rule named a
+   * kind, and a rule cannot name an Agent's (schema/channel.ts).
+   */
+  kind: HumanNotificationKind;
   /** The Issue this is about. A Notification without one still says what happened. */
   issue?: SlackIssue | null;
   /** The public origin of this instance, so the link is one a Human can click. */
   baseUrl: string;
 }
 
-/** What each kind of Notification says, in CONTEXT.md's words (schema/notification.ts). */
-const headlines: Record<Notification["kind"], string> = {
+/**
+ * What each kind of Notification says, in CONTEXT.md's words
+ * (schema/notification.ts). Keyed by the Human kinds rather than by all of
+ * them: Slack is a room full of Humans, `run_answered` is owed to the Agent
+ * that asked, and the Workspace's routing rules cannot name it.
+ */
+const headlines: Record<HumanNotificationKind, string> = {
   mention: "You were mentioned",
   assignment: "An Issue was assigned",
   gate_awaiting: "A Gate is waiting for a Human",
