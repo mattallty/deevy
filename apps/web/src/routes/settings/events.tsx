@@ -9,10 +9,31 @@ import { Button } from "@/components/ui/button";
 import { describeEvent } from "@/lib/event-text";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const PAGE = 100;
-const ANY = "";
+/** Base UI's Select wants a value for "everything"; the empty string is not one. */
+const ANY = "__any";
+
+/** The Event kinds by what they are about, so the filter reads as the log does. */
+const kindFamilies = [
+  { label: "Issues", prefixes: ["issue", "gate", "document", "comment"] },
+  { label: "Runs", prefixes: ["run"] },
+  { label: "Workspace", prefixes: ["member", "agent", "project", "workspace"] },
+];
+const subjectFamilies = [
+  { label: "Work", types: ["issue", "run", "project"] },
+  { label: "Workspace", types: ["member", "team", "label", "channel", "webhook", "workspace"] },
+];
 
 interface EventRow {
   seq: number;
@@ -52,8 +73,8 @@ export function EventLogPage() {
         order: "desc",
         limit: PAGE,
         ...(before === null ? {} : { before }),
-        ...(subjectType ? { subjectType } : {}),
-        ...(projectId ? { projectId } : {}),
+        ...(subjectType !== ANY ? { subjectType } : {}),
+        ...(projectId !== ANY ? { projectId } : {}),
       },
     }),
   );
@@ -81,7 +102,9 @@ export function EventLogPage() {
 
   const rows = useMemo(() => {
     const all = (events.data?.events ?? []) as EventRow[];
-    return kindPrefix ? all.filter((event) => event.kind.startsWith(`${kindPrefix}.`)) : all;
+    return kindPrefix !== ANY
+      ? all.filter((event) => event.kind.startsWith(`${kindPrefix}.`))
+      : all;
   }, [events.data, kindPrefix]);
 
   const columns: DataColumn<EventRow>[] = [
@@ -180,65 +203,90 @@ export function EventLogPage() {
       description="Every change in this Workspace, newest first: who did what, to which Issue or Project, and when. The Activity, the live stream and the inbox all derive from this; a row opens its raw payload."
     >
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
-        <OptionsSelect
-          aria-label="Kind"
-          className="w-40"
-          value={kindPrefix}
-          onChange={setKindPrefix}
-          options={[
-            { value: ANY, label: "Every kind" },
-            ...[
-              "issue",
-              "gate",
-              "run",
-              "document",
-              "comment",
-              "member",
-              "agent",
-              "project",
-              "workspace",
-            ].map((prefix) => ({ value: prefix, label: `${prefix}.*` })),
-          ]}
-        />
-        <OptionsSelect
-          aria-label="Subject"
-          className="w-40"
+        <Select value={kindPrefix} onValueChange={(next) => next !== null && setKindPrefix(next)}>
+          <SelectTrigger aria-label="Kind" className="w-44">
+            <SelectValue>
+              {(selected: string) => (selected === ANY ? "Every kind" : `${selected}.*`)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value={ANY}>Every kind</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            {kindFamilies.map((family) => (
+              <SelectGroup key={family.label}>
+                <SelectLabel>{family.label}</SelectLabel>
+                {family.prefixes.map((prefix) => (
+                  <SelectItem key={prefix} value={prefix}>
+                    {prefix}.*
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
           value={subjectType}
-          onChange={(next) => {
+          onValueChange={(next) => {
+            if (next === null) return;
             setSubjectType(next);
             setBefore(null);
           }}
-          options={[
-            { value: ANY, label: "Any subject" },
-            ...[
-              "issue",
-              "run",
-              "project",
-              "member",
-              "team",
-              "label",
-              "channel",
-              "webhook",
-              "workspace",
-            ].map((type) => ({ value: type, label: type })),
-          ]}
-        />
-        <OptionsSelect
-          aria-label="Project"
-          className="w-48"
+        >
+          <SelectTrigger aria-label="Subject" className="w-40">
+            <SelectValue>
+              {(selected: string) => (selected === ANY ? "Any subject" : selected)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value={ANY}>Any subject</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            {subjectFamilies.map((family) => (
+              <SelectGroup key={family.label}>
+                <SelectLabel>{family.label}</SelectLabel>
+                {family.types.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
           value={projectId}
-          onChange={(next) => {
+          onValueChange={(next) => {
+            if (next === null) return;
             setProjectId(next);
             setBefore(null);
           }}
-          options={[
-            { value: ANY, label: "All Projects" },
-            ...(projects.data?.projects ?? []).map((project) => ({
-              value: project.id,
-              label: `${project.key} — ${project.name}`,
-            })),
-          ]}
-        />
+        >
+          <SelectTrigger aria-label="Project" className="w-48">
+            <SelectValue>
+              {(selected: string) => {
+                if (selected === ANY) return "All Projects";
+                const project = projectById.get(selected);
+                return project ? `${project.key} — ${project.name}` : selected;
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value={ANY}>All Projects</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            <SelectGroup>
+              {(projects.data?.projects ?? []).map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.key} — {project.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
         <span className="flex-1" />
         {before !== null ? (
           <Button variant="ghost" size="sm" onClick={() => setBefore(null)}>

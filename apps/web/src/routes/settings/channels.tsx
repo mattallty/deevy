@@ -14,7 +14,15 @@ import {
 } from "@/components/ui/table";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** The Notification kinds a rule can name, in the words the API uses. */
 const kinds = [
@@ -34,7 +42,8 @@ interface Rule {
 }
 
 /** The empty option of a select, which is what "any" is on the wire. */
-const anyValue = "";
+/** Base UI's Select wants a value for "any"; the empty string is not one. */
+const anyValue = "__any";
 
 /**
  * Channels and routing: where Notifications leave deevy for. A Channel is a
@@ -191,57 +200,109 @@ export function ChannelsPage() {
           <div key={at} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor={`rule-kind-${at}`}>Notification</Label>
-              <OptionsSelect
-                id={`rule-kind-${at}`}
-                className="w-48"
+              <Select
                 value={rule.notificationKind ?? anyValue}
-                onChange={(next) =>
+                onValueChange={(next) => {
+                  if (next === null) return;
                   setDraft((current) =>
                     current.map((one, index) =>
                       index === at
-                        ? { ...one, notificationKind: (next || null) as Kind | null }
+                        ? { ...one, notificationKind: next === anyValue ? null : (next as Kind) }
                         : one,
                     ),
-                  )
-                }
-                options={[{ value: anyValue, label: "Any" }, ...kinds]}
-              />
+                  );
+                }}
+              >
+                <SelectTrigger id={`rule-kind-${at}`} className="w-48">
+                  <SelectValue>
+                    {(selected: string) =>
+                      selected === anyValue
+                        ? "Any"
+                        : (kinds.find((kind) => kind.value === selected)?.label ?? selected)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={anyValue}>Any</SelectItem>
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    {kinds.map((kind) => (
+                      <SelectItem key={kind.value} value={kind.value}>
+                        {kind.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor={`rule-project-${at}`}>Project</Label>
-              <OptionsSelect
-                id={`rule-project-${at}`}
-                className="w-32"
+              <Select
                 value={rule.projectId ?? anyValue}
-                onChange={(next) =>
+                onValueChange={(next) => {
+                  if (next === null) return;
                   setDraft((current) =>
                     current.map((one, index) =>
-                      index === at ? { ...one, projectId: next || null } : one,
+                      index === at ? { ...one, projectId: next === anyValue ? null : next } : one,
                     ),
-                  )
-                }
-                options={[
-                  { value: anyValue, label: "Any" },
-                  ...(projects.data?.projects ?? []).map((project) => ({
-                    value: project.id,
-                    label: project.key,
-                  })),
-                ]}
-              />
+                  );
+                }}
+              >
+                <SelectTrigger id={`rule-project-${at}`} className="w-32">
+                  <SelectValue>
+                    {(selected: string) =>
+                      selected === anyValue
+                        ? "Any"
+                        : (projects.data?.projects.find((project) => project.id === selected)
+                            ?.key ?? selected)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={anyValue}>Any</SelectItem>
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    {(projects.data?.projects ?? []).map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.key}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <Label htmlFor={`rule-channel-${at}`}>Channel</Label>
-              <OptionsSelect
-                id={`rule-channel-${at}`}
-                className="w-full"
+              <Select
                 value={rule.channelId}
-                onChange={(next) =>
+                onValueChange={(next) => {
+                  if (next === null) return;
                   setDraft((current) =>
                     current.map((one, index) => (index === at ? { ...one, channelId: next } : one)),
-                  )
-                }
-                options={rows.map((channel) => ({ value: channel.id, label: channel.name }))}
-              />
+                  );
+                }}
+              >
+                <SelectTrigger id={`rule-channel-${at}`} className="w-full">
+                  <SelectValue>
+                    {(selected: string) =>
+                      rows.find((channel) => channel.id === selected)?.name ?? selected
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {rows.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <Button
               variant="ghost"

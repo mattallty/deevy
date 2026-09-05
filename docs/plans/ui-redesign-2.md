@@ -204,8 +204,9 @@ newest style carries `cn-menu-target cn-menu-translucent` on the popup, which ou
 A second pass (2026-09-06) replaced every remaining native select — seventeen, in ten files: Document
 version, the Board's Assignee filter, New Issue's Project, the State's category and Agent, the Agents
 table's schedule, the Event log's three filters, the routing rules' three, the Repository provider, the
-Project's Team, the Workflow's Move-Issues-to — with `components/options-select.tsx`, one wrapper that
-renders the documented tree from an options array. `ui/native-select.tsx` is deleted. Tests drive a Base UI
+Project's Team, the Workflow's Move-Issues-to — with the shadcn parts composed directly at each site (Matt
+refused a wrapper: a page must be able to group and separate its items), `SelectGroup` + `SelectLabel` where
+the options have families and `SelectSeparator` after a "none" item. `ui/native-select.tsx` is deleted. Tests drive a Base UI
 Select with `tests/select.ts` (`pickOption`: ArrowDown, then Enter on the highlighted option).
 
 ### B″ — Breadcrumb (point 20) — shipped

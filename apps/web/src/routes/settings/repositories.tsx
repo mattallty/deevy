@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/table";
 import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const providers = ["github", "gitlab", "other"] as const;
 
@@ -58,13 +65,25 @@ export function RepositoriesPage() {
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-provider">Provider</Label>
-          <OptionsSelect
-            id="repo-provider"
-            className="w-40"
+          <Select
             value={provider}
-            onChange={(next) => setProvider(next as (typeof providers)[number])}
-            options={providers.map((option) => ({ value: option, label: option }))}
-          />
+            onValueChange={(next) => {
+              if (next) setProvider(next as (typeof providers)[number]);
+            }}
+          >
+            <SelectTrigger id="repo-provider" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {providers.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-name">Name</Label>

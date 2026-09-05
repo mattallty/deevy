@@ -22,12 +22,24 @@ import {
 } from "@/components/workflow-state-fields";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * The ordered State editor. A team that wants Todo, Doing, Done deletes the
  * middle (docs/PLAN.md), which is why deleting is as ordinary here as renaming.
  */
+/** Base UI's Select wants a value for "nowhere"; the empty string is not one. */
+const NOWHERE = "__nowhere";
+
 export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
@@ -276,18 +288,38 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
         {removed.length > 0 ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor="move-issues-to">Move Issues in deleted States to</Label>
-            <OptionsSelect
-              id="move-issues-to"
-              className="w-64"
-              value={moveIssuesTo ?? ""}
-              onChange={(next) => setMoveIssuesTo(next || null)}
-              options={[
-                { value: "", label: "Nowhere (fails if any hold Issues)" },
-                ...draft
-                  .filter((state) => state.id)
-                  .map((state) => ({ value: state.id ?? "", label: state.name })),
-              ]}
-            />
+            <Select
+              value={moveIssuesTo ?? NOWHERE}
+              onValueChange={(next) => {
+                if (next !== null) setMoveIssuesTo(next === NOWHERE ? null : next);
+              }}
+            >
+              <SelectTrigger id="move-issues-to" className="w-64">
+                <SelectValue>
+                  {(selected: string) =>
+                    selected === NOWHERE
+                      ? "Nowhere (fails if any hold Issues)"
+                      : (draft.find((state) => state.id === selected)?.name ?? selected)
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={NOWHERE}>Nowhere (fails if any hold Issues)</SelectItem>
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>States</SelectLabel>
+                  {draft
+                    .filter((state) => state.id)
+                    .map((state) => (
+                      <SelectItem key={state.id} value={state.id ?? ""}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
 

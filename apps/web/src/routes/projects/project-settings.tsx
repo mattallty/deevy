@@ -7,9 +7,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAutosave } from "@/lib/autosave";
 import { orpc } from "@/lib/orpc";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const NO_TEAM = "";
+/** Base UI's Select wants a value for "no Team"; the empty string is not one. */
+const NO_TEAM = "__none";
 
 /**
  * What a Project is called, what it is for, and whose it is — `projects.update`
@@ -107,16 +116,36 @@ export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="project-team">Team</Label>
-          <OptionsSelect
-            id="project-team"
-            className="w-56"
+          <Select
             value={teamId}
-            onChange={(next) => void autosave.saveNow({ teamId: next === NO_TEAM ? null : next })}
-            options={[
-              { value: NO_TEAM, label: "No Team" },
-              ...(teams.data?.teams ?? []).map((team) => ({ value: team.id, label: team.name })),
-            ]}
-          />
+            onValueChange={(next) => {
+              if (next === null) return;
+              void autosave.saveNow({ teamId: next === NO_TEAM ? null : next });
+            }}
+          >
+            <SelectTrigger id="project-team" className="w-56">
+              <SelectValue>
+                {(selected: string) =>
+                  selected === NO_TEAM
+                    ? "No Team"
+                    : (teams.data?.teams.find((team) => team.id === selected)?.name ?? selected)
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={NO_TEAM}>No Team</SelectItem>
+              </SelectGroup>
+              <SelectSeparator />
+              <SelectGroup>
+                {(teams.data?.teams ?? []).map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             A Team owns a Project and can be mentioned; it is not a permission wall.
           </p>

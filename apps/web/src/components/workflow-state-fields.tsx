@@ -3,7 +3,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/** Base UI's Select wants a value for "no Agent"; null is not one. */
+const NOBODY = "__nobody";
 
 export const stateCategories = ["backlog", "active", "done"] as const;
 export type StateCategory = (typeof stateCategories)[number];
@@ -85,13 +97,25 @@ export function StateFields({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`state-category-${index}`}>Counts as</Label>
-        <OptionsSelect
-          id={`state-category-${index}`}
-          className="w-32"
+        <Select
           value={state.category}
-          onChange={(next) => onEdit({ category: next as StateCategory })}
-          options={stateCategories.map((category) => ({ value: category, label: category }))}
-        />
+          onValueChange={(next) => {
+            if (next) onEdit({ category: next as StateCategory });
+          }}
+        >
+          <SelectTrigger id={`state-category-${index}`} className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {stateCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex items-center gap-2 pb-2">
         <Checkbox
@@ -125,16 +149,36 @@ export function StateFields({
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={`state-agent-${index}`}>Assign an Agent on entering</Label>
-        <OptionsSelect
-          id={`state-agent-${index}`}
-          className="w-48"
-          value={state.triggerAgentMemberId ?? ""}
-          onChange={(next) => onEdit({ triggerAgentMemberId: next || null })}
-          options={[
-            { value: "", label: "Nobody" },
-            ...agents.map((agent) => ({ value: agent.id, label: agent.user.name })),
-          ]}
-        />
+        <Select
+          value={state.triggerAgentMemberId ?? NOBODY}
+          onValueChange={(next) => {
+            if (next) onEdit({ triggerAgentMemberId: next === NOBODY ? null : next });
+          }}
+        >
+          <SelectTrigger id={`state-agent-${index}`} className="w-48">
+            <SelectValue>
+              {(selected: string) =>
+                selected === NOBODY
+                  ? "Nobody"
+                  : (agents.find((agent) => agent.id === selected)?.user.name ?? selected)
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value={NOBODY}>Nobody</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel>Agents</SelectLabel>
+              {agents.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  {agent.user.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
       {state.isGate ? (
         <div className="flex w-full flex-col gap-2">

@@ -334,13 +334,15 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `itemToStringLabel`, `isItemEqualToValue`, and `removeLabel` on each chip (`label-picker.tsx` is the
   model; approvers reuse it). In a test: `fireEvent.change(input, …)` filters, `fireEvent.keyDown(input,
 { key: "ArrowDown" })` opens, then `screen.findByRole("option", …)` — the popup is portalled.
-- **Selects are shadcn's, never native.** A plain choice from a list of strings is `OptionsSelect`
-  (`components/options-select.tsx`: the documented tree — `Select` › `SelectTrigger` + `SelectValue`, then
-  `SelectContent` › `SelectGroup` › `SelectItem` — over an options array, `""` meaning none). A choice that
-  needs its own item markup composes those parts directly, still with the `SelectGroup`: in that build the
-  group carries the list's padding, so bare items sit flush against the popup edge. `ui/native-select.tsx`
-  is gone. In a test, `pickOption(trigger, name)` from `tests/select.ts` drives one (ArrowDown opens,
-  Enter on the highlighted option chooses — a click does not), and `selectedLabel(trigger)` reads it.
+- **Selects are shadcn's, never native, composed directly from `ui/select`** — `Select` › `SelectTrigger` +
+  `SelectValue`, then `SelectContent` › `SelectGroup` › `SelectItem`, with `SelectLabel` on a group that has
+  a heading and `SelectSeparator` between a "none" item (Nobody, Never, Any, Nowhere) and the real choices.
+  No wrapper over it: a page groups and separates as its options ask (the Event log's kinds by family, the
+  State's Agents apart from Nobody). In that build the group carries the list's padding, so bare items sit
+  flush against the popup edge. Base UI wants a real value for "none", so a page keeps a sentinel constant
+  (`"__any"`, `"__none"`), never `""`. `ui/native-select.tsx` is gone. In a test, `pickOption(trigger, name)`
+  from `tests/select.ts` drives one (ArrowDown opens, Enter on the highlighted option chooses — a click
+  does not), and `selectedLabel(trigger)` reads it.
 - **The Inbox** is one flat two-line list (`ul aria-label="Notifications"`): actor chip · verb · on KEY,
   the Issue title, the quote. `lib/notification-text.ts` phrases it from the joined Event, actor and
   comment; a checkbox per row and `x` select, a `toolbar "Selection"` marks several read.

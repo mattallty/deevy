@@ -9,7 +9,14 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * The Documents on an Issue: intent, spec, plan, whichever the Workflow asked
@@ -103,23 +110,33 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor={`version-${name}`}>Version</Label>
-          <OptionsSelect
-            id={`version-${name}`}
-            className="w-36"
+          <Select
             value={String(reading)}
-            onChange={(next) => {
+            onValueChange={(next) => {
+              if (next === null) return;
               setDraft(null);
               setVersion(Number(next));
             }}
-            options={Array.from(
-              { length: currentVersion },
-              (_, index) => currentVersion - index,
-            ).map((candidate) => ({
-              value: String(candidate),
-              label:
-                candidate === currentVersion ? `${String(candidate)} (current)` : String(candidate),
-            }))}
-          />
+          >
+            <SelectTrigger id={`version-${name}`} className="w-36">
+              <SelectValue>
+                {(selected: string) =>
+                  Number(selected) === currentVersion ? `${selected} (current)` : selected
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {Array.from({ length: currentVersion }, (_, index) => currentVersion - index).map(
+                  (candidate) => (
+                    <SelectItem key={candidate} value={String(candidate)}>
+                      {candidate === currentVersion ? `${String(candidate)} (current)` : candidate}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         <span className="flex-1" />
         {draft === null && !readingOlder ? (

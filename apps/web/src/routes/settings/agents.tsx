@@ -24,7 +24,15 @@ import {
 import { MemberChip } from "@/components/member-chip";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
 function mcpEndpoint(): string {
@@ -35,6 +43,7 @@ function mcpEndpoint(): string {
  * The intervals a schedule offers. Anything finer than a quarter of an hour is
  * a poll, not a schedule, and the sweep only runs once a minute anyway.
  */
+const NEVER = "never";
 const intervals = [
   { minutes: 15, label: "Every 15 minutes" },
   { minutes: 30, label: "Every 30 minutes" },
@@ -145,25 +154,41 @@ export function AgentsPage() {
                 {grantSummary(agent.grantedProjectIds.length)}
               </TableCell>
               <TableCell>
-                <OptionsSelect
-                  aria-label={`Schedule for ${agent.user.name}`}
-                  className="w-44"
-                  value={agent.scheduleMinutes === null ? "" : String(agent.scheduleMinutes)}
+                <Select
+                  value={agent.scheduleMinutes === null ? NEVER : String(agent.scheduleMinutes)}
                   disabled={update.isPending}
-                  onChange={(next) =>
+                  onValueChange={(next) => {
+                    if (next === null) return;
                     update.mutate({
                       memberId: agent.id,
-                      scheduleMinutes: next ? Number(next) : null,
-                    })
-                  }
-                  options={[
-                    { value: "", label: "Never" },
-                    ...intervals.map((interval) => ({
-                      value: String(interval.minutes),
-                      label: interval.label,
-                    })),
-                  ]}
-                />
+                      scheduleMinutes: next === NEVER ? null : Number(next),
+                    });
+                  }}
+                >
+                  <SelectTrigger aria-label={`Schedule for ${agent.user.name}`} className="w-44">
+                    <SelectValue>
+                      {(selected: string) =>
+                        selected === NEVER
+                          ? "Never"
+                          : (intervals.find((interval) => String(interval.minutes) === selected)
+                              ?.label ?? selected)
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value={NEVER}>Never</SelectItem>
+                    </SelectGroup>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      {intervals.map((interval) => (
+                        <SelectItem key={interval.minutes} value={String(interval.minutes)}>
+                          {interval.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </TableCell>
               <TableCell className="flex items-center justify-end gap-2 text-right">
                 {agent.suspendedAt ? (

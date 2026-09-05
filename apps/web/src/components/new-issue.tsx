@@ -16,7 +16,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { orpc } from "@/lib/orpc";
 import { useShortcut, useShortcutScope } from "@/lib/shortcuts";
-import { OptionsSelect } from "@/components/options-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Creating an Issue, from wherever the Human happens to be.
@@ -131,20 +138,27 @@ function NewIssueDialog({
         >
           <div className="flex flex-col gap-2">
             <Label htmlFor="new-issue-project">Project</Label>
-            <OptionsSelect
-              id="new-issue-project"
-              className="w-full"
-              value={chosen}
-              onChange={setProjectKey}
-              placeholder="Choose a Project"
-              options={[
-                { value: "", label: "Choose a Project" },
-                ...options.map((project: { id: string; key: string; name: string }) => ({
-                  value: project.key,
-                  label: `${project.name} (${project.key})`,
-                })),
-              ]}
-            />
+            <Select value={chosen || null} onValueChange={(next) => setProjectKey(next ?? "")}>
+              <SelectTrigger id="new-issue-project" className="w-full">
+                <SelectValue placeholder="Choose a Project">
+                  {(selected: string | null) => {
+                    const project = options.find(
+                      (candidate: { key: string }) => candidate.key === selected,
+                    );
+                    return project ? `${project.name} (${project.key})` : "Choose a Project";
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {options.map((project: { id: string; key: string; name: string }) => (
+                    <SelectItem key={project.id} value={project.key}>
+                      {project.name} ({project.key})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="new-issue-title">Title</Label>
