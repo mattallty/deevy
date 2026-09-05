@@ -324,6 +324,33 @@ describe("runs.requestApproval", () => {
     expect(told.length).toBeGreaterThan(0);
   });
 
+  it("tells the Agent when its Gate is decided, so its inbox is worth polling", async () => {
+    const { db, asAdmin, asAgent, agent } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+
+    await asAdmin.gates.approve({ key: "DEV-1", note: "Go on then" });
+
+    // ADR-0003 says an Agent without a webhook polls its inbox. Until now the
+    // one thing it waits for never landed there: the inbox carried assignment
+    // and mention, and a Gate ruling reached it only if it thought to call
+    // runs.list again (docs/plans/m3.md).
+    const inbox = await asAgent.inbox.list({});
+    const answered = inbox.notifications.filter((row) => row.kind === "run_answered");
+    expect(answered).toHaveLength(1);
+    expect(answered[0]?.recipientMemberId).toBe(agent.member.id);
+
+    // And the Run is live again, which is what the Agent acts on.
+    const resumed = await asAgent.runs.get({ runId: run.id });
+    expect(resumed.status).toBe("active");
+
+    // The Human who decided it is not told about their own decision.
+    const told = await db.query.notification.findMany({ where: { kind: "run_answered" } });
+    expect(told.map((row) => row.recipientMemberId)).toEqual([agent.member.id]);
+  });
+
   it("asks the Humans the Gate names, and not the Sponsor behind the Run", async () => {
     const { db, admin, asAdmin, asAgent } = await workspaceWithAgent();
     const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });

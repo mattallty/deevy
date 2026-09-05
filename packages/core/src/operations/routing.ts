@@ -1,4 +1,4 @@
-import { notificationKinds, routingRule as routingRuleTable } from "@deevy/db";
+import { humanNotificationKinds, routingRule as routingRuleTable } from "@deevy/db";
 import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -20,7 +20,7 @@ import { NoInput, defineOperation } from "./registry.ts";
 
 const RuleInput = z.object({
   /** Null is every kind. */
-  notificationKind: z.enum(notificationKinds).nullable(),
+  notificationKind: z.enum(humanNotificationKinds).nullable(),
   /** Null is every Project. */
   projectId: z.string().nullable(),
   channelId: z.string(),

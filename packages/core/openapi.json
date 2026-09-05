@@ -17791,7 +17791,8 @@
                               "assignment",
                               "gate_awaiting",
                               "run_awaiting_input",
-                              "run_finished"
+                              "run_finished",
+                              "run_answered"
                             ]
                           },
                           "eventId": {
