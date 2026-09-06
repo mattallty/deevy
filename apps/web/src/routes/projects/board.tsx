@@ -1,7 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
+import {
+  IssueBoard,
+  groupIntoColumns,
+  type BoardColumn,
+  type BoardIssue,
+} from "@/components/issue-board";
 import {
   ISSUE_PAGE,
   IssueFilters,
@@ -12,6 +17,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { orpc } from "@/lib/orpc";
+import { useRowSelection } from "@/lib/row-selection";
 
 /** On a Project's Board a column is one State. */
 const byStateId = (issue: BoardIssue) => issue.state.id;
@@ -80,6 +86,17 @@ export function BoardPage({
     category: state.category as FilterState["category"],
   }));
 
+  // The cards as they are on screen, column by column, for j and k; Enter
+  // peeks and o opens, as on the Issues home (lib/row-selection.ts).
+  const visibleKeys = useMemo(() => {
+    const value = groupIntoColumns(columns, cards, byStateId);
+    return columns.flatMap((column) => (value[column.id] ?? []).map((card) => card.key));
+  }, [columns, cards]);
+  const peek = (key: string) => onSearch({ peek: key });
+  const openFull = (key: string) =>
+    void navigate({ to: "/issues/$issueKey", params: { issueKey: key } });
+  const { selected, select } = useRowSelection(visibleKeys, { peek, openFull });
+
   if (workflow.isError) {
     return (
       <p className="text-destructive">Could not load the Workflow: {workflow.error.message}</p>
@@ -112,7 +129,9 @@ export function BoardPage({
         issues={cards}
         columnOf={byStateId}
         loading={workflow.isPending || issues.isPending}
-        onOpen={(key) => onSearch({ peek: key })}
+        selectedKey={selected}
+        onSelect={select}
+        onOpen={peek}
         onDragStart={() => search.peek && onSearch({ peek: undefined })}
       />
 
@@ -126,7 +145,7 @@ export function BoardPage({
         issueKey={search.peek ?? null}
         modal={false}
         onClose={() => onSearch({ peek: undefined })}
-        onOpenFull={(key) => void navigate({ to: "/issues/$issueKey", params: { issueKey: key } })}
+        onOpenFull={openFull}
       />
     </section>
   );

@@ -23,8 +23,8 @@ import { SidePeek } from "@/components/side-peek";
 import { StateBadge } from "@/components/state-badge";
 import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
+import { useRowSelection } from "@/lib/row-selection";
 import { categoryOrder, foldStates } from "@/lib/states";
-import { useShortcut } from "@/lib/shortcuts";
 import { ago } from "@/lib/time";
 
 type IssueRow = Awaited<
@@ -253,24 +253,10 @@ export function IssuesPage({
         : (groups ? groups.flatMap((g) => (g.collapsed ? [] : g.rows)) : rows).map((r) => r.key),
     [board, boardColumns, boardValue, groups, rows],
   );
-  const [selected, setSelected] = useState<string | null>(null);
-  const move = (delta: number) => {
-    if (visibleIds.length === 0) return;
-    const index = selected ? visibleIds.indexOf(selected) : -1;
-    const next = Math.min(visibleIds.length - 1, Math.max(0, index + delta));
-    setSelected(visibleIds[next] ?? null);
-  };
   const peek = (key: string) => onSearch({ peek: key });
   const openFull = (key: string) =>
     void navigate({ to: "/issues/$issueKey", params: { issueKey: key } });
-
-  useShortcut("j", () => move(1));
-  useShortcut("k", () => move(-1));
-  useShortcut("arrowdown", () => move(1));
-  useShortcut("arrowup", () => move(-1));
-  useShortcut("enter", () => selected && peek(selected));
-  useShortcut("o", () => selected && openFull(selected));
-  useShortcut("escape", () => setSelected(null));
+  const { selected, select: setSelected } = useRowSelection(visibleIds, { peek, openFull });
 
   const columns = useMemo<DataColumn<IssueRow>[]>(
     () => [

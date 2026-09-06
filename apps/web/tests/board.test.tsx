@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { pickOption } from "./select.ts";
 
@@ -129,6 +129,35 @@ describe("the board", () => {
 
     expect(await screen.findByText("DEV-1")).toBeTruthy();
     await waitFor(() => expect(screen.queryByText("DEV-2")).toBeNull());
+  });
+});
+
+describe("the keyboard on the Board", () => {
+  it("moves through the cards with j, peeks with Enter, and opens the page with o", async () => {
+    const router = await mountAt("/projects/DEV/board", { memberName: "Ada" });
+    const columns = await findColumns();
+
+    fireEvent.keyDown(document.body, { key: "j" });
+    const first = within(columns[0]!).getByText("DEV-1").closest("article");
+    expect(first?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(document.body, { key: "j" });
+    const second = within(columns[3]!).getByText("DEV-2").closest("article");
+    expect(second?.getAttribute("aria-selected")).toBe("true");
+    expect(first?.getAttribute("aria-selected")).toBeNull();
+
+    fireEvent.keyDown(document.body, { key: "Enter" });
+    await act(async () => {
+      await router.load();
+    });
+    expect(router.state.location.search).toMatchObject({ peek: "DEV-2" });
+    expect(router.state.location.pathname).toBe("/projects/DEV/board");
+    await screen.findByRole("dialog", { name: /DEV-2/ });
+
+    fireEvent.keyDown(document.body, { key: "o" });
+    await act(async () => {
+      await router.load();
+    });
+    expect(router.state.location.pathname).toBe("/issues/DEV-2");
   });
 });
 
