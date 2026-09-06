@@ -57,13 +57,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # `hasChangesets == false` is also true for an ordinary commit on main, so
-      # it cannot be the signal on its own. The tag is: a version whose tag does
-      # not yet exist is a version the Version PR just brought in.
+      # Two conditions, and the first one is not optional however redundant it
+      # looks. `changesets/action` runs the version command in place, so when
+      # changesets were waiting the working tree — and HEAD, which it commits to
+      # the release branch — is already bumped by the time this step runs.
+      # Reading a version here without that gate tags the Version PR's own
+      # commit, which is not on main, and releases it while its pull request is
+      # still open. That is what the first run of this actually did.
+      #
+      # `hasChangesets == false` on its own is not the signal either, because it
+      # is also true of every ordinary commit on main. The tag is the rest of
+      # it: a version whose tag does not exist yet is one the Version PR just
+      # brought in.
       - name: Is there a version here that has not been released?
         id: guard
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
-          version=$(node -p "require('./package.json').version")
+          # From the commit rather than the working tree, so a future step order
+          # cannot reintroduce the bug above.
+          version=$(git show HEAD:package.json | node -p "JSON.parse(require('node:fs').readFileSync(0,'utf8')).version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
             echo "v$version is already tagged; nothing to release."

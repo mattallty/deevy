@@ -217,9 +217,15 @@ both publish jobs keep their bodies; what changes is what starts them.
   `version: vp run version` and no `publish`. It opens and maintains the "Version Packages" pull request —
   whose own title and commit are conventional, because it is squash-merged like any other and slice 2 will
   read that title.
-- **"No changesets waiting" cannot be the release signal**, because it is also true of every ordinary commit
-  on `main`. The guard is the tag: a version in `package.json` whose tag does not exist yet is one the
-  Version PR just brought in. That job then pushes `vX.Y.Z`, writes the GitHub Release from the new
+- **Releasing takes two conditions**, and the first two attempts got it wrong. "No changesets waiting" is
+  true of every ordinary commit on `main`, so the tag is the other half. And the changesets check is not
+  redundant: the action runs the version command in place, so with changesets waiting the tree and HEAD are
+  already bumped, and a tag step without that gate tags the Version PR's own commit and releases it while the
+  pull request is open. The version is read from the commit, not the working tree.
+- **The Version PR is exempt from the changeset gate.** It is the one pull request that consumes changesets
+  rather than adding one, so the gate is guaranteed to fail on it.
+- **A prerelease never moves `latest`.** `type=raw,value=latest` was unconditional, which would have pointed
+  the tag everybody pulls at a release candidate. That job then pushes `vX.Y.Z`, writes the GitHub Release from the new
   `CHANGELOG.md` section, and calls the publish workflow — calls it, because a tag pushed with
   `GITHUB_TOKEN` does not trigger a workflow.
 - `release.yml`'s two publish jobs derive their image tags from the ref, which carries a version only on the
