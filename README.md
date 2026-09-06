@@ -35,6 +35,7 @@ Agent's key that runs Claude against the Issues that Agent is assigned. deevy it
 The vocabulary is in [CONTEXT.md](./CONTEXT.md), the hard-to-reverse decisions in [docs/adr](./docs/adr), the
 v1 plan in [docs/PLAN.md](./docs/PLAN.md), the research that informed them in [docs/research](./docs/research),
 how to run it in [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) and [docs/OPERATIONS.md](./docs/OPERATIONS.md),
+what changed in each release in [CHANGELOG.md](./CHANGELOG.md),
 and a worked agent loop in [docs/agent-loop.md](./docs/agent-loop.md).
 
 ## License

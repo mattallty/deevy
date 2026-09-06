@@ -1,16 +1,30 @@
 name: Release
 
-# A v0.1.x through v0.4.x tag publishes the images: M1's series, M2's, M3's and
-# M4's. CI's own checks run on main and on pull requests; this workflow re-runs
-# them so a tag can never publish something that does not build.
+# Publishes two images and nothing else: deevy, and the reference agent runtime
+# beside it. The Cloudflare Worker built from the same commit is deployed by hand
+# (docs/OPERATIONS.md), because uploading one needs an account credential this
+# repository does not hold.
 #
-# It publishes two images and nothing else: deevy, and the reference agent
-# runtime beside it. The Cloudflare Worker built from the same commit is
-# deployed by hand (docs/OPERATIONS.md), because uploading one needs an account
-# credential this repository does not hold.
+# Two ways in, and the first is the normal one:
+#
+#  - `workflow_call`, from changesets.yml, once a Version PR has merged. It has to
+#    be a call rather than the tag below, because a tag pushed with GITHUB_TOKEN
+#    does not trigger a workflow — wiring the merge to push a tag and expecting
+#    this file to notice produces a release that silently never happens.
+#  - a `v*` tag pushed by hand, which stays as the escape hatch for a release
+#    made outside the changesets flow (docs/OPERATIONS.md).
+#
+# CI's own checks run on main and on pull requests; `verify` re-runs them so
+# neither route can publish something that does not build.
 on:
   push:
-    tags: ["v0.1.*", "v0.2.*", "v0.3.*", "v0.4.*"]
+    tags: ["v*"]
+  workflow_call:
+    inputs:
+      version:
+        description: The version being released, without a leading v.
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -42,9 +56,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
+          # The ref carries a version only on the tag-push route; on a call it
+          # is main, so the caller passes the version instead. Exactly one of
+          # these two pairs is enabled.
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern=v{{version}}
+            type=semver,pattern={{version}},enable=${{ inputs.version == '' }}
+            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=raw,value=latest
 
       - name: Build and push
@@ -85,9 +104,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}-agent
+          # The ref carries a version only on the tag-push route; on a call it
+          # is main, so the caller passes the version instead. Exactly one of
+          # these two pairs is enabled.
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern=v{{version}}
+            type=semver,pattern={{version}},enable=${{ inputs.version == '' }}
+            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=raw,value=latest
 
       - name: Build and push

@@ -43,3 +43,9 @@ dist-ssr
 data/
 .wrangler/
 .vite/
+
+# Written by `changeset version` and folded into the root CHANGELOG.md by
+# `vp run version`, which then deletes them (docs/plans/commits-and-changelogs.md).
+apps/*/CHANGELOG.md
+packages/*/CHANGELOG.md
+tools/*/CHANGELOG.md

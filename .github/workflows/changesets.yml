@@ -1,0 +1,104 @@
+name: Changesets
+
+# On every push to main, one of two things is true.
+#
+#  - Changesets are waiting. `changesets/action` opens or updates the "Version
+#    Packages" pull request: the version bumps, the folded root CHANGELOG.md,
+#    and the changeset files consumed.
+#  - None are. Either that pull request just merged — in which case the version
+#    in package.json has moved and this tags it, writes the GitHub Release, and
+#    calls the publish workflow — or this is an ordinary commit and the tag
+#    already exists, which is what `guard` checks and why an ordinary push to
+#    main does not release anything.
+on:
+  push:
+    branches: [main]
+
+# Never cancelled: a half-done release is worse than a queued one.
+concurrency:
+  group: changesets
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: The Version PR, or the tag when it merges
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release: ${{ steps.guard.outputs.release }}
+      version: ${{ steps.guard.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1.19.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+
+      - name: Install
+        run: vp install --frozen-lockfile
+
+      # The title and commit are conventional on purpose: this pull request is
+      # squash-merged like any other and its title becomes a commit on main,
+      # where the check in pull-request.yml will read it.
+      - name: Open or update the Version PR
+        uses: changesets/action@v1
+        with:
+          version: vp run version
+          title: "chore(release): version packages"
+          commit: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # `hasChangesets == false` is also true for an ordinary commit on main, so
+      # it cannot be the signal on its own. The tag is: a version whose tag does
+      # not yet exist is a version the Version PR just brought in.
+      - name: Is there a version here that has not been released?
+        id: guard
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already tagged; nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "v$version is new."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag it
+        if: steps.guard.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Write the GitHub Release from the changelog
+        if: steps.guard.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          node tools/release/scripts/release-notes.ts "$VERSION" > /tmp/release-notes.md
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file /tmp/release-notes.md
+
+  # Called rather than left to the tag push above, which GITHUB_TOKEN cannot
+  # trigger. This re-runs the whole of CI before either image is pushed.
+  publish:
+    name: Images
+    needs: version
+    if: needs.version.outputs.release == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.version.outputs.version }}

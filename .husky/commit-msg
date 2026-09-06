@@ -1,0 +1,10 @@
+set -e
+
+# Conventional commits, checked before the message is written rather than after
+# it reaches CI. Deliberately not sourcing vp.sh and not going through pnpm: a
+# git hook inherits no interactive shell's PATH, and the note in vp.sh about a
+# hook that waits on one applies to any launcher. The .bin path needs neither.
+#
+# The squashed pull request title is checked again in CI, which is why skipping
+# this one with `git commit --no-verify` is survivable.
+./node_modules/.bin/commitlint --edit "$1"

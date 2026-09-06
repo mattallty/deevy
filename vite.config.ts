@@ -10,6 +10,11 @@ export default defineConfig({
       // Written by snapshot:mcp-tools and diffed in CI; the generator owns its
       // shape, so the formatter must not have an opinion about it.
       "packages/core/mcp-tools.json",
+      // Written by `changeset version` and rewritten by tools/release's fold
+      // step, for the same reason as the two above: the generator owns its
+      // shape, and a formatter with an opinion about it is churn on every
+      // release (docs/plans/commits-and-changelogs.md).
+      "CHANGELOG.md",
     ],
   },
   lint: {
@@ -35,6 +40,7 @@ export default defineConfig({
           "packages/adapters/src/node/**",
           "packages/db/scripts/**",
           "packages/core/scripts/**",
+          "tools/release/**",
         ],
         env: { node: true },
       },

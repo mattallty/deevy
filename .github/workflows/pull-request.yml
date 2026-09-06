@@ -1,0 +1,81 @@
+name: Pull request
+
+# The two checks that are about the pull request itself rather than its code, in
+# their own workflow because of the triggers: `edited` fires on every title and
+# description change and `labeled` on every label, and neither should re-run the
+# test matrix in ci.yml. Both are an install and a few seconds.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: pull-request-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Merges here are squashed, so the title is the commit message that lands on
+  # main. `.husky/commit-msg` checks what a person writes locally and is
+  # skippable with --no-verify; this is the one that decides what the log looks
+  # like. Same commitlint.config.js, so there is one rule set and not two.
+  title:
+    name: The title is a conventional commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1.19.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+
+      - name: Install
+        run: vp install --frozen-lockfile
+
+      # Through the environment rather than `${{ }}` in the script: a title is
+      # attacker-controlled text and interpolating it into a shell would run it.
+      - name: Lint the title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$PR_TITLE" | ./node_modules/.bin/commitlint
+
+  # `changeset status --since` exits 1 when package files changed and no
+  # changeset declares what that means for a reader of the changelog. A pull
+  # request that touches only docs, CI or tests passes without one:
+  # changedFilePatterns in .changeset/config.json takes those out of the
+  # question, which is most of the escape hatch. The label is the rest.
+  changeset:
+    name: A change that ships carries a changeset
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `--since=origin/main` needs main to exist locally.
+          fetch-depth: 0
+
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1.19.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+
+      - name: Install
+        run: vp install --frozen-lockfile
+
+      - name: Fetch main
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+
+      - name: A changeset declares what this release will say
+        run: |
+          if ! ./node_modules/.bin/changeset status --since=origin/main; then
+            echo "::error::No changeset for a change that touches a package."
+            echo "Run 'changeset add' and describe the change for somebody upgrading deevy."
+            echo "If it changes nothing a user can observe, 'changeset add --empty' says so."
+            echo "If it is not worth an entry at all, add the 'no-changelog' label."
+            exit 1
+          fi

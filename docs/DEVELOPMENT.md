@@ -77,9 +77,66 @@ the operations, so the inbox and the Event log fill themselves. Point a runtime 
 | `vp run db#generate:auth`        | Regenerate `packages/db/src/schema/auth.ts` from Better Auth's config. Needs the bootstrap step below.        |
 | `vp run core#snapshot:openapi`   | Regenerate `packages/core/openapi.json`; CI fails when it is stale.                                           |
 | `vp run core#snapshot:mcp-tools` | Regenerate `packages/core/mcp-tools.json`; CI fails when it is stale.                                         |
+| `changeset add`                  | Declare what a change means for somebody upgrading; `--empty` when it means nothing.                          |
+| `vp run version`                 | Consume the changesets into `CHANGELOG.md` and move the version. CI runs this; you almost never do.           |
 
 The HTTP surface is documented at http://localhost:3000/api/docs while the server runs; the raw document is at
 `/api/spec.json`.
+
+## What a commit message says
+
+Conventional commits, in the standard imperative, checked by `.husky/commit-msg` locally and by
+`pull-request.yml` in CI (ADR-0017):
+
+```
+feat(gates): add ruling authority to Gate
+fix(core): stop the sweep from reopening a ruled Gate
+docs: explain what a changeset is for
+chore(deps): move the Better Auth pin to 1.7.3
+```
+
+The type is one of `build chore ci docs feat fix perf refactor revert style test`. The scope is optional and
+free-form — there is no enum, because the changelog is grouped by the packages a changeset names rather than
+by what a subject line claims.
+
+Two things the rules deliberately allow. The subject may carry the CONTEXT.md vocabulary's capitals
+mid-sentence (`fix(core): a Run waiting on a Gate does not go stale`), because `subject-case` judges the whole
+subject and a lowercase-initial one with a proper noun in it is fine. And **the body is unconstrained prose**,
+unwrapped, as long as you like: `config-conventional` caps body lines at 100 characters by default and this
+repository has always written 700-character paragraphs, so that rule is off.
+
+**Merges here are squashed, so the pull request title is the commit message that lands on `main`.** The hook
+is a courtesy you can skip with `git commit --no-verify`; the title check in CI is the one that decides what
+the log looks like.
+
+## When a change needs a changeset
+
+A changeset is one file saying what a change means for **somebody upgrading deevy** — not what it means for
+somebody reviewing the diff. That distinction is the whole value of the file, because the release notes are
+nothing but these summaries stitched together.
+
+```bash
+changeset add           # pick the packages, pick major/minor/patch, write the summary
+changeset add --empty   # a change no user can observe, declared as such
+```
+
+`pull-request.yml` fails a pull request that changes a package and carries neither. Docs, tests and CI are
+already out of the question — `changedFilePatterns` in `.changeset/config.json` excludes them — so this fires
+on real changes only. The `no-changelog` label is the last resort for the change that genuinely warrants no
+entry at all.
+
+Some notes on the mechanics, because they surprise people:
+
+- **All seven packages share one version.** They are a `fixed` group, so naming one package in a changeset
+  moves all of them. The number is the Docker image tag; there is no per-package release (ADR-0017).
+- **`vp run version` needs a `GITHUB_TOKEN`** and fails without one, including locally. The changelog
+  generator turns each changeset into a line that links its pull request and credits its author, and that is
+  an API call. CI has the token; run this by hand only with one exported.
+- **`changeset status --since=origin/main` reads changesets from git, not from disk.** Run it before
+  committing and it reports no changeset even when the file is sitting there — it is only a false failure
+  locally, because CI always runs it against a commit that contains the file.
+- **The per-package `CHANGELOG.md` files are gitignored scratch.** `changeset version` writes them,
+  `tools/release/scripts/fold-changelog.ts` folds them into the root `CHANGELOG.md` and deletes them.
 
 ## The two snapshots CI diffs
 

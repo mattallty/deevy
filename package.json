@@ -1,15 +1,20 @@
 {
   "name": "deevy",
-  "version": "0.0.0",
+  "version": "0.4.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "vp run -r --parallel dev",
     "ready": "vp check && vp run -r test && vp run -r build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "version": "changeset version && node tools/release/scripts/fold-changelog.ts"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
+    "@commitlint/cli": "catalog:",
+    "@commitlint/config-conventional": "catalog:",
     "husky": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

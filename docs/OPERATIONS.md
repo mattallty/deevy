@@ -6,14 +6,13 @@ admin, and everyone else joins through the allowlist.
 
 ## The image
 
-Published to `ghcr.io/mattallty/deevy` on every `v0.1.x`, `v0.2.x` and `v0.3.x` tag, for `linux/amd64` and
-`linux/arm64`. Tags are the version (`v0.3.0`) and `latest`. The image carries the bundled Node server, the
-migrations, and the built SPA; it runs the SPA and the API on one port, so there is no separate web container.
+Published to `ghcr.io/mattallty/deevy` on every `v*` tag, for `linux/amd64` and `linux/arm64`. Tags are the
+version (`v0.4.0`) and `latest`. The image carries the bundled Node server, the migrations, and the built SPA;
+it runs the SPA and the API on one port, so there is no separate web container.
 
-**The package is private while deevy is pre-release**, so pulling it needs a GitHub account with access:
-`docker login ghcr.io` with a personal access token carrying `read:packages`. Without one the pull fails with
-`unauthorized` rather than anything that explains itself. Building from source needs no account at all and
-produces the same image — the release workflow runs exactly this command:
+**The package is public**, inheriting the repository's visibility, so pulling it needs no account and no
+`docker login`. Building from source produces the same image — the release workflow runs exactly this
+command:
 
 ```bash
 docker build -f apps/server/Dockerfile -t deevy:local .
@@ -27,8 +26,33 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
-  deevy:local   # or ghcr.io/mattallty/deevy:latest once the package is public
+  deevy:local   # or ghcr.io/mattallty/deevy:latest
 ```
+
+## Cutting a release
+
+Releases are made by merging, not by tagging (ADR-0017). Every pull request that changes a package carries a
+changeset; `changesets.yml` collects them on `main` into a **"Version Packages"** pull request holding the
+version bump and the folded `CHANGELOG.md`. Merging that pull request is the release:
+
+1. `changesets.yml` runs again, finds no changesets waiting, and sees a version in `package.json` whose tag
+   does not exist yet.
+2. It pushes `vX.Y.Z` and writes the GitHub Release from that version's `CHANGELOG.md` section.
+3. It calls `release.yml`, which re-runs the whole of CI and then pushes both images.
+
+The tag is pushed for the record and for the image tags; it does **not** drive step 3, because a tag pushed
+with `GITHUB_TOKEN` triggers no workflow. Nothing about an ordinary commit on `main` releases anything — the
+existing tag is the guard.
+
+Two things this needs on the repository, both one-time and both failing at release rather than on a pull
+request, which is the worst place to find out:
+
+- **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests."** Without it
+  `changesets/action` cannot open the Version PR.
+- **A `no-changelog` label**, for the pull request that genuinely warrants no changelog entry.
+
+To release outside this flow, push a `v*` tag by hand; `release.yml` still publishes on one. That skips the
+changelog and the GitHub Release, so it is for recovering a botched release rather than for making one.
 
 ## The Worker
 

@@ -24,7 +24,8 @@ format, so pnpm 11 is required and pinned twice over: `devEngines.packageManager
 the prompt to wipe `node_modules`, so if an install hangs with no output, check `pnpm --version` first.
 `vp dev`, `vp build`, `vp test`, `vp check` are built-ins that ignore package.json scripts; `vp run <script>`
 runs scripts, `-r` recursively, `pkg#script` for one package (package names are `web`, `server`, `core`, `db`,
-`adapters`, `claude-agent`; the last has its own `apps/claude-agent/README.md`).
+`adapters`, `claude-agent`, `release`; `claude-agent` has its own `apps/claude-agent/README.md`, and
+`release` is `tools/release`, which holds the changelog fold and the commit-message rules).
 
 - `vp check` (root): format, lint, typecheck the whole tree; `vp check --fix` applies formatting. Run it before
   every commit; CI runs it first.
@@ -42,6 +43,15 @@ runs scripts, `-r` recursively, `pkg#script` for one package (package names are 
 - Schema change: edit `packages/db/src/schema`, `vp run db#generate`, then hand-patch `NOT NULL` onto every
   `text PRIMARY KEY` in the new `migration.sql` (drizzle-kit rc regression) and run `vp run db#check:migrations`.
 - API change: `vp run core#snapshot:openapi` and commit `packages/core/openapi.json`; CI fails on a stale snapshot.
+- **Every commit message is a conventional commit** in the standard imperative — `feat(gates): add ruling
+authority to Gate`. The type is one of `build chore ci docs feat fix perf refactor revert style test`; the
+  scope is optional and free-form. The body stays unwrapped prose. Merges are squashed, so the **pull request
+  title** must be conventional too — that is the message that lands on `main`, and CI checks it (ADR-0017).
+- **Every change to a package carries a changeset**: `changeset add`, or `changeset add --empty` when nothing
+  a user can observe changed. CI fails a pull request without one, the way it fails a stale snapshot. Write
+  the summary for somebody upgrading deevy, not for somebody reviewing the diff; it is published verbatim as
+  the release notes. Docs, tests and CI need none. Never edit `CHANGELOG.md` by hand — `vp run version` writes
+  it, and the per-package `CHANGELOG.md` files are gitignored scratch.
 - UI components come from the shadcn registry (`apps/web/components.json`, style `base-mira`, Base UI not
   Radix): `pnpm dlx shadcn@latest add <name> --overwrite` from `apps/web`. It rewrites `pnpm-workspace.yaml`
   and strips its comments, and it pins new dependencies, so move them to the catalog and put the comments back.
