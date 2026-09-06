@@ -69,6 +69,15 @@ prerelease. `changeset pre exit` ends the line and the next Version PR carries t
 mode is on, everything merged to `main` goes into the rc line — see
 [DEVELOPMENT.md](./DEVELOPMENT.md#cutting-a-release-candidate).
 
+**The images are built natively, one runner per architecture.** `linux/amd64` on `ubuntu-latest` and
+`linux/arm64` on `ubuntu-24.04-arm`, each pushing an untagged image addressed by digest, with a final job
+collecting the digests into the multi-architecture tags. Nothing is emulated, and a tag never points at a
+half-published image because it is created only once both architectures exist.
+
+**If a build fails and leaves a version tagged with no images**, run the Release workflow from the Actions tab
+with that version (without a leading `v`) as its input. Re-tagging is not possible at that point — the tag and
+the GitHub Release already exist — which is what the `workflow_dispatch` input is for.
+
 To release outside this flow, push a `v*` tag by hand; `release.yml` still publishes on one. That skips the
 changelog and the GitHub Release, so it is for recovering a botched release rather than for making one.
 

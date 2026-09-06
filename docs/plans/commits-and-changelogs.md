@@ -230,7 +230,13 @@ both publish jobs keep their bodies; what changes is what starts them.
   the tag everybody pulls at a release candidate. That job then pushes `vX.Y.Z`, writes the GitHub Release from the new
   `CHANGELOG.md` section, and calls the publish workflow — calls it, because a tag pushed with
   `GITHUB_TOKEN` does not trigger a workflow.
-- `release.yml`'s two publish jobs derive their image tags from the ref, which carries a version only on the
+- `release.yml` builds each architecture on a runner of its own — `ubuntu-latest` and `ubuntu-24.04-arm`,
+  which are free for public repositories — pushing by digest and collecting the digests into the tags in a
+  final job. It began as one job building both platforms together, which meant `linux/arm64` ran under QEMU
+  while the Dockerfile installed and built the whole workspace inside the image; that cost about three times
+  the native half and then hung outright on the 0.5.0-rc.0 release. Every docker build now carries a step
+  timeout as well, because a hang that only trips the job timeout wastes twenty minutes saying nothing.
+- `release.yml`'s image tags derive from the ref, which carries a version only on the
   tag-push route. On a call the ref is `main`, so the caller passes the version and `docker/metadata-action`
   gets both sources with `enable=` making them mutually exclusive.
 - `permissions` on that workflow: `contents: write` (tag, release, and the Version PR's branch) and

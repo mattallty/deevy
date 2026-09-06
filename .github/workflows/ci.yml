@@ -177,10 +177,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Single-architecture and native, so minutes rather than the emulated
+      # build's tens of them — but bounded, because a hung docker build that
+      # only trips the job timeout wastes twenty minutes saying nothing.
       - name: Build deevy
+        timeout-minutes: 10
         run: docker build -f apps/server/Dockerfile -t deevy:ci .
 
       - name: Build the runtime
+        timeout-minutes: 10
         run: docker build -f apps/claude-agent/Dockerfile -t deevy-agent:ci .
 
       - name: Smoke the deevy image

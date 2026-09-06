@@ -5,17 +5,21 @@ name: Release
 # (docs/OPERATIONS.md), because uploading one needs an account credential this
 # repository does not hold.
 #
-# Two ways in, and the first is the normal one:
+# Three ways in, and the first is the normal one:
 #
 #  - `workflow_call`, from changesets.yml, once a Version PR has merged. It has to
 #    be a call rather than the tag below, because a tag pushed with GITHUB_TOKEN
 #    does not trigger a workflow — wiring the merge to push a tag and expecting
 #    this file to notice produces a release that silently never happens.
-#  - a `v*` tag pushed by hand, which stays as the escape hatch for a release
-#    made outside the changesets flow (docs/OPERATIONS.md).
+#  - a `v*` tag pushed by hand, the escape hatch for a release made outside the
+#    changesets flow (docs/OPERATIONS.md).
+#  - `workflow_dispatch` with a version, for the case this workflow has actually
+#    hit: the tag and the GitHub Release exist and only the images are missing,
+#    because a build failed. Re-tagging is not an option then, so republishing
+#    has to be startable on its own.
 #
-# CI's own checks run on main and on pull requests; `verify` re-runs them so
-# neither route can publish something that does not build.
+# CI's own checks run on main and on pull requests; `verify` re-runs them so no
+# route can publish something that does not build.
 on:
   push:
     tags: ["v*"]
@@ -23,6 +27,12 @@ on:
     inputs:
       version:
         description: The version being released, without a leading v.
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to publish images for, without a leading v. Its tag must already exist.
         required: true
         type: string
 
@@ -34,14 +44,110 @@ jobs:
   verify:
     uses: ./.github/workflows/ci.yml
 
-  publish:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  # One job per image per architecture, each on a runner of its own architecture.
+  #
+  # This used to be one job building linux/amd64,linux/arm64 together, which meant
+  # the arm64 half ran under QEMU — and the Dockerfile builds the whole workspace
+  # inside the image (`vp install` then `vp run -r build`), so that is a full JS
+  # toolchain install and an SPA build, emulated. It cost about three times what
+  # the native half did and, on the 0.5.0-rc.0 release, hung outright partway
+  # through the SPA build. Native arm64 runners are free for public repositories,
+  # so the emulation is simply removed rather than tuned.
+  #
+  # Each job pushes an image with no tag, addressed only by digest; `manifest`
+  # below collects the digests into one multi-architecture tag.
+  build:
+    name: ${{ matrix.image.key }} on ${{ matrix.arch.key }}
     needs: verify
+    runs-on: ${{ matrix.arch.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          # `key` and not the image's name: it is also the artifact name below,
+          # and a `digests-deevy-*` pattern would match `digests-deevy-agent-*`.
+          - key: server
+            suffix: ""
+            dockerfile: apps/server/Dockerfile
+          - key: agent
+            suffix: "-agent"
+            dockerfile: apps/claude-agent/Dockerfile
+        arch:
+          - key: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - key: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-qemu-action@v4
+      # No setup-qemu-action: every build here is native, which is the point.
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        # The step timeout is the one that matters. The last emulated build of
+        # both architectures together took 6m28s, so a native build of one is a
+        # few minutes and ten is roughly triple the headroom it needs. The
+        # release this replaced hung inside the SPA build and sat there until a
+        # 30-minute job timeout would have killed it; this fails in ten and says
+        # which architecture did it.
+        timeout-minutes: 10
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          platforms: ${{ matrix.arch.platform }}
+          outputs: type=image,name=ghcr.io/${{ github.repository }}${{ matrix.image.suffix }},push-by-digest=true,name-canonical=true,push=true
+          # Scoped per image and architecture: one shared scope would have the
+          # four jobs overwriting each other's cache on every release.
+          cache-from: type=gha,scope=${{ matrix.image.key }}-${{ matrix.arch.key }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.key }}-${{ matrix.arch.key }}
+
+      - name: Hand the digest to the manifest job
+        run: |
+          mkdir -p /tmp/digests
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.image.key }}-${{ matrix.arch.key }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # The tags everybody pulls are created here, once both architectures exist, so
+  # a tag never points at a half-published image.
+  manifest:
+    name: ${{ matrix.image.key }} manifest
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - key: server
+            suffix: ""
+          - key: agent
+            suffix: "-agent"
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.image.key }}-*
+          merge-multiple: true
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Sign in to GHCR
@@ -55,10 +161,10 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository }}
-          # The ref carries a version only on the tag-push route; on a call it
-          # is main, so the caller passes the version instead. Exactly one of
-          # these two pairs is enabled.
+          images: ghcr.io/${{ github.repository }}${{ matrix.image.suffix }}
+          # The ref carries a version only on the tag-push route; on a call or a
+          # dispatch it is a branch, so the caller passes the version instead.
+          # Exactly one of these two pairs is enabled.
           tags: |
             type=semver,pattern={{version}},enable=${{ inputs.version == '' }}
             type=semver,pattern=v{{version}},enable=${{ inputs.version == '' }}
@@ -69,65 +175,14 @@ jobs:
             # v0.5.0-rc.1 publishes under its own tags and leaves latest alone.
             type=raw,value=latest,enable=${{ !contains(inputs.version || github.ref_name, '-') }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/server/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Point the tags at both architectures
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/${{ github.repository }}${{ matrix.image.suffix }}@sha256:%s ' *)
 
-  # The reference runtime is a separate deployment and a separate decision: an
-  # instance with no runtime is a Workspace where the Humans do the work, and
-  # docker-compose keeps it behind a profile so nobody starts one by accident
-  # (ADR-0013, ADR-0014).
-  publish-agent:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: verify
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Sign in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Tags
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}-agent
-          # The ref carries a version only on the tag-push route; on a call it
-          # is main, so the caller passes the version instead. Exactly one of
-          # these two pairs is enabled.
-          tags: |
-            type=semver,pattern={{version}},enable=${{ inputs.version == '' }}
-            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' }}
-            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
-            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
-            # A prerelease must never move `latest`. Both routes carry the
-            # version in a different place, and a `-` in it is what marks one:
-            # v0.5.0-rc.1 publishes under its own tags and leaves latest alone.
-            type=raw,value=latest,enable=${{ !contains(inputs.version || github.ref_name, '-') }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/claude-agent/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Say what it points at
+        run: |
+          docker buildx imagetools inspect \
+            "ghcr.io/${{ github.repository }}${{ matrix.image.suffix }}:$(jq -cr '.tags[0]|split(":")[-1]' <<< "$DOCKER_METADATA_OUTPUT_JSON")"
