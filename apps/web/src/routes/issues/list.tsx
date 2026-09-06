@@ -4,6 +4,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { useMemo, useState } from "react";
 import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
 import {
   IssueBoard,
   groupIntoColumns,
@@ -95,6 +96,82 @@ export function IssuesPage({
       enabled: search.assignee !== "me" || myId !== null,
     }),
   );
+
+  // What the empty state may say depends on what narrowed the list: a filter,
+  // the default Open view over a list that is all closed, or nothing at all.
+  const onlyFilter = (() => {
+    const set = [
+      search.q ? "q" : null,
+      search.state ? "state" : null,
+      search.assignee ? "assignee" : null,
+      search.kind ? "kind" : null,
+      !fixedProject && search.project ? "project" : null,
+    ].filter(Boolean);
+    return set.length === 1 ? set[0] : set.length === 0 ? null : "several";
+  })();
+  const filtered = onlyFilter !== null;
+  const openOnly = search.open !== "0";
+  // Asked once, only when the open view is empty and nothing else narrows it.
+  const anyAtAll = useQuery(
+    orpc.issues.list.queryOptions({
+      input: { ...(projectKey ? { projectKey } : {}), limit: 1 },
+      enabled: !filtered && openOnly && issues.data?.issues.length === 0,
+    }),
+  );
+  const closedOnly = (anyAtAll.data?.issues.length ?? 0) > 0;
+  const clearFilters = () =>
+    onSearch({
+      q: undefined,
+      state: undefined,
+      assignee: undefined,
+      kind: undefined,
+      ...(fixedProject ? {} : { project: undefined }),
+    });
+  const emptyState = (() => {
+    if (onlyFilter === "assignee" && search.assignee === "me") {
+      return {
+        icon: ClipboardList,
+        title: "Nothing assigned to you",
+        description: "Issues assigned to you show here; All Issues has the rest.",
+      };
+    }
+    if (onlyFilter === "assignee" && search.assignee === "agents:me") {
+      return {
+        icon: ClipboardList,
+        title: "Nothing assigned to your Agents",
+        description: "Issues your Agents hold show here; All Issues has the rest.",
+      };
+    }
+    if (filtered) {
+      return {
+        icon: SearchX,
+        title: "No Issues match your filters",
+        description: "Try other filters, or clear them.",
+        action: (
+          <Button variant="outline" size="sm" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        ),
+      };
+    }
+    if (closedOnly) {
+      return {
+        icon: ClipboardList,
+        title: "No open Issues",
+        description: "Every Issue here is closed. All shows them.",
+        action: (
+          <Button variant="outline" size="sm" onClick={() => onSearch({ open: "0" })}>
+            Show All
+          </Button>
+        ),
+      };
+    }
+    return {
+      icon: ClipboardList,
+      title: "No Issues yet",
+      description: "Press c to create one. It starts in the first State of its Project's Workflow.",
+    };
+  })();
 
   const rows = useMemo(() => {
     const all = (issues.data?.issues ?? []) as IssueRow[];
@@ -355,13 +432,7 @@ export function IssuesPage({
           onSelect={setSelected}
           onOpen={peek}
           loading={issues.isPending}
-          empty={{
-            icon: search.q ? SearchX : ClipboardList,
-            title: search.q ? "No Issues match" : "No Issues yet",
-            description: search.q
-              ? "Try another word, or clear the filters."
-              : "Press c to create one. It starts in the first State of its Project's Workflow.",
-          }}
+          empty={emptyState}
         />
       )}
 

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, ChevronRight, type LucideIcon } from "lucide-react"
 import { useMemo, useState, type ReactNode } from "react";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -49,7 +50,7 @@ export interface DataTableProps<T> {
   onOpen?: (id: string) => void;
   loading?: boolean;
   /** What to say when there are no rows; the icon says what kind of thing is missing. */
-  empty?: { title: ReactNode; description?: ReactNode; icon?: LucideIcon };
+  empty?: { title: ReactNode; description?: ReactNode; icon?: LucideIcon; action?: ReactNode };
   density?: "compact" | "comfortable";
   className?: string;
   "aria-label"?: string;
@@ -131,6 +132,7 @@ export function DataTable<T>({
           <EmptyTitle>{empty.title}</EmptyTitle>
           {empty.description ? <EmptyDescription>{empty.description}</EmptyDescription> : null}
         </EmptyHeader>
+        {empty.action ? <EmptyContent>{empty.action}</EmptyContent> : null}
       </Empty>
     );
   }

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -213,11 +214,23 @@ export function InboxPage({
               <EmptyMedia variant="icon">
                 <Inbox aria-hidden />
               </EmptyMedia>
-              <EmptyTitle>Nothing waiting</EmptyTitle>
+              {/* Under the Unread filter the list may be empty while All is not: say which. */}
+              <EmptyTitle>
+                {search.unread === "1" ? "Nothing unread" : "Nothing waiting"}
+              </EmptyTitle>
               <EmptyDescription>
-                Mentions, assignments and Gates land here as they happen.
+                {search.unread === "1"
+                  ? "You are caught up. All shows what you have read."
+                  : "Mentions, assignments and Gates land here as they happen."}
               </EmptyDescription>
             </EmptyHeader>
+            {search.unread === "1" ? (
+              <EmptyContent>
+                <Button variant="outline" size="sm" onClick={() => onSearch({ unread: undefined })}>
+                  Show All
+                </Button>
+              </EmptyContent>
+            ) : null}
           </Empty>
         ) : null}
         <ul aria-label="Notifications" className="flex flex-col divide-y">

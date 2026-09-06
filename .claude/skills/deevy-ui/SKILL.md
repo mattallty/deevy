@@ -149,7 +149,11 @@ EmptyMedia variant="icon" + EmptyTitle + EmptyDescription`, with a lucide icon t
   every page root (`SettingsPage`, `ProjectLayout`, the Issues home, Projects) is `flex flex-1 flex-col`;
   the Settings layout's content column too. `DataTable` takes `empty={{ icon, title, description }}`; a
   Settings list composes the parts itself. Inline notes inside a detail section ("No Runs yet") stay `<p>`
-  (Matt, 2026-09-06).
+  (Matt, 2026-09-06). **The words say what emptied the list**: under a filter it is "No Issues match your
+  filters" with a Clear filters button (`empty.action`), never "No Issues yet"; a built-in view names
+  itself ("Nothing assigned to you"); the default Open view over an all-closed list says "No open Issues"
+  (one `limit: 1` query, asked only then); the Inbox's Unread filter says "Nothing unread"; the Event
+  log's filters say "No Events match your filters".
 - **Nowhere is a page.** `routes/not-found.tsx` is the root route's `notFoundComponent` and what the Issue
   and Project pages render when the API says `NOT_FOUND` (`isNotFound`, which the QueryClient also uses to
   skip retries): inside the shell, `h1` "There is nothing here" or "There is no Issue DEV-999", the path or

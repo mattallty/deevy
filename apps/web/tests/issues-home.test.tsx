@@ -219,6 +219,20 @@ describe("the Issues home", () => {
   });
 });
 
+describe("the Issues home with nothing to show", () => {
+  it("says the filters are what emptied it, and clears them", async () => {
+    const router = await mountAt("/?state=Nowhere");
+
+    expect(await screen.findByText("No Issues match your filters")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await act(async () => {
+      await router.load();
+    });
+    expect(router.state.location.search).not.toHaveProperty("state");
+    expect(await screen.findByRole("table", { name: "Issues" })).toBeTruthy();
+  });
+});
+
 describe("the board view of the Issues home", () => {
   it("toggles to the Board, writing view to the URL and hiding Group by", async () => {
     const router = await mountAt("/");

@@ -5,7 +5,7 @@ import { DataTable, type DataColumn } from "@/components/data-table";
 import { MemberChip } from "@/components/member-chip";
 import { SettingsPage } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
-import { ScrollText } from "lucide-react";
+import { ScrollText, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeEvent } from "@/lib/event-text";
 import { orpc } from "@/lib/orpc";
@@ -307,11 +307,39 @@ export function EventLogPage() {
           selectedId={open === null ? null : String(open)}
           onOpen={(id) => setOpen((current) => (current === Number(id) ? null : Number(id)))}
           loading={events.isPending}
-          empty={{
-            icon: ScrollText,
-            title: "Nothing yet",
-            description: "The first Event lands when anything happens.",
-          }}
+          empty={
+            kindPrefix !== ANY || subjectType !== ANY || projectId !== ANY
+              ? {
+                  icon: SearchX,
+                  title: "No Events match your filters",
+                  description: "Try other filters, or clear them.",
+                  action: (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setKindPrefix(ANY);
+                        setSubjectType(ANY);
+                        setProjectId(ANY);
+                        setBefore(null);
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ),
+                }
+              : before !== null
+                ? {
+                    icon: ScrollText,
+                    title: "Nothing older",
+                    description: "The log starts here.",
+                  }
+                : {
+                    icon: ScrollText,
+                    title: "Nothing yet",
+                    description: "The first Event lands when anything happens.",
+                  }
+          }
         />
       )}
 
