@@ -65,8 +65,19 @@ export async function openWorkspace(options: WorkspaceOptions): Promise<Workspac
   const repo = options.repo ?? null;
   const auth = authArgs(repo?.token);
 
+  // `safe.directory` because the session owns this tree and the supervisor
+  // does not: git refuses a repository owned by another user unless told, and
+  // the supervisor is the one that has to read what the session left
+  // (src/session-user.ts).
   const git = async (args: string[]): Promise<string> => {
-    const { stdout } = await run("git", [...auth, "-C", cwd, ...args]);
+    const { stdout } = await run("git", [
+      ...auth,
+      "-c",
+      `safe.directory=${cwd}`,
+      "-C",
+      cwd,
+      ...args,
+    ]);
     return stdout.trim();
   };
 

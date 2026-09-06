@@ -279,6 +279,8 @@ export async function walk(origin: string, label: string): Promise<string> {
       githubApi: forge.api,
       githubRepo: "deevy/acceptance",
       listenPort: 0,
+      sessionUid: 10002,
+      sessionGid: 10002,
     };
     const deevy = createDeevy({ config });
     const work = {

@@ -26,10 +26,20 @@ COPY apps/agent/harness.sh /usr/local/bin/install-harness
 RUN install-harness "$HARNESS"
 ENV DEEVY_AGENT_HARNESS=$HARNESS
 
-# The session gets a shell from slice 5, and it is not going to get root with
-# it. The container is the boundary (docs/plans/m4.md).
-RUN useradd --create-home --uid 10001 runtime
-USER runtime
+# Two users, because one is not a boundary. The supervisor runs as root so it
+# can spawn each session as `session`, which is what puts the supervisor's
+# environment — the Agent's key, the git token — outside what a shell in that
+# session can read; on one user it reads them out of `/proc`
+# (docs/plans/agent-owns-git.md, ADR-0019). Root here is root in a container
+# with no capability but the one this needs:
+#
+#   docker run --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID ...
+#
+# Run the image with `--user` instead and the runtime keeps its old shape, says
+# so in its first line, and is fine for trying out and not for a Workspace
+# other people write in.
+RUN useradd --create-home --uid 10001 runtime \
+    && useradd --no-create-home --uid 10002 session
 # /healthz always, and deevy's deliveries when a webhook secret is configured.
 EXPOSE 8787
 CMD ["node", "dist/main.mjs"]

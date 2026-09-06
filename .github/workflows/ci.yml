@@ -256,6 +256,27 @@ jobs:
             echo "$out" | grep -q "refuses to start without it"
           done
 
+      # The claim the whole boundary rests on, made by a session rather than by
+      # reading the code (docs/plans/agent-owns-git.md, convention 28). On one
+      # user a shell in a session reads the supervisor's environment out of
+      # /proc, and the Agent's key and the git token are in it.
+      - name: A session cannot read the supervisor's environment
+        run: |
+          out=$(docker run --rm --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID \
+            -e DEEVY_AGENT_KEY=deevy_sk_ci_secret deevy-agent:ci-claude-code node -e '
+              const { spawnSync } = require("child_process");
+              const read = (opts) => spawnSync("sh", ["-c", "cat /proc/" + process.pid + "/environ"],
+                { encoding: "utf8", ...opts });
+              const saw = (r) => String(r.stdout).includes("deevy_sk_ci_secret");
+              console.log("same-user:" + saw(read({})));
+              console.log("session:" + saw(read({ uid: 10002, gid: 10002 })));
+            ')
+          echo "$out"
+          # The first line is the control: without two users there is no bound,
+          # so a run where neither can read it proves nothing.
+          echo "$out" | grep -qx "same-user:true"
+          echo "$out" | grep -qx "session:false"
+
       - name: Configuration it cannot start without is named
         run: |
           set +e
