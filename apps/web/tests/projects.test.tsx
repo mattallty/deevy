@@ -46,10 +46,12 @@ const stub = vi.hoisted(() => {
             id: "m-ada",
             role: "admin",
             handle: "ada",
+            kind: "human",
             user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com" },
           },
         ],
       },
+      { id: "t2", name: "Runtime", handle: "runtime", members: [] },
     ],
   };
 });
@@ -150,6 +152,42 @@ describe("the Teams settings page", () => {
     expect(within(team).getByRole("heading", { name: "Platform" })).toBeTruthy();
     expect(within(team).getByText("@platform")).toBeTruthy();
     expect(within(team).getByText("Ada Lovelace")).toBeTruthy();
+  });
+
+  it("names the Projects the open Team owns, from the Projects it already has", async () => {
+    await mountAt("/settings/teams");
+
+    // No second call for this: `projects.list` carries each Project's Team.
+    const team = await screen.findByRole("article");
+    expect(within(team).getByText("DEV")).toBeTruthy();
+  });
+
+  it("opens the Team the rail is asked for, and says so in the URL", async () => {
+    const router = await mountAt("/settings/teams");
+
+    const rail = await screen.findByRole("navigation", { name: "Teams" });
+    const [platform, runtime] = within(rail).getAllByRole("button");
+    // The first Team is open until the URL names another one.
+    expect(platform?.getAttribute("aria-current")).toBe("true");
+    expect((await screen.findByRole("article")).getAttribute("aria-label")).toBe("Platform");
+
+    fireEvent.click(runtime!);
+
+    await waitFor(() =>
+      expect(screen.getByRole("article").getAttribute("aria-label")).toBe("Runtime"),
+    );
+    expect(router.state.location.search).toEqual({ team: "t2" });
+    expect(screen.getByText("Nobody on this Team yet.")).toBeTruthy();
+  });
+
+  it("puts taking somebody off a Team behind their row's menu, not a button per row", async () => {
+    await mountAt("/settings/teams");
+
+    const team = await screen.findByRole("article");
+    expect(within(team).queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(within(team).getByRole("button", { name: "Actions for Ada Lovelace" })).toBeTruthy();
+    // The one destructive control on the page.
+    expect(within(team).getByRole("button", { name: "Disband Platform" })).toBeTruthy();
   });
 });
 

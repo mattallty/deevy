@@ -198,7 +198,19 @@ const workspaceRoute = createRoute({
 const teamsRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "teams",
-  component: TeamsPage,
+  // `?team=` names the open Team, so one is a link and Back undoes a selection.
+  validateSearch: (search: Record<string, unknown>) =>
+    typeof search.team === "string" && search.team ? { team: search.team } : {},
+  component: function Teams() {
+    const { team } = teamsRoute.useSearch();
+    const navigate = teamsRoute.useNavigate();
+    return (
+      <TeamsPage
+        selected={team ?? null}
+        onSelect={(next) => void navigate({ search: () => (next ? { team: next } : {}) })}
+      />
+    );
+  },
 });
 const labelsRoute = createRoute({
   getParentRoute: () => settingsRoute,
