@@ -156,6 +156,10 @@ string` erases the literal and every typed `to` in the app stops compiling.
   `@import "shadcn/tailwind.css"` in `index.css` (the `shadcn` package is in the catalog for that one
   stylesheet), as the base-mira style prescribes. Without it those variants match nothing and the kit
   silently degrades (square toggle corners, Tabs in a row) — which is how it shipped until 2026-09-06.
+- **A select lists names, not chips.** A Member in a `SelectItem` or a `SelectValue` is `user.name` as text;
+  the kind comes from the `SelectLabel` of the group it sits in (Humans / Agents), never from a `MemberChip`
+  (Matt, 2026-09-06). And every `SelectItem` sits in a `SelectGroup` — the group carries the padding, so
+  a stray item outside one renders flush left.
 - **Destructive is for what does not undo.** Delete, Remove, Revoke, Archive are `variant="destructive"`
   (base-mira's tinted one, quiet enough for a table row). Suspend and Reinstate are `outline`: a suspension
   reverses, so it is not destructive (Matt, 2026-09-06). Reject is a Gate ruling, not a deletion, and keeps

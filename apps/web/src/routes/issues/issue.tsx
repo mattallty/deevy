@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ActivityStream } from "@/components/activity-stream";
 import { GateControls } from "@/components/gate-controls";
-import { MemberChip } from "@/components/member-chip";
 import { StateBadge } from "@/components/state-badge";
 import { IssueDocuments } from "@/components/issue-documents";
 import { IssueLinks } from "@/components/issue-links";
@@ -19,6 +18,8 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -198,23 +199,32 @@ export function IssuePage({
                 <SelectValue>
                   {(selected: string) => {
                     const member = members.data?.members.find((m) => m.id === selected);
-                    return selected === UNASSIGNED || !member ? (
-                      "Unassigned"
-                    ) : (
-                      <MemberChip member={member} size="xs" />
-                    );
+                    return selected === UNASSIGNED || !member ? "Unassigned" : member.user.name;
                   }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                  {members.data?.members.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      <MemberChip member={member} size="xs" />
-                    </SelectItem>
-                  ))}
                 </SelectGroup>
+                {/* Names as text, under the kind they are: the group says Human or Agent. */}
+                {(["human", "agent"] as const).map((kind) => {
+                  const ofKind = (members.data?.members ?? []).filter((m) => m.kind === kind);
+                  if (ofKind.length === 0) return null;
+                  return (
+                    <Fragment key={kind}>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel>{kind === "human" ? "Humans" : "Agents"}</SelectLabel>
+                        {ofKind.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </Fragment>
+                  );
+                })}
               </SelectContent>
             </Select>
           </section>

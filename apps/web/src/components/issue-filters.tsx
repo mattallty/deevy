@@ -1,5 +1,5 @@
 import { Bot, User, Kanban, List } from "lucide-react";
-import { MemberChip, type ChipMember } from "@/components/member-chip";
+import type { ChipMember } from "@/components/member-chip";
 import {
   Select,
   SelectContent,
@@ -166,16 +166,18 @@ export function IssueFilters({
               if (selected === "me") return "Me";
               if (selected === "agents:me") return "My Agents";
               if (selected === "none") return "Unassigned";
-              const member = memberById.get(selected);
-              return member ? <MemberChip member={member} size="xs" /> : selected;
+              return memberById.get(selected)?.user.name ?? selected;
             }}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ANY}>Anyone</SelectItem>
-          <SelectItem value="me">Me</SelectItem>
-          {sponsorsAgents ? <SelectItem value="agents:me">My Agents</SelectItem> : null}
-          <SelectItem value="none">Unassigned</SelectItem>
+          {/* Every item in a group (the group carries the padding); names as text, the group says the kind. */}
+          <SelectGroup>
+            <SelectItem value={ANY}>Anyone</SelectItem>
+            <SelectItem value="me">Me</SelectItem>
+            {sponsorsAgents ? <SelectItem value="agents:me">My Agents</SelectItem> : null}
+            <SelectItem value="none">Unassigned</SelectItem>
+          </SelectGroup>
           {humans.length > 0 ? (
             <>
               <SelectSeparator />
@@ -183,7 +185,7 @@ export function IssueFilters({
                 <SelectLabel>Humans</SelectLabel>
                 {humans.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
-                    <MemberChip member={member} size="xs" />
+                    {member.user.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -196,7 +198,7 @@ export function IssueFilters({
                 <SelectLabel>Agents</SelectLabel>
                 {agents.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
-                    <MemberChip member={member} size="xs" />
+                    {member.user.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
