@@ -120,7 +120,6 @@ export function IssueFilters({
               <SelectItem value={ANY}>All Projects</SelectItem>
               {projects.map((project) => (
                 <SelectItem key={project.key} value={project.key}>
-                  <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
                   {project.name}
                 </SelectItem>
               ))}
