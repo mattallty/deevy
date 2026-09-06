@@ -260,8 +260,10 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **Opening marks read** — reading is what was owed — and `e` / `⇧E` / `j` / `k` / `o` work on the list.
   Rows keep `Notifications for <key>` lists, `Mark read` (unread only, `stopPropagation` so it does not also
   open) and `Mark all read`; the kind glyph is coloured by what is owed (Gate, Agent, Human).
-- **Search parsing**: TanStack Router parses a raw URL's `?unread=1` / `?open=0` as numbers and `navigate()`
-  hands strings; every `parse*Search` reads both.
+- **Search values are strings, both ways.** `router.tsx` gives the router a `parseSearch`/`stringifySearch`
+  pair on `URLSearchParams`: the default JSON pair wrote `?open=%220%22` (shown as `open="0"`) for a
+  string that looks like a number, and read a raw `?open=0` as the number 0 (2026-09-06). Every
+  `parse*Search` still tolerates a number, so a hand-typed URL from before keeps working.
 - **`Shortcut` hints are `aria-hidden`** (`data-slot="shortcut"`, `data-keys`), so a hint inside a button
   never joins its accessible name. Tests reach one by `data-slot`, never by label.
 

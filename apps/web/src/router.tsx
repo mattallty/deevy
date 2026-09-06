@@ -305,6 +305,26 @@ const routeTree = rootRoute.addChildren([
   tokensRoute,
 ]);
 
+/** `?a=b&c=d` to `{ a: "b", c: "d" }`: strings, whatever they look like. */
+function parseSearch(searchStr: string): Record<string, string> {
+  return Object.fromEntries(new URLSearchParams(searchStr));
+}
+
+/**
+ * The reverse; a key whose value is undefined is left out, which is how a
+ * filter is cleared. A number or a boolean is written as its text; an object
+ * would be a bug in the caller, so it is written as JSON rather than "[object Object]".
+ */
+function stringifySearch(search: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    if (value === undefined || value === null) continue;
+    params.set(key, typeof value === "object" ? JSON.stringify(value) : String(value as string));
+  }
+  const out = params.toString();
+  return out ? `?${out}` : "";
+}
+
 export interface AppRouterOptions {
   /** Tests drive the routes without a browser URL bar. */
   memory?: boolean;
@@ -316,6 +336,12 @@ export function createAppRouter(context: ShellProps, options: AppRouterOptions =
   return createRouter({
     routeTree,
     context,
+    // Every search value deevy writes is a string, and stays one both ways. The
+    // default serialisation is JSON, which quotes a string that would parse as
+    // a number so it survives the round trip — `?open=%220%22`, shown as
+    // `open="0"` — and its decoder turns a raw `?open=0` into the number 0.
+    parseSearch: parseSearch,
+    stringifySearch: stringifySearch,
     ...(memory
       ? { history: createMemoryHistory({ initialEntries: options.initialEntries ?? ["/"] }) }
       : {}),
