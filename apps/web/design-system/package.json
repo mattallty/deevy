@@ -1,0 +1,9 @@
+{
+  "name": "@deevy/design-system",
+  "version": "0.4.1",
+  "private": true,
+  "description": "deevy's UI kit as one importable entry, built for the Claude Design sync (.design-sync/). Not a workspace package: apps/web owns the components; this only re-exports them.",
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/types/design-system/index.d.ts"
+}

@@ -1,0 +1,240 @@
+{
+  "Actions": {
+    "Button": [],
+    "ButtonGroup": ["ButtonGroupSeparator", "ButtonGroupText"],
+    "Toggle": [],
+    "ToggleGroup": ["ToggleGroupItem"],
+    "Kbd": ["KbdGroup"],
+    "Shortcut": []
+  },
+  "Forms": {
+    "Input": [],
+    "Textarea": [],
+    "Checkbox": [],
+    "Switch": [],
+    "Label": [],
+    "Field": [
+      "FieldContent",
+      "FieldDescription",
+      "FieldError",
+      "FieldGroup",
+      "FieldLabel",
+      "FieldLegend",
+      "FieldSeparator",
+      "FieldSet",
+      "FieldTitle"
+    ],
+    "InputGroup": [
+      "InputGroupAddon",
+      "InputGroupButton",
+      "InputGroupInput",
+      "InputGroupText",
+      "InputGroupTextarea"
+    ],
+    "Select": [
+      "SelectContent",
+      "SelectGroup",
+      "SelectItem",
+      "SelectLabel",
+      "SelectScrollDownButton",
+      "SelectScrollUpButton",
+      "SelectSeparator",
+      "SelectTrigger",
+      "SelectValue"
+    ],
+    "Combobox": [
+      "ComboboxChip",
+      "ComboboxChips",
+      "ComboboxChipsInput",
+      "ComboboxCollection",
+      "ComboboxContent",
+      "ComboboxEmpty",
+      "ComboboxGroup",
+      "ComboboxInput",
+      "ComboboxItem",
+      "ComboboxLabel",
+      "ComboboxList",
+      "ComboboxSeparator",
+      "ComboboxTrigger",
+      "ComboboxValue"
+    ],
+    "StateFields": [],
+    "ApproversPicker": [],
+    "IssueFilters": []
+  },
+  "Overlays": {
+    "Dialog": [
+      "DialogClose",
+      "DialogContent",
+      "DialogDescription",
+      "DialogFooter",
+      "DialogHeader",
+      "DialogOverlay",
+      "DialogPortal",
+      "DialogTitle",
+      "DialogTrigger"
+    ],
+    "AlertDialog": [
+      "AlertDialogAction",
+      "AlertDialogCancel",
+      "AlertDialogContent",
+      "AlertDialogDescription",
+      "AlertDialogFooter",
+      "AlertDialogHeader",
+      "AlertDialogMedia",
+      "AlertDialogOverlay",
+      "AlertDialogPortal",
+      "AlertDialogTitle",
+      "AlertDialogTrigger"
+    ],
+    "Sheet": [
+      "SheetClose",
+      "SheetContent",
+      "SheetDescription",
+      "SheetFooter",
+      "SheetHeader",
+      "SheetTitle",
+      "SheetTrigger"
+    ],
+    "Popover": [
+      "PopoverContent",
+      "PopoverDescription",
+      "PopoverHeader",
+      "PopoverTitle",
+      "PopoverTrigger"
+    ],
+    "Tooltip": ["TooltipContent", "TooltipProvider", "TooltipTrigger"],
+    "DropdownMenu": [
+      "DropdownMenuCheckboxItem",
+      "DropdownMenuContent",
+      "DropdownMenuGroup",
+      "DropdownMenuItem",
+      "DropdownMenuLabel",
+      "DropdownMenuPortal",
+      "DropdownMenuRadioGroup",
+      "DropdownMenuRadioItem",
+      "DropdownMenuSeparator",
+      "DropdownMenuShortcut",
+      "DropdownMenuSub",
+      "DropdownMenuSubContent",
+      "DropdownMenuSubTrigger",
+      "DropdownMenuTrigger"
+    ],
+    "Command": [
+      "CommandDialog",
+      "CommandEmpty",
+      "CommandGroup",
+      "CommandInput",
+      "CommandItem",
+      "CommandList",
+      "CommandSeparator",
+      "CommandShortcut"
+    ],
+    "Toaster": []
+  },
+  "Navigation": {
+    "Breadcrumb": [
+      "BreadcrumbEllipsis",
+      "BreadcrumbItem",
+      "BreadcrumbLink",
+      "BreadcrumbList",
+      "BreadcrumbPage",
+      "BreadcrumbSeparator"
+    ],
+    "Tabs": ["TabsContent", "TabsList", "TabsTrigger"],
+    "Sidebar": [
+      "SidebarContent",
+      "SidebarFooter",
+      "SidebarGroup",
+      "SidebarGroupAction",
+      "SidebarGroupContent",
+      "SidebarGroupLabel",
+      "SidebarHeader",
+      "SidebarInput",
+      "SidebarInset",
+      "SidebarMenu",
+      "SidebarMenuAction",
+      "SidebarMenuBadge",
+      "SidebarMenuButton",
+      "SidebarMenuItem",
+      "SidebarMenuSkeleton",
+      "SidebarMenuSub",
+      "SidebarMenuSubButton",
+      "SidebarMenuSubItem",
+      "SidebarProvider",
+      "SidebarRail",
+      "SidebarSeparator",
+      "SidebarTrigger"
+    ],
+    "Collapsible": ["CollapsibleContent", "CollapsibleTrigger"]
+  },
+  "Data display": {
+    "Table": [
+      "TableBody",
+      "TableCaption",
+      "TableCell",
+      "TableFooter",
+      "TableHead",
+      "TableHeader",
+      "TableRow"
+    ],
+    "DataTable": [],
+    "Card": [
+      "CardAction",
+      "CardContent",
+      "CardDescription",
+      "CardFooter",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "Item": [
+      "ItemActions",
+      "ItemContent",
+      "ItemDescription",
+      "ItemFooter",
+      "ItemGroup",
+      "ItemHeader",
+      "ItemMedia",
+      "ItemSeparator",
+      "ItemTitle"
+    ],
+    "Badge": [],
+    "Avatar": ["AvatarBadge", "AvatarFallback", "AvatarGroup", "AvatarGroupCount", "AvatarImage"],
+    "Alert": ["AlertAction", "AlertDescription", "AlertTitle"],
+    "Empty": ["EmptyContent", "EmptyDescription", "EmptyHeader", "EmptyMedia", "EmptyTitle"],
+    "Skeleton": [],
+    "Spinner": [],
+    "Separator": [],
+    "ScrollArea": ["ScrollBar"],
+    "ResizablePanelGroup": ["ResizableHandle", "ResizablePanel"],
+    "Markdown": [],
+    "MarkdownEditor": [],
+    "Timeline": [
+      "TimelineContent",
+      "TimelineDate",
+      "TimelineHeader",
+      "TimelineIndicator",
+      "TimelineItem",
+      "TimelineSeparator",
+      "TimelineTitle"
+    ],
+    "Kanban": [
+      "KanbanBoard",
+      "KanbanColumn",
+      "KanbanColumnContent",
+      "KanbanColumnHandle",
+      "KanbanItem",
+      "KanbanItemHandle",
+      "KanbanOverlay"
+    ],
+    "Sortable": ["SortableContent", "SortableItem", "SortableItemHandle", "SortableOverlay"]
+  },
+  "Members, States and Runs": {
+    "MemberChip": [],
+    "StateBadge": [],
+    "LabelBadge": ["LabelText"],
+    "RunStatus": [],
+    "PageHeader": [],
+    "SettingsPage": ["SettingsSection"]
+  }
+}
