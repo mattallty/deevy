@@ -3,6 +3,7 @@ import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
 import type { GitProxy } from "./git-proxy.ts";
 import type { Proxy } from "./proxy.ts";
+import { branchesPushed, movedRefs, refsFrom, sentenceFor } from "./refs.ts";
 import type { Session, SessionEvent, Usage } from "./session.ts";
 import { openWorkspace, type Workspace } from "./workspace.ts";
 
@@ -245,6 +246,11 @@ export async function workRun(
     };
   }
 
+  // What the remote had before the Run. An Agent pushes where it likes
+  // (ADR-0019), so the account of what it moved is what the runtime owes a
+  // Human in place of a refusal.
+  const before = workspace.repo ? await readRefs(workspace) : new Map<string, string>();
+
   const timeout = AbortSignal.timeout(runTimeoutMs);
   const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
   let failure: string | null = null;
@@ -305,16 +311,23 @@ export async function workRun(
     // evidence there will ever be that this attempt did anything.
     if (workspace.repo && !failure) {
       try {
-        delivered = await (options.deliver ?? deliver)({
-          workspace,
-          forge: options.forge ?? null,
-          issueKey: run.issueKey,
-          runId: run.id,
-          author: options.author ?? {
-            name: "deevy Agent",
-            email: "agent@deevy.invalid",
-          },
-        });
+        // What the session pushed for itself, before the supervisor considers
+        // pushing anything: a session that delivered has delivered, and a
+        // second branch beside its own is noise (ADR-0019).
+        const own = branchesPushed(await movedSince(workspace, before), workspace.repo.baseBranch);
+        delivered =
+          own.length > 0
+            ? await attribute(own, workspace, options, run)
+            : await (options.deliver ?? deliver)({
+                workspace,
+                forge: options.forge ?? null,
+                issueKey: run.issueKey,
+                runId: run.id,
+                author: options.author ?? {
+                  name: "deevy Agent",
+                  email: "agent@deevy.invalid",
+                },
+              });
       } catch (error) {
         // The work happened; only the record of it failed. Say so in the feed
         // and let the Run's own outcome stand.
@@ -325,6 +338,13 @@ export async function workRun(
             `The work on Run \`${run.id}\` is done and could not be delivered: ${why}`,
           )
           .catch(() => undefined);
+      }
+    }
+    // After the delivery, so the record covers what the supervisor pushed on
+    // the session's behalf as well as what the session pushed itself.
+    if (workspace.repo) {
+      for (const sentence of await sentencesFor(workspace, before)) {
+        await deevy.postActivity(run.id, "action", sentence).catch(() => undefined);
       }
     }
     await workspace.release();
@@ -407,4 +427,77 @@ function describe(error: unknown, instead: string | null): string {
   if (instead) return instead;
   if (error instanceof Error) return `The session stopped: ${error.message}`;
   return "The session stopped for a reason it did not give";
+}
+
+/** The refs the remote has now, read through the same origin the session pushes to. */
+async function readRefs(workspace: Workspace): Promise<Map<string, string>> {
+  return refsFrom(await workspace.git(["ls-remote", "origin"]).catch(() => ""));
+}
+
+/**
+ * What this Run moved, as sentences for its feed.
+ *
+ * `merge-base --is-ancestor` needs both commits in the clone, and the clone is
+ * shallow: a ref somebody else moved while the Run was working can leave the
+ * old commit unfetchable, and that answers "rewritten". Erring that way is
+ * deliberate — a Human told to look at something that turns out to be fine
+ * costs a minute, and the other mistake costs the work.
+ */
+async function sentencesFor(
+  workspace: Workspace,
+  before: ReadonlyMap<string, string>,
+): Promise<string[]> {
+  return (await movedSince(workspace, before)).map(sentenceFor);
+}
+
+/** What this Run has moved on the remote so far. */
+async function movedSince(
+  workspace: Workspace,
+  before: ReadonlyMap<string, string>,
+): Promise<Awaited<ReturnType<typeof movedRefs>>> {
+  return movedRefs({
+    before,
+    after: await readRefs(workspace),
+    isAncestor: async (older, newer) => {
+      // Fetching first, because a commit the session did not make is not in a
+      // shallow clone until it is asked for.
+      await workspace.git(["fetch", "--quiet", "origin", older, newer]).catch(() => undefined);
+      return workspace
+        .git(["merge-base", "--is-ancestor", older, newer])
+        .then(() => true)
+        .catch(() => false);
+    },
+  });
+}
+
+/**
+ * A Run whose session pushed for itself: the supervisor opens a pull request
+ * for the first branch it left and reports it, and pushes nothing.
+ *
+ * The first rather than all of them, because a Run is one attempt at one Issue
+ * and a reviewer wants one thing to open; every branch it pushed is in the
+ * feed either way (src/refs.ts).
+ */
+async function attribute(
+  own: Array<{ branch: string; commit: string }>,
+  workspace: Workspace,
+  options: WorkOptions,
+  run: Run,
+): Promise<Delivery> {
+  const [first] = own;
+  const forge = options.forge ?? null;
+  const pullRequest = forge
+    ? await forge.open({
+        branch: first.branch,
+        base: workspace.repo?.baseBranch ?? "main",
+        title: `${run.issueKey}: worked by a deevy Agent`,
+        body: [
+          `Opened by a deevy Agent working ${run.issueKey}, on the branch it pushed itself.`,
+          "",
+          `The Run that produced it is \`${run.id}\`, and its Activity feed in deevy is the account`,
+          "of how it got here, including every ref it moved. A Human decides whether this ships.",
+        ].join("\n"),
+      })
+    : null;
+  return { branch: first.branch, commit: first.commit, pullRequest };
 }

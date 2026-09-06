@@ -31,7 +31,18 @@ export async function deliver(options: DeliverOptions): Promise<Delivery | null>
 
   const branch = `deevy/${issueKey.toLowerCase()}-${runId.slice(0, 8)}`;
   const base = workspace.repo?.baseBranch ?? "main";
-  await workspace.git(["checkout", "-b", branch]);
+  // A Run that stopped at a Gate and was resumed delivers twice, from a fresh
+  // clone each time. Branching from the base again would push a history the
+  // remote's own branch is not part of, which git rejects and which loses the
+  // second pass's work; continuing the branch keeps both passes on it
+  // (docs/plans/agent-owns-git.md).
+  const already = await workspace.git(["ls-remote", "--heads", "origin", branch]).catch(() => "");
+  if (already.trim() === "") {
+    await workspace.git(["checkout", "-b", branch]);
+  } else {
+    await workspace.git(["fetch", "--quiet", "origin", branch]);
+    await workspace.git(["checkout", "--quiet", "-B", branch, "FETCH_HEAD"]);
+  }
   await workspace.git(["add", "-A"]);
   await workspace.git([
     "-c",

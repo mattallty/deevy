@@ -84,6 +84,41 @@ describe("what a Run delivers", () => {
     ]);
   });
 
+  it("delivers twice on one Run, because a Gate ruling brings it back", async () => {
+    // A Run that stops at a Gate and resumes delivers on both passes, from a
+    // fresh clone each time. Branching from the base again would be a
+    // non-fast-forward push and the second pass's work would never reach the
+    // remote (docs/plans/agent-owns-git.md).
+    const repo = await remote();
+    const forge = stubForge();
+
+    const first = await openWorkspace({ runId: "run-abcdef12", repo });
+    scratch.push(first.cwd);
+    await writeFile(join(first.cwd, "before-the-gate.ts"), "export const a = 1;\n");
+    const one = await deliver({
+      workspace: first,
+      forge,
+      issueKey: "DEV-1",
+      runId: "run-abcdef12",
+      author,
+    });
+
+    const second = await openWorkspace({ runId: "run-abcdef12", repo });
+    scratch.push(second.cwd);
+    await writeFile(join(second.cwd, "after-the-ruling.ts"), "export const b = 2;\n");
+    const two = await deliver({
+      workspace: second,
+      forge,
+      issueKey: "DEV-1",
+      runId: "run-abcdef12",
+      author,
+    });
+
+    expect(two?.branch).toBe(one?.branch);
+    const { stdout } = await run("git", ["-C", repo.url, "log", "--format=%s", one?.branch ?? ""]);
+    expect(stdout.split("\n").filter(Boolean)).toHaveLength(3);
+  });
+
   it("delivers nothing when the session changed nothing", async () => {
     const repo = await remote();
     const workspace = await openWorkspace({ runId: "run-1", repo });

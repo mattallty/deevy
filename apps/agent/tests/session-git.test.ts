@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { openGitProxy } from "../src/git-proxy.ts";
+import type { Forge, PullRequest, PullRequestDraft } from "../src/forge.ts";
 import type { RepoConfig } from "../src/workspace.ts";
 import { openWorkspace } from "../src/workspace.ts";
 import { runOnce } from "../src/work.ts";
@@ -49,9 +50,25 @@ async function assigned() {
   return deevy;
 }
 
-/** What `workRun` is given, with the git proxy the session pushes through. */
-function work(deevy: Awaited<ReturnType<typeof instance>>, repo: RepoConfig) {
+/** A forge that says what it was asked to open. */
+function stubForge(): Forge & { opened: PullRequestDraft[] } {
+  const opened: PullRequestDraft[] = [];
   return {
+    opened,
+    open: (draft) => {
+      opened.push(draft);
+      return Promise.resolve<PullRequest>({
+        url: "https://forge.test/pull/1",
+        number: 1,
+      });
+    },
+  };
+}
+
+/** What `workRun` is given, with the git proxy the session pushes through. */
+function work(deevy: Awaited<ReturnType<typeof instance>>, repo: RepoConfig, forge?: Forge) {
+  return {
+    ...(forge ? { forge } : {}),
     deevy: deevy.deevy,
     proxy: deevy.proxy,
     runTimeoutMs: 20_000,
@@ -139,5 +156,95 @@ describe("a session that runs its own git", () => {
     // loopback address: there is nothing in its checkout to find.
     expect(sawInConfig).not.toContain("ghp_the_supervisors_own");
     expect(sawInConfig).toContain("127.0.0.1");
+  });
+
+  it("says in the Run's feed what the session pushed", async () => {
+    const deevy = await assigned();
+    const repo = await remote();
+
+    const session = scripted([
+      async (input) => {
+        const git = (args: string[]) => run("git", ["-C", input.cwd, ...args]);
+        await git(["checkout", "--quiet", "-b", "a-branch"]);
+        await writeFile(join(input.cwd, "f.ts"), "export const z = 3;\n");
+        await git(["add", "-A"]);
+        await git(["-c", "user.name=a", "-c", "user.email=a@b.c", "commit", "-qm", "work"]);
+        await git(["push", "--quiet", "origin", "a-branch"]);
+      },
+      finished,
+    ]);
+
+    const pass = await runOnce({ ...work(deevy, repo), session });
+    const feed = await deevy.asAda.runs.get({ runId: pass.worked[0].runId });
+
+    expect(feed.activities.map((activity) => activity.body).join("\n")).toMatch(
+      /Pushed refs\/heads\/a-branch at [0-9a-f]{7}/,
+    );
+  });
+
+  it("says plainly when the session rewrote the branch everything is built on", async () => {
+    const deevy = await assigned();
+    const repo = await remote();
+
+    // The thing no Gate stands in the way of, and the reason the record exists
+    // (ADR-0019): an Agent is free to do this, and a Human must be able to see
+    // that it did.
+    const session = scripted([
+      async (input) => {
+        const git = (args: string[]) => run("git", ["-C", input.cwd, ...args]);
+        await writeFile(join(input.cwd, "README.md"), "# rewritten\n");
+        await git(["add", "-A"]);
+        await git([
+          "-c",
+          "user.name=a",
+          "-c",
+          "user.email=a@b.c",
+          "commit",
+          "-qm",
+          "not the first commit any more",
+          "--amend",
+        ]);
+        await git(["push", "--quiet", "--force", "origin", "main"]);
+      },
+      finished,
+    ]);
+
+    const pass = await runOnce({ ...work(deevy, repo), session });
+    const feed = await deevy.asAda.runs.get({ runId: pass.worked[0].runId });
+
+    expect(feed.activities.map((activity) => activity.body).join("\n")).toMatch(
+      /Rewrote refs\/heads\/main from [0-9a-f]{7} to [0-9a-f]{7}, which is not a fast-forward/,
+    );
+  });
+
+  it("attaches the branch the session pushed rather than pushing one of its own", async () => {
+    const deevy = await assigned();
+    const repo = await remote();
+    const forge = stubForge();
+
+    const session = scripted([
+      async (input) => {
+        const git = (args: string[]) => run("git", ["-C", input.cwd, ...args]);
+        await git(["checkout", "--quiet", "-b", "its-own-branch"]);
+        await writeFile(join(input.cwd, "f.ts"), "export const z = 3;\n");
+        await git(["add", "-A"]);
+        await git(["-c", "user.name=a", "-c", "user.email=a@b.c", "commit", "-qm", "its own work"]);
+        await git(["push", "--quiet", "origin", "its-own-branch"]);
+      },
+      finished,
+    ]);
+
+    const pass = await runOnce({ ...work(deevy, repo, forge), session });
+
+    // The Run delivered what the session pushed: no second branch of the
+    // supervisor's own, a pull request for the agent's, and a Link that says
+    // which attempt produced it.
+    expect(await refsOn(repo)).not.toContain("refs/heads/deevy/");
+    expect(forge.opened.map((draft) => draft.branch)).toEqual(["its-own-branch"]);
+    expect(pass.worked[0]?.delivered?.branch).toBe("its-own-branch");
+    const links = await deevy.asAda.links.list({ issueKey: "DEV-1" });
+    expect(links.links.map((link) => [link.url, link.runId])).toEqual([
+      ["https://forge.test/pull/1", pass.worked[0].runId],
+    ]);
   });
 });
