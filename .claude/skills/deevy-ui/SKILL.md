@@ -90,11 +90,14 @@ go through the catalog.
   unit is `--density: 0.2625rem`, 5% roomier than Tailwind's default — every spacing utility multiplies it.
   The families, radius, density and `--tracking` are variables `@theme inline` hands to the utilities, so a
   palette review retunes them from one block, as round 2 did with a dev-only switcher (since deleted).
-- **Color slots.** `--human` (copper) for a Human Member; `--agent` (teal) for an Agent; `--gate` (amber)
+- **Color slots.** `--human` (sky blue) for a Human Member; `--agent` (rose) for an Agent; `--gate` (amber)
   for a Gate State and anything waiting on a ruling; `--state-backlog|active|done` for other States;
   `--primary` (indigo) for the one action colour; cool blue-gray paper and ink — the base is tweakcn's
   _clean-slate_ preset (Apache-2.0), picked by Matt from six candidates and then six variations of it. Those
   three saturated slots are the only saturated colours on a screen besides `--primary` and `--destructive`.
+  Round 3 (2026-09-06) chose them as indigo's neighbours — sky & rose, with amber the one warm colour, so a
+  Gate jumps — from six analogous candidates. **Labels choose among eight swatches** (`lib/label-colors.ts`:
+  sky, rose, amber, indigo, green, red, slate, violet; white text on each), never a free colour.
   Both themes; a real System/Light/Dark toggle. Round 1's warm Plex look is history (`docs/plans/ui-redesign.md`).
 - **Layout.** Full-bleed frame, 240px sidebar collapsing to 48px, edge-to-edge lists with a 40px filter bar,
   720px side-peek, Issue page = main + 300px rail with the Gate ruling card always on top. Cards only for

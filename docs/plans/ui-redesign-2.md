@@ -493,15 +493,16 @@ names beside ids for Labels, parent and Assignee (D); nothing else. Each regener
 - H: reorder by drag and by keyboard, pick approvers by typing, write a template in the editor, save once.
 - Close: `vp run web#screens` regenerated; `vp run claude-agent#acceptance` still passes.
 
-## Palette (round 3, opened 2026-09-06)
+## Palette (round 3, 2026-09-06) — picked: sky & rose
 
-Matt keeps the indigo primary but finds the colours beside it — Human copper, Agent teal, Gate amber, the
-State dots — out of tune with it, and wants Labels to choose from a limited, harmonious set instead of a
-free colour picker. Six palette candidates live in `src/dev/palette-candidates.css` behind a dev-only
-switcher (`src/dev/palette-switcher.tsx`, "Palette candidate"), each redefining `--human`, `--agent`,
-`--gate`, `--state-*` and `--destructive` in both themes and proposing eight Label swatches
-(`src/dev/palettes.ts`, hex, white text on each): _Triad_ (copper & teal, chroma pulled down), _Split
-complement_ (orange & green), _Analogous_ (rose & sky), _Jewel_ (plum & jade), _Cool_ (steel & violet),
-_Earth_ (terracotta & olive). `/dev/tokens` draws all six with their swatches. The Labels settings form is
-a `radiogroup "Colour"` of the active palette's eight swatches (`lib/label-colors.ts`), no picker. The pick
-bakes the winner into `index.css` and the swatches into `lib/label-colors.ts`, and reseeds the Labels.
+Matt kept the indigo primary but found the colours beside it — Human copper, Agent teal, Gate amber, the
+State dots — out of tune with it, and wanted Labels to choose from a limited, harmonious set instead of a
+free colour picker. Six candidates lived in `src/dev/palette-candidates.css` behind a dev-only switcher,
+each redefining `--human`, `--agent`, `--gate`, `--state-*` and `--destructive` in both themes with eight
+Label swatches derived from it. The first six spanned the wheel (triad, split complement, analogous, jewel,
+cool, earth); Matt asked for analogous variations only, so the six became rose & sky, magenta & cyan, violet
+& azure, rose & periwinkle, sky & rose (roles swapped) and dusk. **He picked sky & rose**: Humans sky blue,
+Agents rose, Gates amber as the one warm colour, done green, indigo-tinted active dots. Baked into
+`index.css`; the swatches are `lib/label-colors.ts` (sky, rose, amber, indigo, green, red, slate, violet)
+and the Labels form is a `radiogroup "Colour"` over them; the seed's Labels use them; the candidates,
+switcher and `/dev/tokens` per-palette sheets are gone.

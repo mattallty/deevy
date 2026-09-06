@@ -161,15 +161,16 @@ console.log(`agent       Builder (@${builder.member.handle ?? "?"}), sponsored b
 
 // -------------------------------------------------------------------- labels
 
+// Colours are the Label swatches of apps/web/src/lib/label-colors.ts, as the form offers them.
 const label = async (name: string, color: string, scope: string | null = null) =>
   admin.api.labels.create({ name, color, scope });
-const backend = await label("backend", "#1F3A5F");
-const frontend = await label("frontend", "#1F7A6D");
-const docs = await label("docs", "#6B6B6B");
-const checkout = await label("Checkout rewrite", "#B3562C", "epic");
-const agentLoop = await label("Agent loop", "#B7791F", "epic");
-const high = await label("high", "#A63D2F", "priority");
-const low = await label("low", "#8A8A8A", "priority");
+const backend = await label("backend", "#6265ed");
+const frontend = await label("frontend", "#008fba");
+const docs = await label("docs", "#63718f");
+const checkout = await label("Checkout rewrite", "#c88b00", "epic");
+const agentLoop = await label("Agent loop", "#8f5fc0", "epic");
+const high = await label("high", "#d73246", "priority");
+const low = await label("low", "#239d6a", "priority");
 
 // ---------------------------------------------------------------- repository
 

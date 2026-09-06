@@ -3,7 +3,7 @@ import { RunStatus, runStatusLabels, type RunStatusValue } from "@/components/ru
 import { Shortcut } from "@/components/kbd-hint";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
-import { palettes } from "@/dev/palettes";
+import { labelColors } from "@/lib/label-colors";
 import { cn } from "@/lib/utils";
 
 const slots = [
@@ -24,11 +24,10 @@ const slots = [
 const ada = { id: "a", kind: "human" as const, handle: "ada", user: { name: "Ada Lovelace" } };
 const planner = { id: "p", kind: "agent" as const, handle: "planner", user: { name: "Planner" } };
 
-function Sheet({ theme, palette }: { theme: "light" | "dark"; palette: string }) {
-  const swatches = palettes.find((candidate) => candidate.id === palette)?.swatches ?? [];
+function Sheet({ theme }: { theme: "light" | "dark" }) {
+  const swatches = labelColors();
   return (
     <section
-      {...(palette === "current" ? {} : { "data-palette": palette })}
       className={cn(theme, "flex flex-col gap-6 bg-background p-6 text-foreground")}
       aria-label={`${theme} theme`}
     >
@@ -107,37 +106,26 @@ function Sheet({ theme, palette }: { theme: "light" | "dark"; palette: string })
   );
 }
 
-/**
- * The tokens, drawn side by side in both themes — once per palette candidate
- * during the round-3 review, so the colours beside the primary can be judged
- * together with the Label swatches each palette proposes.
- */
+/** The tokens, drawn side by side in both themes, with the Label swatches, for reviewing a palette change. */
 export function TokensPage() {
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Tokens</h1>
         <p className="text-sm text-muted-foreground">
-          The palette and the type scale, as the browser draws them, per palette candidate. Human,
-          Agent and Gate are the only saturated colours on a screen besides the primary.
+          The palette and the type scale, as the browser draws them. Human, Agent and Gate are the
+          only saturated colours on a screen besides the primary; Labels choose among the eight
+          swatches.
         </p>
       </header>
-      {palettes.map((palette) => (
-        <section key={palette.id} aria-label={palette.label} className="flex flex-col gap-3">
-          <h2 className="flex flex-wrap items-baseline gap-x-3 text-base font-semibold">
-            {palette.label}
-            <span className="text-sm font-normal text-muted-foreground">{palette.note}</span>
-          </h2>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="overflow-hidden rounded-lg border">
-              <Sheet theme="light" palette={palette.id} />
-            </div>
-            <div className="overflow-hidden rounded-lg border">
-              <Sheet theme="dark" palette={palette.id} />
-            </div>
-          </div>
-        </section>
-      ))}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="overflow-hidden rounded-lg border">
+          <Sheet theme="light" />
+        </div>
+        <div className="overflow-hidden rounded-lg border">
+          <Sheet theme="dark" />
+        </div>
+      </div>
     </div>
   );
 }

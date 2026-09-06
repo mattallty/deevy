@@ -9,7 +9,9 @@
 /*
  * deevy's tokens (docs/plans/ui-redesign-2.md slice A, .claude/skills/deevy-ui/SKILL.md).
  *
- * Paper and ink are cool blue-gray neutrals; the action colour is indigo. The
+ * Paper and ink are cool blue-gray neutrals; the action colour is indigo, and the
+ * colours beside it are its neighbours (round 3 of the review, 2026-09-06): Humans
+ * sky blue, Agents rose, Gates amber — the one warm colour, so a Gate jumps. The
  * base is tweakcn's clean-slate preset (https://tweakcn.com/r/themes/clean-slate.json,
  * Apache-2.0, (c) tweakcn contributors), chosen from six candidates and then
  * from six variations of it, at a 5% roomier scale and 8px corners. Three
@@ -44,8 +46,6 @@
   --muted-foreground: oklch(0.551 0.0234 264.3637);
   --accent: oklch(0.9299 0.0334 272.79);
   --accent-foreground: oklch(0.3729 0.0306 259.7328);
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.8717 0.0093 258.3382);
   --input: oklch(0.8717 0.0093 258.3382);
   --ring: oklch(0.5854 0.2041 277.12);
@@ -54,15 +54,18 @@
   --sidebar-accent: oklch(0.9299 0.0334 272.79);
   --sidebar-accent-foreground: oklch(0.3729 0.0306 259.7328);
   --sidebar-border: oklch(0.8717 0.0093 258.3382);
-  --human: oklch(0.52 0.14 45);
-  --human-foreground: oklch(0.9842 0.0034 247.8575);
-  --agent: oklch(0.5 0.09 175);
-  --agent-foreground: oklch(0.9842 0.0034 247.8575);
-  --gate: oklch(0.62 0.13 75);
-  --gate-foreground: oklch(0.2795 0.0368 260.031);
-  --state-backlog: oklch(0.62 0.012 247.9);
-  --state-active: oklch(0.55 0.06 277);
-  --state-done: oklch(0.55 0.12 150);
+
+  --human: oklch(0.6 0.13 225);
+  --human-foreground: var(--background);
+  --agent: oklch(0.6 0.17 345);
+  --agent-foreground: var(--background);
+  --gate: oklch(0.72 0.15 80);
+  --gate-foreground: var(--foreground);
+  --state-backlog: oklch(0.62 0.02 265);
+  --state-active: oklch(0.62 0.15 277);
+  --state-done: oklch(0.62 0.13 160);
+  --destructive: oklch(0.58 0.2 20);
+  --destructive-foreground: var(--background);
 }
 
 .dark {
@@ -80,8 +83,6 @@
   --muted-foreground: oklch(0.7137 0.0192 261.3246);
   --accent: oklch(0.3729 0.0306 259.73);
   --accent-foreground: oklch(0.8717 0.0093 258.3382);
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(0.2077 0.0398 265.7549);
   --border: oklch(0.4461 0.0263 256.8018);
   --input: oklch(0.4461 0.0263 256.8018);
   --ring: oklch(0.6801 0.1583 276.93);
@@ -90,15 +91,18 @@
   --sidebar-accent: oklch(0.3729 0.0306 259.73);
   --sidebar-accent-foreground: oklch(0.8717 0.0093 258.3382);
   --sidebar-border: oklch(0.4461 0.0263 256.8018);
-  --human: oklch(0.72 0.13 45);
-  --human-foreground: oklch(0.2077 0.0398 265.7549);
-  --agent: oklch(0.74 0.1 175);
-  --agent-foreground: oklch(0.2077 0.0398 265.7549);
-  --gate: oklch(0.78 0.13 80);
-  --gate-foreground: oklch(0.2077 0.0398 265.7549);
-  --state-backlog: oklch(0.6 0.01 265.8);
-  --state-active: oklch(0.7 0.07 277);
-  --state-done: oklch(0.7 0.12 150);
+
+  --human: oklch(0.76 0.12 225);
+  --human-foreground: var(--background);
+  --agent: oklch(0.76 0.14 345);
+  --agent-foreground: var(--background);
+  --gate: oklch(0.82 0.14 85);
+  --gate-foreground: var(--background);
+  --state-backlog: oklch(0.6 0.02 265);
+  --state-active: oklch(0.72 0.12 277);
+  --state-done: oklch(0.72 0.13 160);
+  --destructive: oklch(0.68 0.17 20);
+  --destructive-foreground: var(--background);
 }
 
 @theme inline {
