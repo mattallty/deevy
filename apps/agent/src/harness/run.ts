@@ -6,6 +6,7 @@ import { createInterface } from "node:readline";
 import type { Config } from "../config.ts";
 import { instructionsPath } from "../instructions.ts";
 import type { Session, SessionEvent, SessionInput } from "../session.ts";
+import { handOver, sessionUserFor } from "../session-user.ts";
 import type { Harness, HarnessContext } from "./contract.ts";
 import { sessionEnv } from "./env.ts";
 
@@ -25,6 +26,8 @@ export interface RunOptions {
   graceMs?: number;
   /** How much of stderr to keep for the `done` detail. */
   stderrBytes?: number;
+  /** Who this process is, so a test can say what it cannot be. */
+  getuid?: () => number | undefined;
 }
 
 /** The session a harness gives, built once per process for one configuration. */
@@ -37,6 +40,13 @@ export function buildSession(config: Config, harness: Harness, options: RunOptio
       await stripFromClone(input.cwd, harness.strip);
       const context: HarnessContext = { config, input, home, instructions: instructionsPath() };
       await harness.prepare?.(context);
+      // After `prepare`, so what it wrote is the session's to read, and before
+      // the spawn, so the session can write where it is about to work.
+      const user = sessionUserFor(config, options.getuid);
+      if (user) {
+        await handOver(home, user);
+        await handOver(input.cwd, user);
+      }
       yield* runHarness(harness, context, options);
     } finally {
       await rm(home, { recursive: true, force: true });
@@ -100,10 +110,15 @@ export async function* runHarness(
   const argv = harness.argv(context);
   const env = environmentFor(harness, context.config, context.home, options.env, context);
 
+  // The session is another user where the runtime can make it one, so the
+  // supervisor's environment, its files and its own `/proc` entry are outside
+  // what a shell in the session can reach (src/session-user.ts).
+  const user = sessionUserFor(context.config, options.getuid);
   const child = spawn(harness.binary, argv, {
     cwd: input.cwd,
     env,
     stdio: ["ignore", "pipe", "pipe"],
+    ...(user ? { uid: user.uid, gid: user.gid } : {}),
   });
 
   let stderr = "";

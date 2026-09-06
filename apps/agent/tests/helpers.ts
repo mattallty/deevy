@@ -23,6 +23,10 @@ export const testConfig: Config = {
   url: baseURL,
   key: "unset",
   harness: "claude-code",
+  // A test is not root, so a session shares its user; the container smoke in
+  // CI is where the two-user boundary is real (docs/plans/agent-owns-git.md).
+  sessionUid: 10002,
+  sessionGid: 10002,
   pollSeconds: 1,
   runTimeoutSeconds: 60,
   model: "claude-opus-5",

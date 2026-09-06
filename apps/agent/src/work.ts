@@ -1,9 +1,11 @@
 import { DeevyError, isOpen, type Deevy, type Ruling, type Run } from "./deevy.ts";
-import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
+import { deliver, titleFor, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
+import type { GitProxy } from "./git-proxy.ts";
 import type { Proxy } from "./proxy.ts";
+import { branchesPushed, movedRefs, refsFrom, sentenceFor } from "./refs.ts";
 import type { Session, SessionEvent, Usage } from "./session.ts";
-import { openWorkspace, type Workspace, type WorkspaceOptions } from "./workspace.ts";
+import { openWorkspace, type Workspace } from "./workspace.ts";
 
 export interface WorkResult {
   runId: string;
@@ -38,6 +40,13 @@ export interface WorkOptions {
    * supervisor hands it what to do with a refusal.
    */
   proxy: (options: { onDenied: (name: string) => Promise<void> }) => Promise<Proxy>;
+  /**
+   * git as the session reaches it: a loopback proxy that holds the credential
+   * and forwards to the real remote (src/git-proxy.ts). Absent, or answering
+   * null, the session's `origin` is the remote itself and only the supervisor
+   * can push to it — which is what a runtime with no repository has anyway.
+   */
+  gitProxy?: () => Promise<GitProxy | null>;
   /** Aborted when the process is stopping, on top of each Run's own timeout. */
   signal?: AbortSignal;
   runTimeoutMs: number;
@@ -45,7 +54,7 @@ export interface WorkOptions {
    * The working directory a Run gets. Defaults to an empty one, and a runtime
    * with a repository configured passes one that holds a clone of it.
    */
-  workspace?: (options: WorkspaceOptions) => Promise<Workspace>;
+  workspace?: (options: { runId: string; originUrl?: string }) => Promise<Workspace>;
   /** Where a pull request is opened, when the repository has one. */
   forge?: Forge | null;
   /** How a Run's work becomes a branch and a pull request. */
@@ -215,10 +224,18 @@ export async function workRun(
   // Before the session, so a repository that cannot be cloned fails the Run
   // with a reason rather than handing the model an empty directory and letting
   // it improvise about why nothing is there.
+  // Before the workspace, because the clone's `origin` is set to it: the
+  // session pushes to loopback and the supervisor carries it out with the
+  // credential (docs/plans/agent-owns-git.md).
+  const git = (await options.gitProxy?.()) ?? null;
   let workspace: Workspace;
   try {
-    workspace = await (options.workspace ?? openWorkspace)({ runId: run.id });
+    workspace = await (options.workspace ?? openWorkspace)({
+      runId: run.id,
+      ...(git ? { originUrl: git.url } : {}),
+    });
   } catch (error) {
+    await git?.close();
     const detail = error instanceof Error ? error.message : String(error);
     await close(deevy, run.id, detail);
     return {
@@ -228,6 +245,11 @@ export async function workRun(
       failedBy: detail,
     };
   }
+
+  // What the remote had before the Run. An Agent pushes where it likes
+  // (ADR-0019), so the account of what it moved is what the runtime owes a
+  // Human in place of a refusal.
+  const before = workspace.repo ? await readRefs(workspace) : new Map<string, string>();
 
   const timeout = AbortSignal.timeout(runTimeoutMs);
   const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
@@ -281,20 +303,36 @@ export async function workRun(
     failure = describe(error, stopped(timeout, options.signal));
   } finally {
     await proxy.close();
+    // The git proxy stays up past the session, because the supervisor's own
+    // push goes through it too — closing it here rather than after the
+    // delivery is a branch that never reaches the remote, which is what the
+    // acceptance walk said when it did.
     // Before the directory goes: whatever the session left behind is the only
     // evidence there will ever be that this attempt did anything.
     if (workspace.repo && !failure) {
       try {
-        delivered = await (options.deliver ?? deliver)({
-          workspace,
-          forge: options.forge ?? null,
-          issueKey: run.issueKey,
-          runId: run.id,
-          author: options.author ?? {
-            name: "deevy Agent",
-            email: "agent@deevy.invalid",
-          },
-        });
+        // What the session pushed for itself, before the supervisor considers
+        // pushing anything: a session that delivered has delivered, and a
+        // second branch beside its own is noise (ADR-0019).
+        const own = branchesPushed(await movedSince(workspace, before), workspace.repo.baseBranch);
+        // What the Agent said when it finished, which is what a reviewer
+        // reads: its reasoning is in the feed, and nobody opening a pull
+        // request goes looking there (docs/plans/agent-owns-git.md).
+        const said = (await deevy.run(run.id).catch(() => null))?.summary ?? undefined;
+        delivered =
+          own.length > 0
+            ? await attribute(own, workspace, options, run, said)
+            : await (options.deliver ?? deliver)({
+                workspace,
+                forge: options.forge ?? null,
+                issueKey: run.issueKey,
+                runId: run.id,
+                author: options.author ?? {
+                  name: "deevy Agent",
+                  email: "agent@deevy.invalid",
+                },
+                ...(said ? { summary: said } : {}),
+              });
       } catch (error) {
         // The work happened; only the record of it failed. Say so in the feed
         // and let the Run's own outcome stand.
@@ -307,7 +345,15 @@ export async function workRun(
           .catch(() => undefined);
       }
     }
+    // After the delivery, so the record covers what the supervisor pushed on
+    // the session's behalf as well as what the session pushed itself.
+    if (workspace.repo) {
+      for (const sentence of await sentencesFor(workspace, before)) {
+        await deevy.postActivity(run.id, "action", sentence).catch(() => undefined);
+      }
+    }
     await workspace.release();
+    await git?.close();
   }
 
   if (delivered) await attach(deevy, run, delivered);
@@ -386,4 +432,79 @@ function describe(error: unknown, instead: string | null): string {
   if (instead) return instead;
   if (error instanceof Error) return `The session stopped: ${error.message}`;
   return "The session stopped for a reason it did not give";
+}
+
+/** The refs the remote has now, read through the same origin the session pushes to. */
+async function readRefs(workspace: Workspace): Promise<Map<string, string>> {
+  return refsFrom(await workspace.git(["ls-remote", "origin"]).catch(() => ""));
+}
+
+/**
+ * What this Run moved, as sentences for its feed.
+ *
+ * `merge-base --is-ancestor` needs both commits in the clone, and the clone is
+ * shallow: a ref somebody else moved while the Run was working can leave the
+ * old commit unfetchable, and that answers "rewritten". Erring that way is
+ * deliberate — a Human told to look at something that turns out to be fine
+ * costs a minute, and the other mistake costs the work.
+ */
+async function sentencesFor(
+  workspace: Workspace,
+  before: ReadonlyMap<string, string>,
+): Promise<string[]> {
+  return (await movedSince(workspace, before)).map(sentenceFor);
+}
+
+/** What this Run has moved on the remote so far. */
+async function movedSince(
+  workspace: Workspace,
+  before: ReadonlyMap<string, string>,
+): Promise<Awaited<ReturnType<typeof movedRefs>>> {
+  return movedRefs({
+    before,
+    after: await readRefs(workspace),
+    isAncestor: async (older, newer) => {
+      // Fetching first, because a commit the session did not make is not in a
+      // shallow clone until it is asked for.
+      await workspace.git(["fetch", "--quiet", "origin", older, newer]).catch(() => undefined);
+      return workspace
+        .git(["merge-base", "--is-ancestor", older, newer])
+        .then(() => true)
+        .catch(() => false);
+    },
+  });
+}
+
+/**
+ * A Run whose session pushed for itself: the supervisor opens a pull request
+ * for the first branch it left and reports it, and pushes nothing.
+ *
+ * The first rather than all of them, because a Run is one attempt at one Issue
+ * and a reviewer wants one thing to open; every branch it pushed is in the
+ * feed either way (src/refs.ts).
+ */
+async function attribute(
+  own: Array<{ branch: string; commit: string }>,
+  workspace: Workspace,
+  options: WorkOptions,
+  run: Run,
+  summary?: string,
+): Promise<Delivery> {
+  const [first] = own;
+  const forge = options.forge ?? null;
+  const pullRequest = forge
+    ? await forge.open({
+        branch: first.branch,
+        base: workspace.repo?.baseBranch ?? "main",
+        title: titleFor(run.issueKey, summary),
+        body: [
+          ...(summary ? [summary.trim(), ""] : []),
+          `Opened by a deevy Agent working ${run.issueKey}, on the branch it pushed itself.`,
+          "",
+          `The Run that produced it is \`${run.id}\`, and its Activity feed in deevy is the account`,
+          "of how it got here, including every ref it moved. A Human decides whether this ships.",
+        ].join("\n"),
+      })
+    : null;
+  return { branch: first.branch, commit: first.commit, pullRequest };
 }

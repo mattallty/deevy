@@ -84,6 +84,90 @@ describe("what a Run delivers", () => {
     ]);
   });
 
+  it("delivers twice on one Run, because a Gate ruling brings it back", async () => {
+    // A Run that stops at a Gate and resumes delivers on both passes, from a
+    // fresh clone each time. Branching from the base again would be a
+    // non-fast-forward push and the second pass's work would never reach the
+    // remote (docs/plans/agent-owns-git.md).
+    const repo = await remote();
+    const forge = stubForge();
+
+    const first = await openWorkspace({ runId: "run-abcdef12", repo });
+    scratch.push(first.cwd);
+    await writeFile(join(first.cwd, "before-the-gate.ts"), "export const a = 1;\n");
+    const one = await deliver({
+      workspace: first,
+      forge,
+      issueKey: "DEV-1",
+      runId: "run-abcdef12",
+      author,
+    });
+
+    const second = await openWorkspace({ runId: "run-abcdef12", repo });
+    scratch.push(second.cwd);
+    await writeFile(join(second.cwd, "after-the-ruling.ts"), "export const b = 2;\n");
+    const two = await deliver({
+      workspace: second,
+      forge,
+      issueKey: "DEV-1",
+      runId: "run-abcdef12",
+      author,
+    });
+
+    expect(two?.branch).toBe(one?.branch);
+    const { stdout } = await run("git", ["-C", repo.url, "log", "--format=%s", one?.branch ?? ""]);
+    expect(stdout.split("\n").filter(Boolean)).toHaveLength(3);
+  });
+
+  it("says what the Agent said, on the pull request and on the commit", async () => {
+    const repo = await remote();
+    const forge = stubForge();
+    const workspace = await openWorkspace({ runId: "run-abcdef12", repo });
+    scratch.push(workspace.cwd);
+    await writeFile(join(workspace.cwd, "health.ts"), "export const ok = true;\n");
+
+    await deliver({
+      workspace,
+      forge,
+      issueKey: "DEV-1",
+      runId: "run-abcdef12",
+      author,
+      summary: "Added a health endpoint, and a smoke that proves it answers.",
+    });
+
+    // What a reviewer opens says what the Agent decided. Its reasoning is in
+    // deevy; this is the one line that reaches the code review.
+    expect(forge.opened[0]).toMatchObject({
+      title: "DEV-1: Added a health endpoint, and a smoke that proves it answers.",
+    });
+    expect(String((forge.opened[0] as { body: string }).body)).toContain(
+      "Added a health endpoint, and a smoke that proves it answers.",
+    );
+    const { stdout } = await run("git", [
+      "-C",
+      repo.url,
+      "log",
+      "-1",
+      "--format=%s",
+      "deevy/dev-1-run-abcd",
+    ]);
+    expect(stdout.trim()).toBe(
+      "DEV-1: Added a health endpoint, and a smoke that proves it answers.",
+    );
+  });
+
+  it("keeps its own line when the Agent finished without saying anything", async () => {
+    const repo = await remote();
+    const forge = stubForge();
+    const workspace = await openWorkspace({ runId: "run-abcdef12", repo });
+    scratch.push(workspace.cwd);
+    await writeFile(join(workspace.cwd, "health.ts"), "export const ok = true;\n");
+
+    await deliver({ workspace, forge, issueKey: "DEV-1", runId: "run-abcdef12", author });
+
+    expect(forge.opened[0]).toMatchObject({ title: "DEV-1: worked by a deevy Agent" });
+  });
+
   it("delivers nothing when the session changed nothing", async () => {
     const repo = await remote();
     const workspace = await openWorkspace({ runId: "run-1", repo });

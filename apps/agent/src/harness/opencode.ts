@@ -28,19 +28,17 @@ export const repositoryPermissions: ReadonlyArray<string> = [
 ];
 
 /**
- * What `bash` refuses even where it is otherwise allowed: the supervisor owns
- * git and the credential to use it (ADR-0014). OpenCode's patterns are plain
- * wildcards over the command, and the last matching rule wins, so these come
- * after the allow. `gh` is listed bare and with arguments because `*` matches
- * zero or more characters and `gh*` would also match `ghostscript`.
+ * Nothing is refused. The session runs git, reaching the world through the
+ * supervisor's proxy, so the credential is still the supervisor's and where an
+ * Agent may push is the scope of the token the operator issued and whatever
+ * the forge protects — both enforced by somebody other than us, which is the
+ * argument for preferring them to a list written here (ADR-0019). What the
+ * runtime does instead is record every ref a Run moved (src/refs.ts).
+ *
+ * `gh` is not denied and is not given a credential either: it wants a token of
+ * its own, and the proxy has none to hand it.
  */
-export const deniedCommands: Readonly<Record<string, "deny">> = {
-  "git push*": "deny",
-  "git remote*": "deny",
-  "git config*": "deny",
-  gh: "deny",
-  "gh *": "deny",
-};
+export const deniedCommands: Readonly<Record<string, "deny">> = {};
 
 /**
  * The provider credentials OpenCode reads from the environment, for the
@@ -87,7 +85,9 @@ export function permissions(context: HarnessContext): Record<string, unknown> {
       ? Object.fromEntries(
           repositoryPermissions.map((name) => [
             name,
-            name === "bash" ? { "*": "allow", ...deniedCommands } : "allow",
+            name === "bash" && Object.keys(deniedCommands).length > 0
+              ? { "*": "allow", ...deniedCommands }
+              : "allow",
           ]),
         )
       : {}),

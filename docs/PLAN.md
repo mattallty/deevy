@@ -205,6 +205,16 @@ tree, and [docs/harnesses.md](./harnesses.md) is how a fifth is added. Built in 
 [harnesses.md](./plans/harnesses.md), recorded in
 [ADR-0018](./adr/0018-a-harness-is-a-cli-behind-the-session-seam.md).
 
+**The agent owns git.** The harness spike left the session and the supervisor sharing a user, which meant a
+shell in a session read the Agent's key and the git token out of `/proc` whatever the environment allowlist
+handed it. The session is now its own user; git reaches the world through a loopback proxy that holds the
+credential, so an Agent branches, commits and pushes as it likes and its checkout holds no token; the
+harnesses deny no git command, because where an Agent can push is the scope of the token and the forge's
+protections rather than a list the runtime wrote; and every ref a Run moves is an Activity naming both
+commits and whether history was rewritten. Built in five slices from
+[agent-owns-git.md](./plans/agent-owns-git.md), recorded in
+[ADR-0019](./adr/0019-the-session-is-its-own-user-and-git-goes-through-the-supervisor.md).
+
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
 mirroring Documents into the Repository; the Slack app; email Channel; private Projects; four-eyes Gates;
 Postgres adapter; a CLI.

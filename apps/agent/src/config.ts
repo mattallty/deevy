@@ -48,6 +48,15 @@ export interface Config {
   webhookSecret?: string;
   /** The port the listener binds. Zero picks one, which is only useful in a test. */
   listenPort: number;
+  /**
+   * The user a session runs as, when the runtime is root and so can make it
+   * somebody else (src/session-user.ts). Zero, or a runtime that is not root,
+   * means the session shares the supervisor's user and can read its
+   * environment out of `/proc` — which is fine on a laptop and is not a way to
+   * run it against a Workspace other people write in.
+   */
+  sessionUid: number;
+  sessionGid: number;
   /** The GitHub API root, when it is not github.com's. */
   githubApi?: string;
   /** `owner/name`, when it cannot be read off the clone URL. */
@@ -72,6 +81,13 @@ import type { RepoConfig } from "./workspace.ts";
 function positive(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** A uid or gid: the default when absent, and zero for "the supervisor's own". */
+function user(value: string | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function required(env: Record<string, string | undefined>, name: string): string {
@@ -103,6 +119,8 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     ...(env.DEEVY_AGENT_WORKDIR ? { workdir: env.DEEVY_AGENT_WORKDIR } : {}),
     ...(env.DEEVY_AGENT_WEBHOOK_SECRET ? { webhookSecret: env.DEEVY_AGENT_WEBHOOK_SECRET } : {}),
     listenPort: positive(env.DEEVY_AGENT_PORT, 8787),
+    sessionUid: user(env.DEEVY_AGENT_SESSION_UID, 10002),
+    sessionGid: user(env.DEEVY_AGENT_SESSION_GID, 10002),
     ...(env.DEEVY_AGENT_GITHUB_API ? { githubApi: env.DEEVY_AGENT_GITHUB_API } : {}),
     ...(env.DEEVY_AGENT_GITHUB_REPO ? { githubRepo: env.DEEVY_AGENT_GITHUB_REPO } : {}),
     ...(env.DEEVY_AGENT_PASS_ENV

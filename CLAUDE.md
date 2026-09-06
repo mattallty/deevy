@@ -14,7 +14,9 @@ shipping `apps/agent`, whose acceptance walk is a script (`vp run agent#acceptan
 both deployments locally on every commit — no Cloudflare account, no OAuth App, no repository on the internet
 (`docs/m4-acceptance.md`); the harness spike then made the runtime `apps/agent`, driving Claude Code,
 OpenCode, Cursor CLI or Copilot CLI as a subprocess behind one contract (`docs/plans/harnesses.md`,
-`docs/harnesses.md`, ADR-0018). v1 is complete;
+`docs/harnesses.md`, ADR-0018), and the agent-owns-git work then gave each session its own user and put git
+behind a loopback proxy that holds the credential, so an Agent pushes where it likes and every ref it moved
+is in the Run's feed (`docs/plans/agent-owns-git.md`, ADR-0019). v1 is complete;
 what comes next is PLAN.md's after-v1 list.
 
 ## Commands

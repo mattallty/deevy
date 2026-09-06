@@ -3,7 +3,9 @@ import { promisify } from "node:util";
 import { readConfig } from "./config.ts";
 import { DeevyError, createDeevy } from "./deevy.ts";
 import { forgeFor } from "./forge.ts";
+import { openGitProxy } from "./git-proxy.ts";
 import { harnessFor, missingFor } from "./harness/index.ts";
+import { sessionUserFor } from "./session-user.ts";
 import { buildSession } from "./harness/run.ts";
 import { createReceiver, startListener } from "./receiver.ts";
 import { startLoop } from "./loop.ts";
@@ -63,6 +65,15 @@ const version = await promisify(execFile)(harness.binary, ["--version"]).catch((
 });
 console.log(`harness ${harness.name}: ${version.stdout.trim() || version.stderr.trim()}`);
 
+// Said in the first lines, because a bound that is not there is worth knowing
+// before a Run rather than after one (src/session-user.ts).
+const sessionUser = sessionUserFor(config);
+console.log(
+  sessionUser
+    ? `sessions run as uid ${String(sessionUser.uid)}, which cannot read this process`
+    : "sessions run as this process's own user, which can read its environment: fine for trying out, not for a shared Workspace",
+);
+
 const deevy = createDeevy({ config });
 const work = {
   deevy,
@@ -72,7 +83,14 @@ const work = {
     openProxy({ url: config.url, key: config.key, tools: deevyToolNames, ...options }),
   runTimeoutMs: config.runTimeoutSeconds * 1000,
   forge: forgeFor(config),
-  workspace: (options: { runId: string }) =>
+  gitProxy: () =>
+    config.repo
+      ? openGitProxy({
+          upstream: config.repo.url,
+          ...(config.repo.token ? { token: config.repo.token } : {}),
+        })
+      : Promise.resolve(null),
+  workspace: (options: { runId: string; originUrl?: string }) =>
     openWorkspace({
       ...options,
       repo: config.repo,

@@ -256,6 +256,51 @@ jobs:
             echo "$out" | grep -q "refuses to start without it"
           done
 
+      # The claim the whole boundary rests on, made by a session rather than by
+      # reading the code (docs/plans/agent-owns-git.md, convention 28). On one
+      # user a shell in a session reads the supervisor's environment out of
+      # /proc, and the Agent's key and the git token are in it.
+      - name: A session cannot read the supervisor's environment
+        run: |
+          out=$(docker run --rm --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID --cap-add=CHOWN --cap-add=DAC_OVERRIDE \
+            -e DEEVY_AGENT_KEY=deevy_sk_ci_secret deevy-agent:ci-claude-code node -e '
+              const { spawnSync } = require("child_process");
+              const read = (opts) => spawnSync("sh", ["-c", "cat /proc/" + process.pid + "/environ"],
+                { encoding: "utf8", ...opts });
+              const saw = (r) => String(r.stdout).includes("deevy_sk_ci_secret");
+              console.log("same-user:" + saw(read({})));
+              console.log("session:" + saw(read({ uid: 10002, gid: 10002 })));
+            ')
+          echo "$out"
+          # The first line is the control: without two users there is no bound,
+          # so a run where neither can read it proves nothing.
+          echo "$out" | grep -qx "same-user:true"
+          echo "$out" | grep -qx "session:false"
+
+      # And the other half: a session can actually work in what it was handed.
+      # The capabilities below are the ones OPERATIONS.md tells an operator to
+      # run with, so this step is what keeps that command true — the first
+      # version of it was missing CHOWN, and every Run would have failed.
+      - name: A session can work in the directory it was given
+        run: |
+          out=$(docker run --rm --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID --cap-add=CHOWN --cap-add=DAC_OVERRIDE \
+            deevy-agent:ci-claude-code node -e '
+              const { mkdtempSync, chownSync, rmSync, writeFileSync } = require("fs");
+              const { spawnSync } = require("child_process");
+              const dir = mkdtempSync("/tmp/work-");
+              chownSync(dir, 10002, 10002);
+              const worked = spawnSync("sh", ["-c", "cd " + dir + " && git init -q . && echo x > f && git add -A && echo ok"],
+                { uid: 10002, gid: 10002, encoding: "utf8" });
+              if (worked.stdout.trim() !== "ok") throw new Error("the session could not work in it");
+              writeFileSync(dir + "/from-supervisor", "y");
+              const read = spawnSync("git", ["-c", "safe.directory=" + dir, "-C", dir, "status", "--porcelain"], { encoding: "utf8" });
+              if (read.status !== 0) throw new Error("the supervisor could not read it back");
+              rmSync(dir, { recursive: true, force: true });
+              console.log("session-directory:ok");
+            ')
+          echo "$out"
+          echo "$out" | grep -qx "session-directory:ok"
+
       - name: Configuration it cannot start without is named
         run: |
           set +e

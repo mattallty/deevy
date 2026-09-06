@@ -45,6 +45,14 @@ export {
   toSessionEvents,
 } from "./harness/claude-code.ts";
 export { instructionsPath, readInstructions } from "./instructions.ts";
+export { handOver, sessionUserFor, type SessionUser } from "./session-user.ts";
+export {
+  openGitProxy,
+  remoteUpstream,
+  repositoryName,
+  type GitProxy,
+  type GitProxyOptions,
+} from "./git-proxy.ts";
 export { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 export {
   forgeFor,

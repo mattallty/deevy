@@ -50,6 +50,23 @@ describe("a working directory", () => {
     await expect(readdir(workspace.cwd)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("points the session's origin at the supervisor, and not at the remote", async () => {
+    const url = await origin();
+    const workspace = await openWorkspace({
+      runId: "run-1",
+      repo: repoFor(url),
+      originUrl: "http://127.0.0.1:9/repo.git",
+    });
+    scratch.push(workspace.cwd);
+
+    // What a session's `git remote -v` shows is a loopback address. The real
+    // remote, and the credential that reaches it, are the supervisor's
+    // (docs/plans/agent-owns-git.md).
+    expect(await workspace.git(["remote", "get-url", "origin"])).toBe(
+      "http://127.0.0.1:9/repo.git",
+    );
+  });
+
   it("is empty when this runtime has no repository, and still cleans up", async () => {
     const workspace = await openWorkspace({ runId: "run-1" });
 

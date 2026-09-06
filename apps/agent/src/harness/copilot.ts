@@ -40,12 +40,7 @@ export const repositoryTools = "read,write,shell";
  * Only meaningful when there is a repository: with no repository `shell` is not
  * granted at all and every command is refused already.
  */
-export const deniedTools: ReadonlyArray<string> = [
-  "shell(git push:*)",
-  "shell(git remote:*)",
-  "shell(git config:*)",
-  "shell(gh:*)",
-];
+export const deniedTools: ReadonlyArray<string> = [];
 
 /** Where Copilot keeps its configuration and state: a subdirectory of the session's own home. */
 export function copilotHome(context: HarnessContext): string {
