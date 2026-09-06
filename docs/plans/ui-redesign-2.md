@@ -492,3 +492,16 @@ names beside ids for Labels, parent and Assignee (D); nothing else. Each regener
 - G: rename a Project, blur, see "Saved"; empty name refused inline.
 - H: reorder by drag and by keyboard, pick approvers by typing, write a template in the editor, save once.
 - Close: `vp run web#screens` regenerated; `vp run claude-agent#acceptance` still passes.
+
+## Palette (round 3, opened 2026-09-06)
+
+Matt keeps the indigo primary but finds the colours beside it — Human copper, Agent teal, Gate amber, the
+State dots — out of tune with it, and wants Labels to choose from a limited, harmonious set instead of a
+free colour picker. Six palette candidates live in `src/dev/palette-candidates.css` behind a dev-only
+switcher (`src/dev/palette-switcher.tsx`, "Palette candidate"), each redefining `--human`, `--agent`,
+`--gate`, `--state-*` and `--destructive` in both themes and proposing eight Label swatches
+(`src/dev/palettes.ts`, hex, white text on each): _Triad_ (copper & teal, chroma pulled down), _Split
+complement_ (orange & green), _Analogous_ (rose & sky), _Jewel_ (plum & jade), _Cool_ (steel & violet),
+_Earth_ (terracotta & olive). `/dev/tokens` draws all six with their swatches. The Labels settings form is
+a `radiogroup "Colour"` of the active palette's eight swatches (`lib/label-colors.ts`), no picker. The pick
+bakes the winner into `index.css` and the swatches into `lib/label-colors.ts`, and reseeds the Labels.

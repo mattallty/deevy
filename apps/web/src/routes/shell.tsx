@@ -22,6 +22,7 @@ import { Shortcut } from "@/components/kbd-hint";
 import { MemberChip } from "@/components/member-chip";
 import { NewIssueButton, NewIssueProvider } from "@/components/new-issue";
 import { ShortcutsSheet } from "@/components/shortcuts-sheet";
+import { PaletteSwitcher } from "@/dev/palette-switcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -272,6 +273,7 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
         />
         <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
         <Toaster />
+        <PaletteSwitcher />
       </NewIssueProvider>
     </SidebarProvider>
   );

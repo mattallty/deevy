@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/table";
 import { labelText } from "@/lib/labels";
 import { SettingsPage } from "@/components/settings-page";
+import { labelColors } from "@/lib/label-colors";
 import { orpc } from "@/lib/orpc";
+import { cn } from "@/lib/utils";
 
 /** Labels are defined once for the Workspace; an Issue carries at most one per scope. */
 export function LabelsPage() {
@@ -25,7 +27,8 @@ export function LabelsPage() {
 
   const [scope, setScope] = useState("");
   const [name, setName] = useState("");
-  const [color, setColor] = useState("#3b82f6");
+  const colors = labelColors();
+  const [color, setColor] = useState(colors[0] ?? "#4f46e5");
 
   const create = useMutation(
     orpc.labels.create.mutationOptions({
@@ -77,14 +80,29 @@ export function LabelsPage() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <FieldLabel htmlFor="label-color">Colour</FieldLabel>
-          <Input
-            id="label-color"
-            type="color"
-            className="w-16"
-            value={color}
-            onChange={(changed) => setColor(changed.target.value)}
-          />
+          <FieldLabel id="label-color-label">Colour</FieldLabel>
+          {/* Eight colours in harmony with the palette, not a picker: a Label reads beside Human, Agent and Gate. */}
+          <div
+            role="radiogroup"
+            aria-labelledby="label-color-label"
+            className="flex items-center gap-1.5"
+          >
+            {colors.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                role="radio"
+                aria-checked={candidate === color}
+                aria-label={candidate}
+                className={cn(
+                  "size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow",
+                  candidate === color ? "ring-2 ring-foreground" : "hover:ring-2 hover:ring-border",
+                )}
+                style={{ background: candidate }}
+                onClick={() => setColor(candidate)}
+              />
+            ))}
+          </div>
         </div>
         <Button type="submit" disabled={create.isPending || !name.trim()}>
           Add Label

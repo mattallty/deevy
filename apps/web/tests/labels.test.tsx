@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => {
@@ -107,6 +107,24 @@ describe("the Label picker on an Issue", () => {
     await waitFor(() =>
       expect(stub.set).toContainEqual(
         expect.objectContaining({ key: "DEV-1", labelIds: ["l1", "l2"] }),
+      ),
+    );
+  });
+});
+
+describe("a Label's colour", () => {
+  it("is one of the palette's swatches, not a free pick", async () => {
+    await mountAt("/settings/labels");
+    const group = await screen.findByRole("radiogroup", { name: "Colour" });
+    const swatches = within(group).getAllByRole("radio");
+    expect(swatches.length).toBe(8);
+    fireEvent.click(swatches[2]!);
+    expect(swatches[2]!.getAttribute("aria-checked")).toBe("true");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "ops" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Label" }));
+    await waitFor(() =>
+      expect(stub.created).toContainEqual(
+        expect.objectContaining({ name: "ops", color: swatches[2]!.getAttribute("aria-label") }),
       ),
     );
   });
