@@ -62,10 +62,8 @@ export function MembersPage() {
           {members.data.members.map((member) => (
             <TableRow key={member.id}>
               <TableCell>
-                <div className="flex flex-col gap-0.5">
-                  <MemberChip member={member} />
-                  <span className="text-xs text-muted-foreground">{member.user.email}</span>
-                </div>
+                {/* The name and the handle: an email is the sign-in's, not the Workspace's to show. */}
+                <MemberChip member={member} />
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {member.handle ? `@${member.handle}` : "—"}
