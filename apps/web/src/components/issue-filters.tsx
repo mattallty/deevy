@@ -146,12 +146,12 @@ export function IssueFilters({
             {states.map((state) => (
               <SelectItem key={state.name} value={state.name}>
                 {state.name}
-                {/* The diamond every StateBadge wears, at the right edge, clear of the check mark. */}
+                {/* The diamond every StateBadge wears, beside the name. */}
                 {state.isGate ? (
                   <>
                     <span
                       aria-hidden
-                      className="ml-auto mr-5 inline-block size-2 self-center rotate-45 rounded-[1px] border-[1.5px] border-gate bg-gate/20"
+                      className="inline-block size-2 self-center rotate-45 rounded-[1px] border-[1.5px] border-gate bg-gate/20"
                     />
                     <span className="sr-only">Gate</span>
                   </>
