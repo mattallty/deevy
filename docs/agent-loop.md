@@ -125,11 +125,17 @@ Work one Issue at a time, in this order.
    there is nothing to reopen and nothing to rescue: if nobody rules on it, deevy asks the approvers again on
    its own. Wait, or come back later and call the same tool.
 
-7. **Attach the evidence.** `links_add` with the Run's id and the pull request URL, so what you produced is
+7. **Commit and push, if you wrote code.** git is yours: your own branch, your own commits, your own
+   messages. `origin` already points where it should and carries no credential you need to think about. Do
+   not push to the default branch: you are able to, and the record will say you did, but what you produce is
+   a proposal and a Human decides whether it ships. If you push nothing, whatever you changed is committed
+   and pushed for you on a branch named after this Run.
+8. **Attach the evidence.** `links_add` with the Run's id and the pull request URL, so what you produced is
    attributed to the attempt that produced it. Use `comments_create` if a Human needs to be told something in
    prose; mention them by handle.
-8. **Finish.** `runs_finish` with `status: "completed"` and a summary a Human can act on: what you did, what
-   you decided, and what you recommend. You recommend; a Human approves.
+9. **Finish.** `runs_finish` with `status: "completed"` and a summary a Human can act on: what you did, what
+   you decided, and what you recommend. You recommend; a Human approves. **What you write here is what a
+   reviewer reads**: it becomes the title and body of the pull request.
 
 Do not decide there is nothing to do while an Issue is assigned to you and is not in a `done` State. There
 almost always is, and it is one of three things: a Document to write, a Gate to ask about, or a rejection to

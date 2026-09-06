@@ -33,7 +33,13 @@ ENV DEEVY_AGENT_HARNESS=$HARNESS
 # (docs/plans/agent-owns-git.md, ADR-0019). Root here is root in a container
 # with no capability but the one this needs:
 #
-#   docker run --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID ...
+#   docker run --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID \
+#              --cap-add=CHOWN --cap-add=DAC_OVERRIDE ...
+#
+# Four, and each was measured rather than guessed: SETUID and SETGID to become
+# the session, CHOWN to hand it its working directory, and DAC_OVERRIDE to read
+# and clean up what it wrote afterwards. With only the first two the runtime
+# fails at the first Run.
 #
 # Run the image with `--user` instead and the runtime keeps its old shape, says
 # so in its first line, and is fine for trying out and not for a Workspace

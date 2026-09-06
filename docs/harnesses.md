@@ -36,7 +36,9 @@ in.
 4. **A way to refuse rather than prompt.** Nobody is there to answer. A CLI that blocks on a prompt in
    headless mode cannot be a recipe until it stops.
 5. **Tools granted by name**, including MCP tools, so the repository tools (read, write, shell) can be
-   granted only when there is a repository and `git push`, `git remote`, `git config` and `gh` denied.
+   granted only when there is a repository. A recipe denies no git command: the session runs git through the
+   supervisor's proxy, which holds the credential, and where an Agent may push is the token's scope and the
+   forge's protections rather than a pattern in a permission file (ADR-0019).
 6. **Nothing in the cloned repository configures the session.** Where the CLI reads a config file from the
    working directory and cannot be told not to, the recipe's `strip` list removes it before the session
    starts.

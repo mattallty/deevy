@@ -244,3 +244,36 @@ will feel worse than it is. `git http-backend` will make the acceptance walk wor
 proxy is one code path rather than two. Some harness will turn out to set `credential.helper` or
 `safe.directory` on its own and fight the prepared git configuration. And the ref record will be the part
 operators actually ask for, because "what did it push" is the question a Human has when they open the Issue.
+
+---
+
+## Found by building the plan
+
+**The capabilities were guessed wrong, and a probe in the image said so.** Slice 1 shipped
+`--cap-drop=ALL --cap-add=SETUID --cap-add=SETGID`, which is enough to _become_ the session and not enough to
+_hand it_ anything: `chown` needs `CHOWN`, and reading back and removing what the session wrote needs
+`DAC_OVERRIDE`. With the first two, every Run would have failed at its first working directory. The
+container smoke now does the whole round trip rather than only the `/proc` half, and it runs with exactly
+the command OPERATIONS.md gives an operator, so the documentation cannot drift from what works.
+
+**`git http-backend` was the right guess.** One code path serves a remote on the internet and a bare
+repository on disk, which is what keeps the acceptance walk offline. It needed `http.receivepack` turned on:
+git's CGI refuses an anonymous push by default, which is the correct default for a git server and the wrong
+one for a listener whose only client is the session.
+
+**The proxy has to outlive the session.** The first version closed it beside the MCP proxy, before the
+delivery step — and the supervisor's own push goes through it too, so the branch never reached the remote.
+The acceptance walk caught it, which is the second time it has caught an ordering mistake that every unit
+test was happy with.
+
+**The double-delivery gap was real.** A Run that delivers before a Gate and again after the ruling pushed a
+history the remote's own branch was not part of, which git rejects; the second pass's work was reported as
+"could not be delivered" and lost. It now continues the branch. There was no test; there is one.
+
+**`safe.directory` is the price of two users.** git refuses a repository owned by somebody else, and the
+supervisor is now somebody else as far as the clone is concerned.
+
+**What was expected and what was found.** The supervisor being root does feel worse than it is, as predicted.
+`http-backend` was predicted and was right. No harness fought the prepared git configuration, which was
+predicted and did not happen. And the ref record is the part that reads best in the feed: "Rewrote
+refs/heads/main from 1a2b3c4 to 5d6e7f8, which is not a fast-forward" is a sentence a Human acts on.

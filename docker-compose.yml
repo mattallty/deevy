@@ -44,10 +44,12 @@ services:
     image: ${DEEVY_AGENT_IMAGE:-ghcr.io/mattallty/deevy-agent:latest}
     restart: unless-stopped
     # The supervisor is root so it can run each session as another user, which
-    # is what keeps the Agent's key and the git token out of a session's reach;
-    # these are the only capabilities that needs (ADR-0019).
+    # is what keeps the Agent's key and the git token out of a session's reach.
+    # Four capabilities, each measured: SETUID and SETGID to become the session,
+    # CHOWN to hand it its working directory, DAC_OVERRIDE to read and clean up
+    # what it wrote (ADR-0019).
     cap_drop: [ALL]
-    cap_add: [SETUID, SETGID]
+    cap_add: [SETUID, SETGID, CHOWN, DAC_OVERRIDE]
     depends_on:
       deevy:
         condition: service_healthy

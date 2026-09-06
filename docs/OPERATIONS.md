@@ -671,9 +671,16 @@ by anyone with access to the Project, and all of it reaches a session that — w
 holds a shell. No prompt makes that safe. What bounds it is structural, and it is worth knowing exactly what
 each part does:
 
-- **The container is the sandbox.** It runs as a non-root user and holds a clone and nothing else. A runtime
-  run directly on a laptop has no boundary at all, which is fine for trying it out and is not a way to run it
-  against a Workspace other people write in.
+- **The session is its own user, and that is the boundary.** The supervisor runs as root in the container so
+  it can spawn each session as `session` (uid 10002); the working directory and the session's home are
+  handed to that user, and the supervisor's own environment, files and `/proc` entry are outside what a shell
+  in the session can read. On one user they are not: a session reads the Agent's key and the git token out of
+  `/proc`, whatever the allowlist below hands it, which is what ADR-0019 was written about. Run it with
+  `--cap-drop=ALL --cap-add=SETUID --cap-add=SETGID --cap-add=CHOWN --cap-add=DAC_OVERRIDE` — four, each
+  measured: two to become the session, `CHOWN` to hand it its working directory, and `DAC_OVERRIDE` to read
+  and clean up what it wrote. With only the first two the runtime fails at its first Run. A runtime that is not root — a laptop, or a container
+  run with `--user` — keeps its old shape, says so in its first lines, and has no boundary at all: fine for
+  trying it out, not a way to run it against a Workspace other people write in.
 - **The tool list is the surface.** Tools are granted by name, never by wildcard, so deevy gaining a
   twenty-first tool does not widen what the runtime may do. `settingSources` is empty and `strictMcpConfig`
   is on, so a `.mcp.json` or a `.claude/settings.json` in the cloned repository configures nothing.
@@ -688,10 +695,15 @@ each part does:
   Run, which adds the key on the way out, offers only the twelve tools the runtime grants, and refuses any
   other tool before deevy hears of it. A refusal is written into the Run's feed as an error Activity. A shell
   that finds the proxy's port gets those twelve tools and nothing else, which is the allowlist and not a hole.
-- **The credential is narrow, and the supervisor holds it.** Scope the git token to one repository, with
-  permission to push a branch and open a pull request. The runtime clones and pushes; the session is refused
-  `git push`, `git remote`, `git config` and `gh`, and the token is passed as a header git does not persist,
-  so it is not in the working directory the session can read.
+- **The credential is the supervisor's, and the session runs git anyway.** `origin` in the clone is a
+  loopback address: the supervisor serves the remote there and adds the token on the way out, so the session
+  branches, commits and pushes as it likes while its checkout holds no credential and its `.git/config` has
+  nothing to find. **Where an Agent can push is the scope of the token you issue and whatever your forge
+  protects, and nothing else.** The runtime does not restrict it: `git push`, `git remote`, `git config` and
+  `gh` are not denied, and an Agent can move the base branch, force-push included, with no Gate in the way —
+  a Gate governs the State an Issue is in, not a ref (ADR-0019). Give it a token scoped to one repository,
+  protect the branches that matter, and read the Run's feed: every ref a Run moved is an Activity naming the
+  branch, both commits, and whether history was rewritten.
 - **A Gate is the last line.** An Agent can never approve one (ADR-0004), so nothing an agent proposes ships
   without a Human deciding it did.
 
@@ -712,7 +724,7 @@ and that is what each paragraph below says, in the words its recipe ships (`boun
 
 **OpenCode** is granted its tools by name in an inline `permission` block where everything else is `deny` and nothing is `ask` (in `run`, an `ask` is auto-rejected and ends the turn), reads no project configuration (`OPENCODE_DISABLE_PROJECT_CONFIG`, with `opencode.json`, `opencode.jsonc` and `.opencode/` removed from the clone as well), loads no plugins (`--pure`), and connects to no MCP server but the runtime's proxy; `AGENTS.md` and `CLAUDE.md` are read as input. A refused tool is an errored `tool_use` in its stream carrying OpenCode's own sentence about the rule, which the runtime writes into the Run's feed as a denial. Not bounded: what `bash` runs in the repository, the network, and tokens; and the provider key is in the session's environment, as every harness's is.
 
-**Cursor CLI** runs under `--force`, which applies edits and runs commands instead of proposing them and allows every tool a deny rule does not name, so the fence is the `permissions.deny` list the runtime writes into the session's own `~/.cursor/cli-config.json`: `git push`, `git remote`, `git config` and `gh` when there is a repository, and every file, shell and web tool when there is not. Nothing on disk configures the session: the clone's `.cursor/` is removed before it starts (a project `.cursor/cli.json` would otherwise _replace_ the deny list, and a `.cursor/mcp.json` would be trusted by `--approve-mcps`), `--disable-project-configs` refuses it anyway, and the only MCP server is the runtime's proxy, with no header. A refused tool is a `tool_call` completed with a `rejected` result and the CLI\'s own sentence, "Command is not allowed", which the runtime writes into the Run's feed. Not bounded: what `Shell` runs in the repository, the network, tokens (usage is reported, cost is not), and `DEEVY_AGENT_EFFORT`, which this harness does not read.
+**Cursor CLI** runs under `--force`, which applies edits and runs commands instead of proposing them and allows every tool a deny rule does not name, so the fence is the `permissions.deny` list the runtime writes into the session's own `~/.cursor/cli-config.json`: nothing when there is a repository, since the session runs git and where it may push is the token's scope and the forge's own protections (ADR-0019), and every file, shell and web tool when there is not. Nothing on disk configures the session: the clone's `.cursor/` is removed before it starts (a project `.cursor/cli.json` would otherwise _replace_ the deny list, and a `.cursor/mcp.json` would be trusted by `--approve-mcps`), `--disable-project-configs` refuses it anyway, and the only MCP server is the runtime's proxy, with no header. A refused tool is a `tool_call` completed with a `rejected` result and the CLI's own sentence, "Command is not allowed", which the runtime writes into the Run's feed. Not bounded: what `Shell` runs in the repository, the network, tokens (usage is reported, cost is not), and `DEEVY_AGENT_EFFORT`, which this harness does not read.
 
 **GitHub Copilot CLI** is granted its tools by name (`--allow-tool`) and, in `-p` without `--allow-all-tools`, refuses anything else automatically rather than asking (`--no-ask-user`); the built-in GitHub MCP server is off (`--disable-builtin-mcps`) so the only server it reaches is the runtime's proxy, the session is not exported to GitHub (`--no-remote-export`), and the token is stripped from the shell it runs and redacted from output (`--secret-env-vars`). Nothing on disk configures the session: the working directory is left untrusted, which is what stops Copilot loading a repository's `.mcp.json`, `.github/mcp.json`, hooks or plugins, so no strip list is needed; `.github/copilot-instructions.md` and `AGENTS.md` are read as input. A refused tool is a `tool.execution_complete` with `error.code` `denied` in the JSON stream, which the runtime writes into the Run's feed. Not bounded: what `shell` runs in the repository, the network, and tokens; and Copilot's JSON stream reports premium-request counts and durations, not token or dollar totals, so a Run worked by Copilot carries no usage into its summary.
 
