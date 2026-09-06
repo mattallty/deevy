@@ -60,7 +60,9 @@ the fold drops the `X.Y.Z-*` sections that release supersedes.
 v2 bundles 3. Running the CLI at 3 under the action at v1 works for every ordinary release and fails only in
 pre-release mode, where the two disagree about the shape of `.changeset/pre.json` — the older code looks for a
 file the newer CLI never wrote. Move the pin and the catalog entry together, the way the other pre-release
-lines in this repository are moved.
+lines in this repository are moved. A test in `tools/release` asserts the pairing rather than leaving it as
+this paragraph: it holds the pairs the action's README states and fails on anything else, including a major
+nobody has checked yet, because whether a future one is compatible is something a person has to go and read.
 
 The one caveat is structural and worth writing down rather than discovering: `changesets.yml` runs on `main`,
 so while pre mode is on every merge to `main` joins the rc line and no stable patch can ship without exiting
