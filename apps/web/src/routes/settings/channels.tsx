@@ -92,7 +92,16 @@ export function ChannelsPage() {
       },
     }),
   );
-  const remove = useMutation(orpc.channels.delete.mutationOptions({ onSuccess: refreshChannels }));
+  // Removing a Channel drops the routing rules that named it (the server cascades).
+  const remove = useMutation(
+    orpc.channels.delete.mutationOptions({
+      onSuccess: () =>
+        Promise.all([
+          refreshChannels(),
+          queryClient.invalidateQueries({ queryKey: orpc.routing.key() }),
+        ]),
+    }),
+  );
   const test = useMutation(
     orpc.channels.test.mutationOptions({
       onSuccess: (result) =>

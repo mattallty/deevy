@@ -218,7 +218,9 @@ export function IssueFilters({
       <ToggleGroup
         value={[value.kind ?? ANY]}
         onValueChange={(next: string[]) => {
+          // Base UI hands over [] when the pressed item is clicked again: keep the filter.
           const picked = next[0];
+          if (!picked) return;
           onChange({ kind: picked === "human" || picked === "agent" ? picked : undefined });
         }}
         aria-label="Assigned to"
@@ -240,7 +242,11 @@ export function IssueFilters({
 
       <ToggleGroup
         value={[value.open === "0" ? "all" : "open"]}
-        onValueChange={(next: string[]) => onChange({ open: next[0] === "all" ? "0" : undefined })}
+        onValueChange={(next: string[]) => {
+          const picked = next[0];
+          if (!picked) return;
+          onChange({ open: picked === "all" ? "0" : undefined });
+        }}
         aria-label="Open or closed"
         variant="outline"
         spacing={0}
@@ -254,9 +260,11 @@ export function IssueFilters({
       {showView ? (
         <ToggleGroup
           value={[value.view ?? "list"]}
-          onValueChange={(next: string[]) =>
-            onChange({ view: next[0] === "board" ? "board" : undefined })
-          }
+          onValueChange={(next: string[]) => {
+            const picked = next[0];
+            if (!picked) return;
+            onChange({ view: picked === "board" ? "board" : undefined });
+          }}
           aria-label="View"
           variant="outline"
           spacing={0}

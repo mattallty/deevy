@@ -244,6 +244,19 @@ describe("the board view of the Issues home", () => {
     expect(screen.queryByRole("combobox", { name: "Group by" })).toBeNull();
   });
 
+  it("keeps the Board when its toggle is pressed again", async () => {
+    const router = await mountAt("/?view=board");
+    await screen.findByRole("region", { name: "Intent" });
+    // Base UI hands a single-select group [] on a second click; the view stays.
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
+    await act(async () => {
+      await new Promise((tick) => setTimeout(tick, 0));
+    });
+    expect(router.state.location.search).toMatchObject({ view: "board" });
+    expect(screen.getByRole("region", { name: "Intent" })).toBeTruthy();
+    expect(screen.queryByRole("table", { name: "Issues" })).toBeNull();
+  });
+
   it("folds same-named States into one column across Projects and keeps the Gate ruling on a card", async () => {
     await mountAt("/?view=board");
     const intent = await screen.findByRole("region", { name: "Intent" });

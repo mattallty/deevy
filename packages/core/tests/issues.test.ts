@@ -51,7 +51,7 @@ describe("issues.create", () => {
         kind: "issue.created",
         actorMemberId: admin.member.id,
         projectId: project.id,
-        payload: { key: "DEV-1", title: "Ship it" },
+        payload: { key: "DEV-1", title: "Ship it", state: "Intent" },
       },
     ]);
   });
@@ -127,6 +127,34 @@ describe("issues.list", () => {
     expect(second.nextCursor).toBe(3);
   });
 
+  it("keeps the cursor when q names an Issue by key, so neither overrides the other", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    for (const title of ["One", "Two", "Three"]) {
+      await client.issues.create({ projectKey: "DEV", title });
+    }
+
+    const found = await client.issues.list({ projectKey: "DEV", after: 1, q: "DEV-2" });
+    expect(found.issues.map((issue) => issue.key)).toEqual(["DEV-2"]);
+    const behind = await client.issues.list({ projectKey: "DEV", after: 2, q: "DEV-2" });
+    expect(behind.issues).toEqual([]);
+    expect(behind.nextCursor).toBeNull();
+  });
+
+  it("ignores after without a projectKey, where a number cursor means nothing", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    await client.projects.create({ name: "Operations", key: "OPS" });
+    await client.issues.create({ projectKey: "DEV", title: "One" });
+    await client.issues.create({ projectKey: "OPS", title: "Two" });
+
+    const all = await client.issues.list({ after: 5 });
+    expect(all.issues.map((issue) => issue.key).sort()).toEqual(["DEV-1", "OPS-1"]);
+    expect(all.nextCursor).toBeNull();
+  });
+
   it("filters by State and by Assignee", async () => {
     const { db, close } = testDb();
     closers.push(close);
@@ -167,6 +195,9 @@ describe("issues.list across the Workspace", () => {
     await client.projects.create({ name: "Operations", key: "OPS" });
     await client.issues.create({ projectKey: "DEV", title: "First" });
     const later = await client.issues.create({ projectKey: "OPS", title: "Second" });
+    // updatedAt has millisecond resolution, and the feed sorts by it: the
+    // touch must land in a later millisecond than the creation above.
+    await new Promise((resolve) => setTimeout(resolve, 5));
     await client.issues.update({ key: "DEV-1", title: "First, touched" });
 
     const all = await client.issues.list({});
@@ -191,6 +222,23 @@ describe("issues.list across the Workspace", () => {
     expect(await keys("the")).toEqual(["DEV-1", "OPS-1"]);
     expect(await keys("nothing here")).toEqual([]);
     expect(await keys("ZZZ-9")).toEqual([]);
+  });
+
+  it("takes % and _ in q literally, rather than as LIKE's wildcards", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    await client.issues.create({ projectKey: "DEV", title: "Move 100% of traffic" });
+    await client.issues.create({ projectKey: "DEV", title: "Move 1000 users" });
+    await client.issues.create({ projectKey: "DEV", title: "snake_case names" });
+    await client.issues.create({ projectKey: "DEV", title: "snakeXcase names" });
+    await client.issues.create({ projectKey: "DEV", title: "A C:\\path\\to it" });
+
+    const titles = async (q: string) =>
+      (await client.issues.list({ q })).issues.map((issue) => issue.title).sort();
+    expect(await titles("100%")).toEqual(["Move 100% of traffic"]);
+    expect(await titles("snake_case")).toEqual(["snake_case names"]);
+    expect(await titles("\\path")).toEqual(["A C:\\path\\to it"]);
   });
 
   it("shows an Agent only the Projects it was granted", async () => {

@@ -104,7 +104,7 @@ describe("the comment thread", () => {
   it("posts what was typed", async () => {
     await mountAt("/issues/DEV-1");
 
-    fireEvent.change(await screen.findByLabelText("Comment"), {
+    fireEvent.change(await screen.findByLabelText("Comment", { selector: "textarea" }), {
       target: { value: "ping @ada" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
@@ -119,7 +119,11 @@ describe("the comment thread", () => {
   it("suggests Members and Teams after an @", async () => {
     await mountAt("/issues/DEV-1");
 
-    fireEvent.change(await screen.findByLabelText("Comment"), { target: { value: "hi @a" } });
+    // The Source view's own suggestions; the rich view has Tiptap's.
+    fireEvent.click(await screen.findByRole("tab", { name: "Source" }));
+    fireEvent.change(screen.getByLabelText("Comment", { selector: "textarea" }), {
+      target: { value: "hi @a" },
+    });
 
     const suggestions = await screen.findByRole("listbox", { name: "Mentions" });
     expect(within(suggestions).getByText("@ada")).toBeTruthy();

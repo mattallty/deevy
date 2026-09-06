@@ -58,7 +58,12 @@ export const gates = {
       });
       // Whatever Run stopped at this Gate carries on now, the way a Human's
       // answer un-blocks an elicitation (docs/plans/m2.md).
-      await resumeGateRuns(context, issue, from.id);
+      await resumeGateRuns(context, issue, {
+        stateId: from.id,
+        state: from.name,
+        ruling: "approved",
+        note: input.note,
+      });
       await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },
@@ -103,7 +108,12 @@ export const gates = {
       });
       // A rejection un-blocks the Run that asked just as an approval does: it
       // is a decision, and the Agent needs to hear it (docs/plans/m2.md).
-      await resumeGateRuns(context, issue, from.id);
+      await resumeGateRuns(context, issue, {
+        stateId: from.id,
+        state: from.name,
+        ruling: "rejected",
+        note: input.note,
+      });
       await openStateDocument(context, issue.id, project.id, to);
       return loadIssue(context, issue.id);
     },

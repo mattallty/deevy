@@ -73,6 +73,10 @@ const stub = vi.hoisted(() => ({
     },
   ],
   saved: [] as Array<Record<string, unknown>>,
+  /** How long `workflow.get` takes to answer, so a refetch can land after a save. */
+  getDelayMs: 0,
+  /** When set, a save is what `workflow.get` serves from then on, as the server would. */
+  remembers: false,
 }));
 
 vi.mock("../src/lib/orpc.ts", async () => {
@@ -82,10 +86,23 @@ vi.mock("../src/lib/orpc.ts", async () => {
     agents: { list: async () => ({ agents: stub.agents }) },
     members: { list: async () => ({ members: stub.members }) },
     workflow: {
-      get: async () => ({ states: stub.states }),
-      update: async (input: Record<string, unknown>) => {
-        stub.saved.push(input);
+      get: async () => {
+        if (stub.getDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, stub.getDelayMs));
+        }
         return { states: stub.states };
+      },
+      // The server answers with the Workflow as saved.
+      update: async (input: { states: Array<Record<string, unknown>> }) => {
+        stub.saved.push(input);
+        const states = input.states.map((state, index) => ({
+          ...stub.states.find((known) => known.id === state.id),
+          ...state,
+          id: (state.id as string | undefined) ?? `new-${String(index)}`,
+          position: index,
+        })) as typeof stub.states;
+        if (stub.remembers) stub.states = states;
+        return { states };
       },
     },
   });
@@ -221,5 +238,36 @@ describe("the order and the template", () => {
       { name: "Plan" },
       { name: "Build", documentName: "plan", documentTemplate: "## Steps" },
     ]);
+  });
+});
+
+describe("saving", () => {
+  it("keeps a renamed State after Save while the refetch is still on its way", async () => {
+    stub.saved.length = 0;
+    const before = stub.states;
+    stub.getDelayMs = 30;
+    stub.remembers = true;
+    try {
+      mount();
+      const intent = await open("Intent");
+      fireEvent.change(within(intent).getByLabelText("Name"), { target: { value: "Backlog" } });
+      expect(screen.getByText(/1 unsaved change/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
+      await waitFor(() => expect(stub.saved).toHaveLength(1));
+
+      // The draft is what was saved, not what the stale query still holds.
+      await waitFor(() => expect(screen.getByText("No changes")).toBeTruthy());
+      const rows = await states();
+      expect(rows[0]?.textContent).toContain("Backlog");
+      expect(screen.queryByLabelText("unsaved")).toBeNull();
+      // And still so once the refetch has landed.
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(screen.getByText("No changes")).toBeTruthy();
+      expect((await states())[0]?.textContent).toContain("Backlog");
+    } finally {
+      stub.states = before;
+      stub.getDelayMs = 0;
+      stub.remembers = false;
+    }
   });
 });

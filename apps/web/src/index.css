@@ -59,9 +59,7 @@
   --sidebar-border: oklch(0.8717 0.0093 258.3382);
 
   --human: oklch(0.6 0.13 225);
-  --human-foreground: var(--background);
   --agent: oklch(0.6 0.17 345);
-  --agent-foreground: var(--background);
   --gate: oklch(0.72 0.15 80);
   --gate-foreground: var(--foreground);
   --state-backlog: oklch(0.62 0.02 265);
@@ -96,9 +94,7 @@
   --sidebar-border: oklch(0.4461 0.0263 256.8018);
 
   --human: oklch(0.76 0.12 225);
-  --human-foreground: var(--background);
   --agent: oklch(0.76 0.14 345);
-  --agent-foreground: var(--background);
   --gate: oklch(0.82 0.14 85);
   --gate-foreground: var(--background);
   --state-backlog: oklch(0.6 0.02 265);
@@ -145,9 +141,7 @@
   --color-sidebar-border: var(--sidebar-border);
 
   --color-human: var(--human);
-  --color-human-foreground: var(--human-foreground);
   --color-agent: var(--agent);
-  --color-agent-foreground: var(--agent-foreground);
   --color-gate: var(--gate);
   --color-gate-foreground: var(--gate-foreground);
   --color-state-backlog: var(--state-backlog);

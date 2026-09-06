@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNowStrict } from "date-fns";
 import { useMemo, useState } from "react";
 import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
@@ -20,23 +19,14 @@ import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
 import { categoryOrder, foldStates } from "@/lib/states";
 import { useShortcut } from "@/lib/shortcuts";
+import { ago } from "@/lib/time";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
 >["issues"][number];
 
-/** Relative, short: "3d", "2h", "just now". */
-function ago(value: Date | string): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  const seconds = (Date.now() - date.getTime()) / 1000;
-  if (seconds < 60) return "just now";
-  return formatDistanceToNowStrict(date, { addSuffix: false })
-    .replace(/ minutes?/, "m")
-    .replace(/ hours?/, "h")
-    .replace(/ days?/, "d")
-    .replace(/ months?/, "mo")
-    .replace(/ years?/, "y");
-}
+/** On the Workspace board a column is a State name, folded across Projects. */
+const byStateName = (issue: BoardIssue) => issue.state.name;
 
 /**
  * The home screen: every Issue you may see, filtered by the URL, grouped by
@@ -221,8 +211,7 @@ export function IssuesPage({
     return columns;
   }, [folded, rows]);
   const boardValue = useMemo(
-    () =>
-      groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], (issue) => issue.state.name),
+    () => groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], byStateName),
     [boardColumns, rows],
   );
 
@@ -298,77 +287,82 @@ export function IssuesPage({
   useShortcut("o", () => selected && openFull(selected));
   useShortcut("escape", () => setSelected(null));
 
-  const columns: DataColumn<IssueRow>[] = [
-    {
-      id: "key",
-      header: "Key",
-      cell: (row) => <span className="font-mono text-xs text-muted-foreground">{row.key}</span>,
-      sortValue: (row) => row.key,
-      className: "w-24",
-    },
-    {
-      id: "title",
-      header: "Title",
-      cell: (row) => (
-        // Clipped, so long Labels shorten the title instead of painting over the
-        // next column; on a phone the Labels go and the title keeps the cell.
-        <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-          <span className="min-w-0 truncate font-medium">{row.title}</span>
-          {row.labels.slice(0, 2).map((label) => (
-            <LabelBadge key={label.id} label={label} className="hidden shrink-0 sm:inline-flex" />
-          ))}
-          {row.labels.length > 2 ? (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              +{row.labels.length - 2}
-            </span>
-          ) : null}
-        </span>
-      ),
-      sortValue: (row) => row.title,
-      className: "max-w-0 w-full",
-    },
-    ...(grouped
-      ? []
-      : [
-          {
-            id: "state",
-            header: "State",
-            cell: (row: IssueRow) => (
-              <StateBadge
-                state={{
-                  name: row.state.name,
-                  isGate: row.state.isGate,
-                  category: row.state.category as FilterState["category"],
-                }}
-              />
-            ),
-            sortValue: (row: IssueRow) => row.state.name,
-            className: "w-36",
-          },
-        ]),
-    {
-      id: "assignee",
-      header: "Assignee",
-      cell: (row) =>
-        row.assignee ? (
-          <MemberChip member={row.assignee} size="xs" />
-        ) : (
-          <span className="text-xs text-muted-foreground">Unassigned</span>
+  const columns = useMemo<DataColumn<IssueRow>[]>(
+    () => [
+      {
+        id: "key",
+        header: "Key",
+        cell: (row) => <span className="font-mono text-xs text-muted-foreground">{row.key}</span>,
+        sortValue: (row) => row.key,
+        className: "w-24",
+      },
+      {
+        id: "title",
+        header: "Title",
+        cell: (row) => (
+          // Clipped, so long Labels shorten the title instead of painting over the
+          // next column; on a phone the Labels go and the title keeps the cell.
+          <span className="flex min-w-0 items-center gap-2 overflow-hidden">
+            <span className="min-w-0 truncate font-medium">{row.title}</span>
+            {row.labels.slice(0, 2).map((label) => (
+              <LabelBadge key={label.id} label={label} className="hidden shrink-0 sm:inline-flex" />
+            ))}
+            {row.labels.length > 2 ? (
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                +{row.labels.length - 2}
+              </span>
+            ) : null}
+          </span>
         ),
-      sortValue: (row) => row.assignee?.user.name ?? "",
-      className: "w-44",
-    },
-    {
-      id: "updated",
-      header: "Updated",
-      cell: (row) => (
-        <span className="font-mono text-xs text-muted-foreground">{ago(row.updatedAt)}</span>
-      ),
-      sortValue: (row) => new Date(row.updatedAt).getTime(),
-      className: "w-20 text-right",
-      headerClassName: "text-right",
-    },
-  ];
+        sortValue: (row) => row.title,
+        className: "max-w-0 w-full",
+      },
+      ...(grouped
+        ? []
+        : [
+            {
+              id: "state",
+              header: "State",
+              cell: (row: IssueRow) => (
+                <StateBadge
+                  state={{
+                    name: row.state.name,
+                    isGate: row.state.isGate,
+                    category: row.state.category as FilterState["category"],
+                  }}
+                />
+              ),
+              sortValue: (row: IssueRow) => row.state.name,
+              className: "w-36",
+            },
+          ]),
+      {
+        id: "assignee",
+        header: "Assignee",
+        cell: (row) =>
+          row.assignee ? (
+            <MemberChip member={row.assignee} size="xs" />
+          ) : (
+            <span className="text-xs text-muted-foreground">Unassigned</span>
+          ),
+        sortValue: (row) => row.assignee?.user.name ?? "",
+        className: "w-44",
+      },
+      {
+        id: "updated",
+        header: "Updated",
+        cell: (row) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {ago(row.updatedAt, { short: true })}
+          </span>
+        ),
+        sortValue: (row) => new Date(row.updatedAt).getTime(),
+        className: "w-20 text-right",
+        headerClassName: "text-right",
+      },
+    ],
+    [grouped],
+  );
 
   const title =
     search.assignee === "me"
@@ -415,7 +409,7 @@ export function IssuesPage({
         <IssueBoard
           columns={boardColumns}
           issues={rows as unknown as BoardIssue[]}
-          columnOf={(issue) => issue.state.name}
+          columnOf={byStateName}
           loading={issues.isPending}
           selectedKey={selected}
           onSelect={setSelected}

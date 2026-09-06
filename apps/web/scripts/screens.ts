@@ -182,10 +182,23 @@ const browser = spawn(
   ],
   { stdio: "ignore" },
 );
+// Watched from the start: an exit that happens before the finally block is
+// still seen, and a Chrome that cannot be started fails the run instead of
+// hanging it — the cleanup below runs either way.
+const exited = new Promise<void>((done, fail) => {
+  browser.once("exit", () => done());
+  browser.once("error", (error) => fail(new Error(`could not start ${chrome}: ${error.message}`)));
+});
+exited.catch(() => {});
 
 try {
   await mkdir(out, { recursive: true });
-  const page = await Cdp.connect(await waitForChrome());
+  const page = await Promise.race([
+    waitForChrome().then((url) => Cdp.connect(url)),
+    exited.then(() => {
+      throw new Error(`Chrome exited before it answered on port ${port}`);
+    }),
+  ]);
   await page.send("Page.enable");
   await viewport(page, false);
 
@@ -247,8 +260,7 @@ try {
   page.close();
 } finally {
   // Chrome keeps writing its profile until it has exited; remove it after, not during.
-  const exited = new Promise<void>((done) => browser.once("exit", () => done()));
-  browser.kill();
+  if (browser.exitCode === null && browser.signalCode === null) browser.kill();
   await exited;
   await rm(profile, { recursive: true, force: true });
 }

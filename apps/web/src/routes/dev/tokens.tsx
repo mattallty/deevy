@@ -3,7 +3,7 @@ import { RunStatus, runStatusLabels, type RunStatusValue } from "@/components/ru
 import { Shortcut } from "@/components/kbd-hint";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
-import { labelColors } from "@/lib/label-colors";
+import { LABEL_COLORS } from "@/lib/label-colors";
 import { cn } from "@/lib/utils";
 
 const slots = [
@@ -25,7 +25,7 @@ const ada = { id: "a", kind: "human" as const, handle: "ada", user: { name: "Ada
 const planner = { id: "p", kind: "agent" as const, handle: "planner", user: { name: "Planner" } };
 
 function Sheet({ theme }: { theme: "light" | "dark" }) {
-  const swatches = labelColors();
+  const swatches = LABEL_COLORS;
   return (
     <section
       className={cn(theme, "flex flex-col gap-6 bg-background p-6 text-foreground")}

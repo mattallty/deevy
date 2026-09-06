@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, formatDistanceToNowStrict, isToday, isYesterday } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Markdown } from "@/components/markdown";
@@ -21,13 +21,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { describeEvent, type EventText, type EventTone } from "@/lib/event-text";
 import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
+import { ago } from "@/lib/time";
 import { cn } from "@/lib/utils";
-
-function ago(value: Date | string): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Date.now() - date.getTime() < 60_000) return "just now";
-  return formatDistanceToNowStrict(date, { addSuffix: true });
-}
 
 function dayLabel(date: Date): string {
   if (isToday(date)) return "Today";
@@ -118,9 +113,11 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
   const comments = useQuery(orpc.comments.list.queryOptions({ input: { issueKey } }));
   const events = useQuery(
     orpc.events.list.queryOptions({
-      input: { subjectType: "issue", subjectId: issueId, limit: 500 },
+      // Newest first, so a long history keeps its latest 500; the stream re-sorts.
+      input: { subjectType: "issue", subjectId: issueId, limit: 500, order: "desc" },
     }),
   );
+  const eventsTruncated = (events.data?.events.length ?? 0) >= 500;
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
   const mentionables = useMentionables();
@@ -244,6 +241,9 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
         <p className="text-sm text-destructive">Could not load the log: {events.error.message}</p>
       ) : null}
 
+      {eventsTruncated ? (
+        <p className="text-xs text-muted-foreground">Showing the latest changes</p>
+      ) : null}
       {comments.data && events.data ? (
         <Timeline
           value={0}
@@ -429,7 +429,7 @@ function CommentItem({
             </Button>
           )}
         </TimelineTitle>
-        <TimelineIndicator className={dot.human} />
+        <TimelineIndicator className={dot[entry.author?.kind === "agent" ? "agent" : "human"]} />
       </TimelineHeader>
       <TimelineContent className="mt-1 rounded-md border bg-card px-3 py-2 text-sm text-foreground">
         {entry.deleted ? (

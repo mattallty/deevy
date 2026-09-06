@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   CircleUser,
   Copy,
@@ -14,7 +14,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
 import { useNewIssue } from "@/components/new-issue";
 import {
@@ -65,10 +65,14 @@ export function CommandPalette({
 
   // Two characters is a search; one is a shortcut hint being typed.
   const [query, setQuery] = useState("");
-  const searching = query.trim().length >= 2;
+  // The search lags a beat behind the keys, and the last matches stay on
+  // screen while the next ones load, so the list never blinks to "Searching…".
+  const q = useDeferredValue(query.trim());
+  const searching = q.length >= 2;
   const found = useQuery({
-    ...orpc.issues.list.queryOptions({ input: { q: query.trim(), limit: 8 } }),
+    ...orpc.issues.list.queryOptions({ input: { q, limit: 8 } }),
     enabled: open && searching,
+    placeholderData: keepPreviousData,
   });
 
   const close = () => {

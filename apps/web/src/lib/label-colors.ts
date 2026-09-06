@@ -5,7 +5,7 @@
  * primary, done green, destructive red, a slate, a violet. Not a picker: a Label
  * reads beside Humans, Agents and Gates, and must not pass for one of them.
  */
-export const LABEL_COLORS: readonly string[] = [
+export const LABEL_COLORS = [
   "#008fba",
   "#c34e97",
   "#c88b00",
@@ -14,8 +14,4 @@ export const LABEL_COLORS: readonly string[] = [
   "#d73246",
   "#63718f",
   "#8f5fc0",
-];
-
-export function labelColors(): readonly string[] {
-  return LABEL_COLORS;
-}
+] as const;

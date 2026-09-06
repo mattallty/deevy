@@ -11,13 +11,14 @@ export const Slot = React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLEleme
   { children, ...slotProps },
   forwardedRef,
 ) {
-  if (!React.isValidElement(children)) return null;
-  const child = children as React.ReactElement<Record<string, unknown>> & {
-    ref?: React.Ref<HTMLElement>;
-  };
-  const childProps = child.props;
-  const childRef = (childProps.ref as React.Ref<HTMLElement> | undefined) ?? child.ref;
+  // The hook runs on every render, before the guard, as the rules of hooks ask.
+  const child = React.isValidElement(children)
+    ? (children as React.ReactElement<Record<string, unknown>> & { ref?: React.Ref<HTMLElement> })
+    : null;
+  const childProps = child?.props ?? {};
+  const childRef = (childProps.ref as React.Ref<HTMLElement> | undefined) ?? child?.ref;
   const ref = useComposedRefs(forwardedRef, childRef);
+  if (!child) return null;
 
   const merged: Record<string, unknown> = { ...childProps };
   for (const [name, value] of Object.entries(slotProps)) {

@@ -17,8 +17,12 @@ Decided 2026-09-06, after the round-2 UI work; `packages/core/src/ids.ts` is the
 Run · `act` Run activity · `ntf` Notification · `whk` webhook subscription · `dlv` delivery · `chan` Channel
 · `rte` routing rule · `repo` Repository · `alw` allowlist rule. Better Auth's models, through its
 `generateId` hook: `usr`, `ses`, `acct`, `ver`, `key` (the API key row; the secret stays `deevy_sk_…`),
-`jwk`, `oacl`, `oars`, `oaca`. A model the map does not know keeps its model name as prefix, so no id is
-ever bare. Prefixes are at most four characters and are permanent: they are visible to Agents.
+`jwk`, and the oauth-provider plugin's `oacl` client, `oars` resource, `oacr` client-resource link, `oaat`
+access token, `oart` refresh token, `oacs` consent and `oaca` client assertion. The hook is handed the
+camelCase schema key (`oauthClient`, never `oauth_client`), and a model the map does not know is refused
+outright rather than given a made-up prefix: the first row a new plugin writes is when its line gets added.
+`oaca` is reserved but never minted, because the plugin stores a client assertion under its own `jti`.
+Prefixes are at most four characters and are permanent: they are visible to Agents.
 
 ## Consequences
 

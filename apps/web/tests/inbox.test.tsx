@@ -60,6 +60,8 @@ const stub = vi.hoisted(() => ({
   ],
   read: [] as unknown[],
   allRead: 0,
+  /** When set, a markRead also flips readAt, as the server's list would show it. */
+  persistReads: false,
 }));
 
 vi.mock("../src/lib/orpc.ts", async () => {
@@ -93,10 +95,20 @@ vi.mock("../src/lib/orpc.ts", async () => {
       }),
     },
     inbox: {
-      list: async () => ({ notifications: stub.notifications, nextCursor: 7 }),
+      // Fresh rows each time: a row marked read in place would look unchanged
+      // to the query's structural sharing, and the list would not re-render.
+      list: async () => ({
+        notifications: stub.notifications.map((row) => ({ ...row })),
+        nextCursor: 7,
+      }),
       unreadCount: async () => ({ unread: 2 }),
-      markRead: async (input: unknown) => {
+      markRead: async (input: { ids: string[] }) => {
         stub.read.push(input);
+        if (stub.persistReads) {
+          for (const row of stub.notifications) {
+            if (input.ids.includes(row.id)) row.readAt = new Date();
+          }
+        }
         return { read: 1 };
       },
       markAllRead: async () => {
@@ -194,6 +206,34 @@ describe("the inbox", () => {
     const list = await screen.findByRole("list", { name: "Notifications" });
     // n2 is read, so two rows stay.
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("under Unread, j from the row just opened goes to the next unread one, not the first", async () => {
+    // A fourth, unread, after the Gate one: opening n3 marks it read and drops
+    // it from the list, and j must still land on n4 rather than start over at n1.
+    const n1 = stub.notifications[0]!;
+    const n3 = stub.notifications[2]!;
+    stub.notifications.push({ ...n1, id: "n4", eventId: 6 });
+    stub.persistReads = true;
+    try {
+      await mountAt("/inbox?unread=1");
+      const list = await screen.findByRole("list", { name: "Notifications" });
+      expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+
+      const reads = stub.read.length;
+      fireEvent.click(within(list).getByText("rejected the Spec Gate"));
+      await waitFor(() => expect(stub.read).toHaveLength(reads + 1));
+      // Read now, so gone from the filtered list.
+      await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(2));
+
+      fireEvent.keyDown(document.body, { key: "j" });
+      await waitFor(() => expect(stub.read.at(-1)).toEqual({ ids: ["n4"] }));
+      expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    } finally {
+      stub.persistReads = false;
+      stub.notifications.pop();
+      n3.readAt = null;
+    }
   });
 });
 

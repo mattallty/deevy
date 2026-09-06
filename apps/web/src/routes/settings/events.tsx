@@ -74,6 +74,7 @@ export function EventLogPage() {
         order: "desc",
         limit: PAGE,
         ...(before === null ? {} : { before }),
+        ...(kindPrefix !== ANY ? { kindPrefix } : {}),
         ...(subjectType !== ANY ? { subjectType } : {}),
         ...(projectId !== ANY ? { projectId } : {}),
       },
@@ -101,102 +102,101 @@ export function EventLogPage() {
     [projects.data],
   );
 
-  const rows = useMemo(() => {
-    const all = (events.data?.events ?? []) as EventRow[];
-    return kindPrefix !== ANY
-      ? all.filter((event) => event.kind.startsWith(`${kindPrefix}.`))
-      : all;
-  }, [events.data, kindPrefix]);
+  // Every filter is the server's, so a page is always a full page of matches.
+  const rows = (events.data?.events ?? []) as EventRow[];
 
-  const columns: DataColumn<EventRow>[] = [
-    {
-      id: "seq",
-      header: "Seq",
-      cell: (row) => <span className="font-mono text-xs text-muted-foreground">{row.seq}</span>,
-      className: "w-16",
-    },
-    {
-      id: "time",
-      header: "When",
-      cell: (row) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {new Date(row.createdAt).toLocaleString()}
-        </span>
-      ),
-      className: "w-44",
-    },
-    {
-      id: "kind",
-      header: "Kind",
-      cell: (row) => (
-        <Badge variant="outline" className={cn("font-mono font-normal", kindClass(row.kind))}>
-          {row.kind}
-        </Badge>
-      ),
-      className: "w-48",
-    },
-    {
-      id: "actor",
-      header: "Actor",
-      cell: (row) => {
-        const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
-        return actor ? (
-          <MemberChip member={actor} size="xs" />
-        ) : (
-          <span className="text-xs text-muted-foreground">deevy</span>
-        );
+  const columns = useMemo<DataColumn<EventRow>[]>(
+    () => [
+      {
+        id: "seq",
+        header: "Seq",
+        cell: (row) => <span className="font-mono text-xs text-muted-foreground">{row.seq}</span>,
+        className: "w-16",
       },
-      className: "w-44",
-    },
-    {
-      id: "what",
-      header: "What",
-      cell: (row) => {
-        const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
-        const said = describeEvent(
-          { kind: row.kind, payload: row.payload, actorKind: actor?.kind ?? null },
-          {
-            memberName: (id) => memberById.get(id)?.user.name,
-            labelName: (id) => labelById.get(id),
-          },
-        );
-        if (!said) return <span className="text-xs text-muted-foreground">a Run step</span>;
-        return (
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-sm">{said.text}</span>
-            {said.detail ? (
-              <span className="truncate text-xs text-muted-foreground">“{said.detail}”</span>
-            ) : null}
+      {
+        id: "time",
+        header: "When",
+        cell: (row) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {new Date(row.createdAt).toLocaleString()}
           </span>
-        );
+        ),
+        className: "w-44",
       },
-      className: "max-w-0 w-full",
-    },
-    {
-      id: "subject",
-      header: "Subject",
-      cell: (row) => {
-        const project = row.projectId ? projectById.get(row.projectId) : undefined;
-        return (
-          <span className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">{row.subjectType}</span>
-            {project ? <span className="font-mono">{project.key}</span> : null}
-            {row.subjectType === "project" && project ? (
-              <Link
-                to="/projects/$key"
-                params={{ key: project.key }}
-                className="hover:underline"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {project.name}
-              </Link>
-            ) : null}
-          </span>
-        );
+      {
+        id: "kind",
+        header: "Kind",
+        cell: (row) => (
+          <Badge variant="outline" className={cn("font-mono font-normal", kindClass(row.kind))}>
+            {row.kind}
+          </Badge>
+        ),
+        className: "w-48",
       },
-      className: "w-56",
-    },
-  ];
+      {
+        id: "actor",
+        header: "Actor",
+        cell: (row) => {
+          const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
+          return actor ? (
+            <MemberChip member={actor} size="xs" />
+          ) : (
+            <span className="text-xs text-muted-foreground">deevy</span>
+          );
+        },
+        className: "w-44",
+      },
+      {
+        id: "what",
+        header: "What",
+        cell: (row) => {
+          const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
+          const said = describeEvent(
+            { kind: row.kind, payload: row.payload, actorKind: actor?.kind ?? null },
+            {
+              memberName: (id) => memberById.get(id)?.user.name,
+              labelName: (id) => labelById.get(id),
+            },
+          );
+          if (!said) return <span className="text-xs text-muted-foreground">a Run step</span>;
+          return (
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-sm">{said.text}</span>
+              {said.detail ? (
+                <span className="truncate text-xs text-muted-foreground">“{said.detail}”</span>
+              ) : null}
+            </span>
+          );
+        },
+        className: "max-w-0 w-full",
+      },
+      {
+        id: "subject",
+        header: "Subject",
+        cell: (row) => {
+          const project = row.projectId ? projectById.get(row.projectId) : undefined;
+          return (
+            <span className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">{row.subjectType}</span>
+              {project ? <span className="font-mono">{project.key}</span> : null}
+              {row.subjectType === "project" && project ? (
+                <Link
+                  to="/projects/$key"
+                  params={{ key: project.key }}
+                  className="hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {project.name}
+                </Link>
+              ) : null}
+            </span>
+          );
+        },
+        className: "w-56",
+      },
+    ],
+    [memberById, labelById, projectById],
+  );
 
   return (
     <SettingsPage
@@ -204,7 +204,14 @@ export function EventLogPage() {
       description="Every change in this Workspace, newest first: who did what, to which Issue or Project, and when. The Activity, the live stream and the inbox all derive from this; a row opens its raw payload."
     >
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
-        <Select value={kindPrefix} onValueChange={(next) => next !== null && setKindPrefix(next)}>
+        <Select
+          value={kindPrefix}
+          onValueChange={(next) => {
+            if (next === null) return;
+            setKindPrefix(next);
+            setBefore(null);
+          }}
+        >
           <SelectTrigger aria-label="Kind" className="w-44">
             <SelectValue>
               {(selected: string) => (selected === ANY ? "Every kind" : `${selected}.*`)}

@@ -4,7 +4,7 @@ import { Shortcut, keyLabel } from "../src/components/kbd-hint.tsx";
 import { MemberChip } from "../src/components/member-chip.tsx";
 import { RunStatus } from "../src/components/run-status.tsx";
 import { StateBadge } from "../src/components/state-badge.tsx";
-import { currentScope, useShortcut, useShortcutScope } from "../src/lib/shortcuts.ts";
+import { activeScope, useShortcut, useShortcutScope } from "../src/lib/shortcuts.ts";
 
 /**
  * The leaf components every screen is built from (docs/plans/ui-redesign.md).
@@ -123,11 +123,11 @@ describe("shortcuts", () => {
         <Sheet />
       </>,
     );
-    expect(currentScope()).toBe("sheet");
+    expect(activeScope()).toBe("sheet");
     fireEvent.keyDown(document.body, { key: "a" });
     expect(sheetLetter).toHaveBeenCalledTimes(1);
     expect(pageLetter).not.toHaveBeenCalled();
     unmount();
-    expect(currentScope()).toBe("page");
+    expect(activeScope()).toBe("page");
   });
 });

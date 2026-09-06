@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNowStrict } from "date-fns";
 import {
   AtSign,
   Bot,
@@ -13,7 +12,8 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMaxWidth } from "@/hooks/use-max-width";
 import { Shortcut } from "@/components/kbd-hint";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
@@ -33,6 +33,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { describeNotification, type NotificationTone } from "@/lib/notification-text";
 import { orpc } from "@/lib/orpc";
 import { useShortcut } from "@/lib/shortcuts";
+import { ago } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { IssuePage } from "@/routes/issues/issue";
 
@@ -69,25 +70,6 @@ const toneClass: Record<NotificationTone, string> = {
   destructive: "text-destructive",
 };
 
-function ago(value: Date | string): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  if (Date.now() - date.getTime() < 60_000) return "just now";
-  return formatDistanceToNowStrict(date, { addSuffix: true });
-}
-
-/** Whether the window is too narrow for two panes; the preview is a peek then. */
-function useNarrow(breakpoint = 1024): boolean {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia(`(max-width: ${String(breakpoint - 1)}px)`);
-    const update = () => setNarrow(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, [breakpoint]);
-  return narrow;
-}
-
 /**
  * What needs you, and the Issue it is about, side by side (docs/plans/
  * ui-redesign.md slice 6). Selecting a Notification opens its Issue in the
@@ -106,7 +88,8 @@ export function InboxPage({
 }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const narrow = useNarrow();
+  // Too narrow for two panes below 1024px; the preview is a peek then.
+  const narrow = useMaxWidth(1024);
   const inbox = useQuery(orpc.inbox.list.queryOptions({ input: {} }));
   const refresh = () => queryClient.invalidateQueries({ queryKey: orpc.inbox.key() });
   const markRead = useMutation(orpc.inbox.markRead.mutationOptions({ onSuccess: refresh }));
@@ -140,6 +123,22 @@ export function InboxPage({
   const move = (delta: number) => {
     if (flat.length === 0) return;
     const index = selected ? flat.findIndex((row) => row.id === selected.id) : -1;
+    if (index === -1 && selected) {
+      // Under the Unread filter the row just opened has left the list (opening
+      // marks it read), so it is placed by where it sits among all of them:
+      // `j` goes to the next unread after it, `k` to the last one before it.
+      const anchor = all.findIndex((row) => row.id === selected.id);
+      if (anchor !== -1) {
+        const position = new Map(all.map((row, at) => [row.id, at]));
+        const candidates = flat.filter((row) => {
+          const at = position.get(row.id) ?? -1;
+          return delta > 0 ? at > anchor : at < anchor;
+        });
+        const next = delta > 0 ? candidates[0] : candidates[candidates.length - 1];
+        if (next) open(next.id);
+        return;
+      }
+    }
     const next = flat[Math.min(flat.length - 1, Math.max(0, index + delta))];
     if (next) open(next.id);
   };

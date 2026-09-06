@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { LabelBadge } from "@/components/label-badge";
 import { SettingsPage } from "@/components/settings-page";
-import { labelColors } from "@/lib/label-colors";
+import { LABEL_COLORS } from "@/lib/label-colors";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +34,8 @@ export function LabelsPage() {
 
   const [scope, setScope] = useState("");
   const [name, setName] = useState("");
-  const colors = labelColors();
-  const [color, setColor] = useState(colors[0] ?? "#4f46e5");
+  const colors = LABEL_COLORS;
+  const [color, setColor] = useState<string>(colors[0]);
 
   const create = useMutation(
     orpc.labels.create.mutationOptions({

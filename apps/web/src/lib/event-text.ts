@@ -39,6 +39,8 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
       ? (event.payload as Record<string, unknown>)
       : {};
   const agentTone: EventTone = event.actorKind === "agent" ? "agent" : "muted";
+  // Something said in a voice: an Agent's rose, a Human's blue.
+  const byActor: EventTone = event.actorKind === "agent" ? "agent" : "human";
   const say = (
     text: string,
     detail: string | null = null,
@@ -158,7 +160,11 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
       return null; // The Run card shows its Activities; the stream would only repeat them.
     case "run.awaiting_input":
       return p.gateStateId
-        ? say("is waiting at a Gate", null, "gate")
+        ? say(
+            str(p.state) ? `is waiting at the ${str(p.state) ?? ""} Gate` : "is waiting at a Gate",
+            null,
+            "gate",
+          )
         : say("is waiting on a Human", str(p.question), "agent");
     case "run.answered":
       return say("answered the Run", null, "human");
@@ -169,11 +175,11 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
     case "run.went_stale":
       return say("went quiet", null, "muted");
     case "comment.created":
-      return say("commented", null, "human");
+      return say("commented", null, byActor);
     case "comment.edited":
-      return say("edited a comment", null, "human");
+      return say("edited a comment", null, byActor);
     case "comment.deleted":
-      return say("withdrew a comment", null, "human");
+      return say("withdrew a comment", null, byActor);
     case "member.joined":
       return say(`joined as ${str(p.role) ?? "a member"}`, null, "human");
     case "member.role_changed":

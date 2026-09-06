@@ -93,7 +93,8 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   );
 
   useShortcut("mod+k", () => setPaletteOpen((open) => !open), { global: true });
-  useShortcut("?", () => setShortcutsOpen((open) => !open));
+  // Global, so `?` closes the sheet too: while open it owns the shortcut scope.
+  useShortcut("?", () => setShortcutsOpen((open) => !open), { global: true });
   useShortcut("g i", () => void navigate({ to: "/inbox" }));
   useShortcut("g m", () => void navigate({ to: "/", search: { assignee: "me" } }));
   useShortcut("g a", () => void navigate({ to: "/", search: {} }));

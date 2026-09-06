@@ -5,8 +5,8 @@
  * Humans sign in through the GitHub stub (apps/web/scripts/stub-github.js), so
  * the admin this creates is the one `DEEVY_DEV_STUB_GITHUB=1` signs in as
  * afterwards; Agents get their identity from `agents.create` and their key from
- * Better Auth; and every Issue, Document, comment, Run and Gate ruling is an
- * operation call, so the Event log, the inbox and the Run states fill
+ * `agents.keys.issue`; and every Issue, Document, comment, Run and Gate ruling
+ * is an operation call, so the Event log, the inbox and the Run states fill
  * themselves the way they do in production. Nothing is inserted by hand.
  *
  *   vp run server#seed            # refuses a database that already has a Project
@@ -147,9 +147,9 @@ async function agent(name: string, projectIds: string[]) {
   for (const projectId of projectIds) {
     await admin.api.agents.grants.add({ memberId: created.id, projectId });
   }
-  const issued = await auth.api.createApiKey({
-    body: { userId: created.user.id, name: "seed" },
-  });
+  // Through the operation, so `agent.key_issued` is in the log like every
+  // other key an admin ever issued.
+  const issued = await admin.api.agents.keys.issue({ memberId: created.id, name: "seed" });
   return { created, key: issued.key, ...(await asAgent(issued.key)) };
 }
 
@@ -228,6 +228,39 @@ async function issue(projectKey: "DEV" | "OPS", seed: Seed) {
   }
   return created;
 }
+
+/** The Run the assignment trigger opened for this Agent on this Issue. */
+async function ownRun(who: typeof planner, issueKey: string) {
+  const { runs } = await who.api.runs.list({ issueKey });
+  const found = runs.find((run) => run.agentMemberId === who.member.id);
+  if (!found) throw new Error(`no Run for ${who.member.handle ?? "agent"} on ${issueKey}`);
+  return found;
+}
+
+// Gone quiet: an Agent that started and never came back. This is the first
+// Issue an Agent is assigned, and it is swept with no grace before any other
+// Run exists, because the broom cannot tell one silent Run from another:
+// every assignment below would open a pending Run it would sweep too. The
+// sweep's clock is one millisecond ahead, since a Run is due strictly before
+// the cutoff and the Activity above may share its millisecond.
+const quiet = await issue("DEV", {
+  title: "Prune the shadcn components nobody imports",
+  labels: [frontend.id, low.id],
+  to: "Build",
+  assignee: builder.member.id,
+});
+const quietRun = await ownRun(builder, quiet.key);
+await builder.api.runs.postActivity({
+  runId: quietRun.id,
+  kind: "thought",
+  body: "Listing every file under components/ui and grepping for its import.",
+});
+await sweepStaleRuns({
+  db,
+  workspaceId: admin.member.workspaceId,
+  silenceMs: 0,
+  now: new Date(Date.now() + 1),
+});
 
 // The epic, and its children.
 const epic = await issue("DEV", {
@@ -426,30 +459,6 @@ await grace.api.comments.create({
 });
 
 // --------------------------------------------------------------------- runs
-
-/** The Run the assignment trigger opened for this Agent on this Issue. */
-async function ownRun(who: typeof planner, issueKey: string) {
-  const { runs } = await who.api.runs.list({ issueKey });
-  const found = runs.find((run) => run.agentMemberId === who.member.id);
-  if (!found) throw new Error(`no Run for ${who.member.handle ?? "agent"} on ${issueKey}`);
-  return found;
-}
-
-// Gone quiet: an Agent that started and never came back. Swept first, with no
-// grace, so nothing that follows is caught by the same broom.
-const quiet = await issue("DEV", {
-  title: "Prune the shadcn components nobody imports",
-  labels: [frontend.id, low.id],
-  to: "Build",
-  assignee: builder.member.id,
-});
-const quietRun = await ownRun(builder, quiet.key);
-await builder.api.runs.postActivity({
-  runId: quietRun.id,
-  kind: "thought",
-  body: "Listing every file under components/ui and grepping for its import.",
-});
-await sweepStaleRuns({ db, workspaceId: admin.member.workspaceId, silenceMs: 0 });
 
 // Waiting on a Human's answer.
 const asking = await issue("DEV", {
