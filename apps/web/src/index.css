@@ -1,5 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* The custom variants the ui/ kit is written against (data-horizontal, data-open, data-checked…): the
+   base-mira style imports it, and without it those variants match nothing and the kit degrades quietly. */
+@import "shadcn/tailwind.css";
 /* Self-hosted: a self-hosted AGPL app does not phone Google for its typeface. */
 @import "@fontsource-variable/inter/wght.css";
 @import "@fontsource-variable/jetbrains-mono/wght.css";

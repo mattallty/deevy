@@ -140,6 +140,14 @@ string` erases the literal and every typed `to` in the app stops compiling.
   and Project pages render when the API says `NOT_FOUND` (`isNotFound`, which the QueryClient also uses to
   skip retries): inside the shell, `h1` "There is nothing here" or "There is no Issue DEV-999", the path or
   the API's message, then Go back / All Issues / Inbox.
+- **Grouped buttons.** shadcn's rule: `ToggleGroup` for buttons that toggle a state (Inbox All/Unread, the
+  filter bar's Any/Humans/Agents, Open/All, List/Board, Activity All/Comments/Changes), `ButtonGroup` for
+  buttons that perform actions (a State's Move up/down in the Workflow editor); `Tabs` for views of one
+  thing (Documents, the editor's Edit/Source). Joined ToggleGroups are `variant="outline" spacing={0}`.
+  Their corners, and half the kit's `data-horizontal:`/`data-open:`/`data-checked:` styling, depend on
+  `@import "shadcn/tailwind.css"` in `index.css` (the `shadcn` package is in the catalog for that one
+  stylesheet), as the base-mira style prescribes. Without it those variants match nothing and the kit
+  silently degrades (square toggle corners, Tabs in a row) — which is how it shipped until 2026-09-06.
 - **Base UI menus.** A `DropdownMenuLabel` must sit inside a `DropdownMenuGroup` (or a radio group) or the
   menu throws the moment it opens. Make a menu's trigger the DOM button itself (`DropdownMenuTrigger
 className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}`: a `tooltip` there turns

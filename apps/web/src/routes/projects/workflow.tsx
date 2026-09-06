@@ -12,6 +12,7 @@ import { ApproversPicker } from "@/components/approvers-picker";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -208,26 +209,29 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
               <StateBadge state={current} size="md" />
               <span className="font-mono text-xs text-muted-foreground">Step {at + 1}</span>
               <span className="flex-1" />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Move ${current.name} up`}
-                disabled={at <= 0}
-                onClick={() => swap(at, at - 1)}
-              >
-                <ArrowUp />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Move ${current.name} down`}
-                disabled={at >= draft.length - 1}
-                onClick={() => swap(at, at + 1)}
-              >
-                <ArrowDown />
-              </Button>
+              {/* Two actions on one thing, joined (shadcn: ButtonGroup for actions, ToggleGroup for state). */}
+              <ButtonGroup aria-label={`Reorder ${current.name}`}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Move ${current.name} up`}
+                  disabled={at <= 0}
+                  onClick={() => swap(at, at - 1)}
+                >
+                  <ArrowUp />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Move ${current.name} down`}
+                  disabled={at >= draft.length - 1}
+                  onClick={() => swap(at, at + 1)}
+                >
+                  <ArrowDown />
+                </Button>
+              </ButtonGroup>
               <Button
                 type="button"
                 variant="ghost"
