@@ -10,9 +10,25 @@ Published to `ghcr.io/mattallty/deevy` on every `v*` tag, for `linux/amd64` and 
 version (`v0.4.0`) and `latest`. The image carries the bundled Node server, the migrations, and the built SPA;
 it runs the SPA and the API on one port, so there is no separate web container.
 
-**The package is public**, inheriting the repository's visibility, so pulling it needs no account and no
-`docker login`. Building from source produces the same image — the release workflow runs exactly this
-command:
+**Check which of the two packages is public before telling anybody to pull one.** A package's visibility is
+set on the package, and making the repository public does not necessarily change one that already existed: as
+of v0.4.1 an anonymous pull of `ghcr.io/mattallty/deevy-agent` succeeds and the same pull of
+`ghcr.io/mattallty/deevy` is refused with a 403. While a package is private, pulling it needs
+`docker login ghcr.io` with a token carrying `read:packages`, and the failure is an unexplained
+`unauthorized`. To change it: the package's page → Package settings → Change visibility.
+
+What a stranger gets is worth checking directly rather than inferring, and needs no account:
+
+```bash
+img=deevy   # or deevy-agent
+token=$(curl -s "https://ghcr.io/token?scope=repository:mattallty/$img:pull" | jq -r .token)
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $token" \
+  -H 'Accept: application/vnd.oci.image.index.v1+json' \
+  "https://ghcr.io/v2/mattallty/$img/manifests/latest"   # 200 public, 403 private
+```
+
+Building from source needs no account either way and produces the same image — the release workflow runs
+exactly this command:
 
 ```bash
 docker build -f apps/server/Dockerfile -t deevy:local .
@@ -26,7 +42,7 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
-  deevy:local   # or ghcr.io/mattallty/deevy:latest
+  deevy:local   # or ghcr.io/mattallty/deevy:latest, if that package is public
 ```
 
 ## Cutting a release
