@@ -119,7 +119,8 @@ only submit key. `src/lib/shortcuts.ts` owns a scope stack: an open Sheet, Dialo
 
 - **Sizes live in `components/ui`.** shadcn's `base-mira` is the compact style — 12px controls, 10px badges
   and kbd, 28px buttons. deevy resizes those files (button, input, textarea, native-select, select, label,
-  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights; the
+  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights, and
+  strips `avatar`'s inner `after:` border, since the kind ring (`MemberChip`) is the avatar's one edge; the
   root stays 16px so 1rem is 16px everywhere. Scale: `text-xs` 12px for meta and badges, `text-sm` 14px for
   everything a person operates or reads in a row, `text-base` 16px for prose, `text-xl` 20px for a page
   title. A `shadcn add --overwrite` of one of those files brings the compact sizes back — re-apply them.
