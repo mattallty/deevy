@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -121,26 +122,30 @@ export function AppBreadcrumb() {
       <BreadcrumbList className="flex-nowrap">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
+          // The separator is an <li> of its own, a sibling of the item: shadcn's
+          // shape, and the only one HTML allows (an <li> may not hold an <li>).
           return (
-            <BreadcrumbItem key={`${crumb.label}-${String(index)}`} className="min-w-0">
+            <Fragment key={`${crumb.label}-${String(index)}`}>
               {index > 0 ? <BreadcrumbSeparator /> : null}
-              {last || !crumb.to ? (
-                <BreadcrumbPage className="truncate">{crumb.label}</BreadcrumbPage>
-              ) : (
-                <BreadcrumbLink
-                  className="truncate"
-                  render={
-                    <Link
-                      to={crumb.to as "/"}
-                      {...(crumb.params ? { params: crumb.params as never } : {})}
-                      {...(crumb.search ? { search: crumb.search as never } : {})}
-                    />
-                  }
-                >
-                  {crumb.label}
-                </BreadcrumbLink>
-              )}
-            </BreadcrumbItem>
+              <BreadcrumbItem className="min-w-0">
+                {last || !crumb.to ? (
+                  <BreadcrumbPage className="truncate">{crumb.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink
+                    className="truncate"
+                    render={
+                      <Link
+                        to={crumb.to as "/"}
+                        {...(crumb.params ? { params: crumb.params as never } : {})}
+                        {...(crumb.search ? { search: crumb.search as never } : {})}
+                      />
+                    }
+                  >
+                    {crumb.label}
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+            </Fragment>
           );
         })}
       </BreadcrumbList>
