@@ -1,5 +1,9 @@
 # The reference runtime is a service, not a CI job
 
+> The second decision here, the Agent SDK over the `claude` CLI, is superseded by
+> [ADR-0018](./0018-a-harness-is-a-cli-behind-the-session-seam.md); the first stands. The package has since
+> moved to `apps/agent`.
+
 [PLAN.md](../PLAN.md)'s M4 sentence promised "Claude Code headless in a GitHub Action and as a local loop".
 M4 shipped the loop, a container, and no Action. This records why, and what it costs, so the plan's sentence
 is not read as the design.

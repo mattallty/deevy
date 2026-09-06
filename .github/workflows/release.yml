@@ -70,9 +70,25 @@ jobs:
           - key: server
             suffix: ""
             dockerfile: apps/server/Dockerfile
-          - key: agent
+            build_args: ""
+          # The runtime is one image per harness (docs/harnesses.md), all from
+          # one Dockerfile, told apart by the CLI the build argument installs.
+          - key: agent-claude-code
             suffix: "-agent"
-            dockerfile: apps/claude-agent/Dockerfile
+            dockerfile: apps/agent/Dockerfile
+            build_args: HARNESS=claude-code
+          - key: agent-opencode
+            suffix: "-agent"
+            dockerfile: apps/agent/Dockerfile
+            build_args: HARNESS=opencode
+          - key: agent-cursor
+            suffix: "-agent"
+            dockerfile: apps/agent/Dockerfile
+            build_args: HARNESS=cursor
+          - key: agent-copilot
+            suffix: "-agent"
+            dockerfile: apps/agent/Dockerfile
+            build_args: HARNESS=copilot
         arch:
           - key: amd64
             platform: linux/amd64
@@ -106,6 +122,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.image.dockerfile }}
+          build-args: ${{ matrix.image.build_args }}
           platforms: ${{ matrix.arch.platform }}
           outputs: type=image,name=ghcr.io/${{ github.repository }}${{ matrix.image.suffix }},push-by-digest=true,name-canonical=true,push=true
           # Scoped per image and architecture: one shared scope would have the
@@ -136,11 +153,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # `primary` gets the bare version tags and `latest`; a harness image
+        # gets `<version>-<harness>` and the moving `<harness>` tag. Claude Code
+        # is both, so the compose profile keeps pulling what it did
+        # (docs/harnesses.md).
         image:
           - key: server
             suffix: ""
-          - key: agent
+            harness: ""
+            primary: true
+          - key: agent-claude-code
             suffix: "-agent"
+            harness: claude-code
+            primary: true
+          - key: agent-opencode
+            suffix: "-agent"
+            harness: opencode
+            primary: false
+          - key: agent-cursor
+            suffix: "-agent"
+            harness: cursor
+            primary: false
+          - key: agent-copilot
+            suffix: "-agent"
+            harness: copilot
+            primary: false
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -166,14 +203,17 @@ jobs:
           # dispatch it is a branch, so the caller passes the version instead.
           # Exactly one of these two pairs is enabled.
           tags: |
-            type=semver,pattern={{version}},enable=${{ inputs.version == '' }}
-            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' }}
-            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
-            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
-            # A prerelease must never move `latest`. Both routes carry the
-            # version in a different place, and a `-` in it is what marks one:
-            # v0.5.0-rc.1 publishes under its own tags and leaves latest alone.
-            type=raw,value=latest,enable=${{ !contains(inputs.version || github.ref_name, '-') }}
+            type=semver,pattern={{version}},enable=${{ inputs.version == '' && matrix.image.primary }}
+            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' && matrix.image.primary }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' && matrix.image.primary }}
+            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' && matrix.image.primary }}
+            type=semver,pattern={{version}}-${{ matrix.image.harness }},enable=${{ inputs.version == '' && matrix.image.harness != '' }}
+            type=raw,value=${{ inputs.version }}-${{ matrix.image.harness }},enable=${{ inputs.version != '' && matrix.image.harness != '' }}
+            # A prerelease must never move `latest` or a harness's moving tag.
+            # Both routes carry the version in a different place, and a `-` in
+            # it is what marks one: v0.5.0-rc.1 publishes under its own tags.
+            type=raw,value=${{ matrix.image.harness }},enable=${{ matrix.image.harness != '' && !contains(inputs.version || github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ matrix.image.primary && !contains(inputs.version || github.ref_name, '-') }}
 
       - name: Point the tags at both architectures
         working-directory: /tmp/digests

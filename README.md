@@ -28,8 +28,9 @@ somebody rules, and finishing with a summary and a pull request linked back to t
 Every change is an Event, and the timeline, the live board, the inbox, Slack and the webhooks all derive from
 that one log.
 
-[`apps/claude-agent`](./apps/claude-agent) is the reference runtime on the other side: a service holding one
-Agent's key that runs Claude against the Issues that Agent is assigned. deevy itself never runs an agent
+[`apps/agent`](./apps/agent) is the reference runtime on the other side: a service holding one
+Agent's key that runs a coding-agent CLI (Claude Code, OpenCode, Cursor or Copilot) against the Issues that
+Agent is assigned. deevy itself never runs an agent
 (ADR-0003).
 
 The vocabulary is in [CONTEXT.md](./CONTEXT.md), the hard-to-reverse decisions in [docs/adr](./docs/adr), the

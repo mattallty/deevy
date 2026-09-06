@@ -14,7 +14,7 @@
       "@deevy/adapters",
       "@deevy/web",
       "@deevy/server",
-      "@deevy/claude-agent",
+      "@deevy/agent",
       "@deevy/release"
     ]
   ],

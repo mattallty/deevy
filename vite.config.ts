@@ -41,7 +41,7 @@ export default defineConfig({
       },
       {
         files: [
-          "apps/claude-agent/**",
+          "apps/agent/**",
           "apps/server/**",
           "apps/web/design-system/build.mjs",
           "apps/web/scripts/**",

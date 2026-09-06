@@ -10,6 +10,11 @@ Published to `ghcr.io/mattallty/deevy` on every `v*` tag, for `linux/amd64` and 
 version (`v0.4.0`) and `latest`. The image carries the bundled Node server, the migrations, and the built SPA;
 it runs the SPA and the API on one port, so there is no separate web container.
 
+The reference runtime is `ghcr.io/mattallty/deevy-agent`, one image per harness
+([docs/harnesses.md](./harnesses.md)): `deevy-agent:claude-code`, `deevy-agent:opencode`,
+`deevy-agent:cursor` and `deevy-agent:copilot`, each also tagged `<version>-<harness>`. `deevy-agent:latest`
+and the bare version tags are Claude Code.
+
 **Both packages are public**, so pulling either needs no account and no `docker login`. A package's
 visibility is set on the package rather than inherited from the repository, so if that ever changes the
 symptom is a `docker pull` failing with an unexplained `unauthorized`; what a stranger gets can be checked
@@ -573,7 +578,7 @@ the instance is given an origin sends them.
 
 ## The reference agent runtime
 
-deevy never runs an agent (ADR-0003). `apps/claude-agent` is the thing on the other side: a service that
+deevy never runs an agent (ADR-0003). `apps/agent` is the thing on the other side: a service that
 holds one Agent's API key, asks deevy what that Agent has been assigned, and runs Claude against it through
 the Claude Agent SDK. It is not part of deevy and does not have to be run at all — an instance with no
 runtime is a Workspace where the Humans do the work.
@@ -590,10 +595,12 @@ to. Point it at a Docker instance or at a `workers.dev` origin and the only thin
 4. **Give it somewhere to work**, if it should write code: `DEEVY_AGENT_REPO` and a `DEEVY_AGENT_GIT_TOKEN`
    scoped to that one repository, with permission to push a branch and open a pull request and nothing else.
    Leave both unset and the runtime works Documents, Gates and Runs only.
-5. **Run it.** `docker compose --profile agent up -d`, or the image directly:
+5. **Run it.** `docker compose --profile agent up -d`, or the image directly. The image carries one
+   coding-agent CLI, chosen at build time; `claude-code` is the default and `opencode`, `cursor` and
+   `copilot` are the others ([docs/harnesses.md](./harnesses.md)):
 
 ```bash
-docker build -f apps/claude-agent/Dockerfile -t deevy-agent .
+docker build -f apps/agent/Dockerfile --build-arg HARNESS=claude-code -t deevy-agent:claude-code .
 ```
 
 6. **Optionally, tell it rather than let it ask.** Set the Agent's webhook URL to the runtime's listener and
@@ -627,25 +634,33 @@ ever pushed to the base branch. A Run that changed nothing attaches nothing.
 
 ### Its configuration
 
-| Variable                          | Default                  | Without it                                                                                                                                                    |
-| --------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEEVY_URL`                       | —                        | It will not start, and says so. The deevy origin, with no trailing slash.                                                                                     |
-| `DEEVY_AGENT_KEY`                 | —                        | It will not start. The Agent's API key, and the whole of the runtime's identity.                                                                              |
-| `ANTHROPIC_API_KEY`               | —                        | Every session fails at once. Read by the Agent SDK, not by the runtime.                                                                                       |
-| `DEEVY_AGENT_POLL_SECONDS`        | 30                       | Nothing: it asks every thirty seconds, backing off to eight times that while there is nothing to do.                                                          |
-| `DEEVY_AGENT_RUN_TIMEOUT_SECONDS` | 1800                     | Nothing. It matches deevy's own stale window: a session allowed to outlive it would be called stale while working.                                            |
-| `DEEVY_AGENT_MODEL`               | `claude-opus-5`          | Nothing.                                                                                                                                                      |
-| `DEEVY_AGENT_EFFORT`              | `high`                   | Nothing. `low`, `medium`, `high`, `xhigh` or `max`; anything else is read as `high`.                                                                          |
-| `DEEVY_AGENT_MAX_TURNS`           | 100                      | Nothing: a backstop on a session that will not stop. The timeout is the real bound.                                                                           |
-| `DEEVY_AGENT_REPO`                | — no repository          | The session gets deevy's tools and an empty directory: no files, no shell, no web. Setting it grants all three.                                               |
-| `DEEVY_AGENT_GIT_TOKEN`           | —                        | A public repository can be cloned and nothing can be pushed, so no Run delivers anything.                                                                     |
-| `DEEVY_AGENT_BASE_BRANCH`         | `main`                   | Nothing: the branch every Run starts from.                                                                                                                    |
-| `DEEVY_AGENT_GITHUB_API`          | `https://api.github.com` | Nothing, unless the repository is on GitHub Enterprise or the acceptance run's local stub.                                                                    |
-| `DEEVY_AGENT_GITHUB_REPO`         | read from the clone URL  | Nothing, unless the clone URL is not a github.com one: without a slug a Run pushes its branch and opens no pull request.                                      |
-| `DEEVY_AGENT_WORKDIR`             | the system temporary     | Nothing: where per-Run working directories are made.                                                                                                          |
-| `DEEVY_AGENT_PASS_ENV`            | —                        | Nothing: a comma-separated list of extra environment variables the session may see, on top of the allowlist. For a proxy, a private registry, or a custom CA. |
-| `DEEVY_AGENT_WEBHOOK_SECRET`      | — no deliveries          | It polls, and refuses every delivery. Set it to the secret the Agent's webhook URL was given.                                                                 |
-| `DEEVY_AGENT_PORT`                | 8787                     | Nothing: `/healthz` always, and deevy's deliveries when a secret is set.                                                                                      |
+"Read by" says which process a variable reaches: the runtime itself, or the session of one harness
+(`DEEVY_AGENT_HARNESS`). A variable read by a harness is passed into that session's environment and by no
+other, and the runtime refuses to start when a harness's required one is missing.
+
+| Variable                                                       | Read by                        | Default                  | Without it                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------- | ------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEEVY_URL`                                                    | the runtime                    | —                        | It will not start, and says so. The deevy origin, with no trailing slash.                                                                                                                                                                                                       |
+| `DEEVY_AGENT_KEY`                                              | the runtime                    | —                        | It will not start. The Agent's API key, and the whole of the runtime's identity.                                                                                                                                                                                                |
+| `DEEVY_AGENT_HARNESS`                                          | the runtime                    | `claude-code`            | Nothing: which coding-agent CLI works the Runs. The runtime refuses to start on a name it does not know, or a binary it cannot run.                                                                                                                                             |
+| `ANTHROPIC_API_KEY`                                            | `claude-code`                  | —                        | With `claude-code`, every session fails at once unless the CLI is signed in some other way. Read by Claude Code, not by the runtime.                                                                                                                                            |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, … | `opencode`                     | —                        | The provider keys OpenCode reads, passed into its session by name (the list is `providerVariables` in its recipe); any other provider's goes through `DEEVY_AGENT_PASS_ENV`. Without one, every Run fails with the provider's own error.                                        |
+| `COPILOT_GITHUB_TOKEN`                                         | `copilot`                      | —                        | The runtime refuses to start. A fine-grained token with the Copilot Requests permission and **no repository permission**, and never the same value as `DEEVY_AGENT_GIT_TOKEN`: the session's shell runs under it, and a token that can push is a push the denylist cannot stop. |
+| `CURSOR_API_KEY`                                               | `cursor`                       | —                        | The runtime refuses to start. Cursor's API key, from cursor.com; the desktop app's login is not shared with the CLI.                                                                                                                                                            |
+| `DEEVY_AGENT_POLL_SECONDS`                                     | the runtime                    | 30                       | Nothing: it asks every thirty seconds, backing off to eight times that while there is nothing to do.                                                                                                                                                                            |
+| `DEEVY_AGENT_RUN_TIMEOUT_SECONDS`                              | the runtime                    | 1800                     | Nothing. It matches deevy's own stale window: a session allowed to outlive it would be called stale while working.                                                                                                                                                              |
+| `DEEVY_AGENT_MODEL`                                            | every harness                  | `claude-opus-5`          | Nothing.                                                                                                                                                                                                                                                                        |
+| `DEEVY_AGENT_EFFORT`                                           | `claude-code`                  | `high`                   | Nothing. `low`, `medium`, `high`, `xhigh` or `max`; anything else is read as `high`.                                                                                                                                                                                            |
+| `DEEVY_AGENT_MAX_TURNS`                                        | `claude-code`, `opencode`      | 100                      | Nothing: a backstop on a session that will not stop. The timeout is the real bound.                                                                                                                                                                                             |
+| `DEEVY_AGENT_REPO`                                             | the runtime                    | — no repository          | The session gets deevy's tools and an empty directory: no files, no shell, no web. Setting it grants all three.                                                                                                                                                                 |
+| `DEEVY_AGENT_GIT_TOKEN`                                        | the runtime                    | —                        | A public repository can be cloned and nothing can be pushed, so no Run delivers anything.                                                                                                                                                                                       |
+| `DEEVY_AGENT_BASE_BRANCH`                                      | the runtime                    | `main`                   | Nothing: the branch every Run starts from.                                                                                                                                                                                                                                      |
+| `DEEVY_AGENT_GITHUB_API`                                       | the runtime                    | `https://api.github.com` | Nothing, unless the repository is on GitHub Enterprise or the acceptance run's local stub.                                                                                                                                                                                      |
+| `DEEVY_AGENT_GITHUB_REPO`                                      | the runtime                    | read from the clone URL  | Nothing, unless the clone URL is not a github.com one: without a slug a Run pushes its branch and opens no pull request.                                                                                                                                                        |
+| `DEEVY_AGENT_WORKDIR`                                          | the runtime                    | the system temporary     | Nothing: where per-Run working directories are made.                                                                                                                                                                                                                            |
+| `DEEVY_AGENT_PASS_ENV`                                         | the runtime, for every session | —                        | Nothing: a comma-separated list of extra environment variables the session may see, on top of the allowlist. For a proxy, a private registry, or a custom CA.                                                                                                                   |
+| `DEEVY_AGENT_WEBHOOK_SECRET`                                   | the runtime                    | — no deliveries          | It polls, and refuses every delivery. Set it to the secret the Agent's webhook URL was given.                                                                                                                                                                                   |
+| `DEEVY_AGENT_PORT`                                             | the runtime                    | 8787                     | Nothing: `/healthz` always, and deevy's deliveries when a secret is set.                                                                                                                                                                                                        |
 
 ### What is bounded, and what is not
 
@@ -665,8 +680,12 @@ each part does:
   allowlist rather than a list of secrets to remove, because a denylist can only exclude what somebody thought
   of: the first version removed `DEEVY_AGENT_KEY` and the git token and passed everything else, so a session
   with a shell inherited every other credential the operator happened to have. Name anything it genuinely
-  needs in `DEEVY_AGENT_PASS_ENV`. The Agent's own key is still the sharpest case — a shell plus that key is
-  every operation the Agent may call, over `curl`, including the ones deliberately left out of the tool list.
+  needs in `DEEVY_AGENT_PASS_ENV`. The Agent's own key is the sharpest case — a shell plus that key is every
+  operation the Agent may call, over `curl`, including the ones deliberately left out of the tool list — and
+  the session never holds it at all: it reaches deevy through a loopback proxy the runtime opens for each
+  Run, which adds the key on the way out, offers only the twelve tools the runtime grants, and refuses any
+  other tool before deevy hears of it. A refusal is written into the Run's feed as an error Activity. A shell
+  that finds the proxy's port gets those twelve tools and nothing else, which is the allowlist and not a hole.
 - **The credential is narrow, and the supervisor holds it.** Scope the git token to one repository, with
   permission to push a branch and open a pull request. The runtime clones and pushes; the session is refused
   `git push`, `git remote`, `git config` and `gh`, and the token is passed as a header git does not persist,
@@ -678,6 +697,23 @@ What is _not_ bounded: a session with a shell can run whatever the repository's 
 network, and spend tokens. Give the runtime a repository you would give a new contractor, and read the pull
 requests.
 
+### Harnesses
+
+Which coding-agent CLI works the Runs is `DEEVY_AGENT_HARNESS`, and each image carries one
+([docs/harnesses.md](./harnesses.md), ADR-0018). The bounds above hold for every harness: the container,
+the environment allowlist, the proxy holding the key and the tool list, the git credential the session
+never sees, and the Gate. What differs is how each CLI grants its own tools and what it reads from disk,
+and that is what each paragraph below says, in the words its recipe ships (`bounds` in
+`apps/agent/src/harness/<name>.ts`).
+
+**Claude Code** is granted its tools by name (`--allowedTools`), refuses anything else rather than asking (`--permission-prompts none`), loads no settings from disk (`--setting-sources ""`) and no MCP server but the runtime's proxy (`--strict-mcp-config`); `.mcp.json` and `.claude/` are removed from the clone before it starts, and `CLAUDE.md` is read as input. A refused tool is a `permission_denied` message in its stream, which the runtime writes into the Run's feed. Not bounded: what `Bash` runs in the repository, the network, and tokens.
+
+**OpenCode** is granted its tools by name in an inline `permission` block where everything else is `deny` and nothing is `ask` (in `run`, an `ask` is auto-rejected and ends the turn), reads no project configuration (`OPENCODE_DISABLE_PROJECT_CONFIG`, with `opencode.json`, `opencode.jsonc` and `.opencode/` removed from the clone as well), loads no plugins (`--pure`), and connects to no MCP server but the runtime's proxy; `AGENTS.md` and `CLAUDE.md` are read as input. A refused tool is an errored `tool_use` in its stream carrying OpenCode's own sentence about the rule, which the runtime writes into the Run's feed as a denial. Not bounded: what `bash` runs in the repository, the network, and tokens; and the provider key is in the session's environment, as every harness's is.
+
+**Cursor CLI** runs under `--force`, which applies edits and runs commands instead of proposing them and allows every tool a deny rule does not name, so the fence is the `permissions.deny` list the runtime writes into the session's own `~/.cursor/cli-config.json`: `git push`, `git remote`, `git config` and `gh` when there is a repository, and every file, shell and web tool when there is not. Nothing on disk configures the session: the clone's `.cursor/` is removed before it starts (a project `.cursor/cli.json` would otherwise _replace_ the deny list, and a `.cursor/mcp.json` would be trusted by `--approve-mcps`), `--disable-project-configs` refuses it anyway, and the only MCP server is the runtime's proxy, with no header. A refused tool is a `tool_call` completed with a `rejected` result and the CLI\'s own sentence, "Command is not allowed", which the runtime writes into the Run's feed. Not bounded: what `Shell` runs in the repository, the network, tokens (usage is reported, cost is not), and `DEEVY_AGENT_EFFORT`, which this harness does not read.
+
+**GitHub Copilot CLI** is granted its tools by name (`--allow-tool`) and, in `-p` without `--allow-all-tools`, refuses anything else automatically rather than asking (`--no-ask-user`); the built-in GitHub MCP server is off (`--disable-builtin-mcps`) so the only server it reaches is the runtime's proxy, the session is not exported to GitHub (`--no-remote-export`), and the token is stripped from the shell it runs and redacted from output (`--secret-env-vars`). Nothing on disk configures the session: the working directory is left untrusted, which is what stops Copilot loading a repository's `.mcp.json`, `.github/mcp.json`, hooks or plugins, so no strip list is needed; `.github/copilot-instructions.md` and `AGENTS.md` are read as input. A refused tool is a `tool.execution_complete` with `error.code` `denied` in the JSON stream, which the runtime writes into the Run's feed. Not bounded: what `shell` runs in the repository, the network, and tokens; and Copilot's JSON stream reports premium-request counts and durations, not token or dollar totals, so a Run worked by Copilot carries no usage into its summary.
+
 ### What it costs
 
 Nothing here is measured, and these are the knobs that move the bill rather than numbers to plan against.
@@ -688,6 +724,7 @@ Nothing here is measured, and these are the knobs that move the bill rather than
 | `DEEVY_AGENT_EFFORT`              | Thinking depth per session. `xhigh` suits code work; `low` suits a runtime that only writes Documents. |
 | `DEEVY_AGENT_RUN_TIMEOUT_SECONDS` | The ceiling on one Run. A session stopped at the timeout has still spent what it spent.                |
 | `DEEVY_AGENT_REPO`                | A repository means file and shell tools, which means longer sessions.                                  |
+| `CURSOR_API_KEY`                  | `cursor`                                                                                               | —   | The runtime refuses to start. Cursor's API key, from cursor.com; the desktop app's login is not shared with the CLI. |
 | `DEEVY_AGENT_POLL_SECONDS`        | Costs deevy requests, not tokens. A poll that finds nothing spends nothing.                            |
 
 Runs are triggered by assignment, mention, a workflow rule, or an Agent's schedule. A schedule on an Agent is

@@ -77,7 +77,7 @@ jobs:
           - name: core
             filters: -F core -F db -F adapters -F release
           - name: runtime and server
-            filters: -F claude-agent -F server
+            filters: -F agent -F server
     steps:
       - uses: actions/checkout@v7
 
@@ -159,7 +159,7 @@ jobs:
       # GitHub's pull-request API, with the real supervisor driving
       # (docs/m4-acceptance.md).
       - name: The reference runtime works an Issue end to end, on both deployments
-        run: vp run claude-agent#acceptance
+        run: vp run agent#acceptance
 
   # Both images in one job: the runtime smoke needs a deevy to talk to, and
   # building that image twice in two jobs is the same minute spent twice. This
@@ -184,9 +184,26 @@ jobs:
         timeout-minutes: 10
         run: docker build -f apps/server/Dockerfile -t deevy:ci .
 
-      - name: Build the runtime
-        timeout-minutes: 10
-        run: docker build -f apps/claude-agent/Dockerfile -t deevy-agent:ci .
+      # One image per harness (docs/harnesses.md). The build stage is shared
+      # through the local layer cache, so the four differ by one npm or curl —
+      # but four installs on every pull-request push is still four installs,
+      # so a pull request builds the default image only and main, and the
+      # release that calls this, build all four.
+      - name: Which harnesses
+        id: which
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "list=claude-code" >> "$GITHUB_OUTPUT"
+          else
+            echo "list=claude-code opencode cursor copilot" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the runtime, once per harness
+        timeout-minutes: 20
+        run: |
+          for harness in ${{ steps.which.outputs.list }}; do
+            docker build -f apps/agent/Dockerfile --build-arg HARNESS=$harness -t deevy-agent:ci-$harness .
+          done
 
       - name: Smoke the deevy image
         run: |
@@ -207,22 +224,42 @@ jobs:
       # loopback above because Better Auth refuses a plain-http MCP resource
       # that is not; it is the OAuth issuer, and this authenticates with an API
       # key, so the two are independent here.
-      - name: The runtime reaches deevy and reports what it is told
+      # Each image first proves its harness binary runs ("harness <name>: <version>"
+      # is logged before deevy is asked anything), then that a key nobody issued is
+      # refused. Cursor and Copilot refuse earlier still, at the credential their
+      # recipe requires, which is the same guard from the other side.
+      - name: Each runtime image runs its harness and reports what deevy tells it
         run: |
-          set +e
-          out=$(docker run --rm --network deevy-ci \
-            -e DEEVY_URL=http://deevy:3000 \
-            -e DEEVY_AGENT_KEY=not-a-key deevy-agent:ci node dist/main.mjs --once 2>&1)
-          code=$?
-          set -e
-          echo "$out"
-          test $code -ne 0
-          echo "$out" | grep -qE "UNAUTHORIZED|FORBIDDEN"
+          for harness in ${{ steps.which.outputs.list }}; do
+            case $harness in cursor|copilot) continue ;; esac
+            set +e
+            out=$(docker run --rm --network deevy-ci \
+              -e DEEVY_URL=http://deevy:3000 \
+              -e DEEVY_AGENT_KEY=not-a-key deevy-agent:ci-$harness node dist/main.mjs --once 2>&1)
+            code=$?
+            set -e
+            echo "$out"
+            test $code -ne 0
+            echo "$out" | grep -q "harness $harness:"
+            echo "$out" | grep -qE "UNAUTHORIZED|FORBIDDEN"
+          done
+          for harness in ${{ steps.which.outputs.list }}; do
+            case $harness in cursor|copilot) ;; *) continue ;; esac
+            set +e
+            out=$(docker run --rm --network deevy-ci \
+              -e DEEVY_URL=http://deevy:3000 \
+              -e DEEVY_AGENT_KEY=not-a-key deevy-agent:ci-$harness node dist/main.mjs --once 2>&1)
+            code=$?
+            set -e
+            echo "$out"
+            test $code -ne 0
+            echo "$out" | grep -q "refuses to start without it"
+          done
 
       - name: Configuration it cannot start without is named
         run: |
           set +e
-          out=$(docker run --rm deevy-agent:ci node dist/main.mjs --once 2>&1)
+          out=$(docker run --rm deevy-agent:ci-claude-code node dist/main.mjs --once 2>&1)
           code=$?
           set -e
           echo "$out"
