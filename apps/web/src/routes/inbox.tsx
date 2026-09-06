@@ -243,21 +243,29 @@ export function InboxPage({
                     aria-hidden
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex flex-wrap items-baseline gap-x-1.5">
-                      {/* The name alone: the glyph on the left already says what happened. */}
-                      {notification.actor ? (
-                        <span className="font-medium">{notification.actor.user.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">deevy</span>
-                      )}
-                      <span className={cn(!notification.readAt && "font-medium")}>{said.verb}</span>
-                      {notification.issue ? (
-                        <>
-                          <span className="text-muted-foreground">on</span>
-                          <span className="font-mono text-xs">{notification.issue.key}</span>
-                        </>
-                      ) : null}
-                      <span className="ml-auto font-mono text-xs text-muted-foreground">
+                    <span className="flex items-baseline gap-x-3">
+                      {/* A sentence with its own spaces, not flex items: the words sit as words do. */}
+                      <span className="min-w-0 flex-1">
+                        {/* The name alone: the glyph on the left already says what happened. */}
+                        {notification.actor ? (
+                          <span className="font-medium">{notification.actor.user.name}</span>
+                        ) : (
+                          <span className="text-muted-foreground">deevy</span>
+                        )}{" "}
+                        <span className={cn(!notification.readAt && "font-medium")}>
+                          {said.verb}
+                        </span>
+                        {notification.issue ? (
+                          <>
+                            {" "}
+                            <span className="text-muted-foreground">on</span>{" "}
+                            <span className="font-mono text-xs whitespace-nowrap">
+                              {notification.issue.key}
+                            </span>
+                          </>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
                         {ago(notification.createdAt)}
                       </span>
                     </span>
