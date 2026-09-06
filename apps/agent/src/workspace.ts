@@ -48,6 +48,13 @@ export interface WorkspaceOptions {
   repo?: RepoConfig | null;
   /** Names the directory after the Run, so two Runs cannot share one. */
   runId: string;
+  /**
+   * What `origin` points at once the clone is made: the supervisor's own git
+   * proxy, so the session pushes to loopback and the credential stays here
+   * (src/git-proxy.ts). Absent, `origin` is the remote itself, which is what a
+   * runtime with no repository or no credential has anyway.
+   */
+  originUrl?: string;
 }
 
 /**
@@ -102,6 +109,11 @@ export async function openWorkspace(options: WorkspaceOptions): Promise<Workspac
       );
     }
   }
+
+  // The clone was made with the credential; what the session inherits is a
+  // loopback address, so a `git remote -v` in the session shows the supervisor
+  // and a push reaches the world through it (docs/plans/agent-owns-git.md).
+  if (repo && options.originUrl) await git(["remote", "set-url", "origin", options.originUrl]);
 
   return {
     cwd,

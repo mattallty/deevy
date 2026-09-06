@@ -28,20 +28,17 @@ export const repositoryTools: ReadonlyArray<string> = [
 ];
 
 /**
- * What is refused even where it would otherwise be reachable.
+ * Nothing is refused. The session runs git, reaching the world through the
+ * supervisor's proxy, so the credential is still the supervisor's and where an
+ * Agent may push is the scope of the token the operator issued and whatever
+ * the forge protects — both enforced by somebody other than us, which is the
+ * argument for preferring them to a list written here (ADR-0019). What the
+ * runtime does instead is record every ref a Run moved (src/refs.ts).
  *
- * The supervisor owns git and the credential to use it, so a session reaching
- * for a push or a pull request is a bug rather than initiative, and denying it
- * makes that ownership enforced instead of hoped for. Nothing else is listed:
- * a denylist beside an allowlist invites the belief that the allowlist has
- * holes this patches, and it does not.
+ * `gh` is not denied and is not given a credential either: it wants a token of
+ * its own, and the proxy has none to hand it.
  */
-export const deniedTools: ReadonlyArray<string> = [
-  "Bash(git push:*)",
-  "Bash(git remote:*)",
-  "Bash(git config:*)",
-  "Bash(gh:*)",
-];
+export const deniedTools: ReadonlyArray<string> = [];
 
 /**
  * Claude Code, headless: `claude -p` with the stream the Agent SDK reads,
@@ -98,7 +95,9 @@ export const claudeCode: Harness = {
       "none",
       "--allowedTools",
       ...tools,
-      ...(config.repo ? ["--disallowedTools", ...deniedTools] : []),
+      // Only when there is something to deny: the flag with no values after it
+      // would take the next flag as one.
+      ...(config.repo && deniedTools.length > 0 ? ["--disallowedTools", ...deniedTools] : []),
       "--append-system-prompt-file",
       instructions,
       "--model",

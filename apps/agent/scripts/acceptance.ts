@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { createDeevy } from "../src/deevy.ts";
 import { forgeFor } from "../src/forge.ts";
+import { openGitProxy } from "../src/git-proxy.ts";
 import { openProxy } from "../src/proxy.ts";
 import type { SessionEvent } from "../src/session.ts";
 import { deevyToolNames } from "../src/tools.ts";
@@ -285,6 +286,9 @@ export async function walk(origin: string, label: string): Promise<string> {
     const deevy = createDeevy({ config });
     const work = {
       deevy,
+      // Every push in this walk goes through the supervisor's git proxy, which
+      // is how the session reaches a remote at all (docs/plans/agent-owns-git.md).
+      gitProxy: () => openGitProxy({ upstream: config.repo.url, token: config.repo.token }),
       proxy: (options: { onDenied: (name: string) => Promise<void> }) =>
         openProxy({ url: origin, key, tools: deevyToolNames, ...options }),
       runTimeoutMs: 120_000,

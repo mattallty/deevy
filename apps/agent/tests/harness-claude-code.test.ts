@@ -99,10 +99,9 @@ describe("the command line a session runs under", () => {
   it("adds the file and shell tools only when there is a repository to use them on", () => {
     const argv = claudeCode.argv(context(withRepo));
     const allowed = argv.indexOf("--allowedTools");
-    const denied = argv.indexOf("--disallowedTools");
     const next = argv.indexOf("--append-system-prompt-file");
 
-    expect(argv.slice(allowed + 1, denied)).toEqual([...deevyTools, ...repositoryTools]);
+    expect(argv.slice(allowed + 1, next)).toEqual([...deevyTools, ...repositoryTools]);
     expect(repositoryTools).toEqual([
       "Read",
       "Write",
@@ -113,15 +112,12 @@ describe("the command line a session runs under", () => {
       "WebSearch",
       "WebFetch",
     ]);
-    // The supervisor owns git and the credential to use it, so the session
-    // reaching for a push is a bug rather than initiative.
-    expect(argv.slice(denied + 1, next)).toEqual(deniedTools);
-    expect(deniedTools).toEqual([
-      "Bash(git push:*)",
-      "Bash(git remote:*)",
-      "Bash(git config:*)",
-      "Bash(gh:*)",
-    ]);
+    // Nothing is denied. The session runs git, reaching the world through the
+    // supervisor's proxy, and where it may push is the token's scope and the
+    // forge's own protections rather than a list this program wrote
+    // (ADR-0019). The flag is left out rather than passed empty.
+    expect(argv).not.toContain("--disallowedTools");
+    expect(deniedTools).toEqual([]);
   });
 
   it("puts the prompt before the variadic tool lists, which would otherwise swallow it", () => {

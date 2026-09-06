@@ -119,23 +119,11 @@ describe("the command line a session runs under", () => {
     // The last `--allow-tool` is the repository grant, one comma-joined value.
     expect(argv[allow + 1]).toEqual("read,write,shell");
     expect(repositoryTools).toEqual("read,write,shell");
-    // Then every git denial, before `--model`.
-    expect(argv.slice(allow + 2, model)).toEqual([
-      "--deny-tool",
-      "shell(git push:*)",
-      "--deny-tool",
-      "shell(git remote:*)",
-      "--deny-tool",
-      "shell(git config:*)",
-      "--deny-tool",
-      "shell(gh:*)",
-    ]);
-    expect(deniedTools).toEqual([
-      "shell(git push:*)",
-      "shell(git remote:*)",
-      "shell(git config:*)",
-      "shell(gh:*)",
-    ]);
+    // And nothing denied after it: the session runs git through the
+    // supervisor's proxy, and where it may push is the token's scope and the
+    // forge's own protections (ADR-0019).
+    expect(argv.slice(allow + 2, model)).toEqual([]);
+    expect(deniedTools).toEqual([]);
   });
 
   it("grants tools by name, so deevy widening is not this program widening", () => {

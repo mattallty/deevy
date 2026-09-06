@@ -29,20 +29,17 @@ export const deevyTools: ReadonlyArray<string> = deevyToolNames.map(
 export const repositoryTools: ReadonlyArray<string> = ["Read(**)", "Write(**)", "Shell(*)"];
 
 /**
- * What is refused even where the shell is otherwise allowed. The supervisor
- * owns git and the credential to use it, so a session reaching for a push or
- * a pull request is a bug rather than initiative (ADR-0014). A deny rule wins
- * over every allow, and over `--force`, whose own description is "allow
- * commands unless explicitly denied". `Shell(git push)` matches `git push`
- * followed by anything, the way Cursor documents `Shell(git)` matching every
- * git subcommand.
+ * Nothing is refused. The session runs git, reaching the world through the
+ * supervisor's proxy, so the credential is still the supervisor's and where an
+ * Agent may push is the scope of the token the operator issued and whatever
+ * the forge protects — both enforced by somebody other than us, which is the
+ * argument for preferring them to a list written here (ADR-0019). What the
+ * runtime does instead is record every ref a Run moved (src/refs.ts).
+ *
+ * `gh` is not denied and is not given a credential either: it wants a token of
+ * its own, and the proxy has none to hand it.
  */
-export const deniedTools: ReadonlyArray<string> = [
-  "Shell(git push)",
-  "Shell(git remote)",
-  "Shell(git config)",
-  "Shell(gh)",
-];
+export const deniedTools: ReadonlyArray<string> = [];
 
 /**
  * What is refused when there is no repository. Under `--force` every tool is
@@ -189,8 +186,9 @@ export const cursor: Harness = {
   bounds: [
     "**Cursor CLI** runs under `--force`, which applies edits and runs commands instead of proposing",
     "them and allows every tool a deny rule does not name, so the fence is the `permissions.deny` list",
-    "the runtime writes into the session's own `~/.cursor/cli-config.json`: `git push`, `git remote`,",
-    "`git config` and `gh` when there is a repository, and every file, shell and web tool when there is",
+    "the runtime writes into the session's own `~/.cursor/cli-config.json`: nothing when there is a",
+    "repository, since the session runs git and where it may push is the token's scope and the forge's",
+    "own protections (ADR-0019), and every file, shell and web tool when there is",
     "not. Nothing on disk configures the session: the clone's `.cursor/` is removed before it starts",
     "(a project `.cursor/cli.json` would otherwise *replace* the deny list, and a `.cursor/mcp.json`",
     "would be trusted by `--approve-mcps`), `--disable-project-configs` refuses it anyway, and the only",

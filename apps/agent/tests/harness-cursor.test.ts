@@ -181,9 +181,10 @@ describe("what prepare writes into the session's home", () => {
           "Write(**)",
           "Shell(*)",
         ],
-        // The supervisor owns git and the credential to use it, so the
-        // session reaching for a push is a bug rather than initiative.
-        deny: ["Shell(git push)", "Shell(git remote)", "Shell(git config)", "Shell(gh)"],
+        // Nothing is denied with a repository: the session runs git, and
+        // where it may push is the token's scope and the forge's own
+        // protections rather than this list (ADR-0019).
+        deny: [],
       },
     });
     expect(JSON.parse(await readFile(join(home, ".cursor", "mcp.json"), "utf8"))).toEqual({
@@ -209,12 +210,7 @@ describe("what prepare writes into the session's home", () => {
     });
     expect(deniedWithoutRepository).toEqual(["Read(**)", "Write(**)", "Shell(*)", "WebFetch(*)"]);
     expect(repositoryTools).toEqual(["Read(**)", "Write(**)", "Shell(*)"]);
-    expect(deniedTools).toEqual([
-      "Shell(git push)",
-      "Shell(git remote)",
-      "Shell(git config)",
-      "Shell(gh)",
-    ]);
+    expect(deniedTools).toEqual([]);
   });
 
   it("grants the deevy tools by name, so deevy widening is not this program widening", () => {

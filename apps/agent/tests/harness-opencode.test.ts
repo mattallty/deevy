@@ -151,16 +151,10 @@ describe("the inline configuration", () => {
         glob: "allow",
         grep: "allow",
         edit: "allow",
-        bash: {
-          "*": "allow",
-          // The supervisor owns git and the credential to use it, so the
-          // session reaching for a push is a bug rather than initiative.
-          "git push*": "deny",
-          "git remote*": "deny",
-          "git config*": "deny",
-          gh: "deny",
-          "gh *": "deny",
-        },
+        // Allowed whole: the session runs git, reaching the world through the
+        // supervisor's proxy, and where it may push is the token's scope and
+        // the forge's own protections rather than a pattern here (ADR-0019).
+        bash: "allow",
         webfetch: "allow",
         websearch: "allow",
       },
@@ -191,21 +185,17 @@ describe("the inline configuration", () => {
       "webfetch",
       "websearch",
     ]);
-    expect(Object.keys(deniedCommands)).toEqual([
-      "git push*",
-      "git remote*",
-      "git config*",
-      "gh",
-      "gh *",
-    ]);
+    expect(deniedCommands).toEqual({});
   });
 
   it("writes the denial of everything first, because the last matching rule wins", () => {
     for (const cfg of [config, withRepo]) {
       const keys = Object.keys(permissions(context(cfg)));
       expect(keys[0]).toBe("*");
-      const bash = permissions(context(cfg)).bash as Record<string, string> | undefined;
-      if (bash) expect(Object.keys(bash)[0]).toBe("*");
+      // `bash` is a bare "allow" now that nothing under it is denied; a rule
+      // with patterns would still have to put the catch-all first.
+      const bash = permissions(context(cfg)).bash as Record<string, string> | string | undefined;
+      if (bash && typeof bash === "object") expect(Object.keys(bash)[0]).toBe("*");
     }
   });
 

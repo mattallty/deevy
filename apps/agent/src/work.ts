@@ -1,9 +1,10 @@
 import { DeevyError, isOpen, type Deevy, type Ruling, type Run } from "./deevy.ts";
 import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
+import type { GitProxy } from "./git-proxy.ts";
 import type { Proxy } from "./proxy.ts";
 import type { Session, SessionEvent, Usage } from "./session.ts";
-import { openWorkspace, type Workspace, type WorkspaceOptions } from "./workspace.ts";
+import { openWorkspace, type Workspace } from "./workspace.ts";
 
 export interface WorkResult {
   runId: string;
@@ -38,6 +39,13 @@ export interface WorkOptions {
    * supervisor hands it what to do with a refusal.
    */
   proxy: (options: { onDenied: (name: string) => Promise<void> }) => Promise<Proxy>;
+  /**
+   * git as the session reaches it: a loopback proxy that holds the credential
+   * and forwards to the real remote (src/git-proxy.ts). Absent, or answering
+   * null, the session's `origin` is the remote itself and only the supervisor
+   * can push to it — which is what a runtime with no repository has anyway.
+   */
+  gitProxy?: () => Promise<GitProxy | null>;
   /** Aborted when the process is stopping, on top of each Run's own timeout. */
   signal?: AbortSignal;
   runTimeoutMs: number;
@@ -45,7 +53,7 @@ export interface WorkOptions {
    * The working directory a Run gets. Defaults to an empty one, and a runtime
    * with a repository configured passes one that holds a clone of it.
    */
-  workspace?: (options: WorkspaceOptions) => Promise<Workspace>;
+  workspace?: (options: { runId: string; originUrl?: string }) => Promise<Workspace>;
   /** Where a pull request is opened, when the repository has one. */
   forge?: Forge | null;
   /** How a Run's work becomes a branch and a pull request. */
@@ -215,10 +223,18 @@ export async function workRun(
   // Before the session, so a repository that cannot be cloned fails the Run
   // with a reason rather than handing the model an empty directory and letting
   // it improvise about why nothing is there.
+  // Before the workspace, because the clone's `origin` is set to it: the
+  // session pushes to loopback and the supervisor carries it out with the
+  // credential (docs/plans/agent-owns-git.md).
+  const git = (await options.gitProxy?.()) ?? null;
   let workspace: Workspace;
   try {
-    workspace = await (options.workspace ?? openWorkspace)({ runId: run.id });
+    workspace = await (options.workspace ?? openWorkspace)({
+      runId: run.id,
+      ...(git ? { originUrl: git.url } : {}),
+    });
   } catch (error) {
+    await git?.close();
     const detail = error instanceof Error ? error.message : String(error);
     await close(deevy, run.id, detail);
     return {
@@ -281,6 +297,10 @@ export async function workRun(
     failure = describe(error, stopped(timeout, options.signal));
   } finally {
     await proxy.close();
+    // The git proxy stays up past the session, because the supervisor's own
+    // push goes through it too — closing it here rather than after the
+    // delivery is a branch that never reaches the remote, which is what the
+    // acceptance walk said when it did.
     // Before the directory goes: whatever the session left behind is the only
     // evidence there will ever be that this attempt did anything.
     if (workspace.repo && !failure) {
@@ -308,6 +328,7 @@ export async function workRun(
       }
     }
     await workspace.release();
+    await git?.close();
   }
 
   if (delivered) await attach(deevy, run, delivered);

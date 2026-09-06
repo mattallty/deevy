@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { readConfig } from "./config.ts";
 import { DeevyError, createDeevy } from "./deevy.ts";
 import { forgeFor } from "./forge.ts";
+import { openGitProxy } from "./git-proxy.ts";
 import { harnessFor, missingFor } from "./harness/index.ts";
 import { sessionUserFor } from "./session-user.ts";
 import { buildSession } from "./harness/run.ts";
@@ -82,7 +83,14 @@ const work = {
     openProxy({ url: config.url, key: config.key, tools: deevyToolNames, ...options }),
   runTimeoutMs: config.runTimeoutSeconds * 1000,
   forge: forgeFor(config),
-  workspace: (options: { runId: string }) =>
+  gitProxy: () =>
+    config.repo
+      ? openGitProxy({
+          upstream: config.repo.url,
+          ...(config.repo.token ? { token: config.repo.token } : {}),
+        })
+      : Promise.resolve(null),
+  workspace: (options: { runId: string; originUrl?: string }) =>
     openWorkspace({
       ...options,
       repo: config.repo,
