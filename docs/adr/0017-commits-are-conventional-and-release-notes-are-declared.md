@@ -57,14 +57,20 @@ to push `vX.Y.Z` and leaving `release.yml` on its tag trigger produces a release
 The tag is still created, because OPERATIONS.md and the image tags refer to it, and a hand-pushed `v*` tag
 still publishes — that route stays as the escape hatch for a release made outside this flow.
 
-Releasing takes **two** conditions, and getting this wrong cost the first two attempts. "No changesets
-waiting" cannot be the signal on its own, because it is also true of every ordinary push to main — the tag is
-the rest of it, and a version whose tag does not exist yet is one the Version PR just brought in. But the
-changesets check is not redundant either: `changesets/action` runs the version command **in place**, so when
-changesets _were_ waiting the working tree and HEAD are already bumped by the time anything downstream looks
-at them. A tag step that reads the version without that gate tags the Version PR's own commit — which is not
-on `main` — and publishes it while its pull request is still open. Both conditions, and the version read from
-the commit rather than the working tree.
+Releasing takes **two** conditions, and getting this wrong cost three attempts. "No changesets waiting"
+cannot be the signal on its own, because it is also true of every ordinary push to main — the tag is the rest
+of it, and a version whose tag does not exist yet is one the Version PR just brought in. But the changesets
+check is not redundant either: `changesets/action` runs the version command **in place**, so when changesets
+were waiting the working tree and HEAD are already bumped by the time anything downstream looks at them. A tag
+step that reads the version without that gate tags the Version PR's own commit — which is not on `main` — and
+publishes it while its pull request is still open.
+
+Both facts are read from the commit, before the action runs, and neither from the action's outputs. It is not
+a usable source for the first one: in the branch it takes when there are no changesets **and no publish
+script** — deevy's case, since nothing goes to npm — it returns without setting any output, so
+`hasChangesets` is the empty string rather than `false`, and a guard comparing it against `"false"` never
+fires and skips the release with a green tick. Counting `.changeset/*.md` on the commit answers the question
+the workflow is actually asking, from a source the action cannot invalidate.
 
 The Version PR is also the one pull request that consumes changesets instead of adding one, so the gate that
 requires a changeset has to exempt it by branch name or it can never merge.
