@@ -2,7 +2,6 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { IssuesSearch } from "@/components/issue-filters";
-import { StateBadge } from "@/components/state-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +39,7 @@ export function ProjectLayout({ projectKey }: { projectKey: string }) {
     );
   }
 
-  const { key, name, description, team, states, archivedAt } = project.data;
+  const { key, name, description, team, archivedAt } = project.data;
   const base = `/projects/${key}`;
   const current = tabs.find((tab) => tab.to !== "" && pathname.startsWith(base + tab.to))?.to ?? "";
 
@@ -56,19 +55,6 @@ export function ProjectLayout({ projectKey }: { projectKey: string }) {
           <h1 className="text-xl font-semibold tracking-tight">{name}</h1>
           {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
         </div>
-        <ul aria-label="Workflow" className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {states.map((state) => (
-            <li key={state.id}>
-              <StateBadge
-                state={{
-                  name: state.name,
-                  isGate: state.isGate,
-                  category: state.category as "backlog" | "active" | "done",
-                }}
-              />
-            </li>
-          ))}
-        </ul>
         <nav aria-label="Project" className="-mb-px flex gap-1">
           {tabs.map((tab) => {
             const active = tab.to === current;

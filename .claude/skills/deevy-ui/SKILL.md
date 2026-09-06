@@ -269,8 +269,9 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 
 ## What slice 8 settled (the Project)
 
-- **`/projects/$key` is a layout route** (`ProjectLayout`: header, `ul aria-label="Workflow"` strip of
-  `StateBadge`s, `nav aria-label="Project"` tabs) with children `/` (Issues: quick-add "New Issue"/"Add
+- **`/projects/$key` is a layout route** (`ProjectLayout`: header — key, Team, name, description; the
+  `ul aria-label="Workflow"` strip of `StateBadge`s it carried went on 2026-09-06, since the Issues tab's
+  groups and the Board's columns are the Workflow already — `nav aria-label="Project"` tabs) with children `/` (Issues: quick-add "New Issue"/"Add
   Issue" + the Issues home `embedded` and `fixedProject`), `board`, `workflow`, `settings`
   (`projects.update`/`archive`), and `settings/workflow` redirecting to `workflow`. The Issue filters and
   `?peek=` validate on the layout, so the tabs share them.

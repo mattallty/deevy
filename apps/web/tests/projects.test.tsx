@@ -142,18 +142,15 @@ describe("the Projects page", () => {
 });
 
 describe("the Project page", () => {
-  it("names the Project and shows its Workflow in order, marking the Gates", async () => {
+  it("names the Project, and keeps the Workflow for the tabs that show it", async () => {
     await mountAt("/projects/DEV");
 
     expect(await screen.findByRole("heading", { name: "deevy" })).toBeTruthy();
     // The sidebar lists the Projects too, so the page is asked, not the document.
     expect(within(screen.getByRole("main")).getByText("DEV")).toBeTruthy();
-    const workflow = screen.getByRole("list", { name: "Workflow" });
-    expect(
-      within(workflow)
-        .getAllByRole("listitem")
-        .map((li) => li.textContent),
-    ).toEqual(["IntentGate", "SpecGate", "PlanGate", "Build", "ReviewGate", "Done"]);
+    // The Issues tab groups by State and the Board's columns are the States: the
+    // header does not repeat them (2026-09-06).
+    expect(screen.queryByRole("list", { name: "Workflow" })).toBeNull();
   });
 
   it("offers the new-Issue form and says so when the Project has none", async () => {
