@@ -504,5 +504,5 @@ cool, earth); Matt asked for analogous variations only, so the six became rose &
 & azure, rose & periwinkle, sky & rose (roles swapped) and dusk. **He picked sky & rose**: Humans sky blue,
 Agents rose, Gates amber as the one warm colour, done green, indigo-tinted active dots. Baked into
 `index.css`; the swatches are `lib/label-colors.ts` (sky, rose, amber, indigo, green, red, slate, violet)
-and the Labels form is a `radiogroup "Colour"` over them; the seed's Labels use them; the candidates,
+and the Labels form is a `radiogroup "Color"` over them; the seed's Labels use them; the candidates,
 switcher and `/dev/tokens` per-palette sheets are gone.

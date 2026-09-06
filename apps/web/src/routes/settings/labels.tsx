@@ -53,7 +53,8 @@ export function LabelsPage() {
       }
     >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
+        // One grid: a label line, then a 32px control row, so the four labels and the four controls each sit on one line.
+        className="grid items-start gap-3 rounded-lg border bg-card p-4 sm:grid-cols-[10rem_minmax(0,1fr)_auto_auto]"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) {
@@ -70,7 +71,7 @@ export function LabelsPage() {
             onChange={(changed) => setScope(changed.target.value)}
           />
         </div>
-        <div className="flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <FieldLabel htmlFor="label-name">Name</FieldLabel>
           <Input
             id="label-name"
@@ -80,12 +81,12 @@ export function LabelsPage() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <FieldLabel id="label-color-label">Colour</FieldLabel>
-          {/* Eight colours in harmony with the palette, not a picker: a Label reads beside Human, Agent and Gate. */}
+          <FieldLabel id="label-color-label">Color</FieldLabel>
+          {/* Eight colors in harmony with the palette, not a picker: a Label reads beside Human, Agent and Gate. */}
           <div
             role="radiogroup"
             aria-labelledby="label-color-label"
-            className="flex items-center gap-1.5"
+            className="flex h-8 items-center gap-1.5"
           >
             {colors.map((candidate) => (
               <button
@@ -104,9 +105,15 @@ export function LabelsPage() {
             ))}
           </div>
         </div>
-        <Button type="submit" disabled={create.isPending || !name.trim()}>
-          Add Label
-        </Button>
+        <div className="flex flex-col gap-2">
+          {/* An empty label line, so the button shares the control row. */}
+          <FieldLabel aria-hidden className="invisible">
+            Add
+          </FieldLabel>
+          <Button type="submit" disabled={create.isPending || !name.trim()}>
+            Add Label
+          </Button>
+        </div>
       </form>
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}

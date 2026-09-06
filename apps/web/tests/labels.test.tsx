@@ -115,7 +115,7 @@ describe("the Label picker on an Issue", () => {
 describe("a Label's colour", () => {
   it("is one of the palette's swatches, not a free pick", async () => {
     await mountAt("/settings/labels");
-    const group = await screen.findByRole("radiogroup", { name: "Colour" });
+    const group = await screen.findByRole("radiogroup", { name: "Color" });
     const swatches = within(group).getAllByRole("radio");
     expect(swatches.length).toBe(8);
     fireEvent.click(swatches[2]!);
