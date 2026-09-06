@@ -66,3 +66,40 @@ export function SettingsSection({
     </section>
   );
 }
+
+/**
+ * One setting, as a row: what it is and a line on why, then the control that
+ * changes it. Rows sit in a plain column and rule against one another, so a
+ * tenth setting is a tenth row rather than a tenth card — a page of cards each
+ * holding a single field spends more frame than it frames (Matt, 2026-09-07).
+ * Stacked until the column is wide enough to put the control beside the label.
+ */
+export function SettingsRow({
+  label,
+  hint,
+  htmlFor,
+  children,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  /** Names the control this row is about, so the label is the control's label. */
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  const name = <span className="text-sm font-medium">{label}</span>;
+  return (
+    <div className="grid items-start gap-x-6 gap-y-3 border-t py-3.5 last:border-b @lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="w-fit cursor-pointer">
+            {name}
+          </label>
+        ) : (
+          name
+        )}
+        {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
+      </div>
+      <div className="flex min-w-0 flex-col items-start gap-2 @lg:items-end">{children}</div>
+    </div>
+  );
+}

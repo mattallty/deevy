@@ -129,7 +129,7 @@ describe("the app shell", () => {
     await mountAt("/settings/allowlist");
 
     expect(await screen.findByRole("heading", { level: 1, name: "Workspace" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: "Allowlist" })).toBeTruthy();
+    expect(screen.getByText("Who may join")).toBeTruthy();
     expect(
       screen.getByRole("navigation", { name: "Settings" }).querySelector('[aria-current="page"]')
         ?.textContent,
