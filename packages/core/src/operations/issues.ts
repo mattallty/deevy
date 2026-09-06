@@ -116,7 +116,19 @@ export const issues = {
        */
       after: z.coerce.number().int().nonnegative().optional(),
       stateId: z.string().optional(),
+      /**
+       * A State by name rather than id: States belong to a Project, and a
+       * Workspace-wide list spans Projects whose Workflows share names
+       * (Done is Done everywhere), so the name is what folds across them.
+       */
+      stateName: z.string().trim().min(1).max(100).optional(),
       assigneeMemberId: z.string().optional(),
+      /** Only Issues held by a Human, or only those held by an Agent. */
+      assigneeKind: z.enum(["human", "agent"]).optional(),
+      /** Only Issues nobody holds. */
+      unassigned: QueryFlag.optional(),
+      /** Only Issues held by an Agent this Human sponsors: "my Agents' Issues". */
+      sponsorMemberId: z.string().optional(),
       labelId: z.string().optional(),
       /** Only Issues whose State is not a `done` one. */
       open: QueryFlag.optional(),
@@ -126,6 +138,13 @@ export const issues = {
       issues: z.array(IssueSummarySchema),
       /** The number of the last Issue returned, or null when the page is empty. */
       nextCursor: z.number().int().nullable(),
+      /**
+       * Whether more Issues matched than the page holds. A Project's list
+       * turns the page with `after`; the Workspace-wide feed has no cursor,
+       * so this is how a screen knows to say "narrow the filters" rather
+       * than lie with a count.
+       */
+      hasMore: z.boolean(),
     }),
     handler: async ({ input, context }) => {
       const projects = input.projectKey
@@ -141,13 +160,22 @@ export const issues = {
         clauses.push({ number: { gt: input.after } });
       }
       if (input.q !== undefined) clauses.push(searchClause(input.q, projects));
-      const rows = await context.db.query.issue.findMany({
+      // The Assignee filters combine under AND: "Agents I sponsor, and this
+      // one in particular" is a narrower question, not a contradiction.
+      const assignee = {
+        ...(input.assigneeKind === undefined ? {} : { kind: input.assigneeKind }),
+        ...(input.sponsorMemberId === undefined ? {} : { sponsorId: input.sponsorMemberId }),
+      };
+      const page = await context.db.query.issue.findMany({
         where: {
           ...(only ? { projectId: only.id } : { projectId: { in: [...keyOf.keys()] } }),
           ...(input.stateId === undefined ? {} : { stateId: input.stateId }),
+          ...(input.stateName === undefined ? {} : { state: { name: input.stateName } }),
           ...(input.assigneeMemberId === undefined
             ? {}
             : { assigneeMemberId: input.assigneeMemberId }),
+          ...(input.unassigned ? { assigneeMemberId: { isNull: true } } : {}),
+          ...(Object.keys(assignee).length > 0 ? { assignee } : {}),
           ...(input.open ? { closedAt: { isNull: true } } : {}),
           ...(input.labelId === undefined ? {} : { labels: { id: input.labelId } }),
           ...(clauses.length > 0 ? { AND: clauses } : {}),
@@ -158,11 +186,14 @@ export const issues = {
         // Two changes in one millisecond would otherwise land in scan order,
         // so the id breaks the tie the same way every time.
         orderBy: input.projectKey ? { number: "asc" } : { updatedAt: "desc", id: "desc" },
-        limit: input.limit,
+        // One past the page, so `hasMore` costs no second query.
+        limit: input.limit + 1,
       });
+      const rows = page.slice(0, input.limit);
       return {
         issues: rows.map((row) => withKey(row, keyOf.get(row.projectId) ?? "")),
         nextCursor: input.projectKey ? (rows.at(-1)?.number ?? null) : null,
+        hasMore: page.length > input.limit,
       };
     },
   }),
@@ -436,14 +467,15 @@ type SearchClause = NonNullable<
 /**
  * What `q` means: `DEV-12` is exactly that Issue, a bare number is that number
  * in any Project (or a title containing it), anything else is a word of the
- * title. SQLite's LIKE is case-insensitive for ASCII, which is what a key or
- * a title is.
+ * title. A key whose Project does not exist here is a word of the title too
+ * ("Read ADR-0015 before touching ids" is found by `ADR-0015`). SQLite's LIKE
+ * is case-insensitive for ASCII, which is what a key or a title is.
  */
 function searchClause(q: string, projects: Array<{ id: string; key: string }>): SearchClause {
   const asKey = /^([A-Za-z]{2,6})-(\d+)$/.exec(q);
   if (asKey) {
     const project = projects.find((candidate) => candidate.key === asKey[1]?.toUpperCase());
-    return project ? { projectId: project.id, number: Number(asKey[2]) } : { number: -1 };
+    if (project) return { projectId: project.id, number: Number(asKey[2]) };
   }
   const title = titleContains(q);
   if (/^\d+$/.test(q)) return { OR: [{ number: Number(q) }, title] };

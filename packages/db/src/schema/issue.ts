@@ -39,5 +39,13 @@ export const issue = sqliteTable(
     index("issue_projectId_stateId_idx").on(table.projectId, table.stateId),
     index("issue_assignee_idx").on(table.assigneeMemberId),
     index("issue_parentId_idx").on(table.parentId),
+    /**
+     * The Workspace-wide feed (`issues.list` with no Project) orders every
+     * visible Project's Issues by `updated_at`; without this it sorts a scan
+     * of the table on a temporary b-tree, on every Issue Event that re-runs
+     * it. A `(project_id, updated_at)` pair would not help: the `IN` over
+     * Projects still sorts.
+     */
+    index("issue_updatedAt_idx").on(table.updatedAt),
   ],
 );

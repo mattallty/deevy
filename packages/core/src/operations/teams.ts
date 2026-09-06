@@ -123,11 +123,13 @@ export const teams = {
       if (already) return loadTeam(context.db, found.id);
 
       await context.db.insert(teamMemberTable).values({ teamId: found.id, memberId: target.id });
+      // The name beside the id, so the log reads without a lookup (docs/plans/ui-redesign-2.md D).
+      const added = await context.db.query.user.findFirst({ where: { id: target.userId } });
       await appendEvent(context, {
         kind: "team.member_added",
         subjectType: "team",
         subjectId: found.id,
-        payload: { memberId: target.id },
+        payload: { memberId: target.id, memberName: added?.name ?? null, teamName: found.name },
       });
       return loadTeam(context.db, found.id);
     },
@@ -153,11 +155,19 @@ export const teams = {
         .where(
           and(eq(teamMemberTable.teamId, found.id), eq(teamMemberTable.memberId, input.memberId)),
         );
+      const removed = await context.db.query.member.findFirst({
+        where: { id: input.memberId },
+        with: { user: true },
+      });
       await appendEvent(context, {
         kind: "team.member_removed",
         subjectType: "team",
         subjectId: found.id,
-        payload: { memberId: input.memberId },
+        payload: {
+          memberId: input.memberId,
+          memberName: removed?.user.name ?? null,
+          teamName: found.name,
+        },
       });
       return loadTeam(context.db, found.id);
     },

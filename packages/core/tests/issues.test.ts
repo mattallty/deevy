@@ -224,6 +224,90 @@ describe("issues.list across the Workspace", () => {
     expect(await keys("ZZZ-9")).toEqual([]);
   });
 
+  it("reads a key no Project here has as a word of the title", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    await client.issues.create({ projectKey: "DEV", title: "Read ADR-0015 before touching ids" });
+    await client.issues.create({ projectKey: "DEV", title: "Nothing to do with it" });
+
+    const found = await client.issues.list({ q: "ADR-0015" });
+    expect(found.issues.map((issue) => issue.key)).toEqual(["DEV-1"]);
+    // A key of a Project that does exist is still exactly that Issue.
+    expect((await client.issues.list({ q: "DEV-2" })).issues.map((issue) => issue.key)).toEqual([
+      "DEV-2",
+    ]);
+  });
+
+  it("filters by State name, by the Assignee's kind, by nobody, and by Sponsor", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client, project } = await withProject(db);
+    await client.projects.create({ name: "Operations", key: "OPS" });
+    const grace = await memberContext(db, { name: "Grace" });
+    const planner = await agentContext(db, { sponsor: admin.member, grants: [project.id] });
+    const builder = await agentContext(db, {
+      name: "Builder",
+      sponsor: grace.member,
+      grants: [project.id],
+    });
+    await client.issues.create({ projectKey: "DEV", title: "Nobody's" });
+    await client.issues.create({
+      projectKey: "DEV",
+      title: "Ada's",
+      assigneeMemberId: admin.member.id,
+    });
+    await client.issues.create({
+      projectKey: "DEV",
+      title: "Planner's",
+      assigneeMemberId: planner.member.id,
+    });
+    await client.issues.create({
+      projectKey: "OPS",
+      title: "Builder's",
+      assigneeMemberId: builder.member.id,
+    });
+    // Intent is a Gate, so a ruling is what moves DEV-2 on, into Spec.
+    await client.gates.approve({ key: "DEV-2" });
+
+    const titles = async (input: Parameters<typeof client.issues.list>[0]) =>
+      (await client.issues.list(input)).issues.map((issue) => issue.title).sort();
+    expect(await titles({ stateName: "Spec" })).toEqual(["Ada's"]);
+    expect(await titles({ stateName: "Intent" })).toEqual(["Builder's", "Nobody's", "Planner's"]);
+    expect(await titles({ assigneeKind: "human" })).toEqual(["Ada's"]);
+    expect(await titles({ assigneeKind: "agent" })).toEqual(["Builder's", "Planner's"]);
+    expect(await titles({ unassigned: true })).toEqual(["Nobody's"]);
+    expect(await titles({ sponsorMemberId: admin.member.id })).toEqual(["Planner's"]);
+    expect(await titles({ sponsorMemberId: grace.member.id })).toEqual(["Builder's"]);
+    // The filters narrow together.
+    expect(await titles({ assigneeKind: "agent", stateName: "Intent", projectKey: "DEV" })).toEqual(
+      ["Planner's"],
+    );
+  });
+
+  it("says when more matched than the page holds", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    for (const title of ["One", "Two", "Three"]) {
+      await client.issues.create({ projectKey: "DEV", title });
+    }
+
+    const short = await client.issues.list({ limit: 2 });
+    expect(short.issues).toHaveLength(2);
+    expect(short.hasMore).toBe(true);
+    const whole = await client.issues.list({ limit: 3 });
+    expect(whole.issues).toHaveLength(3);
+    expect(whole.hasMore).toBe(false);
+    // A Project's page says so too, beside its cursor.
+    const paged = await client.issues.list({ projectKey: "DEV", limit: 2 });
+    expect(paged).toMatchObject({ nextCursor: 2, hasMore: true });
+    expect(await client.issues.list({ projectKey: "DEV", after: 2, limit: 2 })).toMatchObject({
+      nextCursor: 3,
+      hasMore: false,
+    });
+  });
+
   it("takes % and _ in q literally, rather than as LIKE's wildcards", async () => {
     const { db, close } = testDb();
     closers.push(close);

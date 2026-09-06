@@ -181,6 +181,32 @@ describe("events.list by kind family", () => {
   });
 });
 
+describe("events.list actors", () => {
+  it("carries who did each Event, and null for what deevy did itself", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const context = await memberContext(db, { name: "Ada" });
+    await appendEvent(
+      { db, workspace: context.workspace, member: null },
+      { kind: "workspace.created", subjectType: "workspace", subjectId: context.workspace.id },
+    );
+    await appendEvent(context, {
+      kind: "member.joined",
+      subjectType: "member",
+      subjectId: context.member.id,
+    });
+
+    const client = createRouterClient(router, { context });
+    const page = await client.events.list({});
+
+    expect(page.events.map((e) => [e.kind, e.actor?.user.name ?? null])).toEqual([
+      ["workspace.created", null],
+      ["member.joined", "Ada"],
+    ]);
+    expect(page.events[1]?.actor).toMatchObject({ id: context.member.id, kind: "human" });
+  });
+});
+
 describe("events.list scoping", () => {
   it("never returns Events belonging to another Workspace", async () => {
     const { db, close } = testDb();

@@ -1082,6 +1082,67 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "lastActivities": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "runId": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "thought",
+                                    "action",
+                                    "elicitation",
+                                    "response",
+                                    "error",
+                                    "prompt"
+                                  ]
+                                },
+                                "body": {
+                                  "type": "string"
+                                },
+                                "payload": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "propertyNames": {
+                                        "type": "string"
+                                      },
+                                      "additionalProperties": {}
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "runId",
+                                "kind",
+                                "body",
+                                "payload",
+                                "createdAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "activityCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
                           }
                         },
                         "required": [
@@ -1095,7 +1156,9 @@
                           "startedAt",
                           "lastActivityAt",
                           "finishedAt",
-                          "createdAt"
+                          "createdAt",
+                          "lastActivities",
+                          "activityCount"
                         ],
                         "additionalProperties": false
                       }
@@ -1787,6 +1850,125 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "actor": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "workspaceId": {
+                                    "type": "string"
+                                  },
+                                  "userId": {
+                                    "type": "string"
+                                  },
+                                  "handle": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "role": {
+                                    "type": "string",
+                                    "enum": [
+                                      "admin",
+                                      "member"
+                                    ]
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "human",
+                                      "agent"
+                                    ]
+                                  },
+                                  "sponsorId": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  },
+                                  "suspendedAt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "x-native-type": "date"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "user": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "email": {
+                                        "type": "string"
+                                      },
+                                      "image": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "kind": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "human",
+                                              "agent"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "email",
+                                      "image",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "workspaceId",
+                                  "userId",
+                                  "handle",
+                                  "role",
+                                  "kind",
+                                  "sponsorId",
+                                  "createdAt",
+                                  "suspendedAt",
+                                  "user"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -1798,7 +1980,8 @@
                           "subjectId",
                           "projectId",
                           "payload",
-                          "createdAt"
+                          "createdAt",
+                          "actor"
                         ],
                         "additionalProperties": false
                       }
@@ -8387,7 +8570,54 @@
           },
           {
             "in": "query",
+            "name": "stateName",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "in": "query",
             "name": "assigneeMemberId",
+            "schema": {
+              "type": "string"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "in": "query",
+            "name": "assigneeKind",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent"
+              ]
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "in": "query",
+            "name": "unassigned",
+            "schema": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true,
+            "style": "deepObject",
+            "explode": true
+          },
+          {
+            "in": "query",
+            "name": "sponsorMemberId",
             "schema": {
               "type": "string"
             },
@@ -8773,11 +9003,15 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "hasMore": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "issues",
-                    "nextCursor"
+                    "nextCursor",
+                    "hasMore"
                   ],
                   "additionalProperties": false
                 }
