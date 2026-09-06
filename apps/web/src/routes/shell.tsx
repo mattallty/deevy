@@ -120,7 +120,10 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
                   size="lg"
                   tooltip={workspaceName}
                   render={<Link to="/" />}
-                  className="font-semibold"
+                  // Folded, `size="lg"` sets `p-0`, which left-aligns the size-6
+                  // badge in a size-8 box: 4px off the column every other icon
+                  // keeps. Centre it there and the rail reads as one column.
+                  className="font-semibold group-data-[collapsible=icon]:justify-center"
                 >
                   <span
                     aria-hidden
@@ -128,7 +131,11 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
                   >
                     {workspaceName.slice(0, 1).toUpperCase()}
                   </span>
-                  <span className="truncate">{workspaceName}</span>
+                  {/* Gone when folded, gap and all: left in, its `gap-2` alone is
+                      the 4px that pushed the badge off the rail's centre line. */}
+                  <span className="truncate group-data-[collapsible=icon]:hidden">
+                    {workspaceName}
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -306,7 +313,7 @@ function MemberMenu({
   };
 }) {
   const { theme, setTheme } = useTheme();
-  // Folded to icons (the Settings area does this), the trigger is the avatar alone.
+  // Folded to icons, the trigger is the avatar alone.
   const folded = useSidebar().state === "collapsed";
   return (
     <DropdownMenu>
@@ -321,9 +328,20 @@ function MemberMenu({
         className={cn(
           sidebarMenuButtonVariants({ size: "lg" }),
           "min-w-0 group-data-[collapsible=icon]:justify-center",
+          // The avatar's ring and its offset are drawn outside its box, which
+          // together are the folded button's whole width; clipping is what
+          // shaved the ring's left off, so folded it does not clip.
+          "group-data-[collapsible=icon]:overflow-visible",
         )}
       >
-        <MemberChip member={me} size="md" className="min-w-0 flex-1" avatarOnly={folded} />
+        {/* Folded, the chip must not stretch: `flex-1` parks the avatar against
+            the button's left edge, and `justify-center` then has nothing to move. */}
+        <MemberChip
+          member={me}
+          size="md"
+          className={cn("min-w-0", folded ? "shrink-0" : "flex-1")}
+          avatarOnly={folded}
+        />
         <ChevronsUpDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56">

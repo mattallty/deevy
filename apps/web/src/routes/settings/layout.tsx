@@ -1,6 +1,4 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
-import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 export interface SettingsNavPage {
@@ -50,20 +48,12 @@ export const settingsNav: Array<{ group: string; pages: SettingsNavPage[] }> = [
 
 /**
  * The frame every Settings page sits in: a second, narrower navigation beside
- * the page, with the primary sidebar folded to its icons so the two levels
- * read as two levels.
+ * the page. It leaves the primary sidebar alone — this nav's own border, group
+ * headings and active tint already read as the second level, and folding
+ * somebody's sidebar for them was a jolt on the way in and again on the way
+ * out (Matt, 2026-09-07).
  */
 export function SettingsLayout() {
-  const { open, setOpen } = useSidebar();
-  // Folded while here, and put back the way it was found on the way out — a
-  // Human who keeps the sidebar folded does not get it unfolded by visiting.
-  const before = useRef(open);
-  useEffect(() => {
-    const was = before.current;
-    setOpen(false);
-    return () => setOpen(was);
-  }, [setOpen]);
-
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   return (
@@ -124,7 +114,7 @@ export function SettingsLayout() {
             }),
           )}
         </nav>
-        <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col">
+        <div className="mx-auto flex w-full max-w-[1100px] flex-1 flex-col">
           <Outlet />
         </div>
       </div>
