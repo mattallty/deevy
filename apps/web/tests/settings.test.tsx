@@ -38,7 +38,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
 
 const { MembersPage } = await import("../src/routes/settings/members.tsx");
 const { mount } = await import("./mount.tsx");
-const { AllowlistPage } = await import("../src/routes/settings/allowlist.tsx");
+const { AllowlistSection } = await import("../src/routes/settings/allowlist.tsx");
 
 describe("the Members settings page", () => {
   it("lists every Member with their role and handle", async () => {
@@ -58,9 +58,9 @@ describe("the Members settings page", () => {
   });
 });
 
-describe("the allowlist settings page", () => {
+describe("the Allowlist section of Workspace › General", () => {
   it("lists the rules that admit a sign-in", async () => {
-    mount(<AllowlistPage />);
+    mount(<AllowlistSection />);
 
     const rules = await screen.findByRole("table");
     expect(within(rules).getByText("example.com")).toBeTruthy();

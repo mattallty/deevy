@@ -18,7 +18,6 @@ export const settingsNav: Array<{ group: string; pages: SettingsNavPage[] }> = [
       { label: "General", to: "/settings/workspace" },
       { label: "Members", to: "/settings/members" },
       { label: "Teams", to: "/settings/teams" },
-      { label: "Allowlist", to: "/settings/allowlist" },
       { label: "Event log", to: "/settings/events" },
     ],
   },

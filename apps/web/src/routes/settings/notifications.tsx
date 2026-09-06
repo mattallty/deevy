@@ -79,7 +79,7 @@ export function NotificationsPage() {
           <TableBody>
             {draft.map((row) => (
               <TableRow key={row.kind}>
-                <TableCell className="font-medium">{labels[row.kind] ?? row.kind}</TableCell>
+                <TableCell>{labels[row.kind] ?? row.kind}</TableCell>
                 <TableCell className="w-24">
                   <div className="flex justify-center">
                     <Checkbox

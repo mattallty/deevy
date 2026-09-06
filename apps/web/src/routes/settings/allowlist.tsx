@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SettingsPage } from "@/components/settings-page";
+import { SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 const kindLabels = {
@@ -25,9 +25,11 @@ type RuleKind = keyof typeof kindLabels;
 
 /**
  * M1 admits teammates by rule rather than by invitation: any sign-in matching a
- * rule below joins the Workspace as a Member.
+ * rule below joins the Workspace as a Member. A section rather than a page of
+ * its own: who may join is a fact about the Workspace, so it sits under
+ * Workspace › General beside the name (Matt, 2026-09-07).
  */
-export function AllowlistPage() {
+export function AllowlistSection() {
   const queryClient = useQueryClient();
   const rules = useQuery(orpc.allowlist.list.queryOptions({ input: {} }));
   const refresh = () => queryClient.invalidateQueries({ queryKey: orpc.allowlist.key() });
@@ -78,12 +80,14 @@ export function AllowlistPage() {
   ];
 
   return (
-    <SettingsPage
+    <SettingsSection
+      aria-label="Allowlist"
       title="Allowlist"
-      description={<>A sign-in matching any rule below joins this Workspace as a Member.</>}
+      description="A sign-in matching any rule below joins this Workspace as a Member."
     >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
+        // The section is the card; the form does not draw a second one.
+        className="flex flex-wrap items-end gap-3"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (value.trim()) add.mutate({ kind, value: value.trim() });
@@ -138,6 +142,6 @@ export function AllowlistPage() {
           }}
         />
       )}
-    </SettingsPage>
+    </SettingsSection>
   );
 }
