@@ -18,8 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { describeEvent, type EventText, type EventTone } from "@/lib/event-text";
-import { useMentionables } from "@/lib/mentions";
+import { describeEvent, toneDotClass as dot, type EventText } from "@/lib/event-text";
+import { useEventContext, useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 import { ago } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -53,15 +53,6 @@ type Row =
   | { type: "fold"; id: string; entries: EventEntry[] };
 
 type Filter = "all" | "comments" | "changes";
-
-/** The dot's colour by what the item is: a Gate amber, an Agent teal, a Human copper. */
-const dot: Record<EventTone, string> = {
-  human: "border-human bg-human/15",
-  agent: "border-agent bg-agent/15",
-  gate: "border-gate bg-gate/25",
-  muted: "border-border bg-muted",
-  destructive: "border-destructive bg-destructive/15",
-};
 
 /**
  * Fold an Agent's run of routine steps — a Run started, a Document written —
@@ -118,8 +109,8 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
     }),
   );
   const eventsTruncated = (events.data?.events.length ?? 0) >= 500;
-  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
-  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
+  // Names for what an older payload only numbers; the actor rides on the Event.
+  const eventContext = useEventContext();
   const mentionables = useMentionables();
   const [filter, setFilter] = useState<Filter>("all");
   const [body, setBody] = useState("");
@@ -138,21 +129,6 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
     }),
   );
 
-  const memberById = useMemo(
-    () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
-    [members.data],
-  );
-  const labelById = useMemo(
-    () =>
-      new Map(
-        (labels.data?.labels ?? []).map((label) => [
-          label.id,
-          label.scope ? `${label.scope}: ${label.name}` : label.name,
-        ]),
-      ),
-    [labels.data],
-  );
-
   const entries = useMemo<Entry[]>(() => {
     const list: Entry[] = [];
     for (const comment of comments.data?.comments ?? []) {
@@ -168,13 +144,10 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
     }
     for (const event of events.data?.events ?? []) {
       if (event.kind.startsWith("comment.")) continue;
-      const actor = event.actorMemberId ? (memberById.get(event.actorMemberId) ?? null) : null;
+      const actor = event.actor ?? null;
       const said = describeEvent(
         { kind: event.kind, payload: event.payload, actorKind: actor?.kind ?? null },
-        {
-          memberName: (id) => memberById.get(id)?.user.name,
-          labelName: (id) => labelById.get(id),
-        },
+        eventContext,
       );
       if (!said) continue;
       list.push({
@@ -186,7 +159,7 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
       });
     }
     return list.sort((a, b) => a.at.getTime() - b.at.getTime());
-  }, [comments.data, events.data, memberById, labelById]);
+  }, [comments.data, events.data, eventContext]);
 
   const rows = useMemo(
     () =>

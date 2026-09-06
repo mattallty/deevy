@@ -196,9 +196,13 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
   takes `q` — an Issue key, a number, or a word of the title. Its REST path is `/issues`, with everything as
   query parameters; MCP and RPC callers name it the same as before. One list per screen, never a fan-out.
 - **Filters live in the URL** (`components/issue-filters.tsx`: `IssuesSearch`, `parseIssuesSearch`), so a
-  view is a link and Back undoes a filter. The server filters Project, Assignee, open and `q`; State (by
-  name, folded across Projects), Human/Agent and "my Agents" fold client-side. `assignee=me` becomes the
-  Member id from `me.get`; `agents:me` is the Agents whose `sponsorId` is me.
+  view is a link and Back undoes a filter. **Every filter is the server's** (2026-09-06, #10): `issueFilterInput(search, myId, projectKey?)` turns the URL into
+  the one `issues.list` input the Issues home, the Board and the palette send — `stateName` (a name, folded
+  across Projects), `assigneeKind`, `unassigned`, `sponsorMemberId` for "my Agents", `assigneeMemberId`
+  for `me` — and returns null while `me.get` has not said who "me" is. Nothing folds over the page in the
+  browser any more: past 200 Issues that fold lied. The list holds `ISSUE_PAGE` (200) and the server says
+  `hasMore`; the page then reads "Showing the first 200 Issues. Narrow the filters to see the rest." and
+  the count is "200+".
 - **`components/data-table.tsx`** is hand-rolled on `ui/table`: client sort per column, group rows that
   fold, skeleton, `Empty`, `aria-selected` on the keyboard row. No TanStack Table — it went to v9 with a new
   API and this list needs none of a grid. A row's accessible name is its text.

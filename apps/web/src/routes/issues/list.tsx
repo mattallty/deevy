@@ -10,7 +10,13 @@ import {
   type BoardColumn,
   type BoardIssue,
 } from "@/components/issue-board";
-import { IssueFilters, type FilterState, type IssuesSearch } from "@/components/issue-filters";
+import {
+  ISSUE_PAGE,
+  IssueFilters,
+  issueFilterInput,
+  type FilterState,
+  type IssuesSearch,
+} from "@/components/issue-filters";
 import { MemberChip } from "@/components/member-chip";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
@@ -31,9 +37,9 @@ const byStateName = (issue: BoardIssue) => issue.state.name;
 /**
  * The home screen: every Issue you may see, filtered by the URL, grouped by
  * State, with one open beside the list (docs/plans/ui-redesign.md slice 2).
- * One `issues.list` per view — the server does the Project, Assignee and open
- * filters and the search; State, kind and "my Agents" fold client-side, since
- * they are about names and Sponsors the list already carries.
+ * One `issues.list` per view, and every filter is the server's
+ * (`issueFilterInput`), so a count is a count and a match past the page is
+ * said to exist rather than lost; the page holds the first ISSUE_PAGE.
  */
 export function IssuesPage({
   search,
@@ -65,25 +71,13 @@ export function IssuesPage({
     [memberList, myId],
   );
 
-  // What the server can filter, it filters.
-  const assigneeMemberId =
-    search.assignee === "me"
-      ? (myId ?? undefined)
-      : search.assignee && !["agents:me", "none"].includes(search.assignee)
-        ? search.assignee
-        : undefined;
   const projectKey = fixedProject ?? search.project;
+  const filterInput = issueFilterInput(search, myId, projectKey);
   const issues = useQuery(
     orpc.issues.list.queryOptions({
-      input: {
-        ...(projectKey ? { projectKey } : {}),
-        ...(assigneeMemberId ? { assigneeMemberId } : {}),
-        ...(search.open === "0" ? {} : { open: true }),
-        ...(search.q ? { q: search.q } : {}),
-        limit: 200,
-      },
+      input: filterInput ?? { limit: ISSUE_PAGE },
       // "Me" cannot be asked for until we know who that is.
-      enabled: search.assignee !== "me" || myId !== null,
+      enabled: filterInput !== null,
     }),
   );
 
@@ -163,17 +157,8 @@ export function IssuesPage({
     };
   })();
 
-  const rows = useMemo(() => {
-    const all = (issues.data?.issues ?? []) as IssueRow[];
-    return all.filter((issue) => {
-      if (search.state && issue.state.name !== search.state) return false;
-      if (search.kind && issue.assignee?.kind !== search.kind) return false;
-      if (search.assignee === "none" && issue.assignee) return false;
-      if (search.assignee === "agents:me" && !(issue.assignee && myAgentIds.has(issue.assignee.id)))
-        return false;
-      return true;
-    });
-  }, [issues.data, search.state, search.kind, search.assignee, myAgentIds]);
+  const rows = useMemo(() => (issues.data?.issues ?? []) as IssueRow[], [issues.data]);
+  const truncated = issues.data?.hasMore ?? false;
 
   // Every State name across the visible Projects, in Workflow order (lib/states.ts).
   const folded = useMemo(
@@ -373,8 +358,9 @@ export function IssuesPage({
           ? (projects.data?.projects.find((p) => p.key === search.project)?.name ?? search.project)
           : "All Issues";
 
+  // "200+" when the page is full and more matched: a count that is not one says so.
   const count = issues.data
-    ? `${String(rows.length)} ${rows.length === 1 ? "Issue" : "Issues"}${search.open === "0" ? "" : " open"}`
+    ? `${String(rows.length)}${truncated ? "+" : ""} ${rows.length === 1 ? "Issue" : "Issues"}${search.open === "0" ? "" : " open"}`
     : undefined;
   const filters = (
     <IssueFilters
@@ -429,6 +415,12 @@ export function IssuesPage({
           empty={emptyState}
         />
       )}
+
+      {truncated ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          Showing the first {ISSUE_PAGE} Issues. Narrow the filters to see the rest.
+        </p>
+      ) : null}
 
       <SidePeek
         issueKey={search.peek ?? null}

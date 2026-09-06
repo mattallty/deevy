@@ -1,4 +1,4 @@
-import { useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { matchQuery, useQueryClient, type Query, type QueryKey } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { client, orpc } from "@/lib/orpc";
 
@@ -69,6 +69,18 @@ export function keysFor(event: LiveEvent): QueryKey[] {
 export const COALESCE_MS = 16;
 
 /**
+ * Whether an Event could still change what a query holds. A finished Run's
+ * detail never changes — its Activities are written, its clocks stopped — so
+ * an Issue with twenty-five finished Runs does not re-read all of them on
+ * every Activity tick of the one still working (review of #8, item 3).
+ */
+export function stillChanging(query: Query): boolean {
+  if (!matchQuery({ queryKey: orpc.runs.get.key() }, query)) return true;
+  const data = query.state.data as { finishedAt?: unknown } | undefined;
+  return !data?.finishedAt;
+}
+
+/**
  * Keeps this browser in step with the Workspace by reading the Event log as it
  * happens (docs/plans/m1.md slice 7). Every Event invalidates the queries that
  * could show it, so nothing here decides what changed: the Event log does.
@@ -94,7 +106,11 @@ export function useLiveEvents(enabled: boolean) {
         flush = null;
         const batch = [...pending.values()];
         pending.clear();
-        void Promise.all(batch.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+        void Promise.all(
+          batch.map((queryKey) =>
+            queryClient.invalidateQueries({ queryKey, predicate: stillChanging }),
+          ),
+        );
       }, COALESCE_MS);
     }
 

@@ -30,6 +30,7 @@ import {
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { toneClass } from "@/lib/event-text";
 import { describeNotification, type NotificationTone } from "@/lib/notification-text";
 import { orpc } from "@/lib/orpc";
 import { useShortcut } from "@/lib/shortcuts";
@@ -62,13 +63,6 @@ function glyphFor(kind: string, tone: NotificationTone): LucideIcon {
   if (kind === "run_awaiting_input") return Bot;
   return CircleCheck;
 }
-const toneClass: Record<NotificationTone, string> = {
-  human: "text-human",
-  agent: "text-agent",
-  gate: "text-gate-foreground dark:text-gate",
-  muted: "text-muted-foreground",
-  destructive: "text-destructive",
-};
 
 /**
  * What needs you, and the Issue it is about, side by side (docs/plans/

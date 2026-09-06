@@ -8,6 +8,27 @@
  */
 export type EventTone = "human" | "agent" | "gate" | "muted" | "destructive";
 
+/**
+ * The colour a tone takes on screen, as text: the one map the Inbox glyph,
+ * the Event log's kind and any other row that speaks in a tone read from.
+ */
+export const toneClass: Record<EventTone, string> = {
+  human: "text-human",
+  agent: "text-agent",
+  gate: "text-gate-foreground dark:text-gate",
+  muted: "text-muted-foreground",
+  destructive: "text-destructive",
+};
+
+/** The same tones as a timeline dot: an edge in the hue, a tint inside. */
+export const toneDotClass: Record<EventTone, string> = {
+  human: "border-human bg-human/15",
+  agent: "border-agent bg-agent/15",
+  gate: "border-gate bg-gate/25",
+  muted: "border-border bg-muted",
+  destructive: "border-destructive bg-destructive/15",
+};
+
 export interface EventText {
   text: string;
   detail: string | null;
@@ -219,9 +240,13 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
     case "team.deleted":
       return say(`deleted the Team ${str(p.name) ?? ""}`, null, "destructive");
     case "team.member_added":
-      return say(`added ${member(p.memberId, null) ?? "a Member"} to the Team`);
+      return say(
+        `added ${member(p.memberId, p.memberName) ?? "a Member"} to the Team${str(p.teamName) ? ` ${str(p.teamName) ?? ""}` : ""}`,
+      );
     case "team.member_removed":
-      return say(`removed ${member(p.memberId, null) ?? "a Member"} from the Team`);
+      return say(
+        `removed ${member(p.memberId, p.memberName) ?? "a Member"} from the Team${str(p.teamName) ? ` ${str(p.teamName) ?? ""}` : ""}`,
+      );
     case "workflow.updated":
       return say(`set the Workflow to ${list(p.states).join(" → ")}`);
     case "label.created":

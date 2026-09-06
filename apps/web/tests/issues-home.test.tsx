@@ -60,7 +60,11 @@ const issue = (
   createdAt: new Date("2026-09-05T09:00:00Z"),
 });
 
-const stub = vi.hoisted(() => ({ listed: [] as unknown[] }));
+const stub = vi.hoisted(() => ({
+  listed: [] as unknown[],
+  /** How many Issues a page holds; the real server caps at 200, a test at fewer. */
+  pageSize: Number.POSITIVE_INFINITY,
+}));
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
@@ -84,17 +88,31 @@ vi.mock("../src/lib/orpc.ts", async () => {
       }),
     },
     issues: {
-      list: async (input: unknown) => {
+      // Filters the way the server does, so what the page shows is what it asked for.
+      list: async (input: {
+        stateName?: string;
+        assigneeKind?: string;
+        unassigned?: boolean;
+        sponsorMemberId?: string;
+        assigneeMemberId?: string;
+        limit?: number;
+      }) => {
         stub.listed.push(input);
-        return {
-          issues: [
-            issue("DEV-1", "Ship the Event log", intent, ada),
-            issue("DEV-2", "Retry webhook deliveries", build, planner),
-            issue("DEV-3", "Already shipped", done, null),
-            issue("OPS-1", "Rotate the secret", todo, null),
-          ],
-          nextCursor: null,
-        };
+        const all = [
+          issue("DEV-1", "Ship the Event log", intent, ada),
+          issue("DEV-2", "Retry webhook deliveries", build, planner),
+          issue("DEV-3", "Already shipped", done, null),
+          issue("OPS-1", "Rotate the secret", todo, null),
+        ].filter(
+          (row) =>
+            (!input.stateName || row.state.name === input.stateName) &&
+            (!input.assigneeKind || row.assignee?.kind === input.assigneeKind) &&
+            (!input.unassigned || row.assignee === null) &&
+            (!input.sponsorMemberId || row.assignee?.sponsorId === input.sponsorMemberId) &&
+            (!input.assigneeMemberId || row.assignee?.id === input.assigneeMemberId),
+        );
+        const limit = Math.min(input.limit ?? 50, stub.pageSize);
+        return { issues: all.slice(0, limit), nextCursor: null, hasMore: all.length > limit };
       },
       get: async () => ({
         ...issue("DEV-1", "Ship the Event log", intent, ada),
@@ -164,13 +182,43 @@ describe("the Issues home", () => {
     expect(within(table).getByRole("row", { name: /DEV-1/ })).toBeTruthy();
   });
 
-  it("offers My Agents to a Sponsor and folds their Issues client-side", async () => {
+  it("offers My Agents to a Sponsor and asks the server for their Issues", async () => {
     await mountAt("/?assignee=agents:me");
 
     expect(await screen.findByRole("heading", { name: "My Agents' Issues" })).toBeTruthy();
     const table = await screen.findByRole("table", { name: "Issues" });
     expect(within(table).getByRole("row", { name: /DEV-2/ })).toBeTruthy();
     expect(within(table).queryByRole("row", { name: /DEV-1/ })).toBeNull();
+    // The Sponsor, not a fold over the page: past 200 Issues the fold lied.
+    expect(stub.listed.at(-1)).toMatchObject({ sponsorMemberId: "m-ada" });
+    expect(stub.listed.at(-1)).not.toHaveProperty("assigneeMemberId");
+  });
+
+  it("sends every filter to the server: State by name, kind, and Unassigned", async () => {
+    await mountAt("/?state=Build&kind=agent");
+    const table = await screen.findByRole("table", { name: "Issues" });
+    expect(within(table).getByRole("row", { name: /DEV-2/ })).toBeTruthy();
+    expect(within(table).queryByRole("row", { name: /DEV-1/ })).toBeNull();
+    expect(stub.listed.at(-1)).toMatchObject({ stateName: "Build", assigneeKind: "agent" });
+
+    await mountAt("/?assignee=none");
+    await waitFor(() => expect(stub.listed.at(-1)).toMatchObject({ unassigned: true }));
+  });
+
+  it("says when the page is the first 200 of more, and counts with a plus", async () => {
+    stub.pageSize = 2;
+    try {
+      await mountAt("/");
+      const table = await screen.findByRole("table", { name: "Issues" });
+      expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
+      expect(stub.listed.at(-1)).toMatchObject({ limit: 200 });
+      expect(
+        screen.getByText("Showing the first 200 Issues. Narrow the filters to see the rest."),
+      ).toBeTruthy();
+      expect(screen.getByText("2+ Issues open")).toBeTruthy();
+    } finally {
+      stub.pageSize = Number.POSITIVE_INFINITY;
+    }
   });
 
   it("writes a filter to the URL", async () => {

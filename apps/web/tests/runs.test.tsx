@@ -24,6 +24,8 @@ const stub = vi.hoisted(() => {
       finishedAt: new Date("2026-09-04T10:20:00Z"),
     },
     answer: vi.fn(async () => ({ run: {}, activity: {} })),
+    /** Which Runs' details were asked for; a folded, finished Run's should not be. */
+    fetched: [] as string[],
     gated: { ...base, id: "run-gated", status: "awaiting_input" as const },
     activities: {
       "run-waiting": [
@@ -94,8 +96,19 @@ vi.mock("../src/lib/orpc.ts", async () => {
       list: async () => ({ members: [{ id: "m-ada", user: { name: "Ada" } }] }),
     },
     runs: {
-      list: async () => ({ runs: [stub.waiting, stub.gated, stub.done], nextCursor: null }),
-      get: async ({ runId }: { runId: string }) => ({ activities: stub.activities[runId] ?? [] }),
+      // The list carries each Run's last three Activities, as the server's does.
+      list: async () => ({
+        runs: [stub.waiting, stub.gated, stub.done].map((run) => ({
+          ...run,
+          lastActivities: (stub.activities[run.id] ?? []).slice(-3),
+          activityCount: (stub.activities[run.id] ?? []).length,
+        })),
+        nextCursor: null,
+      }),
+      get: async ({ runId }: { runId: string }) => {
+        stub.fetched.push(runId);
+        return { ...stub.done, id: runId, activities: stub.activities[runId] ?? [] };
+      },
       answer: stub.answer,
     },
   });
@@ -161,5 +174,17 @@ describe("the Runs section on an Issue", () => {
       .map((item) => item.getAttribute("data-kind"));
     expect(kinds).toEqual(["thought", "action", "elicitation"]);
     expect(within(feed).getByText("Reading intent v2")).toBeTruthy();
+  });
+
+  it("reads a finished Run's whole feed only when it is opened", async () => {
+    stub.fetched.length = 0;
+    mount(<IssueRuns issueKey="DEV-1" />);
+
+    const done = await screen.findByRole("article", { name: /run-done/i });
+    await within(done).findByRole("list", { name: /Activity of run-done/ });
+    // The waiting Runs need their feeds (the Gate they asked about is in
+    // them); the finished one shows what the list carried.
+    await waitFor(() => expect(stub.fetched).toContain("run-waiting"));
+    expect(stub.fetched).not.toContain("run-done");
   });
 });

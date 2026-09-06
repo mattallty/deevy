@@ -55,6 +55,37 @@ export function parseIssuesSearch(search: Record<string, unknown>): IssuesSearch
   };
 }
 
+/** How many Issues one list asks for: the server's maximum, and what "Showing the first…" counts. */
+export const ISSUE_PAGE = 200;
+
+/**
+ * What the server is asked for, from the filters in the URL: every one of
+ * them, since `issues.list` filters State (by name, folded across Projects),
+ * the Assignee's kind, Unassigned and "my Agents" itself. `me` and `agents:me`
+ * need the signed-in Member's id, so until it is known there is nothing to
+ * ask, and null says so. The Issues home and the Board send the same thing.
+ */
+export function issueFilterInput(search: IssuesSearch, myId: string | null, projectKey?: string) {
+  const mine = search.assignee === "me" || search.assignee === "agents:me";
+  if (mine && myId === null) return null;
+  const named =
+    search.assignee && !["me", "agents:me", "none"].includes(search.assignee)
+      ? search.assignee
+      : undefined;
+  return {
+    ...(projectKey ? { projectKey } : {}),
+    ...(search.state ? { stateName: search.state } : {}),
+    ...(search.kind ? { assigneeKind: search.kind } : {}),
+    ...(search.assignee === "me" && myId ? { assigneeMemberId: myId } : {}),
+    ...(search.assignee === "agents:me" && myId ? { sponsorMemberId: myId } : {}),
+    ...(search.assignee === "none" ? { unassigned: true } : {}),
+    ...(named ? { assigneeMemberId: named } : {}),
+    ...(search.open === "0" ? {} : { open: true }),
+    ...(search.q ? { q: search.q } : {}),
+    limit: ISSUE_PAGE,
+  };
+}
+
 const ANY = "__any";
 
 export interface FilterState {
@@ -95,7 +126,6 @@ export function IssueFilters({
 }) {
   const humans = members.filter((member) => member.kind === "human");
   const agents = members.filter((member) => member.kind === "agent");
-  const memberById = new Map(members.map((member) => [member.id, member]));
 
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
@@ -174,7 +204,7 @@ export function IssueFilters({
               if (selected === "me") return "Me";
               if (selected === "agents:me") return "My Agents";
               if (selected === "none") return "Unassigned";
-              return memberById.get(selected)?.user.name ?? selected;
+              return members.find((member) => member.id === selected)?.user.name ?? selected;
             }}
           </SelectValue>
         </SelectTrigger>

@@ -13,12 +13,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Markdown } from "@/components/markdown";
-import { MemberChip, type ChipMember } from "@/components/member-chip";
+import { MemberChip } from "@/components/member-chip";
 import { RunStatus, type RunStatusValue } from "@/components/run-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useMembersById } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,9 @@ interface RunView {
   finishedAt?: string | Date | null;
   lastActivityAt?: string | Date;
   createdAt?: string | Date;
+  /** What `runs.list` carries of the feed: the last few, and how many there are. */
+  lastActivities?: ActivityView[];
+  activityCount?: number;
 }
 
 interface ActivityView {
@@ -169,14 +173,21 @@ export interface RunCardProps {
 
 /**
  * One Run: who ran, how it stands, what it did, and — when it is waiting on a
- * Human — the way to answer it.
+ * Human — the way to answer it. Folded, the card shows what the list already
+ * carries (the last three Activities); the whole feed is read only when it
+ * is opened, when the Run is waiting (the Gate it asked about is in the
+ * feed), or when there are rulings to match a question against.
  */
 export function RunCard({ run, decisions, pinned = false, answering, onAnswer }: RunCardProps) {
-  const detail = useQuery(orpc.runs.get.queryOptions({ input: { runId: run.id } }));
-  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const [expanded, setExpanded] = useState(pinned);
+  const wantsDetail = expanded || run.status === "awaiting_input" || decisions.length > 0;
+  const detail = useQuery(
+    orpc.runs.get.queryOptions({ input: { runId: run.id }, enabled: wantsDetail }),
+  );
+  const memberById = useMembersById();
 
-  const activities = (detail.data?.activities ?? []) as ActivityView[];
+  const activities = (detail.data?.activities ?? run.lastActivities ?? []) as ActivityView[];
+  const total = detail.data?.activities.length ?? run.activityCount ?? activities.length;
   const asked = lastGateRequest(activities);
   const decided = asked
     ? decisions
@@ -186,9 +197,6 @@ export function RunCard({ run, decisions, pinned = false, answering, onAnswer }:
         .at(-1)
     : undefined;
   const waitingOnGate = run.status === "awaiting_input" && asked !== null && !decided;
-  const memberById = new Map(
-    (members.data?.members ?? []).map((member) => [member.id, member as ChipMember]),
-  );
   const agent = run.agentMemberId ? memberById.get(run.agentMemberId) : undefined;
   const decidedBy = decided
     ? (memberById.get(decided.memberId ?? "")?.user.name ?? "a Human")
@@ -221,10 +229,10 @@ export function RunCard({ run, decisions, pinned = false, answering, onAnswer }:
         </span>
         {time ? <span className="font-mono text-xs text-muted-foreground">{time}</span> : null}
         <span className="flex-1" />
-        {activities.length > 3 ? (
+        {total > 3 ? (
           <Button variant="ghost" size="xs" onClick={() => setExpanded((open) => !open)}>
             {expanded ? <ChevronDown /> : <ChevronRight />}
-            {expanded ? "Fewer" : `All ${String(activities.length)}`}
+            {expanded ? "Fewer" : `All ${String(total)}`}
           </Button>
         ) : null}
       </header>
@@ -249,7 +257,7 @@ export function RunCard({ run, decisions, pinned = false, answering, onAnswer }:
         </p>
       ) : null}
 
-      {detail.isPending ? <Skeleton className="m-3 h-10" /> : null}
+      {wantsDetail && detail.isPending ? <Skeleton className="m-3 h-10" /> : null}
       {shown.length > 0 ? (
         <ol aria-label={`Activity of ${run.id}`} className="flex flex-col gap-1.5 px-3 py-2">
           {shown.map((activity, index) => {
