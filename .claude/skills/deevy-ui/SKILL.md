@@ -149,6 +149,9 @@ string` erases the literal and every typed `to` in the app stops compiling.
   filter bar's Any/Humans/Agents, Open/All, List/Board, Activity All/Comments/Changes), `ButtonGroup` for
   buttons that perform actions (a State's Move up/down in the Workflow editor); `Tabs` for views of one
   thing (Documents, the editor's Edit/Source). Joined ToggleGroups are `variant="outline" spacing={0}`.
+  A pressed Toggle is `bg-primary/10 text-primary` with a `border-primary/30` edge (`/20` fill in dark):
+  the one "selected" language the sidebar, the Settings nav and the Tabs underline already speak; the kit's
+  `bg-muted` was a 1% step off the page (Matt, 2026-09-06).
   Their corners, and half the kit's `data-horizontal:`/`data-open:`/`data-checked:` styling, depend on
   `@import "shadcn/tailwind.css"` in `index.css` (the `shadcn` package is in the catalog for that one
   stylesheet), as the base-mira style prescribes. Without it those variants match nothing and the kit
