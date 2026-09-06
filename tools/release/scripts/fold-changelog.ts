@@ -127,7 +127,16 @@ async function main() {
   const entry = `## ${version}\n\n${body === "" ? "No user-visible changes.\n" : body}`;
   const changelogPath = path.join(root, "CHANGELOG.md");
   const existing = await readFile(changelogPath, "utf8");
-  const [header, ...rest] = existing.split(/(?=^## )/m);
+  const [header, ...sections] = existing.split(/(?=^## )/m);
+
+  // Leaving pre-release mode re-lists every change in the final version's
+  // section, so the `0.5.0-rc.*` entries above it are the same notes twice.
+  // They go, and only when the release being written is the final one — an rc
+  // never removes the rc before it.
+  const superseded = version.includes("-")
+    ? () => false
+    : (s: string) => s.startsWith(`## ${version}-`);
+  const rest = sections.filter((section) => !superseded(section));
   await writeFile(
     changelogPath,
     `${header!.trimEnd()}\n\n${entry}\n${rest.join("")}`.trimEnd() + "\n",

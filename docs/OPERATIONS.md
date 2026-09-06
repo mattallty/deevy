@@ -15,14 +15,10 @@ The reference runtime is `ghcr.io/mattallty/deevy-agent`, one image per harness
 `deevy-agent:cursor` and `deevy-agent:copilot`, each also tagged `<version>-<harness>`. `deevy-agent:latest`
 and the bare version tags are Claude Code.
 
-**Check which of the two packages is public before telling anybody to pull one.** A package's visibility is
-set on the package, and making the repository public does not necessarily change one that already existed: as
-of v0.4.1 an anonymous pull of `ghcr.io/mattallty/deevy-agent` succeeds and the same pull of
-`ghcr.io/mattallty/deevy` is refused with a 403. While a package is private, pulling it needs
-`docker login ghcr.io` with a token carrying `read:packages`, and the failure is an unexplained
-`unauthorized`. To change it: the package's page → Package settings → Change visibility.
-
-What a stranger gets is worth checking directly rather than inferring, and needs no account:
+**Both packages are public**, so pulling either needs no account and no `docker login`. A package's
+visibility is set on the package rather than inherited from the repository, so if that ever changes the
+symptom is a `docker pull` failing with an unexplained `unauthorized`; what a stranger gets can be checked
+directly, with no account:
 
 ```bash
 img=deevy   # or deevy-agent
@@ -47,7 +43,7 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
-  deevy:local   # or ghcr.io/mattallty/deevy:latest, if that package is public
+  deevy:local   # or ghcr.io/mattallty/deevy:latest
 ```
 
 ## Cutting a release
@@ -71,6 +67,21 @@ request, which is the worst place to find out:
 - **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests."** Without it
   `changesets/action` cannot open the Version PR.
 - **A `no-changelog` label**, for the pull request that genuinely warrants no changelog entry.
+
+**A release candidate** goes out the same way, with `changeset pre enter rc` committed first: the images are
+tagged `0.5.0-rc.0` and `v0.5.0-rc.0`, `latest` is left where it is, and the GitHub Release is marked as a
+prerelease. `changeset pre exit` ends the line and the next Version PR carries the final version. While pre
+mode is on, everything merged to `main` goes into the rc line — see
+[DEVELOPMENT.md](./DEVELOPMENT.md#cutting-a-release-candidate).
+
+**The images are built natively, one runner per architecture.** `linux/amd64` on `ubuntu-latest` and
+`linux/arm64` on `ubuntu-24.04-arm`, each pushing an untagged image addressed by digest, with a final job
+collecting the digests into the multi-architecture tags. Nothing is emulated, and a tag never points at a
+half-published image because it is created only once both architectures exist.
+
+**If a build fails and leaves a version tagged with no images**, run the Release workflow from the Actions tab
+with that version (without a leading `v`) as its input. Re-tagging is not possible at that point — the tag and
+the GitHub Release already exist — which is what the `workflow_dispatch` input is for.
 
 To release outside this flow, push a `v*` tag by hand; `release.yml` still publishes on one. That skips the
 changelog and the GitHub Release, so it is for recovering a botched release rather than for making one.

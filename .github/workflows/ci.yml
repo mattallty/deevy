@@ -177,7 +177,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Single-architecture and native, so minutes rather than the emulated
+      # build's tens of them — but bounded, because a hung docker build that
+      # only trips the job timeout wastes twenty minutes saying nothing.
       - name: Build deevy
+        timeout-minutes: 10
         run: docker build -f apps/server/Dockerfile -t deevy:ci .
 
       # One image per harness (docs/harnesses.md). The build stage is shared
@@ -195,6 +199,7 @@ jobs:
           fi
 
       - name: Build the runtime, once per harness
+        timeout-minutes: 20
         run: |
           for harness in ${{ steps.which.outputs.list }}; do
             docker build -f apps/agent/Dockerfile --build-arg HARNESS=$harness -t deevy-agent:ci-$harness .

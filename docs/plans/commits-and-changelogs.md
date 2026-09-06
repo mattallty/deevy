@@ -213,8 +213,8 @@ both publish jobs keep their bodies; what changes is what starts them.
 - The publish half becomes `on: workflow_call` with a `version` input, so it can be called rather than only
   triggered. The existing `on: push: tags:` stays as the manual escape hatch, widened to `v*` — today's
   `v0.1.*`–`v0.4.*` filter would not match the `v0.5.0` this work produces.
-- A new `.github/workflows/changesets.yml`, on `push` to `main`, runs `changesets/action@v1` with
-  `version: vp run version` and no `publish`. It opens and maintains the "Version Packages" pull request —
+- A new `.github/workflows/changesets.yml`, on `push` to `main`, runs `changesets/action@v2` with
+  `version-script: vp run version` and no `publish`. It opens and maintains the "Version Packages" pull request —
   whose own title and commit are conventional, because it is squash-merged like any other and slice 2 will
   read that title.
 - **Releasing takes two conditions**, and getting it wrong cost three attempts. "No changesets waiting" is
@@ -230,7 +230,13 @@ both publish jobs keep their bodies; what changes is what starts them.
   the tag everybody pulls at a release candidate. That job then pushes `vX.Y.Z`, writes the GitHub Release from the new
   `CHANGELOG.md` section, and calls the publish workflow — calls it, because a tag pushed with
   `GITHUB_TOKEN` does not trigger a workflow.
-- `release.yml`'s two publish jobs derive their image tags from the ref, which carries a version only on the
+- `release.yml` builds each architecture on a runner of its own — `ubuntu-latest` and `ubuntu-24.04-arm`,
+  which are free for public repositories — pushing by digest and collecting the digests into the tags in a
+  final job. It began as one job building both platforms together, which meant `linux/arm64` ran under QEMU
+  while the Dockerfile installed and built the whole workspace inside the image; that cost about three times
+  the native half and then hung outright on the 0.5.0-rc.0 release. Every docker build now carries a step
+  timeout as well, because a hang that only trips the job timeout wastes twenty minutes saying nothing.
+- `release.yml`'s image tags derive from the ref, which carries a version only on the
   tag-push route. On a call the ref is `main`, so the caller passes the version and `docker/metadata-action`
   gets both sources with `enable=` making them mutually exclusive.
 - `permissions` on that workflow: `contents: write` (tag, release, and the Version PR's branch) and
@@ -256,6 +262,24 @@ a contributor forgets and a CI job then blocks them for.
 snapshot rule it most resembles — a generated artefact CI fails on when it is missing — and
 `docs/OPERATIONS.md`'s release section is rewritten around the Version PR instead of a hand-pushed tag.
 
+## Release candidates
+
+Added after the fact, once the release path had been walked end to end. `changeset pre enter rc` /
+`changeset pre exit` around the normal flow; versions become `0.5.0-rc.N`; the `-` in the version marks the
+GitHub Release as a prerelease and keeps `latest` where it is, and the fold drops the `X.Y.Z-*` sections the
+final release supersedes.
+
+Two things the probe found that the reasoning would have got wrong. `changeset version` in pre mode does not
+delete a changeset, it **moves it into `.changeset/pre/`** so that leaving pre mode can re-read every change
+into the final notes — which is why the workflow's `find -maxdepth 1` is load-bearing and commented as such;
+counting those files would mean an rc never releases. And `pre.json` in changesets 3 is just `{mode, tag}`,
+with none of the `initialVersions` or `changesets` bookkeeping older versions kept, so there is nothing there
+worth reading.
+
+The caveat is the changesets documentation's own: doing pre-releases from the default branch blocks every
+other change until you exit. That is accepted here rather than solved with a release branch, and written
+down in DEVELOPMENT.md and ADR-0017.
+
 ## What this does not do
 
 - **No history rewrite.** `pre-squash-backup` suggests this repository has been through one already. Every
@@ -266,6 +290,9 @@ snapshot rule it most resembles — a generated artefact CI fails on when it is 
   silently.
 - **No `semantic-release` and no `release-please`.** Either would replace changesets rather than join it, and
   both derive the changelog from commits, which the decision above rejects.
+- **No snapshot releases.** They are npm's way to install a branch, and their own documentation says the
+  version commit must never be merged — the opposite of a Version PR flow. An image tagged by commit is the
+  equivalent here and needs no changesets.
 - **Nothing published to npm.** `access` stays `restricted` and `changesets/action` is run without `publish`.
   If a package is ever published, that is one line in the action and one package out of the `fixed` group.
 

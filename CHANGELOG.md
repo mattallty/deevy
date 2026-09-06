@@ -7,6 +7,15 @@ A release is two Docker images and one `vX.Y.Z` tag — see [docs/OPERATIONS.md]
 
 <!-- Entries are inserted below this line by `vp run version`. -->
 
+## 0.5.0
+
+### Minor Changes
+
+- **release** — [#19](https://github.com/mattallty/deevy/pull/19) [`d6aa91e`](https://github.com/mattallty/deevy/commit/d6aa91e46e74152b1549aaaafc7d85e941e92ea6) Thanks [@mattallty](https://github.com/mattallty)! - Release candidates. `changeset pre enter rc` puts the release path into pre-release mode: versions become
+  `0.5.0-rc.N`, the images publish under their own tags without moving `latest`, and the GitHub Release is
+  marked as a prerelease. `changeset pre exit` ends the line, and the final release's notes re-list every
+  change in it.
+
 ## 0.4.1
 
 ### Patch Changes

@@ -15,9 +15,16 @@ export default defineConfig({
       // shape, and a formatter with an opinion about it is churn on every
       // release (docs/plans/commits-and-changelogs.md).
       "CHANGELOG.md",
+      // A fork of one of the Claude Design sync's own scripts, kept byte-for-byte
+      // diffable against the upstream copy it was forked from.
+      ".design-sync/overrides/**",
     ],
   },
   lint: {
+    // The Claude Design sync's preview cards (.design-sync/previews) are
+    // compiled by the sync's own esbuild, never by the app, and are written as
+    // story files (many exports per file); the rules for app code do not apply.
+    ignorePatterns: [".design-sync/**"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     options: { typeAware: true, typeCheck: true },
@@ -36,6 +43,7 @@ export default defineConfig({
         files: [
           "apps/agent/**",
           "apps/server/**",
+          "apps/web/design-system/build.mjs",
           "apps/web/scripts/**",
           "packages/adapters/src/node/**",
           "packages/db/scripts/**",

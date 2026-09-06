@@ -21,9 +21,18 @@ export const proseClassName = cn(
   "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:text-xs/5",
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-xs",
   "[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5",
+  // A task list is two DOMs: Tiptap's node view (`ul[data-type=taskList] > li >
+  // label + div`, and the li carries no data-type of its own — only the static
+  // renderHTML does) and remark-gfm's (`ul.contains-task-list > li.task-list-item
+  // > input + text`). Both key on the list, so each item is one row: the
+  // checkbox at the left, the text beside it.
   "[&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:pl-0",
-  "[&_li[data-type=taskItem]]:flex [&_li[data-type=taskItem]]:items-start [&_li[data-type=taskItem]]:gap-2",
-  "[&_li[data-type=taskItem]>label]:mt-1 [&_li[data-type=taskItem]>div]:flex-1",
+  "[&_ul.contains-task-list]:list-none [&_ul.contains-task-list]:pl-0",
+  "[&_ul[data-type=taskList]>li]:flex [&_ul[data-type=taskList]>li]:items-start [&_ul[data-type=taskList]>li]:gap-2",
+  "[&_ul.contains-task-list>li]:flex [&_ul.contains-task-list>li]:items-start [&_ul.contains-task-list>li]:gap-2",
+  "[&_ul[data-type=taskList]>li>label]:mt-1 [&_ul[data-type=taskList]>li>label]:flex [&_ul[data-type=taskList]>li>label]:shrink-0",
+  "[&_ul[data-type=taskList]>li>div]:min-w-0 [&_ul[data-type=taskList]>li>div]:flex-1",
+  "[&_ul.contains-task-list>li>input]:mt-1 [&_ul.contains-task-list>li>input]:shrink-0",
   "[&_input[type=checkbox]]:size-3.5 [&_input[type=checkbox]]:accent-primary",
   "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
   "[&_hr]:border-border",
