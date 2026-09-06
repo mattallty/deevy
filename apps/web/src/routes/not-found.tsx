@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { CompassIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
 
 /**
@@ -43,12 +43,15 @@ export function NotFoundPage({
         <Button variant="outline" onClick={() => router.history.back()}>
           Go back
         </Button>
-        <Button variant="outline" render={<Link to="/" />}>
+        {/* Links that look like buttons, not Buttons rendering links: a real
+            <a> keeps its link role (the test asks for one) and Base UI has no
+            native-button expectation to warn about. */}
+        <Link to="/" className={buttonVariants({ variant: "outline" })}>
           All Issues
-        </Button>
-        <Button variant="outline" render={<Link to="/inbox" />}>
+        </Link>
+        <Link to="/inbox" className={buttonVariants({ variant: "outline" })}>
           Inbox
-        </Button>
+        </Link>
       </div>
     </Empty>
   );

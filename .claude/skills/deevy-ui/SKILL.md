@@ -33,7 +33,10 @@ rules) and `frontend-design` (design process) beside it.
   Issue, State, Gate, Run, Activity, Document, Event, Notification, Channel. "Board" is the column view of a
   Project, never a Project. Never "ticket", "task", "status", "user", "bot".
 - **Base UI, not Radix.** `apps/web/components.json` is `"style": "base-mira"`. Custom triggers use
-  `render={<Link … />}` (and `nativeButton={false}` on a Button that renders an anchor), never `asChild`.
+  `render={<Link … />}` (and `nativeButton={false}` on a Button that renders an anchor — without it Base
+  UI warns on every render, which is what CI's stderr shows), never `asChild`. `nativeButton={false}`
+  gives the anchor a button role, so navigation a test finds as a `link` (the not-found page's ways out) is
+  a `<Link className={buttonVariants(…)}>` instead: a real link dressed as a button.
   Nothing under `apps/web` may import `@radix-ui/*`.
 - Work from `apps/web` so the `shadcn` skill's `shadcn info` finds `components.json`. Add components with
   `pnpm dlx shadcn@latest add <item> --overwrite`; it rewrites `pnpm-workspace.yaml` and pins versions, so
