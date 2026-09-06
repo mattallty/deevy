@@ -151,7 +151,7 @@ export function IssueFilters({
                   <>
                     <span
                       aria-hidden
-                      className="ml-auto mr-5 inline-block size-2 rotate-45 rounded-[1px] border-[1.5px] border-gate bg-gate/20"
+                      className="ml-auto mr-5 inline-block size-2 self-center rotate-45 rounded-[1px] border-[1.5px] border-gate bg-gate/20"
                     />
                     <span className="sr-only">Gate</span>
                   </>
