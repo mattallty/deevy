@@ -10,14 +10,10 @@ Published to `ghcr.io/mattallty/deevy` on every `v*` tag, for `linux/amd64` and 
 version (`v0.4.0`) and `latest`. The image carries the bundled Node server, the migrations, and the built SPA;
 it runs the SPA and the API on one port, so there is no separate web container.
 
-**Check which of the two packages is public before telling anybody to pull one.** A package's visibility is
-set on the package, and making the repository public does not necessarily change one that already existed: as
-of v0.4.1 an anonymous pull of `ghcr.io/mattallty/deevy-agent` succeeds and the same pull of
-`ghcr.io/mattallty/deevy` is refused with a 403. While a package is private, pulling it needs
-`docker login ghcr.io` with a token carrying `read:packages`, and the failure is an unexplained
-`unauthorized`. To change it: the package's page → Package settings → Change visibility.
-
-What a stranger gets is worth checking directly rather than inferring, and needs no account:
+**Both packages are public**, so pulling either needs no account and no `docker login`. A package's
+visibility is set on the package rather than inherited from the repository, so if that ever changes the
+symptom is a `docker pull` failing with an unexplained `unauthorized`; what a stranger gets can be checked
+directly, with no account:
 
 ```bash
 img=deevy   # or deevy-agent
@@ -42,7 +38,7 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
-  deevy:local   # or ghcr.io/mattallty/deevy:latest, if that package is public
+  deevy:local   # or ghcr.io/mattallty/deevy:latest
 ```
 
 ## Cutting a release
@@ -66,6 +62,12 @@ request, which is the worst place to find out:
 - **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests."** Without it
   `changesets/action` cannot open the Version PR.
 - **A `no-changelog` label**, for the pull request that genuinely warrants no changelog entry.
+
+**A release candidate** goes out the same way, with `changeset pre enter rc` committed first: the images are
+tagged `0.5.0-rc.0` and `v0.5.0-rc.0`, `latest` is left where it is, and the GitHub Release is marked as a
+prerelease. `changeset pre exit` ends the line and the next Version PR carries the final version. While pre
+mode is on, everything merged to `main` goes into the rc line — see
+[DEVELOPMENT.md](./DEVELOPMENT.md#cutting-a-release-candidate).
 
 To release outside this flow, push a `v*` tag by hand; `release.yml` still publishes on one. That skips the
 changelog and the GitHub Release, so it is for recovering a botched release rather than for making one.

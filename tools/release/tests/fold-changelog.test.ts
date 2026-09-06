@@ -24,7 +24,11 @@ const packages = [
   "tools/release",
 ];
 
-async function fold(changelogs: Record<string, string>) {
+async function fold(
+  changelogs: Record<string, string>,
+  options: { version?: string; existing?: string } = {},
+) {
+  const version = options.version ?? "0.5.0";
   const dir = await mkdtemp(path.join(tmpdir(), "deevy-fold-"));
   try {
     await mkdir(path.join(dir, "tools/release/scripts"), { recursive: true });
@@ -37,7 +41,7 @@ async function fold(changelogs: Record<string, string>) {
       const name = `@deevy/${path.basename(pkg)}`;
       await writeFile(
         path.join(dir, pkg, "package.json"),
-        JSON.stringify({ name, version: "0.5.0" }, null, 2),
+        JSON.stringify({ name, version }, null, 2),
       );
       const changelog = changelogs[pkg];
       if (changelog !== undefined) await writeFile(path.join(dir, pkg, "CHANGELOG.md"), changelog);
@@ -48,7 +52,7 @@ async function fold(changelogs: Record<string, string>) {
     );
     await writeFile(
       path.join(dir, "CHANGELOG.md"),
-      "# Changelog\n\nA preamble.\n\n## 0.4.0\n\nOlder.\n",
+      options.existing ?? "# Changelog\n\nA preamble.\n\n## 0.4.0\n\nOlder.\n",
     );
 
     await run("node", [path.join(dir, "tools/release/scripts/fold-changelog.ts")], { cwd: dir });
@@ -157,6 +161,31 @@ describe("folding the per-package changelogs", { timeout: 30_000 }, () => {
     expect(changelog.startsWith("# Changelog\n\nA preamble.")).toBe(true);
     expect(changelog.indexOf("## 0.5.0")).toBeLessThan(changelog.indexOf("## 0.4.0"));
     expect(changelog).toContain("Older.");
+  });
+
+  it("drops the release candidates a final version supersedes", async () => {
+    // Leaving pre-release mode re-lists every change in the final section, so
+    // the rc entries above it are the same notes a second time.
+    const { changelog } = await fold(withChanges, {
+      version: "0.5.0",
+      existing:
+        "# Changelog\n\n## 0.5.0-rc.1\n\nSecond candidate.\n\n## 0.5.0-rc.0\n\nFirst candidate.\n\n## 0.4.1\n\nOlder.\n",
+    });
+    expect(changelog).not.toContain("0.5.0-rc.");
+    expect(changelog).not.toContain("Second candidate.");
+    expect(changelog).toContain("## 0.5.0");
+    expect(changelog).toContain("## 0.4.1");
+    expect(changelog).toContain("Older.");
+  });
+
+  it("keeps the candidate before it when the release is itself a candidate", async () => {
+    const { changelog } = await fold(withChanges, {
+      version: "0.5.0-rc.1",
+      existing: "# Changelog\n\n## 0.5.0-rc.0\n\nFirst candidate.\n\n## 0.4.1\n\nOlder.\n",
+    });
+    expect(changelog).toContain("## 0.5.0-rc.1");
+    expect(changelog).toContain("## 0.5.0-rc.0");
+    expect(changelog).toContain("First candidate.");
   });
 
   it("syncs the root, which changesets never sees", async () => {

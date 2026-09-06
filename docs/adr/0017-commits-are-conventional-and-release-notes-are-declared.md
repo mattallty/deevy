@@ -49,6 +49,24 @@ left on disk deliberately: `changesets/action` reads them back after the version
 Version PR, and deleting them fails the release, which is how the first run of this ended. Being gitignored is
 what keeps them out of the commit, and only the newest section is ever read. If `@deevy/core` is ever published, splitting it out of the `fixed` group is one line.
 
+## Release candidates, and not snapshots
+
+Changesets' pre-release mode is supported, because an rc is a thing deevy will want and the cost was small:
+an rc publishes images under its own tags, is a prerelease on GitHub, and does not move `latest` — the same
+`-` in the version decides all three. Leaving pre mode re-lists every change in the final version's notes, so
+the fold drops the `X.Y.Z-*` sections that release supersedes.
+
+The one caveat is structural and worth writing down rather than discovering: `changesets.yml` runs on `main`,
+so while pre mode is on every merge to `main` joins the rc line and no stable patch can ship without exiting
+first. The changesets documentation recommends a dedicated branch for exactly this. deevy does not have one,
+because it has no maintained stable line to patch — an rc here is a stabilising period, not a parallel
+release train — and if that ever stops being true, the branch is the answer rather than more workflow.
+
+**Snapshot releases are deliberately absent.** They exist so somebody can `npm install` a branch, and the
+changesets documentation is explicit that a snapshot version commit must never be merged — which is the
+opposite of a flow whose whole mechanism is merging a Version PR. The equivalent here is an image tagged by
+commit, which needs nothing from changesets.
+
 ## The release fires by call, not by tag
 
 `changesets.yml` calls `release.yml` through `workflow_call` when a Version PR merges. This is a constraint

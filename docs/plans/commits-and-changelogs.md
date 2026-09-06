@@ -256,6 +256,24 @@ a contributor forgets and a CI job then blocks them for.
 snapshot rule it most resembles — a generated artefact CI fails on when it is missing — and
 `docs/OPERATIONS.md`'s release section is rewritten around the Version PR instead of a hand-pushed tag.
 
+## Release candidates
+
+Added after the fact, once the release path had been walked end to end. `changeset pre enter rc` /
+`changeset pre exit` around the normal flow; versions become `0.5.0-rc.N`; the `-` in the version marks the
+GitHub Release as a prerelease and keeps `latest` where it is, and the fold drops the `X.Y.Z-*` sections the
+final release supersedes.
+
+Two things the probe found that the reasoning would have got wrong. `changeset version` in pre mode does not
+delete a changeset, it **moves it into `.changeset/pre/`** so that leaving pre mode can re-read every change
+into the final notes — which is why the workflow's `find -maxdepth 1` is load-bearing and commented as such;
+counting those files would mean an rc never releases. And `pre.json` in changesets 3 is just `{mode, tag}`,
+with none of the `initialVersions` or `changesets` bookkeeping older versions kept, so there is nothing there
+worth reading.
+
+The caveat is the changesets documentation's own: doing pre-releases from the default branch blocks every
+other change until you exit. That is accepted here rather than solved with a release branch, and written
+down in DEVELOPMENT.md and ADR-0017.
+
 ## What this does not do
 
 - **No history rewrite.** `pre-squash-backup` suggests this repository has been through one already. Every
@@ -266,6 +284,9 @@ snapshot rule it most resembles — a generated artefact CI fails on when it is 
   silently.
 - **No `semantic-release` and no `release-please`.** Either would replace changesets rather than join it, and
   both derive the changelog from commits, which the decision above rejects.
+- **No snapshot releases.** They are npm's way to install a branch, and their own documentation says the
+  version commit must never be merged — the opposite of a Version PR flow. An image tagged by commit is the
+  equivalent here and needs no changesets.
 - **Nothing published to npm.** `access` stays `restricted` and `changesets/action` is run without `publish`.
   If a package is ever published, that is one line in the action and one package out of the `fixed` group.
 
