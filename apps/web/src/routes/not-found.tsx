@@ -21,31 +21,32 @@ export function NotFoundPage({
   const router = useRouter();
   const path = router.state.location.pathname;
   return (
-    <Empty className="min-h-[60vh]">
+    // The shell's page area is a stretched flex item, so full height is the whole area: centred in it.
+    <Empty className="h-full gap-6">
       <EmptyHeader>
-        <EmptyMedia variant="icon">
+        <EmptyMedia variant="icon" className="size-14 [&_svg]:size-7">
           <CompassIcon aria-hidden />
         </EmptyMedia>
-        <h1 className="text-lg font-medium">
+        <h1 className="text-2xl font-semibold tracking-tight">
           {what ? `There is no ${what}` : "There is nothing here"}
         </h1>
-        <EmptyDescription>
+        <EmptyDescription className="text-base">
           {detail ?? (
             <>
-              Nothing lives at <code className="font-mono text-xs">{path}</code>. The link may be
+              Nothing lives at <code className="font-mono text-sm">{path}</code>. The link may be
               stale, or the page may have moved.
             </>
           )}
         </EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => router.history.back()}>
+        <Button variant="outline" onClick={() => router.history.back()}>
           Go back
         </Button>
-        <Button variant="outline" size="sm" render={<Link to="/" />}>
+        <Button variant="outline" render={<Link to="/" />}>
           All Issues
         </Button>
-        <Button variant="outline" size="sm" render={<Link to="/inbox" />}>
+        <Button variant="outline" render={<Link to="/inbox" />}>
           Inbox
         </Button>
       </div>

@@ -104,18 +104,23 @@ function labelOf(segment: string): string {
 
 /** The top bar's breadcrumb: where you are in the Workspace, each step above it a link. */
 export function AppBreadcrumb() {
-  const { pathname, search } = useRouterState({
+  const { pathname, search, nowhere } = useRouterState({
     select: (state) => ({
       pathname: state.location.pathname,
       search: state.location.search as Record<string, unknown>,
+      // A URL no route claims leaves only the root matched (every page is a route
+      // under it), and the path would only spell itself back, capitalised.
+      nowhere: state.matches.length === 1,
     }),
   });
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
-  const crumbs = crumbsFor(pathname, search, {
-    project: (key) => projects.data?.projects.find((project) => project.key === key)?.name,
-    member: (id) => members.data?.members.find((member) => member.id === id)?.user.name,
-  });
+  const crumbs: Crumb[] = nowhere
+    ? [{ label: "Not found" }]
+    : crumbsFor(pathname, search, {
+        project: (key) => projects.data?.projects.find((project) => project.key === key)?.name,
+        member: (id) => members.data?.members.find((member) => member.id === id)?.user.name,
+      });
 
   return (
     <Breadcrumb className="min-w-0">

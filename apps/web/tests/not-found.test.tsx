@@ -41,6 +41,9 @@ describe("a URL that leads nowhere", () => {
 
     expect(await screen.findByRole("heading", { name: "There is nothing here" })).toBeTruthy();
     expect(screen.getByText("/nowhere/at/all")).toBeTruthy();
+    // The top bar does not spell the path back; it says what happened.
+    const crumbs = screen.getByRole("navigation", { name: "breadcrumb" });
+    expect(crumbs.textContent).toBe("Not found");
     // The shell is still around it (the sidebar is one landmark), and the page
     // itself offers the way out: back, or the two places most links come from.
     expect(document.querySelector('[data-slot="sidebar"]')).toBeTruthy();
@@ -50,6 +53,14 @@ describe("a URL that leads nowhere", () => {
     expect(within(page).getByRole("button", { name: "Go back" })).toBeTruthy();
     expect(within(page).getByRole("link", { name: "All Issues" })).toBeTruthy();
     expect(within(page).getByRole("link", { name: "Inbox" })).toBeTruthy();
+  });
+
+  it("keeps the real crumbs on a page that exists", async () => {
+    await mountAt("/");
+
+    await screen.findByRole("heading", { name: "All Issues" });
+    const crumbs = screen.getByRole("navigation", { name: "breadcrumb" });
+    expect(crumbs.textContent).toBe("All Issues");
   });
 
   it("says which Issue does not exist when the API says NOT_FOUND", async () => {
