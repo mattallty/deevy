@@ -33,7 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -252,7 +251,6 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
         <SidebarInset>
           <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
             <AppBreadcrumb />
             <span className="flex-1" />
             {/* In the top bar, so it is one click from anywhere and `c` from anywhere. */}
