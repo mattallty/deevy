@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -129,9 +137,17 @@ export function AllowlistPage() {
         </Table>
       ) : null}
       {rules.data?.rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No rules yet, so nobody new can join. Add one above.
-        </p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ShieldCheck aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No rules yet</EmptyTitle>
+            <EmptyDescription>
+              Nobody new can join until there is one. Add a domain or an address above.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
     </SettingsPage>
   );

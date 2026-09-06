@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { DataTable, type DataColumn } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
+import { FolderKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -80,7 +81,7 @@ export function ProjectsPage() {
   ];
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-1 flex-col gap-4">
       <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
@@ -104,7 +105,11 @@ export function ProjectsPage() {
           getRowId={(project) => project.key}
           onOpen={(key) => void navigate({ to: "/projects/$key", params: { key } })}
           loading={projects.isPending}
-          empty={{ title: "No Projects yet", description: "Create one to give the work a home." }}
+          empty={{
+            icon: FolderKanban,
+            title: "No Projects yet",
+            description: "Create one to give the work a home.",
+          }}
         />
       )}
     </section>

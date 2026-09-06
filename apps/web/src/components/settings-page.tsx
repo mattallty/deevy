@@ -19,7 +19,7 @@ export function SettingsPage({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-1 flex-col gap-6">
       <PageHeader title={title} description={description} actions={actions} />
       {children}
     </section>

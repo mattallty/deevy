@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -208,7 +216,17 @@ export function WebhooksPage() {
       ) : null}
 
       {subscriptions.data && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No webhook subscriptions yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Webhook aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Webhooks yet</EmptyTitle>
+            <EmptyDescription>
+              Subscribe a URL above; every Event it names is delivered there.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       {open ? (

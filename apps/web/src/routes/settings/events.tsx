@@ -5,6 +5,7 @@ import { DataTable, type DataColumn } from "@/components/data-table";
 import { MemberChip } from "@/components/member-chip";
 import { SettingsPage } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
+import { ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeEvent } from "@/lib/event-text";
 import { orpc } from "@/lib/orpc";
@@ -307,6 +308,7 @@ export function EventLogPage() {
           onOpen={(id) => setOpen((current) => (current === Number(id) ? null : Number(id)))}
           loading={events.isPending}
           empty={{
+            icon: ScrollText,
             title: "Nothing yet",
             description: "The first Event lands when anything happens.",
           }}

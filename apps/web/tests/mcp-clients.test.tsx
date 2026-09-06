@@ -76,7 +76,7 @@ describe("the MCP clients settings page", () => {
 
     await waitFor(() => expect(stub.revoked).toHaveLength(1));
     expect(stub.revoked[0]).toEqual({ clientId: "https://claude.ai/mcp/client" });
-    expect(await screen.findByText(/No MCP client is connected as you yet/)).toBeTruthy();
+    expect(await screen.findByText("No MCP clients yet")).toBeTruthy();
   });
 });
 

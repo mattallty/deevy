@@ -257,7 +257,9 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
             <NewIssueButton variant="default" size="default" withShortcut />
           </div>
           {/* SidebarInset is the <main>; this is the page inside it. */}
-          <div className={cn("min-w-0 flex-1", bleed ? "flex min-h-0 flex-col" : "p-6")}>
+          <div
+            className={cn("min-w-0 flex-1", bleed ? "flex min-h-0 flex-col" : "flex flex-col p-6")}
+          >
             <Outlet />
           </div>
         </SidebarInset>

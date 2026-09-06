@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label as FieldLabel } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -149,7 +157,17 @@ export function LabelsPage() {
       ) : null}
 
       {labels.data?.labels.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Labels yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Tags aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Labels yet</EmptyTitle>
+            <EmptyDescription>
+              Add one above; an Issue then carries it, one per scope.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
     </SettingsPage>
   );

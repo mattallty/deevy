@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { useMemo, useState } from "react";
+import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
 import {
   IssueBoard,
@@ -18,7 +19,6 @@ import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
 import { categoryOrder, foldStates } from "@/lib/states";
 import { useShortcut } from "@/lib/shortcuts";
-import { cn } from "@/lib/utils";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
@@ -320,7 +320,7 @@ export function IssuesPage({
   );
 
   return (
-    <section className={cn("flex flex-col gap-4")}>
+    <section className="flex flex-1 flex-col gap-4">
       {embedded ? (
         <div className="flex flex-wrap items-center gap-3">
           {filters}
@@ -356,6 +356,7 @@ export function IssuesPage({
           onOpen={peek}
           loading={issues.isPending}
           empty={{
+            icon: search.q ? SearchX : ClipboardList,
             title: search.q ? "No Issues match" : "No Issues yet",
             description: search.q
               ? "Try another word, or clear the filters."

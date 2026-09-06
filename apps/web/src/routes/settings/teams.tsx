@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -68,7 +76,17 @@ export function TeamsPage() {
 
       {teams.isPending ? <p className="text-muted-foreground">Loading Teams…</p> : null}
       {teams.data?.teams.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Teams yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Teams yet</EmptyTitle>
+            <EmptyDescription>
+              A Team owns Projects and can be mentioned as one. Create the first above.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       <div className="flex flex-col gap-4">

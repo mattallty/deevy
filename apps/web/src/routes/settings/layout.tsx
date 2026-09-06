@@ -97,8 +97,8 @@ export function SettingsLayout() {
           </div>
         ))}
       </nav>
-      <div className="min-w-0 flex-1 p-6">
-        <div className="mx-auto w-full max-w-[880px]">
+      <div className="flex min-w-0 flex-1 flex-col p-6">
+        <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col">
           <Outlet />
         </div>
       </div>

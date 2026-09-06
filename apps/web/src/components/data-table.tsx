@@ -1,6 +1,12 @@
-import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -42,7 +48,8 @@ export interface DataTableProps<T> {
   /** A click or Enter on a row. */
   onOpen?: (id: string) => void;
   loading?: boolean;
-  empty?: { title: ReactNode; description?: ReactNode };
+  /** What to say when there are no rows; the icon says what kind of thing is missing. */
+  empty?: { title: ReactNode; description?: ReactNode; icon?: LucideIcon };
   density?: "compact" | "comfortable";
   className?: string;
   "aria-label"?: string;
@@ -116,6 +123,11 @@ export function DataTable<T>({
     return (
       <Empty className={className}>
         <EmptyHeader>
+          {empty.icon ? (
+            <EmptyMedia variant="icon">
+              <empty.icon aria-hidden />
+            </EmptyMedia>
+          ) : null}
           <EmptyTitle>{empty.title}</EmptyTitle>
           {empty.description ? <EmptyDescription>{empty.description}</EmptyDescription> : null}
         </EmptyHeader>

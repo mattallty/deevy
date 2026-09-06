@@ -8,6 +8,8 @@ import {
   CircleX,
   Diamond,
   ExternalLink,
+  Inbox,
+  MailOpen,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -17,7 +19,13 @@ import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -200,8 +208,11 @@ export function InboxPage({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {inbox.isPending ? <Skeleton className="m-4 h-64" /> : null}
         {inbox.data && flat.length === 0 ? (
-          <Empty className="m-4">
+          <Empty className="h-full">
             <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Inbox aria-hidden />
+              </EmptyMedia>
               <EmptyTitle>Nothing waiting</EmptyTitle>
               <EmptyDescription>
                 Mentions, assignments and Gates land here as they happen.
@@ -328,6 +339,9 @@ export function InboxPage({
   ) : (
     <Empty className="h-full">
       <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <MailOpen aria-hidden />
+        </EmptyMedia>
         <EmptyTitle>Pick a Notification</EmptyTitle>
         <EmptyDescription>
           The Issue it is about opens here, with what it asks of you in front.

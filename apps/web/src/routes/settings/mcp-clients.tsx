@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -109,9 +117,17 @@ export function McpClientsPage() {
       ) : null}
 
       {clients.data && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No MCP client is connected as you yet. Add one with the command above.
-        </p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Plug aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No MCP clients yet</EmptyTitle>
+            <EmptyDescription>
+              Nothing is connected as you. Add one with the command above.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       {rows.length > 0 ? (

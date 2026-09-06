@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -189,7 +197,17 @@ export function ChannelsPage() {
       ) : null}
 
       {channels.data && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Channels yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageSquare aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Channels yet</EmptyTitle>
+            <EmptyDescription>
+              Connect one above, and route a kind of Notification to it.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       <SettingsSection

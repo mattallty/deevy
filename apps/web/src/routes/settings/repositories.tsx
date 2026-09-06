@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -142,7 +150,17 @@ export function RepositoriesPage() {
       ) : null}
 
       {repositories.data?.repositories.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Repositories registered yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GitBranch aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Repositories yet</EmptyTitle>
+            <EmptyDescription>
+              Register one above, so a pull request can link to its Issue.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
     </SettingsPage>
   );

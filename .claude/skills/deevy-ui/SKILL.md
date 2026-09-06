@@ -141,6 +141,15 @@ string` erases the literal and every typed `to` in the app stops compiling.
   its children straight into the Dialog, so the cmdk `<Command>` root is ours to add inside it. cmdk itself
   depends on `@radix-ui/react-dialog` and friends — the one sanctioned transitive Radix dependency, because
   it is what shadcn ships for Base UI projects too; nothing under `apps/web/src` imports Radix directly.
+- **An empty list is an `Empty`, centred in the room the page leaves.** shadcn's `Empty › EmptyHeader ›
+EmptyMedia variant="icon" + EmptyTitle + EmptyDescription`, with a lucide icon that says what kind of
+  thing is missing (ClipboardList for Issues, SearchX for a search, FolderKanban, ScrollText, Inbox, Users,
+  Tags, Webhook…). The kit's title is `text-base` and its description `text-sm` (one step up from
+  base-mira). Height flows down so the `flex-1` Empty centres: the shell's page area is a flex column, and
+  every page root (`SettingsPage`, `ProjectLayout`, the Issues home, Projects) is `flex flex-1 flex-col`;
+  the Settings layout's content column too. `DataTable` takes `empty={{ icon, title, description }}`; a
+  Settings list composes the parts itself. Inline notes inside a detail section ("No Runs yet") stay `<p>`
+  (Matt, 2026-09-06).
 - **Nowhere is a page.** `routes/not-found.tsx` is the root route's `notFoundComponent` and what the Issue
   and Project pages render when the API says `NOT_FOUND` (`isNotFound`, which the QueryClient also uses to
   skip retries): inside the shell, `h1` "There is nothing here" or "There is no Issue DEV-999", the path or
