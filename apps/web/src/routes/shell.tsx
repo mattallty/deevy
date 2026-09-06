@@ -285,7 +285,8 @@ function InboxBadge() {
   return (
     <SidebarMenuBadge
       aria-label={`${String(count)} unread`}
-      className="bg-gate text-gate-foreground rounded-full px-1.5 font-mono text-[11px] font-medium"
+      // A count, not an alarm: quiet grey that reads on the row's rest, hover and active tints.
+      className="rounded-full bg-muted-foreground/15 px-1.5 text-[11px] font-medium text-foreground/75 tabular-nums"
     >
       {count}
     </SidebarMenuBadge>
