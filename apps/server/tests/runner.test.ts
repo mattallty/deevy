@@ -13,6 +13,7 @@ import {
 } from "@deevy/db";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { startRunner } from "../src/runner.ts";
+import { newId } from "@deevy/core";
 
 const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname;
 const MINUTE = 60_000;
@@ -37,22 +38,22 @@ interface SeedOptions {
 
 /** A Workspace with one Agent and one Issue, straight into the tables. */
 async function seedWorkspace(db: Db, options: SeedOptions = {}) {
-  const workspaceId = crypto.randomUUID();
+  const workspaceId = newId("workspace");
   await db.insert(workspaceTable).values({ id: workspaceId, name: "deevy", slug: "deevy" });
-  const userId = crypto.randomUUID();
+  const userId = newId("user");
   await db.insert(userTable).values({ id: userId, name: "Planner", email: "planner@example.com" });
-  const agentMemberId = crypto.randomUUID();
+  const agentMemberId = newId("member");
   await db.insert(memberTable).values({ id: agentMemberId, workspaceId, userId, kind: "agent" });
   await db
     .insert(agentTable)
     .values({ memberId: agentMemberId, scheduleMinutes: options.scheduleMinutes ?? null });
-  const projectId = crypto.randomUUID();
+  const projectId = newId("project");
   await db.insert(projectTable).values({ id: projectId, workspaceId, key: "DEV", name: "deevy" });
-  const stateId = crypto.randomUUID();
+  const stateId = newId("state");
   await db
     .insert(workflowState)
     .values({ id: stateId, projectId, name: "Doing", position: 1, category: "active" });
-  const issueId = crypto.randomUUID();
+  const issueId = newId("issue");
   await db.insert(issueTable).values({
     id: issueId,
     projectId,
@@ -73,7 +74,7 @@ async function seedRuns(
 ) {
   await db.insert(runTable).values(
     Array.from({ length: count }, () => ({
-      id: crypto.randomUUID(),
+      id: newId("run"),
       ...where,
       trigger: "manual" as const,
       status: "active" as const,

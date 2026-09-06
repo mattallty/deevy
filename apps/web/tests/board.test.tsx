@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption } from "./select.ts";
 
 const stub = vi.hoisted(() => {
   const states = [
@@ -14,9 +15,10 @@ const stub = vi.hoisted(() => {
   ];
   const ada = {
     id: "m-ada",
+    kind: "human",
     role: "admin",
     handle: "ada",
-    user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net" },
+    user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com" },
   };
   return {
     states,
@@ -30,6 +32,7 @@ const stub = vi.hoisted(() => {
         state: states[0],
         assignee: ada,
         assigneeMemberId: ada.id,
+        labels: [],
         closedAt: null,
         updatedAt: new Date(),
       },
@@ -41,6 +44,7 @@ const stub = vi.hoisted(() => {
         state: states[3],
         assignee: null,
         assigneeMemberId: null,
+        labels: [],
         closedAt: null,
         updatedAt: new Date(),
       },
@@ -99,7 +103,7 @@ async function findColumns() {
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada" },
+    { workspaceName: "Acme Team", memberName: "Ada" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -141,7 +145,7 @@ describe("the board", () => {
     await mountAt("/projects/DEV/board");
 
     await findColumns();
-    fireEvent.change(screen.getByLabelText("Assignee"), { target: { value: stub.ada.id } });
+    await pickOption(screen.getByLabelText("Assignee"), /Ada/);
 
     expect(await screen.findByText("DEV-1")).toBeTruthy();
     await waitFor(() => expect(screen.queryByText("DEV-2")).toBeNull());
@@ -163,5 +167,18 @@ describe("moving a card out of a Gate column", () => {
       expect(stub.approved).toContainEqual(expect.objectContaining({ key: "DEV-1" })),
     );
     expect(stub.moved).toEqual([]);
+  });
+});
+
+describe("a card", () => {
+  it("opens beside the board when clicked, with the peek non-modal so a drag still works", async () => {
+    await mountAt("/projects/DEV/board");
+    const columns = await findColumns();
+
+    fireEvent.click(within(columns[3]!).getByText("In Build"));
+    const peek = await screen.findByRole("dialog", { name: /DEV-2/ });
+    expect(peek).toBeTruthy();
+    // Non-modal: the board behind it is still there to drag.
+    expect(document.querySelectorAll('[data-slot="board-column"]')).toHaveLength(6);
   });
 });

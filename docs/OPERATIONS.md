@@ -121,7 +121,7 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    a `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
 
    ```jsonc
-   "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Flippable" },
+   "vars": { "DEEVY_ADMIN_EMAIL": "you@example.com", "DEEVY_WORKSPACE_NAME": "Acme" },
    ```
 
    Deploying a public fork, put `DEEVY_ADMIN_EMAIL` in with `wrangler secret put` instead. It is not a
@@ -152,10 +152,10 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
 
 9. **Sign in** at the `workers.dev` origin with the GitHub account whose email is `DEEVY_ADMIN_EMAIL`. The
    first sign-in creates the Workspace and makes you its admin, and nothing else ever creates a second one.
-   Settings, Members lists exactly one Member — you, `admin`, `human`. The Event log behind that has no
-   Workspace-level view in the SPA, where it is read per Issue as the timeline; the whole log is
-   `GET /api/events`, which a signed-in browser can simply visit, and it opens with `workspace.created` then
-   `member.joined`, both with a null actor because deevy did the writing.
+   Settings, Members lists exactly one Member — you, `admin`, `human`. Settings, Event log is the whole
+   Workspace log, newest first (an Issue's Activity is the same log read per Issue); it opens with
+   `member.joined` over `workspace.created`, both with a null actor because deevy did the writing. The raw
+   document is `GET /api/events`, which a signed-in browser can simply visit.
 
 ### What a free account does not give you
 

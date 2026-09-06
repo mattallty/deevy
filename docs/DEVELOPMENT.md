@@ -39,6 +39,31 @@ and no Membership. The admin manages the rules under Settings, Allowlist. A `git
 listing the organizations the sign-in's token can see, which needs the `read:org` scope: deevy requests it, so
 an OAuth App created before this slice asks for the extra scope the next time someone signs in.
 
+### Running without an OAuth App
+
+Set `DEEVY_DEV_STUB_GITHUB=1` and the Node server imports `apps/web/scripts/stub-github.js` — the same stub the
+acceptance walk and the Workers smoke prepend to their bundles — so GitHub's three endpoints answer locally
+and the OAuth `code` is the email address. The signed-out page then offers "Sign in as this email" beneath the
+GitHub button (it learns the flag from `health.ping`); any address signs in, and the one in `DEEVY_ADMIN_EMAIL`
+becomes the admin exactly as it would with a real OAuth App. `readEnv` refuses the flag under
+`NODE_ENV=production`, and the Worker never has it.
+
+`.claude/launch.json` carries a second configuration, `dev:stub`, which runs the same two dev tasks with the
+flag on and `DEEVY_DATABASE_PATH=./data/stub.sqlite`, so a stubbed instance never shares a database with one you
+sign in to for real. To fill that database:
+
+```bash
+DEEVY_DATABASE_PATH=./data/stub.sqlite vp run server#seed          # refuses a database with a Project in it
+DEEVY_DATABASE_PATH=./data/stub.sqlite vp run server#seed -- --force  # removes the file first
+```
+
+The seed (`apps/server/src/seed.ts`, a second `vp pack` entry beside the server) signs the admin and
+`grace@<the admin's domain>` in through the stub, creates the Agents `Planner` and `Builder` with the admin as
+Sponsor and prints their keys once, and then creates two Projects, some thirty-five Issues, Documents, comments
+with mentions, Runs in every status, Gate rulings, Links, a Slack Channel, routing and a webhook — all through
+the operations, so the inbox and the Event log fill themselves. Point a runtime at the printed key
+(`DEEVY_AGENT_KEY`) and it will find Planner's pending Runs.
+
 ## Everyday commands
 
 | Command                          | What it does                                                                                                  |

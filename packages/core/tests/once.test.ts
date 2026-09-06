@@ -12,6 +12,7 @@ import { deriveWebhookDeliveries } from "../src/webhooks.ts";
 import { deliverWebhook, remindAboutGates } from "../src/work.ts";
 import { router } from "../src/operations/index.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 /**
  * At most one outbound attempt owed per destination per Event, and one inbox
@@ -32,10 +33,10 @@ async function workspace() {
   const { db, close } = testDb();
   closers.push(close);
   const alice = await memberContext(db, { role: "admin", name: "Alice" });
-  const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+  const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
   const asAlice = createRouterClient(router, { context: alice });
   const project = await asAlice.projects.create({ name: "deevy", key: "DEV" });
-  const subscriptionId = crypto.randomUUID();
+  const subscriptionId = newId("webhook");
   await db.insert(webhookSubscription).values({
     id: subscriptionId,
     workspaceId: alice.workspace.id,
@@ -50,7 +51,7 @@ async function workspace() {
 
 /** A Slack Channel the Workspace sends everything to. */
 async function slackRoom(db: Db, workspaceId: string) {
-  const channelId = crypto.randomUUID();
+  const channelId = newId("channel");
   await db.insert(channelTable).values({
     id: channelId,
     workspaceId,
@@ -59,7 +60,7 @@ async function slackRoom(db: Db, workspaceId: string) {
     config: { webhookUrl: "https://hooks.slack.example/services/T000/B000/xxx" },
   });
   await db.insert(routingRule).values({
-    id: crypto.randomUUID(),
+    id: newId("routingRule"),
     workspaceId,
     notificationKind: null,
     projectId: null,

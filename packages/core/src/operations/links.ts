@@ -7,6 +7,7 @@ import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
 import { assertProjectVisible, requireIssue, requireRun } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 export const links = {
   list: defineOperation({
@@ -62,7 +63,7 @@ export const links = {
       });
       const parsed = parseLink(input.url, known);
 
-      const id = crypto.randomUUID();
+      const id = newId("link");
       await context.db.insert(issueLinkTable).values({
         id,
         issueId: issue.id,

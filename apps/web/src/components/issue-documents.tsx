@@ -3,19 +3,44 @@ import { useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { useMentionables } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
+import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * The Documents on an Issue: intent, spec, plan, whichever the Workflow asked
  * for. Writes are versions, so an older one stays readable (CONTEXT.md).
  */
-export function IssueDocuments({ issueKey }: { issueKey: string }) {
+export function IssueDocuments({
+  issueKey,
+  shortcutScope = PAGE_SCOPE,
+}: {
+  issueKey: string;
+  /** The shortcut scope the Issue is shown in, so `[` and `]` turn these tabs. */
+  shortcutScope?: string;
+}) {
   const documents = useQuery(orpc.documents.list.queryOptions({ input: { issueKey } }));
   const [active, setActive] = useState<string | null>(null);
+  const names = (documents.data?.documents ?? []).map((doc) => doc.name);
+  const current = active && names.includes(active) ? active : names[0];
+  const turn = (by: -1 | 1) => {
+    if (!current || names.length < 2) return;
+    const at = names.indexOf(current);
+    setActive(names[(at + by + names.length) % names.length] ?? null);
+  };
+  useShortcut("[", () => turn(-1), { scope: shortcutScope });
+  useShortcut("]", () => turn(1), { scope: shortcutScope });
 
   if (documents.isPending) return <Skeleton className="h-40 w-full" />;
   if (documents.isError) {
@@ -23,9 +48,8 @@ export function IssueDocuments({ issueKey }: { issueKey: string }) {
   }
   if (documents.data.documents.length === 0) return null;
 
-  const names = documents.data.documents.map((doc) => doc.name);
-  const current = active && names.includes(active) ? active : names[0]!;
-  const document = documents.data.documents.find((doc) => doc.name === current)!;
+  const document = documents.data.documents.find((doc) => doc.name === current);
+  if (!current || !document) return null;
 
   return (
     <section className="flex flex-col gap-3">
@@ -59,6 +83,7 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
   const document = useQuery(
     orpc.documents.get.queryOptions({ input: { issueKey, name, version: reading } }),
   );
+  const mentionables = useMentionables();
   const write = useMutation(
     orpc.documents.write.mutationOptions({
       onSuccess: async () => {
@@ -85,22 +110,33 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor={`version-${name}`}>Version</Label>
-          <NativeSelect
-            id={`version-${name}`}
+          <Select
             value={String(reading)}
-            onChange={(changed) => {
+            onValueChange={(next) => {
+              if (next === null) return;
               setDraft(null);
-              setVersion(Number(changed.target.value));
+              setVersion(Number(next));
             }}
           >
-            {Array.from({ length: currentVersion }, (_, index) => currentVersion - index).map(
-              (candidate) => (
-                <option key={candidate} value={candidate}>
-                  {candidate === currentVersion ? `${candidate} (current)` : candidate}
-                </option>
-              ),
-            )}
-          </NativeSelect>
+            <SelectTrigger id={`version-${name}`} className="w-36">
+              <SelectValue>
+                {(selected: string) =>
+                  Number(selected) === currentVersion ? `${selected} (current)` : selected
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {Array.from({ length: currentVersion }, (_, index) => currentVersion - index).map(
+                  (candidate) => (
+                    <SelectItem key={candidate} value={String(candidate)}>
+                      {candidate === currentVersion ? `${String(candidate)} (current)` : candidate}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         <span className="flex-1" />
         {draft === null && !readingOlder ? (
@@ -131,16 +167,15 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
             write.mutate({ issueKey, name, body: draft });
           }}
         >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`body-${name}`}>Body</Label>
-            <Textarea
-              id={`body-${name}`}
-              aria-label="Body"
-              rows={16}
-              value={draft}
-              onChange={(changed) => setDraft(changed.target.value)}
-            />
-          </div>
+          <MarkdownEditor
+            id={`body-${name}`}
+            value={draft}
+            onChange={setDraft}
+            mentions={mentionables}
+            rows={16}
+            placeholder={`Write the ${name}…`}
+            onSubmit={() => write.mutate({ issueKey, name, body: draft })}
+          />
           <div className="flex gap-2">
             <Button type="submit" disabled={write.isPending}>
               Save version

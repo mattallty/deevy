@@ -51,6 +51,12 @@ export interface AppOptions {
    * never reaches here (`isDefinedRefusal`).
    */
   onError?: (error: unknown) => void;
+  /**
+   * Whether this instance signs Humans in through a GitHub stub, so the SPA may
+   * offer "sign in as <email>" (apps/server reads it from
+   * `DEEVY_DEV_STUB_GITHUB`). Reported on `health.ping`; the Worker never sets it.
+   */
+  devSignIn?: boolean;
 }
 
 /**
@@ -88,6 +94,7 @@ export function createApp({
   live,
   jobs = discardingJobQueue(),
   onError: report = console.error,
+  devSignIn = false,
 }: AppOptions) {
   // A client asking for a Run that does not exist is a 404, not something for
   // an operator to read. Reporting every refusal buried the ones that matter in
@@ -134,6 +141,7 @@ export function createApp({
     ...(await buildContext(db, auth, request.headers, originOf(request.url))),
     ...(live ? { live } : {}),
     jobs,
+    devSignIn,
   });
   app.use("/rpc/*", async (c, next) => {
     c.set("ctx", await contextFor(c.req.raw));

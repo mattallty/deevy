@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { bootstrapWorkspace, joinWorkspace } from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 /** An admin plus one allowlist rule: the arrangement every join test starts from. */
 async function allow(
@@ -14,7 +15,7 @@ async function allow(
 ) {
   const admin = await memberContext(db, { role: "admin", name: "Ada" });
   await db.insert(allowlistRule).values({
-    id: crypto.randomUUID(),
+    id: newId("allowlistRule"),
     workspaceId: admin.workspace.id,
     kind: kind as "email_domain" | "github_org",
     value,
@@ -34,15 +35,15 @@ describe("joinWorkspace", () => {
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     await db.insert(allowlistRule).values({
-      id: crypto.randomUUID(),
+      id: newId("allowlistRule"),
       workspaceId: admin.workspace.id,
       kind: "email_domain",
-      value: "flippable.net",
+      value: "example.com",
       createdBy: admin.member.id,
     });
-    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@flippable.net" });
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.com" });
 
-    await joinWorkspace(db, { userId: "u-bob", email: "bob@flippable.net", name: "Bob" });
+    await joinWorkspace(db, { userId: "u-bob", email: "bob@example.com", name: "Bob" });
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
       workspaceId: admin.workspace.id,
@@ -56,10 +57,10 @@ describe("joinWorkspace", () => {
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     await db.insert(allowlistRule).values({
-      id: crypto.randomUUID(),
+      id: newId("allowlistRule"),
       workspaceId: admin.workspace.id,
       kind: "email_domain",
-      value: "flippable.net",
+      value: "example.com",
       createdBy: admin.member.id,
     });
     await db.insert(user).values({ id: "u-carol", name: "Carol", email: "carol@example.org" });
@@ -74,12 +75,12 @@ describe("the handle a Member joins with", () => {
   it("takes the GitHub login when the sign-in supplies one", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    await allow(db, "flippable.net");
-    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@flippable.net" });
+    await allow(db, "example.com");
+    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
 
     await joinWorkspace(
       db,
-      { userId: "u-bob", email: "bob@flippable.net", name: "Bob Vance" },
+      { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" },
       { githubLogin: "bvance" },
     );
 
@@ -91,10 +92,10 @@ describe("the handle a Member joins with", () => {
   it("falls back to a slug of the name", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    await allow(db, "flippable.net");
-    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@flippable.net" });
+    await allow(db, "example.com");
+    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
 
-    await joinWorkspace(db, { userId: "u-bob", email: "bob@flippable.net", name: "Bob Vance" });
+    await joinWorkspace(db, { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" });
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
       handle: "bob-vance",
@@ -104,11 +105,11 @@ describe("the handle a Member joins with", () => {
   it("suffixes a handle another Member already holds", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    const admin = await allow(db, "flippable.net");
+    const admin = await allow(db, "example.com");
     await db.update(member).set({ handle: "bob-vance" }).where(eq(member.id, admin.member.id));
-    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@flippable.net" });
+    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
 
-    await joinWorkspace(db, { userId: "u-bob", email: "bob@flippable.net", name: "Bob Vance" });
+    await joinWorkspace(db, { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" });
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
       handle: "bob-vance-2",
@@ -120,10 +121,10 @@ describe("the Event a join appends", () => {
   it("records member.joined with the new Member as subject and no actor", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    const admin = await allow(db, "flippable.net");
-    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@flippable.net" });
+    const admin = await allow(db, "example.com");
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.com" });
 
-    await joinWorkspace(db, { userId: "u-bob", email: "bob@flippable.net", name: "Bob" });
+    await joinWorkspace(db, { userId: "u-bob", email: "bob@example.com", name: "Bob" });
 
     const bob = await db.query.member.findFirst({ where: { userId: "u-bob" } });
     const client = createRouterClient(router, { context: admin });
@@ -138,13 +139,13 @@ describe("a github_org rule", () => {
   it("admits a sign-in whose organizations include the rule's value", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    await allow(db, "flippable", "github_org");
+    await allow(db, "acme", "github_org");
     await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.org" });
 
     await joinWorkspace(
       db,
       { userId: "u-bob", email: "bob@example.org", name: "Bob" },
-      { listOrgs: async () => ["Acme", "Flippable"] },
+      { listOrgs: async () => ["Acme", "Acme"] },
     );
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
@@ -155,13 +156,13 @@ describe("a github_org rule", () => {
   it("turns away a sign-in in none of the allowed organizations", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    await allow(db, "flippable", "github_org");
+    await allow(db, "acme", "github_org");
     await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.org" });
 
     await joinWorkspace(
       db,
       { userId: "u-bob", email: "bob@example.org", name: "Bob" },
-      { listOrgs: async () => ["Acme"] },
+      { listOrgs: async () => ["Globex"] },
     );
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toBeUndefined();
@@ -170,13 +171,13 @@ describe("a github_org rule", () => {
   it("never asks for organizations when an email domain already matched", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    await allow(db, "flippable.net");
-    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@flippable.net" });
+    await allow(db, "example.com");
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.com" });
     let asked = false;
 
     await joinWorkspace(
       db,
-      { userId: "u-bob", email: "bob@flippable.net", name: "Bob" },
+      { userId: "u-bob", email: "bob@example.com", name: "Bob" },
       {
         listOrgs: async () => {
           asked = true;
@@ -211,12 +212,12 @@ describe("the admin the bootstrap creates", () => {
   it("carries a handle, so slice 10 can mention them", async () => {
     const { db, close } = testDb();
     closers.push(close);
-    await db.insert(user).values({ id: "u1", name: "Ada Lovelace", email: "ada@flippable.net" });
+    await db.insert(user).values({ id: "u1", name: "Ada Lovelace", email: "ada@example.com" });
 
     await bootstrapWorkspace(
       db,
-      { userId: "u1", email: "ada@flippable.net", name: "Ada Lovelace" },
-      { adminEmail: "ada@flippable.net" },
+      { userId: "u1", email: "ada@example.com", name: "Ada Lovelace" },
+      { adminEmail: "ada@example.com" },
     );
 
     expect(await db.query.member.findFirst({ where: { userId: "u1" } })).toMatchObject({

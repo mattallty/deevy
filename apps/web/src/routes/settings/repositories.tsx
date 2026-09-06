@@ -1,9 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -13,7 +20,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const providers = ["github", "gitlab", "other"] as const;
 
@@ -40,16 +56,14 @@ export function RepositoriesPage() {
   const failed = create.error ?? remove.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Repositories</h1>
-        <p className="text-sm text-muted-foreground">
-          Where the code lives. A Link pasted on an Issue is matched to one of these by its URL.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Repositories"
+      description={
+        <>Where the code lives. A Link pasted on an Issue is matched to one of these by its URL.</>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim() && url.trim()) {
@@ -59,17 +73,25 @@ export function RepositoriesPage() {
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-provider">Provider</Label>
-          <NativeSelect
-            id="repo-provider"
+          <Select
             value={provider}
-            onChange={(changed) => setProvider(changed.target.value as (typeof providers)[number])}
+            onValueChange={(next) => {
+              if (next) setProvider(next as (typeof providers)[number]);
+            }}
           >
-            {providers.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </NativeSelect>
+            <SelectTrigger id="repo-provider" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {providers.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-name">Name</Label>
@@ -128,8 +150,18 @@ export function RepositoriesPage() {
       ) : null}
 
       {repositories.data?.repositories.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Repositories registered yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GitBranch aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Repositories yet</EmptyTitle>
+            <EmptyDescription>
+              Register one above, so a pull request can link to its Issue.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

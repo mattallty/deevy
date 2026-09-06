@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
 /** What each kind of Notification is called on this page, in CONTEXT.md's words. */
@@ -54,15 +55,15 @@ export function NotificationsPage() {
     );
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Notifications</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Notifications"
+      description={
+        <>
           What reaches you, and where. Slack only arrives for the Channels this Workspace routes a
           kind to; turning it off here stops it either way.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       {preferences.isPending ? <Skeleton className="h-48 w-full" /> : null}
       {save.error ? <p className="text-sm text-destructive">{save.error.message}</p> : null}
 
@@ -79,19 +80,23 @@ export function NotificationsPage() {
             {draft.map((row) => (
               <TableRow key={row.kind}>
                 <TableCell className="font-medium">{labels[row.kind] ?? row.kind}</TableCell>
-                <TableCell className="text-center">
-                  <Checkbox
-                    aria-label={`${labels[row.kind] ?? row.kind} in the inbox`}
-                    checked={row.inbox}
-                    onCheckedChange={() => toggle(row.kind, "inbox")}
-                  />
+                <TableCell className="w-24">
+                  <div className="flex justify-center">
+                    <Checkbox
+                      aria-label={`${labels[row.kind] ?? row.kind} in the inbox`}
+                      checked={row.inbox}
+                      onCheckedChange={() => toggle(row.kind, "inbox")}
+                    />
+                  </div>
                 </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox
-                    aria-label={`${labels[row.kind] ?? row.kind} in Slack`}
-                    checked={row.slack}
-                    onCheckedChange={() => toggle(row.kind, "slack")}
-                  />
+                <TableCell className="w-24">
+                  <div className="flex justify-center">
+                    <Checkbox
+                      aria-label={`${labels[row.kind] ?? row.kind} in Slack`}
+                      checked={row.slack}
+                      onCheckedChange={() => toggle(row.kind, "slack")}
+                    />
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -115,6 +120,6 @@ export function NotificationsPage() {
           Save
         </Button>
       </div>
-    </section>
+    </SettingsPage>
   );
 }

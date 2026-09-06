@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
 /**
@@ -85,17 +94,17 @@ export function WebhooksPage() {
   const failed = create.error ?? remove.error ?? update.error ?? redeliver.error;
 
   return (
-    <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Webhooks</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Webhooks"
+      description={
+        <>
           Where deevy delivers its Events. Every POST is signed with the subscription&apos;s secret
           in a <code>deevy-signature</code> header, and retried until it lands or is given up on.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (!url.trim() || !secret) return;
@@ -192,7 +201,7 @@ export function WebhooksPage() {
                     {subscription.disabledAt ? "Switch on" : "Switch off"}
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ subscriptionId: subscription.id })}
@@ -207,18 +216,24 @@ export function WebhooksPage() {
       ) : null}
 
       {subscriptions.data && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No webhook subscriptions yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Webhook aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Webhooks yet</EmptyTitle>
+            <EmptyDescription>
+              Subscribe a URL above; every Event it names is delivered there.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       {open ? (
-        <section className="flex flex-col gap-3">
-          <header>
-            <h2 className="text-lg font-semibold">Recent deliveries</h2>
-            <p className="text-sm text-muted-foreground">
-              What this subscription was owed lately. A failed one is tried again on its own;
-              Redeliver owes it from the beginning.
-            </p>
-          </header>
+        <SettingsSection
+          title="Recent deliveries"
+          description="What this subscription was owed lately. A failed one is tried again on its own; Redeliver owes it from the beginning."
+        >
           {deliveries.isPending ? <Skeleton className="h-20 w-full" /> : null}
           {(deliveries.data?.deliveries ?? []).length === 0 && !deliveries.isPending ? (
             <p className="text-sm text-muted-foreground">Nothing has been owed to it yet.</p>
@@ -243,8 +258,8 @@ export function WebhooksPage() {
               </Button>
             </div>
           ))}
-        </section>
+        </SettingsSection>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -16,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MemberChip } from "@/components/member-chip";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 /**
@@ -40,14 +43,10 @@ export function MembersPage() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Members</h1>
-        <p className="text-sm text-muted-foreground">
-          Everyone in this Workspace. Add an allowlist rule to let more people in.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Members"
+      description={<>Everyone in this Workspace. Add an allowlist rule to let more people in.</>}
+    >
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       <Table>
@@ -63,8 +62,8 @@ export function MembersPage() {
           {members.data.members.map((member) => (
             <TableRow key={member.id}>
               <TableCell>
-                <div className="font-medium">{member.user.name}</div>
-                <div className="text-xs text-muted-foreground">{member.user.email}</div>
+                {/* The name and the handle: an email is the sign-in's, not the Workspace's to show. */}
+                <MemberChip member={member} />
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {member.handle ? `@${member.handle}` : "—"}
@@ -78,12 +77,15 @@ export function MembersPage() {
                       updateRole.mutate({ memberId: member.id, role: role as "admin" | "member" })
                     }
                   >
-                    <SelectTrigger aria-label={`Role of ${member.user.name}`}>
+                    {/* Small in a row, so the row keeps its 40px like the rows without a control. */}
+                    <SelectTrigger size="sm" aria-label={`Role of ${member.user.name}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">admin</SelectItem>
-                      <SelectItem value="member">member</SelectItem>
+                      <SelectGroup>
+                        <SelectItem value="admin">admin</SelectItem>
+                        <SelectItem value="member">member</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   {member.kind === "agent" ? <Badge variant="secondary">Agent</Badge> : null}
@@ -117,6 +119,6 @@ export function MembersPage() {
           ))}
         </TableBody>
       </Table>
-    </section>
+    </SettingsPage>
   );
 }

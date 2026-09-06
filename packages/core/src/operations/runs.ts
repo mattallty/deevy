@@ -28,6 +28,7 @@ import { gateApprovers, gateUrl } from "../workflow.ts";
 import { defineOperation } from "./registry.ts";
 import type { Run } from "@deevy/db";
 import { assertOwnRun, parseRunCursor, requireIssue, requireRun, runView } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 export const runs = {
   start: defineOperation({
@@ -62,7 +63,7 @@ export const runs = {
           message: "This Agent already has an open Run on this Issue",
         });
       }
-      const id = crypto.randomUUID();
+      const id = newId("run");
       await context.db.insert(runTable).values({
         id,
         issueId: issue.id,
@@ -102,7 +103,7 @@ export const runs = {
       assertOwnRun(context, run);
       const status = statusAfterActivity(run.status, input.kind);
 
-      const id = crypto.randomUUID();
+      const id = newId("activity");
       await context.db.insert(activityTable).values({
         id,
         runId: run.id,
@@ -154,7 +155,7 @@ export const runs = {
 
       // The answer joins the Activity feed as a `response`, because that feed
       // is where the Agent looks: an answer it cannot read is no answer.
-      const id = crypto.randomUUID();
+      const id = newId("activity");
       await context.db.insert(activityTable).values({
         id,
         runId: run.id,
@@ -270,7 +271,7 @@ export const runs = {
         // answer arrives as (`runs.answer`): the Agent reads its answers in one
         // place, and the question is closed, so the next Gate is a new one.
         if (outstanding) {
-          const id = crypto.randomUUID();
+          const id = newId("activity");
           await context.db.insert(activityTable).values({
             id,
             runId: run.id,
@@ -311,7 +312,7 @@ export const runs = {
       const alreadyAsking =
         run.status === "awaiting_input" && outstanding?.request.gateStateId === gate.id;
       if (!alreadyAsking) {
-        const id = crypto.randomUUID();
+        const id = newId("activity");
         await context.db.insert(activityTable).values({
           id,
           runId: run.id,

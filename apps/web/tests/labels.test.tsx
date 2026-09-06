@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => {
@@ -52,7 +52,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada" },
+    { workspaceName: "Acme Team", memberName: "Ada" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -69,11 +69,14 @@ async function mountAt(path: string) {
 }
 
 describe("the Labels settings page", () => {
-  it("lists Labels, showing a scoped one as scope: name", async () => {
+  it("lists Labels, a scoped one as its scope in a pill then its name", async () => {
     await mountAt("/settings/labels");
 
     expect(await screen.findByText("backend")).toBeTruthy();
-    expect(screen.getByText("epic: Checkout")).toBeTruthy();
+    // The eye sees [[epic] Checkout]; the badge names itself `epic: Checkout`.
+    const scoped = screen.getByLabelText("epic: Checkout");
+    expect(scoped.textContent).toBe("epicCheckout");
+    expect(within(scoped).getByText("epic")).toBeTruthy();
   });
 
   it("creates a Label from the form, splitting scope from name", async () => {
@@ -96,11 +99,35 @@ describe("the Label picker on an Issue", () => {
     await mountAt("/issues/DEV-1");
 
     await screen.findByRole("group", { name: "Labels" });
-    fireEvent.click(await screen.findByRole("button", { name: "epic: Checkout" }));
+    // The Issue's own Label is a chip; the rest are found by typing.
+    expect(screen.getByRole("button", { name: "Remove backend" })).toBeTruthy();
+    // Typing filters; ArrowDown is what opens the Base UI popup under jsdom.
+    const box = screen.getByRole("combobox", { name: "Labels" });
+    fireEvent.change(box, { target: { value: "epic" } });
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: "epic: Checkout" }));
 
     await waitFor(() =>
       expect(stub.set).toContainEqual(
         expect.objectContaining({ key: "DEV-1", labelIds: ["l1", "l2"] }),
+      ),
+    );
+  });
+});
+
+describe("a Label's colour", () => {
+  it("is one of the palette's swatches, not a free pick", async () => {
+    await mountAt("/settings/labels");
+    const group = await screen.findByRole("radiogroup", { name: "Color" });
+    const swatches = within(group).getAllByRole("radio");
+    expect(swatches.length).toBe(8);
+    fireEvent.click(swatches[2]!);
+    expect(swatches[2]!.getAttribute("aria-checked")).toBe("true");
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "ops" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Label" }));
+    await waitFor(() =>
+      expect(stub.created).toContainEqual(
+        expect.objectContaining({ name: "ops", color: swatches[2]!.getAttribute("aria-label") }),
       ),
     );
   });

@@ -90,7 +90,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada" },
+    { workspaceName: "Acme Team", memberName: "Ada" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -143,6 +143,15 @@ describe("an Issue sitting in a Gate", () => {
     await waitFor(() => expect(scrolled).toHaveBeenCalled());
   });
 
+  it("puts the ruling in front of the Human the link was for", async () => {
+    await mountAt("/issues/DEV-1?gate=s1");
+
+    const banner = await screen.findByRole("status");
+    expect(banner.textContent).toMatch(/Waiting on your ruling/);
+    expect(banner.textContent).toMatch(/Intent/);
+    expect(within(banner).getByRole("button", { name: "Rule now" })).toBeTruthy();
+  });
+
   it("is left alone when the link names a State the Issue has moved on from", async () => {
     const scrolled = vi.fn();
     Element.prototype.scrollIntoView = scrolled;
@@ -177,6 +186,7 @@ describe("the Workflow editor", () => {
 
     const list = await screen.findByRole("list", { name: "States" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(4);
-    expect(within(list).getAllByDisplayValue("Intent")).toHaveLength(1);
+    // Master–detail: the first State's form sits beside the list, not inside it.
+    expect(screen.getAllByDisplayValue("Intent")).toHaveLength(1);
   });
 });

@@ -29,6 +29,19 @@ vi.mock("../src/lib/orpc.ts", async () => {
     teams: { list: async () => ({ teams: [] }) },
     allowlist: { list: async () => ({ rules: [] }) },
     workflow: { get: async () => ({ states: [] }) },
+    // Namespaces the hook only ever names a key of; nothing here is called.
+    comments: {},
+    documents: {},
+    links: {},
+    inbox: {},
+    runs: {},
+    agents: {},
+    labels: {},
+    repositories: {},
+    channels: {},
+    routing: {},
+    webhooks: {},
+    workspace: {},
     events: {
       list: async () => ({ events: [], nextCursor: null }),
       subscribe: async (input: unknown) => {
@@ -120,5 +133,45 @@ describe("useLiveEvents", () => {
     // The first subscription starts with no cursor; the hook adopts the seq it
     // is told and would reconnect from there.
     expect(stub.subscribed[0]).toEqual({ after: undefined });
+  });
+
+  it("re-reads each key once for a burst of Events", async () => {
+    stub.subscribed.length = 0;
+    stub.endsCleanly = 0;
+    // Two Events about Issues in one tick: one refetch of the Issue queries,
+    // not two, however many screens hold one (docs/plans/ui-redesign.md).
+    stub.messages = [
+      {
+        type: "event",
+        event: { seq: 9, kind: "issue.created", subjectType: "issue", projectId: "p1" },
+      },
+      {
+        type: "event",
+        event: { seq: 10, kind: "issue.updated", subjectType: "issue", projectId: "p1" },
+      },
+    ];
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidated: unknown[] = [];
+    const original = queryClient.invalidateQueries.bind(queryClient);
+    queryClient.invalidateQueries = (filters?: Parameters<typeof original>[0]) => {
+      invalidated.push(filters?.queryKey);
+      return original(filters);
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Probe />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(invalidated.length).toBeGreaterThan(0));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const issueKeys = invalidated.filter((key) => JSON.stringify(key).includes('"issues"'));
+    expect(issueKeys).toHaveLength(1);
+    // And what an Issue Event touches beside the Issue: what is shown with it.
+    const all = JSON.stringify(invalidated);
+    expect(all).toContain("comments");
+    expect(all).toContain("inbox");
+    expect(all).not.toContain("members");
   });
 });

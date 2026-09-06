@@ -1,9 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -13,7 +20,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** The Notification kinds a rule can name, in the words the API uses. */
 const kinds = [
@@ -33,7 +50,8 @@ interface Rule {
 }
 
 /** The empty option of a select, which is what "any" is on the wire. */
-const anyValue = "";
+/** Base UI's Select wants a value for "any"; the empty string is not one. */
+const anyValue = "__any";
 
 /**
  * Channels and routing: where Notifications leave deevy for. A Channel is a
@@ -95,17 +113,17 @@ export function ChannelsPage() {
   const failed = create.error ?? remove.error ?? test.error ?? save.error;
 
   return (
-    <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Channels</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Channels"
+      description={
+        <>
           Where Notifications are delivered. Every Human has an inbox; a Slack Channel is an
           incoming webhook this Workspace posts to.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim() && webhookUrl.trim()) {
@@ -164,7 +182,7 @@ export function ChannelsPage() {
                     Test
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ channelId: channel.id })}
@@ -179,89 +197,133 @@ export function ChannelsPage() {
       ) : null}
 
       {channels.data && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Channels yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageSquare aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Channels yet</EmptyTitle>
+            <EmptyDescription>
+              Connect one above, and route a kind of Notification to it.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <header>
-          <h2 className="text-lg font-semibold">Routing</h2>
-          <p className="text-sm text-muted-foreground">
-            Which Notifications reach which Channel. A rule left on Any covers every kind or every
-            Project. Each Human still chooses what reaches them, under Notifications.
-          </p>
-        </header>
-
+      <SettingsSection
+        title="Routing"
+        description="Which Notifications reach which Channel. A rule left on Any covers every kind or every Project. Each Human still chooses what reaches them, under Notifications."
+      >
         {draft.map((rule, at) => (
           <div key={at} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor={`rule-kind-${at}`}>Notification</Label>
-              <NativeSelect
-                id={`rule-kind-${at}`}
+              <Select
                 value={rule.notificationKind ?? anyValue}
-                onChange={(changed) =>
+                onValueChange={(next) => {
+                  if (next === null) return;
                   setDraft((current) =>
                     current.map((one, index) =>
                       index === at
-                        ? {
-                            ...one,
-                            notificationKind: (changed.target.value || null) as Kind | null,
-                          }
+                        ? { ...one, notificationKind: next === anyValue ? null : (next as Kind) }
                         : one,
                     ),
-                  )
-                }
+                  );
+                }}
               >
-                <option value={anyValue}>Any</option>
-                {kinds.map((kind) => (
-                  <option key={kind.value} value={kind.value}>
-                    {kind.label}
-                  </option>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id={`rule-kind-${at}`} className="w-48">
+                  <SelectValue>
+                    {(selected: string) =>
+                      selected === anyValue
+                        ? "Any"
+                        : (kinds.find((kind) => kind.value === selected)?.label ?? selected)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={anyValue}>Any</SelectItem>
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    {kinds.map((kind) => (
+                      <SelectItem key={kind.value} value={kind.value}>
+                        {kind.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor={`rule-project-${at}`}>Project</Label>
-              <NativeSelect
-                id={`rule-project-${at}`}
+              <Select
                 value={rule.projectId ?? anyValue}
-                onChange={(changed) =>
+                onValueChange={(next) => {
+                  if (next === null) return;
                   setDraft((current) =>
                     current.map((one, index) =>
-                      index === at ? { ...one, projectId: changed.target.value || null } : one,
+                      index === at ? { ...one, projectId: next === anyValue ? null : next } : one,
                     ),
-                  )
-                }
+                  );
+                }}
               >
-                <option value={anyValue}>Any</option>
-                {(projects.data?.projects ?? []).map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.key}
-                  </option>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id={`rule-project-${at}`} className="w-32">
+                  <SelectValue>
+                    {(selected: string) =>
+                      selected === anyValue
+                        ? "Any"
+                        : (projects.data?.projects.find((project) => project.id === selected)
+                            ?.key ?? selected)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={anyValue}>Any</SelectItem>
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    {(projects.data?.projects ?? []).map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.key}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <Label htmlFor={`rule-channel-${at}`}>Channel</Label>
-              <NativeSelect
-                id={`rule-channel-${at}`}
+              <Select
                 value={rule.channelId}
-                onChange={(changed) =>
+                onValueChange={(next) => {
+                  if (next === null) return;
                   setDraft((current) =>
-                    current.map((one, index) =>
-                      index === at ? { ...one, channelId: changed.target.value } : one,
-                    ),
-                  )
-                }
+                    current.map((one, index) => (index === at ? { ...one, channelId: next } : one)),
+                  );
+                }}
               >
-                {rows.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.name}
-                  </option>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id={`rule-channel-${at}`} className="w-full">
+                  <SelectValue>
+                    {(selected: string) =>
+                      rows.find((channel) => channel.id === selected)?.name ?? selected
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {rows.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
             <Button
-              variant="ghost"
+              variant="destructive"
               size="sm"
               onClick={() => setDraft((current) => current.filter((_, index) => index !== at))}
             >
@@ -287,7 +349,7 @@ export function ChannelsPage() {
             Save routing
           </Button>
         </div>
-      </section>
-    </section>
+      </SettingsSection>
+    </SettingsPage>
   );
 }

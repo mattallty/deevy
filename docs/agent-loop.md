@@ -82,7 +82,7 @@ Work one Issue at a time, in this order.
    the one that still works when the inbox has been read: it answers with your own Runs, since you have no way
    to learn your own Member id.
 2. **Find your Run.** `runs_list` with that `issueKey`. The trigger that assigned you already opened a Run in
-   `pending`; its `id` is what every later call needs. A Run that is `completed` or `failed` is not it: those
+   `pending`; its `id` (`run_…` — every id says what it names, ADR-0015) is what every later call needs. A Run that is `completed` or `failed` is not it: those
    are finished attempts, and an Issue still assigned to you that is not in a `done` State is still yours to
    work whatever happened on an earlier try. If every Run there is finished, open a new one with `runs_start`.
    That is not a duplicate — the rule is one _open_ Run per Issue and Agent, and a finished one is not open.

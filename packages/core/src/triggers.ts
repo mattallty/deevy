@@ -2,6 +2,7 @@ import { issue as issueTable, run as runTable, type Db, type Event, type Run } f
 import { eq } from "drizzle-orm";
 import type { EventInput } from "./events.ts";
 import { openRunFor } from "./runs.ts";
+import { newId } from "./ids.ts";
 
 /**
  * The four triggers (docs/PLAN.md) read the Event log rather than being spread
@@ -75,12 +76,21 @@ async function stateRule(db: Db, event: Event): Promise<EventInput[]> {
     .update(issueTable)
     .set({ assigneeMemberId: agentMemberId, updatedAt: new Date() })
     .where(eq(issueTable.id, found.id));
+  const agent = await db.query.member.findFirst({
+    where: { id: agentMemberId },
+    with: { user: true },
+  });
   events.push({
     kind: "issue.assigned",
     subjectType: "issue",
     subjectId: found.id,
     projectId: event.projectId,
-    payload: { from: found.assigneeMemberId, to: agentMemberId, byStateRule: true },
+    payload: {
+      from: found.assigneeMemberId,
+      to: agentMemberId,
+      toName: agent?.user.name ?? null,
+      byStateRule: true,
+    },
   });
   return events;
 }
@@ -144,7 +154,7 @@ interface StartRunInput {
  */
 async function startRun(db: Db, input: StartRunInput): Promise<Run | null> {
   if (await openRunFor(db, input.issueId, input.agentMemberId)) return null;
-  const id = crypto.randomUUID();
+  const id = newId("run");
   await db.insert(runTable).values({
     id,
     issueId: input.issueId,

@@ -12,8 +12,8 @@ afterEach(() => {
 
 async function workspace(db: MemberContext["db"]) {
   const alice = await memberContext(db, { role: "admin", name: "Alice" });
-  const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
-  const carol = await memberContext(db, { name: "Carol", email: "carol@flippable.net" });
+  const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
+  const carol = await memberContext(db, { name: "Carol", email: "carol@example.com" });
   await db.update(memberTable).set({ handle: "bob" }).where(eq(memberTable.id, bob.member.id));
   const asAlice = createRouterClient(router, { context: alice });
   const asBob = createRouterClient(router, { context: bob });
@@ -183,7 +183,7 @@ describe("an Agent's own inbox", () => {
     const project = await asAlice.projects.create({ name: "deevy", key: "DEV" });
     const planner = await agentContext(db, {
       name: "Planner",
-      email: "planner@flippable.net",
+      email: "planner@example.com",
       sponsor: alice.member,
       grants: [project.id],
     });
@@ -212,7 +212,7 @@ describe("an Agent's own inbox", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { asAlice, planner, asPlanner } = await agentWorkspace(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const asBob = createRouterClient(router, { context: bob });
     await asAlice.issues.create({ projectKey: "DEV", title: "One" });
     await asAlice.issues.create({ projectKey: "DEV", title: "Two" });
@@ -248,5 +248,24 @@ describe("an Agent's own inbox", () => {
       }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect((await asPlanner.inbox.list({ unreadOnly: true })).notifications).toHaveLength(1);
+  });
+});
+
+describe("what a Notification carries", () => {
+  it("names who did it and quotes the comment a mention came from", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { bob, asAlice, asBob } = await workspace(db);
+    await asAlice.issues.create({ projectKey: "DEV", title: "Ship it" });
+    await asAlice.comments.create({ issueKey: "DEV-1", body: "Look at this, @bob" });
+    await asAlice.issues.update({ key: "DEV-1", assigneeMemberId: bob.member.id });
+
+    const rows = (await asBob.inbox.list({})).notifications;
+    const mention = rows.find((row) => row.kind === "mention");
+    expect(mention?.actor?.user.name).toBe("Alice");
+    expect(mention?.comment?.body).toBe("Look at this, @bob");
+    const assignment = rows.find((row) => row.kind === "assignment");
+    expect(assignment?.actor?.user.name).toBe("Alice");
+    expect(assignment?.comment).toBeNull();
   });
 });

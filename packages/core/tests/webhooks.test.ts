@@ -8,6 +8,7 @@ import { deliverDueWebhooks, deliverWebhook, sweepSchedules } from "../src/work.
 import { router } from "../src/operations/index.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
 import { signPayload, verifySignature } from "../src/webhooks.ts";
+import { newId } from "../src/ids.ts";
 
 /**
  * A receiver's whole defence is the signature, so it is checked against a
@@ -79,7 +80,7 @@ async function workspace() {
   const project = await asAdmin.projects.create({ key: "DEV", name: "deevy" });
 
   async function subscribe(seed: SubscriptionSeed = {}) {
-    const id = crypto.randomUUID();
+    const id = newId("webhook");
     await db.insert(webhookSubscription).values({
       id,
       workspaceId: admin.workspace.id,
@@ -147,7 +148,7 @@ describe("what an Event owes a subscriber", () => {
       {
         kind: "run.started",
         subjectType: "run",
-        subjectId: crypto.randomUUID(),
+        subjectId: newId("run"),
         projectId: project.id,
         payload: { issueId: issue.id },
       },

@@ -5,6 +5,7 @@ import { bootstrapWorkspace } from "../src/auth.ts";
 import { appendEvent } from "../src/events.ts";
 import { router } from "../src/operations/index.ts";
 import { contextFor, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -95,12 +96,34 @@ describe("events.list from a cursor", () => {
   });
 });
 
+describe("events.list newest first", () => {
+  it("orders by seq descending on request and pages back with before", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const context = await memberContext(db, { role: "admin" });
+    const client = createRouterClient(router, { context });
+    for (const kind of ["workspace.created", "member.joined", "issue.created"] as const) {
+      await appendEvent(context, {
+        kind,
+        subjectType: "workspace",
+        subjectId: context.workspace.id,
+      });
+    }
+
+    const newest = await client.events.list({ order: "desc", limit: 2 });
+    expect(newest.events.map((event) => event.kind)).toEqual(["issue.created", "member.joined"]);
+    const older = await client.events.list({ order: "desc", before: newest.nextCursor ?? 0 });
+    expect(older.events.map((event) => event.kind)).toEqual(["workspace.created"]);
+    expect(older.nextCursor).toBe(older.events[0]?.seq ?? null);
+  });
+});
+
 describe("events.list scoping", () => {
   it("never returns Events belonging to another Workspace", async () => {
     const { db, close } = testDb();
     closers.push(close);
     const context = await memberContext(db);
-    const other = crypto.randomUUID();
+    const other = newId("workspace");
     await db.insert(workspace).values({ id: other, name: "other", slug: "other" });
     await appendEvent(
       { db, workspace: { id: other }, member: null },
@@ -157,7 +180,7 @@ describe("the Event log after bootstrap", () => {
       { userId: "u1", email: "ada@example.com" },
       {
         adminEmail: "ada@example.com",
-        workspaceName: "Flippable Team",
+        workspaceName: "Acme Team",
       },
     );
 
@@ -203,5 +226,44 @@ describe("events.list access", () => {
       context: { db, session: null, member: null, workspace: null },
     });
     await expect(client.events.list({})).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
+
+describe("self-describing payloads", () => {
+  it("carries names and keys beside ids for Labels, the Assignee and the parent", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const alice = await memberContext(db, { role: "admin", name: "Alice" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
+    const asAlice = createRouterClient(router, { context: alice });
+    await asAlice.projects.create({ name: "deevy", key: "DEV" });
+    const backend = await asAlice.labels.create({ name: "backend", color: "#333" });
+    const epic = await asAlice.labels.create({ scope: "epic", name: "Checkout", color: "#555" });
+    const parent = await asAlice.issues.create({ projectKey: "DEV", title: "Parent" });
+    const child = await asAlice.issues.create({ projectKey: "DEV", title: "Child" });
+
+    await asAlice.issues.setLabels({ key: child.key, labelIds: [backend.id, epic.id] });
+    await asAlice.issues.setLabels({ key: child.key, labelIds: [epic.id] });
+    await asAlice.issues.update({ key: child.key, assigneeMemberId: bob.member.id });
+    await asAlice.issues.update({ key: child.key, parentKey: parent.key });
+
+    const { events } = await asAlice.events.list({ subjectType: "issue", subjectId: child.id });
+    const payloads = events.map((event) => [event.kind, event.payload] as const);
+    expect(payloads).toContainEqual([
+      "issue.labels_changed",
+      expect.objectContaining({ addedNames: ["backend", "epic: Checkout"], removedNames: [] }),
+    ]);
+    expect(payloads).toContainEqual([
+      "issue.labels_changed",
+      expect.objectContaining({ addedNames: [], removedNames: ["backend"] }),
+    ]);
+    expect(payloads).toContainEqual([
+      "issue.assigned",
+      expect.objectContaining({ fromName: null, toName: "Bob" }),
+    ]);
+    expect(payloads).toContainEqual([
+      "issue.reparented",
+      expect.objectContaining({ fromKey: null, toKey: parent.key }),
+    ]);
   });
 });

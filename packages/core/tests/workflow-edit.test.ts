@@ -104,7 +104,7 @@ describe("workflow.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client, state } = await withProject(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const asBob = createRouterClient(router, { context: bob });
     await expect(

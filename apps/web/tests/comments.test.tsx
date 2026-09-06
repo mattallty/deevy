@@ -74,7 +74,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada" },
+    { workspaceName: "Acme Team", memberName: "Ada" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -94,7 +94,7 @@ describe("the comment thread", () => {
   it("shows each comment with its author, and marks a withdrawn one", async () => {
     await mountAt("/issues/DEV-1");
 
-    const thread = await screen.findByRole("list", { name: "Comments" });
+    const thread = await screen.findByRole("list", { name: "Activity" });
     const entries = within(thread).getAllByRole("listitem");
     expect(entries).toHaveLength(2);
     expect(within(entries[0]!).getByText("First thought")).toBeTruthy();

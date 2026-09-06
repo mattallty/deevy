@@ -86,6 +86,10 @@ and `deriveNotifications` turns Events into inbox rows right after the insert. T
 of what happened: the timeline, the live stream and the inbox all read it rather than keeping a second source.
 Add a new kind to the `EventKind` union.
 
+**Ids** (ADR-0015): every row deevy creates gets `<prefix>_<12 chars of 0-9a-z>` from `newId(kind)` in
+`packages/core/src/ids.ts` (`iss_`, `mem_`, `proj_`, `run_`…; Better Auth's rows through its `generateId` hook);
+never `crypto.randomUUID()`. `Event.seq` stays an integer and Issue keys stay `DEV-42`.
+
 **Data** (ADR-0008): Drizzle 1.0 rc on the SQLite dialect. Relations use `defineRelations` /
 `defineRelationsPart` merged per table in `packages/db/src/relations.ts`; dates are integer `timestamp_ms`
 columns; the Better Auth adapter is the `/relations-v2` entry. Migrations are applied by the Node migrator at
@@ -95,6 +99,16 @@ startup (`openDatabase`) or by `wrangler d1 migrations apply`, never by `drizzle
 to it, so the Docker runtime image carries `dist/` and the SPA only. `apps/web` builds the Worker only when
 `DEEVY_TARGET=workers`, emitting `dist/deevy` (the bundle plus the `wrangler.json` a deploy uploads) beside
 `dist/client` (the SPA those assets are). A deploy uses that generated configuration, never `src/worker.ts`.
+
+## UI
+
+The SPA is being redesigned in slices from `docs/plans/ui-redesign.md`; the decisions it has made so far —
+Base UI only, which registries and items are allowed, markdown as the one format Documents are stored in, the
+design language, the keyboard model, and the accessible names the tests rely on — are the `deevy-ui` skill in
+`.claude/skills/deevy-ui/SKILL.md`. Read it before changing anything under `apps/web/src` or `apps/web/tests`;
+the vendored `shadcn` and `frontend-design` skills beside it are the component rules and the design process it
+leans on. To see the app without a GitHub OAuth App, run the `dev:stub` launch configuration and
+`DEEVY_DATABASE_PATH=./data/stub.sqlite vp run server#seed` (`docs/DEVELOPMENT.md`, "Running without an OAuth App").
 
 ## Dependencies
 

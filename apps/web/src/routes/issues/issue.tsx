@@ -1,37 +1,56 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { ActivityStream } from "@/components/activity-stream";
 import { GateControls } from "@/components/gate-controls";
-import { IssueComments } from "@/components/issue-comments";
+import { StateBadge } from "@/components/state-badge";
 import { IssueDocuments } from "@/components/issue-documents";
 import { IssueLinks } from "@/components/issue-links";
-import { IssueRuns } from "@/components/issue-runs";
+import { IssueRuns } from "@/components/run-card";
 import { LabelPicker } from "@/components/label-picker";
-import { IssueTimeline } from "@/components/issue-timeline.tsx";
+import { ParentPicker } from "@/components/parent-picker";
 import { Markdown } from "@/components/markdown.tsx";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { useMentionables } from "@/lib/mentions";
+import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc.ts";
+import { isNotFound, NotFoundPage } from "@/routes/not-found";
 
 const UNASSIGNED = "unassigned";
 
 /** One Issue: its title and description, its State, its family, and its timeline. */
-export function IssuePage({ issueKey }: { issueKey: string }) {
+export function IssuePage({
+  issueKey,
+  focusGate = false,
+  shortcutScope = PAGE_SCOPE,
+}: {
+  issueKey: string;
+  /** Put the ruling in front of the reader, as `?gate=` does: the Inbox opens a Gate Notification this way. */
+  focusGate?: boolean;
+  /** Where the Issue is shown, so `a`/`s`/`l`/`p` reach this one: the page, or the peek's scope. */
+  shortcutScope?: string;
+}) {
   const queryClient = useQueryClient();
   const issue = useQuery(orpc.issues.get.queryOptions({ input: { key: issueKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const [editing, setEditing] = useState(false);
+  // `a` opens the Assignee picker (docs/plans/ui-redesign.md, "Keyboard").
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  useShortcut("a", () => setAssigneeOpen(true), { scope: shortcutScope });
 
   // `?gate=<stateId>` is what an Agent's URL elicitation hands a Human
   // (docs/plans/m2.md): the Issue opens with the Gate it is waiting on in
@@ -42,7 +61,9 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
     unknown
   >;
   const askedGate = typeof search.gate === "string" ? search.gate : null;
-  const gateFocused = askedGate !== null && askedGate === issue.data?.state.id;
+  const gateFocused =
+    (askedGate !== null && askedGate === issue.data?.state.id) ||
+    (focusGate && issue.data?.state.isGate === true);
   const gatePanel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (gateFocused) gatePanel.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -52,13 +73,16 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
     orpc.issues.update.mutationOptions({
       onSuccess: async () => {
         setEditing(false);
-        await queryClient.invalidateQueries();
+        await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
       },
     }),
   );
 
   if (issue.isPending) return <p className="text-muted-foreground">Loading {issueKey}…</p>;
   if (issue.isError) {
+    if (isNotFound(issue.error)) {
+      return <NotFoundPage what={`Issue ${issueKey}`} detail={issue.error.message} />;
+    }
     return (
       <p className="text-destructive">
         Could not load {issueKey}: {issue.error.message}
@@ -68,129 +92,179 @@ export function IssuePage({ issueKey }: { issueKey: string }) {
 
   const { id, key, title, description, state, assignee, parent, children, gateDecisions, labels } =
     issue.data;
+  const badgeState = {
+    name: state.name,
+    isGate: state.isGate,
+    category: state.category as "backlog" | "active" | "done",
+  };
 
   return (
-    <article className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{key}</Badge>
-          <Badge variant={state.isGate ? "outline" : "default"}>{state.name}</Badge>
-          {parent ? (
-            <Link
-              to="/issues/$issueKey"
-              params={{ issueKey: parent.key }}
-              className="text-sm text-muted-foreground hover:underline"
-            >
-              parent {parent.key}
-            </Link>
+    <article className="@container flex flex-col gap-6">
+      {gateFocused ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-3 rounded-md border border-gate/50 bg-gate/10 px-4 py-2 text-sm"
+        >
+          <span>
+            Waiting on your ruling at the <strong>{state.name}</strong> Gate.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => {
+              gatePanel.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              document.getElementById("gate-note")?.focus();
+            }}
+          >
+            Rule now
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-8 @3xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <header className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="font-mono text-muted-foreground">{key}</span>
+              <StateBadge state={badgeState} />
+            </div>
+
+            {editing ? (
+              <EditIssue
+                title={title}
+                description={description}
+                pending={update.isPending}
+                onCancel={() => setEditing(false)}
+                onSave={(next) => update.mutate({ key, ...next })}
+              />
+            ) : (
+              <div className="flex items-start gap-3">
+                <h1 className="flex-1 text-xl font-semibold tracking-tight">{title}</h1>
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  Edit
+                </Button>
+              </div>
+            )}
+            {update.error ? (
+              <p className="text-sm text-destructive">{update.error.message}</p>
+            ) : null}
+          </header>
+
+          {!editing && description ? <Markdown>{description}</Markdown> : null}
+          {!editing && !description ? (
+            <p className="text-sm text-muted-foreground">No description yet.</p>
           ) : null}
+
+          <IssueDocuments issueKey={key} shortcutScope={shortcutScope} />
+
+          <IssueRuns issueKey={key} decisions={gateDecisions} />
+
+          <ActivityStream issueId={id} issueKey={key} />
         </div>
 
-        {editing ? (
-          <EditIssue
-            title={title}
-            description={description}
-            pending={update.isPending}
-            onCancel={() => setEditing(false)}
-            onSave={(next) => update.mutate({ key, ...next })}
-          />
-        ) : (
-          <div className="flex items-start gap-3">
-            <h1 className="flex-1 text-2xl font-semibold">{title}</h1>
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
+        <aside className="flex flex-col gap-5 @3xl:order-none -order-1">
+          <div
+            ref={gatePanel}
+            role="group"
+            aria-label={state.isGate ? `${state.name} Gate` : `${state.name} State`}
+            {...(gateFocused ? { "data-focused": "true" } : {})}
+            className={cn(
+              "rounded-lg",
+              state.isGate && "border border-gate/40 bg-gate/5 p-3",
+              gateFocused && "ring-2 ring-gate ring-offset-2 ring-offset-background",
+            )}
+          >
+            <GateControls
+              issueKey={key}
+              projectKey={issue.data.project.key}
+              state={state}
+              decisions={gateDecisions}
+              shortcutScope={shortcutScope}
+            />
           </div>
-        )}
-        {update.error ? <p className="text-sm text-destructive">{update.error.message}</p> : null}
-      </header>
 
-      {!editing && description ? <Markdown>{description}</Markdown> : null}
-      {!editing && !description ? (
-        <p className="text-sm text-muted-foreground">No description yet.</p>
-      ) : null}
-
-      <LabelPicker issueKey={key} labels={labels} />
-
-      <IssueDocuments issueKey={key} />
-
-      <div
-        ref={gatePanel}
-        role="group"
-        aria-label={state.isGate ? `${state.name} Gate` : `${state.name} State`}
-        {...(gateFocused ? { "data-focused": "true" } : {})}
-        className={cn(
-          "rounded-lg",
-          gateFocused && "ring-2 ring-primary ring-offset-4 ring-offset-background",
-        )}
-      >
-        <GateControls
-          issueKey={key}
-          projectKey={issue.data.project.key}
-          state={state}
-          decisions={gateDecisions}
-        />
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Assignee</h2>
-        <Select
-          value={assignee?.id ?? UNASSIGNED}
-          disabled={update.isPending}
-          onValueChange={(next) =>
-            update.mutate({ key, assigneeMemberId: next === UNASSIGNED ? null : next })
-          }
-        >
-          <SelectTrigger aria-label="Assignee" className="w-64">
-            <SelectValue>
-              {(selected: string) =>
-                selected === UNASSIGNED
-                  ? "Unassigned"
-                  : (members.data?.members.find((member) => member.id === selected)?.user.name ??
-                    "Unassigned")
+          <section className="flex flex-col gap-2">
+            <h2 className="text-xs font-medium text-muted-foreground">Assignee</h2>
+            <Select
+              value={assignee?.id ?? UNASSIGNED}
+              disabled={update.isPending}
+              open={assigneeOpen}
+              onOpenChange={setAssigneeOpen}
+              onValueChange={(next) =>
+                update.mutate({ key, assigneeMemberId: next === UNASSIGNED ? null : next })
               }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-            {members.data?.members.map((member) => (
-              <SelectItem key={member.id} value={member.id}>
-                {member.user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </section>
+            >
+              <SelectTrigger aria-label="Assignee" className="w-full">
+                <SelectValue>
+                  {(selected: string) => {
+                    const member = members.data?.members.find((m) => m.id === selected);
+                    return selected === UNASSIGNED || !member ? "Unassigned" : member.user.name;
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                </SelectGroup>
+                {/* Names as text, under the kind they are: the group says Human or Agent. */}
+                {(["human", "agent"] as const).map((kind) => {
+                  const ofKind = (members.data?.members ?? []).filter((m) => m.kind === kind);
+                  if (ofKind.length === 0) return null;
+                  return (
+                    <Fragment key={kind}>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel>{kind === "human" ? "Humans" : "Agents"}</SelectLabel>
+                        {ofKind.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </Fragment>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </section>
 
-      {children.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Children</h2>
-          <ul className="flex flex-col gap-1">
-            {children.map((child) => (
-              <li key={child.id} className="text-sm">
-                <Link
-                  to="/issues/$issueKey"
-                  params={{ issueKey: child.key }}
-                  className="hover:underline"
-                >
-                  <span className="text-muted-foreground">{child.key}</span> {child.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+          <LabelPicker issueKey={key} labels={labels} shortcutScope={shortcutScope} />
 
-      <IssueRuns issueKey={key} decisions={gateDecisions} />
+          <ParentPicker
+            issueKey={key}
+            projectKey={issue.data.project.key}
+            parent={parent}
+            shortcutScope={shortcutScope}
+          />
 
-      <IssueLinks issueKey={key} />
+          {children.length > 0 ? (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-xs font-medium text-muted-foreground">Children</h2>
+              <ul className="flex flex-col gap-1">
+                {children.map((child) => (
+                  <li key={child.id} className="text-sm">
+                    <Link
+                      to="/issues/$issueKey"
+                      params={{ issueKey: child.key }}
+                      className="hover:underline"
+                    >
+                      <span className="font-mono text-xs text-muted-foreground">{child.key}</span>{" "}
+                      {child.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
-      <IssueComments issueKey={key} />
+          <IssueLinks issueKey={key} />
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Timeline</h2>
-        <IssueTimeline issueId={id} />
-      </section>
+          <p className="font-mono text-xs text-muted-foreground">
+            updated {new Date(issue.data.updatedAt).toLocaleString()}
+          </p>
+        </aside>
+      </div>
     </article>
   );
 }
@@ -206,6 +280,7 @@ interface EditIssueProps {
 function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueProps) {
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftDescription, setDraftDescription] = useState(description ?? "");
+  const mentionables = useMentionables();
 
   return (
     <form
@@ -228,12 +303,20 @@ function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueP
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="issue-description">Description</Label>
-        <Textarea
+        <MarkdownEditor
           id="issue-description"
-          rows={10}
+          aria-label="Description"
           value={draftDescription}
-          placeholder="Markdown."
-          onChange={(changed) => setDraftDescription(changed.target.value)}
+          onChange={setDraftDescription}
+          mentions={mentionables}
+          rows={10}
+          placeholder="What this Issue is, and why."
+          onSubmit={() =>
+            onSave({
+              title: draftTitle.trim(),
+              description: draftDescription.trim() === "" ? null : draftDescription,
+            })
+          }
         />
       </div>
       <div className="flex gap-2">

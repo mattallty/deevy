@@ -58,6 +58,11 @@ export interface AppContext {
    * on knowing nothing about it.
    */
   jobs?: JobQueue;
+  /**
+   * Whether sign-in goes through the development GitHub stub (app.ts). Only
+   * `health.ping` reads it, so a signed-out SPA can offer the dev form.
+   */
+  devSignIn?: boolean;
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"

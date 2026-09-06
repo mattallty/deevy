@@ -1,11 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -18,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 const kindLabels = {
@@ -50,16 +60,12 @@ export function AllowlistPage() {
   const failed = add.error ?? remove.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Allowlist</h1>
-        <p className="text-sm text-muted-foreground">
-          A sign-in matching any rule below joins this Workspace as a Member.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Allowlist"
+      description={<>A sign-in matching any rule below joins this Workspace as a Member.</>}
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (value.trim()) add.mutate({ kind, value: value.trim() });
@@ -72,8 +78,10 @@ export function AllowlistPage() {
               <SelectValue>{(selected: RuleKind) => kindLabels[selected]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
-              <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
+              <SelectGroup>
+                <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
+                <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -84,7 +92,7 @@ export function AllowlistPage() {
           <Input
             id="rule-value"
             value={value}
-            placeholder={kind === "email_domain" ? "flippable.net" : "flippable"}
+            placeholder={kind === "email_domain" ? "example.com" : "acme"}
             onChange={(changed) => setValue(changed.target.value)}
           />
         </div>
@@ -115,7 +123,7 @@ export function AllowlistPage() {
                 <TableCell className="font-medium">{rule.value}</TableCell>
                 <TableCell className="text-right">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ ruleId: rule.id })}
@@ -129,10 +137,18 @@ export function AllowlistPage() {
         </Table>
       ) : null}
       {rules.data?.rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No rules yet, so nobody new can join. Add one above.
-        </p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ShieldCheck aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No rules yet</EmptyTitle>
+            <EmptyDescription>
+              Nobody new can join until there is one. Add a domain or an address above.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

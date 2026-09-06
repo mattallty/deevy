@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { selectedLabel } from "./select.ts";
 
 const stub = vi.hoisted(() => {
   const states = [
@@ -12,7 +13,7 @@ const stub = vi.hoisted(() => {
     id: "m-ada",
     role: "admin",
     handle: "ada",
-    user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net" },
+    user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com" },
   };
   const epic = {
     id: "i1",
@@ -27,6 +28,7 @@ const stub = vi.hoisted(() => {
     parent: null,
     children: [] as unknown[],
     closedAt: null,
+    updatedAt: new Date("2026-09-05T10:00:00Z"),
     project: { id: "p1", key: "DEV", name: "deevy" },
     gateDecisions: [] as unknown[],
     labels: [] as unknown[],
@@ -59,18 +61,21 @@ vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
   const byKey: Record<string, unknown> = { "DEV-1": stub.epic, "DEV-2": stub.child };
+  const project = {
+    id: "p1",
+    key: "DEV",
+    name: "deevy",
+    description: null,
+    team: null,
+    archivedAt: null,
+    states: stub.states,
+  };
   const client = stubClient({
     members: { list: async () => ({ members: [stub.ada] }) },
     projects: {
-      get: async () => ({
-        id: "p1",
-        key: "DEV",
-        name: "deevy",
-        description: null,
-        team: null,
-        archivedAt: null,
-        states: stub.states,
-      }),
+      get: async () => project,
+      // The New Issue dialog lists the Projects to match the page's against.
+      list: async () => ({ projects: [project] }),
     },
     workflow: { get: async () => ({ states: stub.states }) },
     issues: {
@@ -114,7 +119,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -141,13 +146,20 @@ describe("the Project page's Issue list", () => {
     expect(within(table).getByText("Ada Lovelace")).toBeTruthy();
   });
 
-  it("creates an Issue from the form with the title typed in", async () => {
+  it("creates an Issue through the top bar's dialog, in this Project", async () => {
     await mountAt("/projects/DEV");
+    await screen.findByRole("table", { name: "Issues" });
 
-    fireEvent.change(await screen.findByLabelText("New Issue"), {
+    // No inline form: the dialog opens with the page's Project already chosen.
+    fireEvent.click(screen.getByRole("button", { name: /new issue/i }));
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() =>
+      expect(selectedLabel(within(dialog).getByLabelText(/project/i))).toContain("(DEV)"),
+    );
+    fireEvent.change(within(dialog).getByLabelText(/title/i), {
       target: { value: "Write the migration" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Issue" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /^create issue$/i }));
 
     await waitFor(() =>
       expect(stub.created).toContainEqual(
@@ -178,7 +190,7 @@ describe("the Issue page", () => {
   it("renders the timeline from the Event log", async () => {
     await mountAt("/issues/DEV-1");
 
-    const timeline = await screen.findByRole("list", { name: "Timeline" });
+    const timeline = await screen.findByRole("list", { name: "Activity" });
     expect(within(timeline).getAllByRole("listitem")).toHaveLength(2);
   });
 

@@ -15,19 +15,19 @@ describe("workspace.update", () => {
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     const client = createRouterClient(router, { context: admin });
 
-    const renamed = await client.workspace.update({ name: "Flippable Team" });
+    const renamed = await client.workspace.update({ name: "Acme Team" });
 
-    expect(renamed).toMatchObject({ name: "Flippable Team", slug: "flippable-team" });
+    expect(renamed).toMatchObject({ name: "Acme Team", slug: "acme-team" });
     // A later request builds its context afresh, which is what sees the change.
     const later = createRouterClient(router, {
       context: contextFor(db, admin.member, renamed),
     });
-    expect(await later.workspace.get()).toMatchObject({ name: "Flippable Team" });
+    expect(await later.workspace.get()).toMatchObject({ name: "Acme Team" });
     const page = await client.events.list({ subjectType: "workspace" });
     expect(page.events.at(-1)).toMatchObject({
       kind: "workspace.updated",
       actorMemberId: admin.member.id,
-      payload: { from: "deevy", to: "Flippable Team" },
+      payload: { from: "deevy", to: "Acme Team" },
     });
   });
 
@@ -35,7 +35,7 @@ describe("workspace.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: bob });
     await expect(client.workspace.update({ name: "Mine" })).rejects.toMatchObject({

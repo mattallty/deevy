@@ -28,7 +28,7 @@ export interface Deployment {
 }
 
 /** The email `DEEVY_ADMIN_EMAIL` names, whose first sign-in bootstraps the Workspace. */
-export const adminEmail = "ada@flippable.net";
+export const adminEmail = "ada@example.com";
 export const secret = "acceptance-secret-acceptance-secret-32";
 
 /** A port nothing is on, taken and released, so a sign-in origin can be named up front. */

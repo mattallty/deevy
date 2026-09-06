@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption } from "./select.ts";
 
 const stub = vi.hoisted(() => ({
   states: [{ id: "s1", name: "Intent", position: 0, isGate: true, category: "backlog" }],
@@ -61,7 +62,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada" },
+    { workspaceName: "Acme Team", memberName: "Ada" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -109,7 +110,7 @@ describe("the Documents section on an Issue", () => {
   it("lets an older version be read", async () => {
     await mountAt("/issues/DEV-1");
 
-    fireEvent.change(await screen.findByLabelText("Version"), { target: { value: "1" } });
+    await pickOption(await screen.findByLabelText("Version"), "1");
 
     await waitFor(() => expect(screen.queryByText(/The Event log has no reader/)).toBeNull());
   });

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
 /** A self-hosted instance serves one Workspace; this is its name. */
@@ -18,7 +19,7 @@ export function WorkspacePage() {
 
   const save = useMutation(
     orpc.workspace.update.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries(),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.workspace.key() }),
     }),
   );
 
@@ -30,16 +31,16 @@ export function WorkspacePage() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Workspace</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Workspace"
+      description={
+        <>
           This instance serves one Workspace. Renaming it changes what everyone sees in the sidebar.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) save.mutate({ name: name.trim() });
@@ -62,6 +63,6 @@ export function WorkspacePage() {
       {save.isSuccess && !save.isPending ? (
         <p className="text-sm text-muted-foreground">Saved.</p>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

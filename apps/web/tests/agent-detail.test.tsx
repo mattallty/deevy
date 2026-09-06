@@ -17,7 +17,7 @@ const stub = vi.hoisted(() => ({
       kind: "human",
       handle: "ada",
       suspendedAt: null,
-      user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net", image: null },
+      user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com", image: null },
     },
     webhookUrl: null,
     scheduleMinutes: null,
@@ -82,7 +82,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -130,12 +130,12 @@ describe("an Agent's own page", () => {
     await mountAt("/settings/agents/m-planner");
 
     const grants = await screen.findByRole("region", { name: /projects/i });
-    // The picker only offers Projects it has not been granted, so it stays
-    // closed until both queries have answered.
-    await within(grants).findByRole("option", { name: /OPS/ });
-    fireEvent.change(within(grants).getByLabelText(/grant a project/i), {
-      target: { value: "p-ops" },
-    });
+    // A combobox over the Projects not yet granted: ArrowDown opens it under
+    // jsdom, the options are portalled, choosing one grants it.
+    const picker = within(grants).getByLabelText(/grant a project/i);
+    fireEvent.keyDown(picker, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: /OPS/ }));
+    fireEvent.keyDown(picker, { key: "Escape" });
     await waitFor(() => expect(calls.grantAdd).toHaveBeenCalledTimes(1));
     expect(calls.grantAdd.mock.calls[0]?.[0]).toMatchObject({
       memberId: "m-planner",
@@ -144,5 +144,16 @@ describe("an Agent's own page", () => {
 
     fireEvent.click(within(grants).getByRole("button", { name: /revoke DEV/i }));
     await waitFor(() => expect(calls.grantRemove).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("the Agent's own settings", () => {
+  it("offers the schedule, the Sponsor, its recent Runs, and the way to suspend it", async () => {
+    await mountAt("/settings/agents/m-planner");
+
+    expect(await screen.findByLabelText("Wake")).toBeTruthy();
+    expect(screen.getByLabelText("Change Sponsor")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Recent Runs" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Suspend" })).toBeTruthy();
   });
 });

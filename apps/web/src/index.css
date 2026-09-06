@@ -1,71 +1,124 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* The custom variants the ui/ kit is written against (data-horizontal, data-open, data-checked…): the
+   base-mira style imports it, and without it those variants match nothing and the kit degrades quietly. */
+@import "shadcn/tailwind.css";
+/* Self-hosted: a self-hosted AGPL app does not phone Google for its typeface. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn/ui "new-york" tokens, slate base. Both themes are defined so the
-   Workspace follows the operating system's setting. */
+/*
+ * deevy's tokens (docs/plans/ui-redesign-2.md slice A, .claude/skills/deevy-ui/SKILL.md).
+ *
+ * Paper and ink are cool blue-gray neutrals; the action colour is indigo, and the
+ * colours beside it are its neighbours (round 3 of the review, 2026-09-06): Humans
+ * sky blue, Agents rose, Gates amber — the one warm colour, so a Gate jumps. The
+ * base is tweakcn's clean-slate preset (https://tweakcn.com/r/themes/clean-slate.json,
+ * Apache-2.0, (c) tweakcn contributors), chosen from six candidates and then
+ * from six variations of it, at a 5% roomier scale and 8px corners. Three
+ * saturated slots carry the one idea the UI has: --human for a Human Member,
+ * --agent for an Agent, --gate for a Gate State and anything waiting on a
+ * Human's ruling. Nothing else on a screen is saturated except --primary and
+ * --destructive. The theme is a class (`.dark` on <html>, set by next-themes
+ * from the System/Light/Dark toggle), so the toggle wins in both directions
+ * and the OS setting is the default.
+ *
+ * Type, radius and density are variables (--face-*, --radius, --density,
+ * --tracking) that @theme inline hands to the utilities, so a future review
+ * can retune them the way this one did, from one block.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --face-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --face-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 0.5rem;
+  --density: 0.2625rem;
+  --tracking: 0em;
+  --background: oklch(0.9842 0.0034 247.8575);
+  --foreground: oklch(0.2795 0.0368 260.031);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.2795 0.0368 260.031);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
+  --popover-foreground: oklch(0.2795 0.0368 260.031);
+  --primary: oklch(0.5854 0.2041 277.12);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9276 0.0058 264.5313);
+  --secondary-foreground: oklch(0.3729 0.0306 259.7328);
+  --muted: oklch(0.967 0.0029 264.5419);
+  --muted-foreground: oklch(0.551 0.0234 264.3637);
+  --accent: oklch(0.9299 0.0334 272.79);
+  --accent-foreground: oklch(0.3729 0.0306 259.7328);
+  --border: oklch(0.8717 0.0093 258.3382);
+  --input: oklch(0.8717 0.0093 258.3382);
+  --ring: oklch(0.5854 0.2041 277.12);
+  --sidebar: oklch(0.967 0.0029 264.5419);
+  --sidebar-foreground: oklch(0.2795 0.0368 260.031);
+  --sidebar-accent: oklch(0.9299 0.0334 272.79);
+  --sidebar-accent-foreground: oklch(0.3729 0.0306 259.7328);
+  --sidebar-border: oklch(0.8717 0.0093 258.3382);
+
+  --human: oklch(0.6 0.13 225);
+  --human-foreground: var(--background);
+  --agent: oklch(0.6 0.17 345);
+  --agent-foreground: var(--background);
+  --gate: oklch(0.72 0.15 80);
+  --gate-foreground: var(--foreground);
+  --state-backlog: oklch(0.62 0.02 265);
+  --state-active: oklch(0.62 0.15 277);
+  --state-done: oklch(0.62 0.13 160);
+  --destructive: oklch(0.58 0.2 20);
+  --destructive-foreground: var(--background);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: oklch(0.129 0.042 264.695);
-    --foreground: oklch(0.984 0.003 247.858);
-    --card: oklch(0.208 0.042 265.755);
-    --card-foreground: oklch(0.984 0.003 247.858);
-    --popover: oklch(0.208 0.042 265.755);
-    --popover-foreground: oklch(0.984 0.003 247.858);
-    --primary: oklch(0.929 0.013 255.508);
-    --primary-foreground: oklch(0.208 0.042 265.755);
-    --secondary: oklch(0.279 0.041 260.031);
-    --secondary-foreground: oklch(0.984 0.003 247.858);
-    --muted: oklch(0.279 0.041 260.031);
-    --muted-foreground: oklch(0.704 0.04 256.788);
-    --accent: oklch(0.279 0.041 260.031);
-    --accent-foreground: oklch(0.984 0.003 247.858);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.984 0.003 247.858);
-    --border: oklch(1 0 0 / 12%);
-    --input: oklch(1 0 0 / 18%);
-    --ring: oklch(0.551 0.027 264.364);
-    --sidebar: oklch(0.208 0.042 265.755);
-    --sidebar-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-accent: oklch(0.279 0.041 260.031);
-    --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-border: oklch(1 0 0 / 12%);
-  }
+.dark {
+  --background: oklch(0.2077 0.0398 265.7549);
+  --foreground: oklch(0.9288 0.0126 255.5078);
+  --card: oklch(0.2795 0.0368 260.031);
+  --card-foreground: oklch(0.9288 0.0126 255.5078);
+  --popover: oklch(0.2795 0.0368 260.031);
+  --popover-foreground: oklch(0.9288 0.0126 255.5078);
+  --primary: oklch(0.6801 0.1583 276.93);
+  --primary-foreground: oklch(0.2077 0.0398 265.7549);
+  --secondary: oklch(0.3351 0.0331 260.912);
+  --secondary-foreground: oklch(0.8717 0.0093 258.3382);
+  --muted: oklch(0.2427 0.0381 259.9437);
+  --muted-foreground: oklch(0.7137 0.0192 261.3246);
+  --accent: oklch(0.3729 0.0306 259.73);
+  --accent-foreground: oklch(0.8717 0.0093 258.3382);
+  --border: oklch(0.4461 0.0263 256.8018);
+  --input: oklch(0.4461 0.0263 256.8018);
+  --ring: oklch(0.6801 0.1583 276.93);
+  --sidebar: oklch(0.2795 0.0368 260.031);
+  --sidebar-foreground: oklch(0.9288 0.0126 255.5078);
+  --sidebar-accent: oklch(0.3729 0.0306 259.73);
+  --sidebar-accent-foreground: oklch(0.8717 0.0093 258.3382);
+  --sidebar-border: oklch(0.4461 0.0263 256.8018);
+
+  --human: oklch(0.76 0.12 225);
+  --human-foreground: var(--background);
+  --agent: oklch(0.76 0.14 345);
+  --agent-foreground: var(--background);
+  --gate: oklch(0.82 0.14 85);
+  --gate-foreground: var(--background);
+  --state-backlog: oklch(0.6 0.02 265);
+  --state-active: oklch(0.72 0.12 277);
+  --state-done: oklch(0.72 0.13 160);
+  --destructive: oklch(0.68 0.17 20);
+  --destructive-foreground: var(--background);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  --font-sans: var(--face-sans);
+  --font-mono: var(--face-mono);
+  /* Every spacing utility is calc(var(--density) * n), so one variable sets the scale. */
+  --spacing: var(--density);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -90,13 +143,110 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+
+  --color-human: var(--human);
+  --color-human-foreground: var(--human-foreground);
+  --color-agent: var(--agent);
+  --color-agent-foreground: var(--agent-foreground);
+  --color-gate: var(--gate);
+  --color-gate-foreground: var(--gate-foreground);
+  --color-state-backlog: var(--state-backlog);
+  --color-state-active: var(--state-active);
+  --color-state-done: var(--state-done);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  /*
+   * The type scale lives in the components: shadcn's base-mira style is the
+   * compact one (12px controls, 10px badges), and deevy resizes those files
+   * to a 14px control size with heights to match rather than moving the root
+   * (.claude/skills/deevy-ui). The root stays 16px, so 1rem is 16px everywhere.
+   */
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans text-sm antialiased;
+    letter-spacing: var(--tracking);
+  }
+  /* Keys, seqs and times line up when their digits share a width. */
+  .font-mono,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/*
+ * Code, coloured by lowlight in both the reader (rehype-highlight) and the
+ * editor (the code block extension), from the palette rather than a theme file:
+ * one accent per token family, quiet by design.
+ */
+@layer components {
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-built_in,
+  .hljs-doctag,
+  .hljs-meta {
+    color: var(--primary);
+  }
+  .hljs-string,
+  .hljs-attr,
+  .hljs-template-tag,
+  .hljs-addition,
+  .hljs-regexp {
+    color: var(--agent);
+  }
+  .hljs-number,
+  .hljs-literal,
+  .hljs-symbol,
+  .hljs-variable,
+  .hljs-template-variable,
+  .hljs-deletion {
+    color: var(--human);
+  }
+  .hljs-title,
+  .hljs-section,
+  .hljs-name,
+  .hljs-type,
+  .hljs-class .hljs-title {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  .hljs-emphasis {
+    font-style: italic;
+  }
+  .hljs-strong {
+    font-weight: 600;
+  }
+
+  /* The editor's empty line says what it is for; ProseMirror's own chrome stays out. */
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--muted-foreground);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+  .tiptap .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: color-mix(in oklch, var(--primary) 10%, transparent);
+    pointer-events: none;
+  }
+  .tiptap td,
+  .tiptap th {
+    position: relative;
   }
 }

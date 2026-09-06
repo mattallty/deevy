@@ -1,7 +1,7 @@
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { notification as notificationTable } from "@deevy/db";
-import { NotificationWithIssueSchema } from "../schemas.ts";
+import { MemberWithUserSchema, NotificationWithIssueSchema } from "../schemas.ts";
 import { NoInput, defineOperation } from "./registry.ts";
 import { QueryFlag, issueWith, withKey } from "./shared.ts";
 
@@ -21,13 +21,22 @@ export const inbox = {
       limit: z.coerce.number().int().min(1).max(200).default(50),
     }),
     output: z.object({
-      notifications: z.array(NotificationWithIssueSchema),
+      notifications: z.array(
+        NotificationWithIssueSchema.extend({
+          /** Who did the thing the Notification is about; null when deevy itself did. */
+          actor: MemberWithUserSchema.nullable(),
+          /** The comment, when the Event is one; `body` is null once it has been withdrawn. */
+          comment: z.object({ id: z.string(), body: z.string().nullable() }).nullable(),
+        }),
+      ),
       nextCursor: z.number().int().nullable(),
     }),
     handler: async ({ input, context }) => {
       // A Notification names an Issue and carries it back in full, so the
       // inbox is a way into a Project as much as issues.get is. An Agent sees
       // only what its grants cover; a Human is not scoped (docs/plans/m2.md).
+      // It also carries who did it and, for a mention, what they wrote, so a
+      // row can read as a sentence without one query per row.
       const granted = context.grantedProjectIds;
       const rows = await context.db.query.notification.findMany({
         where: {
@@ -45,11 +54,50 @@ export const inbox = {
         columns: { id: true, key: true },
       });
       const keyOf = new Map(projects.map((project) => [project.id, project.key]));
+      const actorIds = [
+        ...new Set(
+          rows.flatMap((row) => (row.event.actorMemberId ? [row.event.actorMemberId] : [])),
+        ),
+      ];
+      const actors =
+        actorIds.length > 0
+          ? await context.db.query.member.findMany({
+              where: { id: { in: actorIds } },
+              with: { user: true },
+            })
+          : [];
+      const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+      const commentIds = rows.flatMap((row) => {
+        const payload = row.event.payload as { commentId?: unknown } | null;
+        return row.event.kind.startsWith("comment.") && typeof payload?.commentId === "string"
+          ? [payload.commentId]
+          : [];
+      });
+      const comments =
+        commentIds.length > 0
+          ? await context.db.query.comment.findMany({
+              where: { id: { in: commentIds } },
+              columns: { id: true, body: true, deletedAt: true },
+            })
+          : [];
+      const commentById = new Map(
+        comments.map((row) => [row.id, { id: row.id, body: row.deletedAt ? null : row.body }]),
+      );
       return {
-        notifications: rows.map((row) => ({
-          ...row,
-          issue: row.issue ? withKey(row.issue, keyOf.get(row.issue.projectId) ?? "") : null,
-        })),
+        notifications: rows.map((row) => {
+          const payload = row.event.payload as { commentId?: unknown } | null;
+          return {
+            ...row,
+            issue: row.issue ? withKey(row.issue, keyOf.get(row.issue.projectId) ?? "") : null,
+            actor: row.event.actorMemberId
+              ? (actorById.get(row.event.actorMemberId) ?? null)
+              : null,
+            comment:
+              typeof payload?.commentId === "string"
+                ? (commentById.get(payload.commentId) ?? null)
+                : null,
+          };
+        }),
         nextCursor: rows.at(-1)?.eventId ?? null,
       };
     },

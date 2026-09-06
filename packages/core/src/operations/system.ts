@@ -10,8 +10,17 @@ export const health = {
     path: "/health/ping",
     auth: "public",
     input: NoInput,
-    output: z.object({ ok: z.literal(true), time: z.string() }),
-    handler: async () => ({ ok: true as const, time: new Date().toISOString() }),
+    output: z.object({
+      ok: z.literal(true),
+      time: z.string(),
+      /** True when this instance signs in through the development GitHub stub. */
+      devSignIn: z.boolean(),
+    }),
+    handler: async ({ context }) => ({
+      ok: true as const,
+      time: new Date().toISOString(),
+      devSignIn: context.devSignIn === true,
+    }),
   }),
 };
 

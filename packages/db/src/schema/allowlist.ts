@@ -19,7 +19,7 @@ export const allowlistRule = sqliteTable(
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: allowlistRuleKinds }).notNull(),
-    /** An email domain (`flippable.net`) or a GitHub organization login, lowercased. */
+    /** An email domain (`example.com`) or a GitHub organization login, lowercased. */
     value: text("value").notNull(),
     createdBy: text("created_by").references(() => member.id, { onDelete: "set null" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),

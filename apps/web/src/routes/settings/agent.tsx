@@ -1,24 +1,62 @@
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { MemberChip } from "@/components/member-chip";
+import { RunStatus, type RunStatusValue } from "@/components/run-status";
+import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { orpc } from "@/lib/orpc.ts";
+import { orpc } from "@/lib/orpc";
 
 /**
- * One Agent: who answers for it, the Projects it may see, and the keys it
- * reaches deevy with. An Agent starts able to see nothing and reach nothing,
- * so this page is where it is given both (ADR-0004).
+ * The intervals a schedule offers. Anything finer than a quarter of an hour is
+ * a poll, not a schedule, and the sweep only runs once a minute anyway.
+ */
+const NEVER = "never";
+const intervals = [
+  { minutes: 15, label: "Every 15 minutes" },
+  { minutes: 30, label: "Every 30 minutes" },
+  { minutes: 60, label: "Hourly" },
+  { minutes: 240, label: "Every 4 hours" },
+  { minutes: 1440, label: "Daily" },
+];
+
+/**
+ * One Agent: who answers for it, the Projects it may see, the keys it reaches
+ * deevy with, how often it wakes, and what it has done lately. An Agent starts
+ * able to see nothing and reach nothing, so this page is where it is given
+ * both (ADR-0004); its Sponsor can be changed here by an admin (ADR-0001).
  */
 export function AgentPage({ memberId }: { memberId: string }) {
   const queryClient = useQueryClient();
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
+  const me = useQuery(orpc.me.get.queryOptions());
   const refresh = async () => {
-    await queryClient.invalidateQueries();
+    await queryClient.invalidateQueries({ queryKey: orpc.agents.key() });
+    await queryClient.invalidateQueries({ queryKey: orpc.members.key() });
   };
+  const update = useMutation(orpc.agents.update.mutationOptions({ onSuccess: refresh }));
+  const suspend = useMutation(orpc.agents.suspend.mutationOptions({ onSuccess: refresh }));
+  const reinstate = useMutation(orpc.agents.reinstate.mutationOptions({ onSuccess: refresh }));
 
   if (agents.isPending) return <Skeleton className="h-40 w-full" />;
   if (agents.isError) {
@@ -26,23 +64,174 @@ export function AgentPage({ memberId }: { memberId: string }) {
   }
   const agent = agents.data.agents.find((row) => row.id === memberId);
   if (!agent) return <p className="text-muted-foreground">No such Agent.</p>;
+  const admin = me.data?.member?.role === "admin";
 
   return (
-    <section className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{agent.user.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {agent.handle ? `@${agent.handle} · ` : ""}
-          Sponsored by{" "}
-          <span className="text-foreground">{agent.sponsor?.user.name ?? "nobody"}</span>
-          {agent.suspendedAt ? " · " : ""}
+    <SettingsPage
+      title={
+        <MemberChip
+          member={{
+            id: agent.id,
+            kind: "agent",
+            handle: agent.handle,
+            suspendedAt: agent.suspendedAt,
+            user: agent.user,
+          }}
+          size="lg"
+          showHandle
+        />
+      }
+      description={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <span>
+            Sponsored by{" "}
+            <span className="text-foreground">{agent.sponsor?.user.name ?? "nobody"}</span>
+          </span>
           {agent.suspendedAt ? <Badge variant="outline">Suspended</Badge> : null}
-        </p>
-      </header>
-
+        </span>
+      }
+      actions={
+        admin ? <SponsorPicker memberId={memberId} current={agent.sponsor?.id ?? null} /> : null
+      }
+    >
       <Grants memberId={memberId} onChanged={refresh} />
       <Keys memberId={memberId} onChanged={refresh} />
-    </section>
+
+      <SettingsSection
+        title="Schedule"
+        description="A schedule wakes the Agent on the Issues assigned to it, whether or not anything happened. Never means it only reacts."
+      >
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="agent-schedule">Wake</Label>
+          {/* shadcn's Base UI Select, as its docs compose it: trigger and value, then a group of items. */}
+          <Select
+            value={agent.scheduleMinutes === null ? NEVER : String(agent.scheduleMinutes)}
+            disabled={update.isPending}
+            onValueChange={(next) => {
+              if (next === null) return;
+              update.mutate({ memberId, scheduleMinutes: next === NEVER ? null : Number(next) });
+            }}
+          >
+            <SelectTrigger id="agent-schedule" className="w-56">
+              <SelectValue>
+                {(selected: string) =>
+                  selected === NEVER
+                    ? "Never"
+                    : (intervals.find((interval) => String(interval.minutes) === selected)?.label ??
+                      selected)
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={NEVER}>Never</SelectItem>
+                {intervals.map((interval) => (
+                  <SelectItem key={interval.minutes} value={String(interval.minutes)}>
+                    {interval.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        {update.error ? <p className="text-sm text-destructive">{update.error.message}</p> : null}
+      </SettingsSection>
+
+      <RecentRuns memberId={memberId} />
+
+      <SettingsSection
+        tone="danger"
+        title={agent.suspendedAt ? "Suspended" : "Suspend this Agent"}
+        description={
+          agent.suspendedAt
+            ? "Its keys are refused and its Runs stop until it is reinstated."
+            : "Its keys are refused and its Runs stop. Nothing it did is undone: the log is the record."
+        }
+      >
+        <div>
+          {agent.suspendedAt ? (
+            <Button
+              variant="outline"
+              disabled={reinstate.isPending}
+              onClick={() => reinstate.mutate({ memberId })}
+            >
+              Reinstate
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              disabled={suspend.isPending}
+              onClick={() => suspend.mutate({ memberId })}
+            >
+              Suspend
+            </Button>
+          )}
+        </div>
+        {(suspend.error ?? reinstate.error) ? (
+          <p className="text-sm text-destructive">{(suspend.error ?? reinstate.error)?.message}</p>
+        ) : null}
+      </SettingsSection>
+    </SettingsPage>
+  );
+}
+
+/** An admin hands an Agent to another Human — the one hop of accountability (ADR-0001). */
+function SponsorPicker({ memberId, current }: { memberId: string; current: string | null }) {
+  const queryClient = useQueryClient();
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const setSponsor = useMutation(
+    orpc.agents.setSponsor.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: orpc.agents.key() });
+        await queryClient.invalidateQueries({ queryKey: orpc.members.key() });
+      },
+    }),
+  );
+  const humans = (members.data?.members ?? []).filter(
+    (member) => member.kind === "human" && !member.suspendedAt,
+  );
+  return (
+    <div className="flex flex-col gap-1">
+      <Label htmlFor="agent-sponsor" className="text-xs text-muted-foreground">
+        Sponsor
+      </Label>
+      {/* A combobox, typed into: the Workspace's Humans, the current one shown. */}
+      <Combobox
+        items={humans}
+        value={humans.find((human) => human.id === current) ?? null}
+        onValueChange={(next) => {
+          const human = next as (typeof humans)[number] | null;
+          if (human && human.id !== current) {
+            setSponsor.mutate({ memberId, sponsorMemberId: human.id });
+          }
+        }}
+        itemToStringLabel={(human: (typeof humans)[number]) => human.user.name}
+        isItemEqualToValue={(a: (typeof humans)[number], b: (typeof humans)[number]) =>
+          a.id === b.id
+        }
+        disabled={setSponsor.isPending}
+      >
+        <ComboboxInput
+          id="agent-sponsor"
+          aria-label="Change Sponsor"
+          className="w-56"
+          placeholder={current ? undefined : "Nobody yet; name a Human…"}
+        />
+        <ComboboxContent>
+          <ComboboxEmpty>No Human by that name.</ComboboxEmpty>
+          <ComboboxList>
+            {(human: (typeof humans)[number]) => (
+              <ComboboxItem key={human.id} value={human}>
+                {human.user.name}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      {setSponsor.error ? (
+        <p className="text-xs text-destructive">{setSponsor.error.message}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -59,26 +248,25 @@ function Grants({ memberId, onChanged }: { memberId: string; onChanged: () => Pr
   );
 
   return (
-    <section aria-label="Projects" className="flex flex-col gap-3 rounded-md border p-4">
-      <div>
-        <h2 className="text-sm font-medium">Projects</h2>
-        <p className="text-sm text-muted-foreground">
-          It can read and write Issues in these and nowhere else. A Project it was not granted does
-          not exist to it.
-        </p>
-      </div>
-
+    <SettingsSection
+      aria-label="Projects"
+      title="Projects"
+      description="It can read and write Issues in these and nowhere else. A Project it was not granted does not exist to it."
+    >
       {mine.length === 0 ? (
         <p className="text-sm text-muted-foreground">None yet, so it can see nothing.</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {mine.map((project) => (
-            <li key={project.id} className="flex items-center gap-1 rounded border px-2 py-1">
-              <span className="text-sm font-medium">{project.key}</span>
-              <span className="text-sm text-muted-foreground">{project.name}</span>
+            <li
+              key={project.id}
+              className="flex items-center gap-1 rounded-md border bg-background px-2 py-1"
+            >
+              <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
+              <span className="text-sm">{project.name}</span>
               <Button
-                size="sm"
-                variant="ghost"
+                size="xs"
+                variant="destructive"
                 aria-label={`Revoke ${project.key}`}
                 disabled={remove.isPending}
                 onClick={() => remove.mutate({ memberId, projectId: project.id })}
@@ -92,27 +280,44 @@ function Grants({ memberId, onChanged }: { memberId: string; onChanged: () => Pr
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="grant-project">Grant a Project</Label>
-        <NativeSelect
-          id="grant-project"
-          value=""
-          disabled={add.isPending || ungranted.length === 0}
-          onChange={(changed) => {
-            const projectId = changed.target.value;
-            if (projectId) add.mutate({ memberId, projectId });
+        {/* A combobox over the Projects not yet granted; choosing one grants it. */}
+        <Combobox
+          items={ungranted}
+          value={null}
+          onValueChange={(next) => {
+            const project = next as (typeof ungranted)[number] | null;
+            if (project) add.mutate({ memberId, projectId: project.id });
           }}
+          itemToStringLabel={(project: (typeof ungranted)[number]) =>
+            `${project.key} — ${project.name}`
+          }
+          isItemEqualToValue={(a: (typeof ungranted)[number], b: (typeof ungranted)[number]) =>
+            a.id === b.id
+          }
+          disabled={add.isPending || ungranted.length === 0}
         >
-          <option value="">Choose a Project…</option>
-          {ungranted.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.key} — {project.name}
-            </option>
-          ))}
-        </NativeSelect>
+          <ComboboxInput
+            id="grant-project"
+            className="w-72"
+            placeholder={ungranted.length === 0 ? "Every Project is granted" : "Choose a Project…"}
+          />
+          <ComboboxContent>
+            <ComboboxEmpty>No Project matches.</ComboboxEmpty>
+            <ComboboxList>
+              {(project: (typeof ungranted)[number]) => (
+                <ComboboxItem key={project.id} value={project}>
+                  <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
+                  {project.name}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
       </div>
       {(add.error ?? remove.error) ? (
         <p className="text-sm text-destructive">{(add.error ?? remove.error)?.message}</p>
       ) : null}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -137,36 +342,34 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
   const revoke = useMutation(orpc.agents.keys.revoke.mutationOptions({ onSuccess: onChanged }));
 
   return (
-    <section aria-label="API keys" className="flex flex-col gap-3 rounded-md border p-4">
-      <div>
-        <h2 className="text-sm font-medium">API keys</h2>
-        <p className="text-sm text-muted-foreground">
-          The Agent sends one as a bearer token. deevy keeps only a hash, so a key it has issued
-          cannot be shown again.
-        </p>
-      </div>
-
+    <SettingsSection
+      aria-label="API keys"
+      title="API keys"
+      description="The Agent sends one as a bearer token. deevy keeps only a hash, so a key it has issued cannot be shown again."
+    >
       {minted ? (
-        <div className="flex flex-col gap-1 rounded border border-dashed p-3">
+        <div className="flex flex-col gap-1 rounded-md border border-gate/50 bg-gate/10 p-3">
           <p className="text-sm font-medium">Copy this now: it is the only time you will see it.</p>
-          <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">{minted}</code>
+          <code className="overflow-x-auto rounded bg-background px-2 py-1 font-mono text-sm">
+            {minted}
+          </code>
         </div>
       ) : null}
 
       {(keys.data?.keys ?? []).length === 0 ? (
         <p className="text-sm text-muted-foreground">No keys, so it cannot reach deevy yet.</p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col divide-y">
           {(keys.data?.keys ?? []).map((key) => (
-            <li key={key.id} className="flex items-center justify-between gap-2 text-sm">
-              <span>
-                <span className="font-medium">{key.name ?? "unnamed"}</span>{" "}
-                <code className="text-muted-foreground">{key.start}…</code>
+            <li key={key.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="font-medium">{key.name ?? "unnamed"}</span>
+                <code className="font-mono text-xs text-muted-foreground">{key.start}…</code>
                 {key.enabled ? null : <Badge variant="outline">Disabled</Badge>}
               </span>
               <Button
                 size="sm"
-                variant="outline"
+                variant="destructive"
                 disabled={revoke.isPending}
                 onClick={() => revoke.mutate({ memberId, keyId: key.id })}
               >
@@ -200,6 +403,52 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
       {(issue.error ?? revoke.error) ? (
         <p className="text-sm text-destructive">{(issue.error ?? revoke.error)?.message}</p>
       ) : null}
-    </section>
+    </SettingsSection>
+  );
+}
+
+/** The last ten Runs, so whether the Agent is working is a glance, not a query. */
+function RecentRuns({ memberId }: { memberId: string }) {
+  const runs = useQuery(
+    orpc.runs.list.queryOptions({ input: { agentMemberId: memberId, limit: 10 } }),
+  );
+  const rows = (runs.data?.runs ?? []) as Array<{
+    id: string;
+    status: string;
+    issueKey?: string;
+    summary: string | null;
+    createdAt: string | Date;
+  }>;
+  return (
+    <SettingsSection title="Recent Runs" description="The last ten attempts this Agent made.">
+      {runs.isPending ? <Skeleton className="h-16 w-full" /> : null}
+      {runs.data && rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No Runs yet.</p>
+      ) : null}
+      {rows.length > 0 ? (
+        <ul className="flex flex-col divide-y">
+          {rows.map((run) => (
+            <li key={run.id} className="flex items-center gap-3 py-2 text-sm">
+              <RunStatus status={run.status as RunStatusValue} />
+              {run.issueKey ? (
+                <Link
+                  to="/issues/$issueKey"
+                  params={{ issueKey: run.issueKey }}
+                  className="font-mono text-xs hover:underline"
+                >
+                  {run.issueKey}
+                </Link>
+              ) : null}
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                {run.summary ?? ""}
+              </span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {new Date(run.createdAt).toLocaleDateString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </SettingsSection>
   );
 }

@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label as FieldLabel } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,8 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { labelText } from "@/lib/labels";
+import { LabelBadge } from "@/components/label-badge";
+import { SettingsPage } from "@/components/settings-page";
+import { labelColors } from "@/lib/label-colors";
 import { orpc } from "@/lib/orpc";
+import { cn } from "@/lib/utils";
 
 /** Labels are defined once for the Workspace; an Issue carries at most one per scope. */
 export function LabelsPage() {
@@ -24,7 +34,8 @@ export function LabelsPage() {
 
   const [scope, setScope] = useState("");
   const [name, setName] = useState("");
-  const [color, setColor] = useState("#3b82f6");
+  const colors = labelColors();
+  const [color, setColor] = useState(colors[0] ?? "#4f46e5");
 
   const create = useMutation(
     orpc.labels.create.mutationOptions({
@@ -39,17 +50,18 @@ export function LabelsPage() {
   const failed = create.error ?? remove.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Labels</h1>
-        <p className="text-sm text-muted-foreground">
+    <SettingsPage
+      title="Labels"
+      description={
+        <>
           Plain like <code>backend</code>, or scoped like <code>epic: Checkout rewrite</code>. An
           Issue carries at most one Label per scope.
-        </p>
-      </header>
-
+        </>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        // One grid: a label line, then a 32px control row, so the four labels and the four controls each sit on one line.
+        className="grid items-start gap-3 rounded-lg border bg-card p-4 sm:grid-cols-[10rem_minmax(0,1fr)_auto_auto]"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) {
@@ -66,7 +78,7 @@ export function LabelsPage() {
             onChange={(changed) => setScope(changed.target.value)}
           />
         </div>
-        <div className="flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <FieldLabel htmlFor="label-name">Name</FieldLabel>
           <Input
             id="label-name"
@@ -76,18 +88,39 @@ export function LabelsPage() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <FieldLabel htmlFor="label-color">Colour</FieldLabel>
-          <Input
-            id="label-color"
-            type="color"
-            className="w-16"
-            value={color}
-            onChange={(changed) => setColor(changed.target.value)}
-          />
+          <FieldLabel id="label-color-label">Color</FieldLabel>
+          {/* Eight colors in harmony with the palette, not a picker: a Label reads beside Human, Agent and Gate. */}
+          <div
+            role="radiogroup"
+            aria-labelledby="label-color-label"
+            className="flex h-8 items-center gap-1.5"
+          >
+            {colors.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                role="radio"
+                aria-checked={candidate === color}
+                aria-label={candidate}
+                className={cn(
+                  "size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow",
+                  candidate === color ? "ring-2 ring-foreground" : "hover:ring-2 hover:ring-border",
+                )}
+                style={{ background: candidate }}
+                onClick={() => setColor(candidate)}
+              />
+            ))}
+          </div>
         </div>
-        <Button type="submit" disabled={create.isPending || !name.trim()}>
-          Add Label
-        </Button>
+        <div className="flex flex-col gap-2">
+          {/* An empty label line, so the button shares the control row. */}
+          <FieldLabel aria-hidden className="invisible">
+            Add
+          </FieldLabel>
+          <Button type="submit" disabled={create.isPending || !name.trim()}>
+            Add Label
+          </Button>
+        </div>
       </form>
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
@@ -105,13 +138,11 @@ export function LabelsPage() {
             {labels.data.labels.map((label) => (
               <TableRow key={label.id}>
                 <TableCell>
-                  <Badge style={{ backgroundColor: label.color, color: "#fff" }}>
-                    {labelText(label)}
-                  </Badge>
+                  <LabelBadge label={label} variant="solid" />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ labelId: label.id })}
@@ -126,8 +157,18 @@ export function LabelsPage() {
       ) : null}
 
       {labels.data?.labels.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Labels yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Tags aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Labels yet</EmptyTitle>
+            <EmptyDescription>
+              Add one above; an Issue then carries it, one per scope.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
-    </section>
+    </SettingsPage>
   );
 }

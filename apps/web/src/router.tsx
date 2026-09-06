@@ -3,16 +3,32 @@ import {
   createRoute,
   createRouter,
   createMemoryHistory,
+  redirect,
+  useNavigate,
 } from "@tanstack/react-router";
-import { ProjectsPage } from "./routes/index.tsx";
+
+declare module "@tanstack/react-router" {
+  interface StaticDataRouteOption {
+    /** The page owns its padding and height — the Inbox's two panes — so the shell adds none. */
+    bleed?: boolean;
+  }
+}
+import { parseIssuesSearch, type IssuesSearch } from "./components/issue-filters.tsx";
+import { IssuesPage } from "./routes/issues/list.tsx";
+import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
-import { InboxPage } from "./routes/inbox.tsx";
+import { TokensPage } from "./routes/dev/tokens.tsx";
+import { InboxPage, parseInboxSearch } from "./routes/inbox.tsx";
+import { NotFoundPage } from "./routes/not-found.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
-import { ProjectPage } from "./routes/projects/project.tsx";
+import { ProjectIssuesTab, ProjectLayout } from "./routes/projects/project.tsx";
+import { ProjectSettingsPage } from "./routes/projects/project-settings.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { ChannelsPage } from "./routes/settings/channels.tsx";
+import { EventLogPage } from "./routes/settings/events.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
+import { SettingsLayout } from "./routes/settings/layout.tsx";
 import { NotificationsPage } from "./routes/settings/notifications.tsx";
 import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
@@ -33,37 +49,123 @@ const rootRoute = createRootRouteWithContext<ShellProps>()({
   component: function Root() {
     return <AppShell {...rootRoute.useRouteContext()} />;
   },
+  // A URL no route claims renders inside the shell, not as the router's bare <p>.
+  notFoundComponent: () => <NotFoundPage />,
 });
 
+// Home is the Issues you may see; the filters and the peek ride in the URL, so
+// a view is a link and Back undoes a filter (docs/plans/ui-redesign.md slice 2).
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  validateSearch: (search: Record<string, unknown>) => parseIssuesSearch(search),
+  component: function Issues() {
+    const search = indexRoute.useSearch();
+    const navigate = indexRoute.useNavigate();
+    return (
+      <IssuesPage
+        search={search}
+        onSearch={(patch) =>
+          void navigate({
+            search: (previous) => parseIssuesSearch({ ...previous, ...patch }),
+          })
+        }
+      />
+    );
+  },
+});
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects",
   component: ProjectsPage,
 });
+// A Project is a layout route: header and tabs, with each tab a child so it is
+// linkable alone. The Issue filters and the peek ride on the layout's search,
+// so the Issues tab and the Board share them (docs/plans/ui-redesign.md).
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$key",
+  validateSearch: (search: Record<string, unknown>) => parseIssuesSearch(search),
   component: function Project() {
-    return <ProjectPage projectKey={projectRoute.useParams().key} />;
+    return <ProjectLayout projectKey={projectRoute.useParams().key} />;
+  },
+});
+function useProjectSearch() {
+  const search = projectRoute.useSearch();
+  // The router's own navigate, not the layout route's: a route's navigate takes
+  // its path as `from`, and a tab writing its search would land on the layout —
+  // the Board losing "/board" the moment a peek opened. `to: "."` is where we are.
+  const navigate = useNavigate();
+  const onSearch = (patch: Partial<IssuesSearch>) =>
+    void navigate({
+      to: ".",
+      search: (previous) =>
+        parseIssuesSearch({ ...(previous as Record<string, unknown>), ...patch }) as never,
+    });
+  return { search, onSearch };
+}
+const projectIssuesRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "/",
+  component: function ProjectIssues() {
+    const { search, onSearch } = useProjectSearch();
+    return (
+      <ProjectIssuesTab
+        projectKey={projectRoute.useParams().key}
+        search={search}
+        onSearch={onSearch}
+      />
+    );
   },
 });
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/inbox",
-  component: InboxPage,
+  staticData: { bleed: true },
+  validateSearch: (search: Record<string, unknown>) => parseInboxSearch(search),
+  component: function InboxRoute() {
+    const search = inboxRoute.useSearch();
+    const navigate = inboxRoute.useNavigate();
+    return (
+      <InboxPage
+        search={search}
+        onSearch={(patch) =>
+          void navigate({ search: (previous) => parseInboxSearch({ ...previous, ...patch }) })
+        }
+      />
+    );
+  },
 });
 const boardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$key/board",
+  getParentRoute: () => projectRoute,
+  path: "board",
   component: function Board() {
-    return <BoardPage projectKey={boardRoute.useParams().key} />;
+    const { search, onSearch } = useProjectSearch();
+    return (
+      <BoardPage projectKey={projectRoute.useParams().key} search={search} onSearch={onSearch} />
+    );
   },
 });
 const workflowRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$key/settings/workflow",
+  getParentRoute: () => projectRoute,
+  path: "workflow",
   component: function Workflow() {
-    return <WorkflowPage projectKey={workflowRoute.useParams().key} />;
+    return <WorkflowPage projectKey={projectRoute.useParams().key} />;
+  },
+});
+const projectSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings",
+  component: function ProjectSettings() {
+    return <ProjectSettingsPage projectKey={projectRoute.useParams().key} />;
+  },
+});
+// Where the Workflow editor used to live; links in the wild keep working.
+const oldWorkflowRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/workflow",
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: "/projects/$key/workflow", params: { key: params.key } });
   },
 });
 const issueRoute = createRoute({
@@ -73,96 +175,155 @@ const issueRoute = createRoute({
     return <IssuePage issueKey={issueRoute.useParams().issueKey} />;
   },
 });
-const workspaceRoute = createRoute({
+
+// The Settings area: one layout route with its own navigation, and the pages
+// as its children so `/settings/<page>` keeps every URL it had.
+const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/settings/workspace",
+  path: "/settings",
+  component: SettingsLayout,
+});
+const settingsIndexRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "/",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/workspace" });
+  },
+});
+// Each declared with its literal path, so the router's types know every `to`.
+const workspaceRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "workspace",
   component: WorkspacePage,
 });
 const teamsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/teams",
+  getParentRoute: () => settingsRoute,
+  path: "teams",
   component: TeamsPage,
 });
 const labelsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/labels",
+  getParentRoute: () => settingsRoute,
+  path: "labels",
   component: LabelsPage,
 });
 const repositoriesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/repositories",
+  getParentRoute: () => settingsRoute,
+  path: "repositories",
   component: RepositoriesPage,
 });
 const membersRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/members",
+  getParentRoute: () => settingsRoute,
+  path: "members",
   component: MembersPage,
 });
 const agentsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/agents",
+  getParentRoute: () => settingsRoute,
+  path: "agents",
   component: AgentsPage,
 });
 const channelsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/channels",
+  getParentRoute: () => settingsRoute,
+  path: "channels",
   component: ChannelsPage,
 });
 const webhooksRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/webhooks",
+  getParentRoute: () => settingsRoute,
+  path: "webhooks",
   component: WebhooksPage,
 });
 const notificationsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/notifications",
+  getParentRoute: () => settingsRoute,
+  path: "notifications",
   component: NotificationsPage,
 });
+const allowlistRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "allowlist",
+  component: AllowlistPage,
+});
+const mcpClientsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "mcp-clients",
+  component: McpClientsPage,
+});
+const eventLogRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "events",
+  component: EventLogPage,
+});
 const agentRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/agents/$memberId",
+  getParentRoute: () => settingsRoute,
+  path: "agents/$memberId",
   component: function AgentRoute() {
     return <AgentPage memberId={agentRoute.useParams().memberId} />;
   },
 });
-const allowlistRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/allowlist",
-  component: AllowlistPage,
-});
-const mcpClientsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/mcp-clients",
-  component: McpClientsPage,
-});
+
 // Where the OAuth provider sends a Human mid-authorization (packages/core/src/auth.ts).
 const consentRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/consent",
   component: ConsentPage,
 });
+// The design tokens, drawn: a page for reviewing the palette and the type
+// scale in both themes. Not linked from anywhere; a developer knows the URL.
+const tokensRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dev/tokens",
+  component: TokensPage,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  projectsRoute,
   inboxRoute,
-  projectRoute,
-  boardRoute,
-  workflowRoute,
+  projectRoute.addChildren([
+    projectIssuesRoute,
+    boardRoute,
+    workflowRoute,
+    projectSettingsRoute,
+    oldWorkflowRoute,
+  ]),
   issueRoute,
-  workspaceRoute,
-  teamsRoute,
-  labelsRoute,
-  repositoriesRoute,
-  membersRoute,
-  agentsRoute,
-  agentRoute,
-  channelsRoute,
-  webhooksRoute,
-  notificationsRoute,
-  allowlistRoute,
-  mcpClientsRoute,
+  settingsRoute.addChildren([
+    settingsIndexRoute,
+    workspaceRoute,
+    teamsRoute,
+    labelsRoute,
+    repositoriesRoute,
+    membersRoute,
+    agentsRoute,
+    agentRoute,
+    channelsRoute,
+    webhooksRoute,
+    notificationsRoute,
+    allowlistRoute,
+    mcpClientsRoute,
+    eventLogRoute,
+  ]),
   consentRoute,
+  tokensRoute,
 ]);
+
+/** `?a=b&c=d` to `{ a: "b", c: "d" }`: strings, whatever they look like. */
+function parseSearch(searchStr: string): Record<string, string> {
+  return Object.fromEntries(new URLSearchParams(searchStr));
+}
+
+/**
+ * The reverse; a key whose value is undefined is left out, which is how a
+ * filter is cleared. A number or a boolean is written as its text; an object
+ * would be a bug in the caller, so it is written as JSON rather than "[object Object]".
+ */
+function stringifySearch(search: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    if (value === undefined || value === null) continue;
+    params.set(key, typeof value === "object" ? JSON.stringify(value) : String(value as string));
+  }
+  const out = params.toString();
+  return out ? `?${out}` : "";
+}
 
 export interface AppRouterOptions {
   /** Tests drive the routes without a browser URL bar. */
@@ -175,6 +336,12 @@ export function createAppRouter(context: ShellProps, options: AppRouterOptions =
   return createRouter({
     routeTree,
     context,
+    // Every search value deevy writes is a string, and stays one both ways. The
+    // default serialisation is JSON, which quotes a string that would parse as
+    // a number so it survives the round trip — `?open=%220%22`, shown as
+    // `open="0"` — and its decoder turns a raw `?open=0` into the number 0.
+    parseSearch: parseSearch,
+    stringifySearch: stringifySearch,
     ...(memory
       ? { history: createMemoryHistory({ initialEntries: options.initialEntries ?? ["/"] }) }
       : {}),

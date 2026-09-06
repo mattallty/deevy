@@ -66,7 +66,7 @@ describe("projects.create", () => {
     const { db, close } = testDb();
     closers.push(close);
     await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
 
     const client = createRouterClient(router, { context: bob });
     await expect(client.projects.create({ name: "deevy", key: "DEV" })).rejects.toMatchObject({
@@ -131,7 +131,7 @@ describe("projects.list and projects.get", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     await createRouterClient(router, { context: admin }).projects.create({
       name: "deevy",
       key: "DEV",
@@ -169,7 +169,7 @@ describe("projects.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const owner = createRouterClient(router, { context: admin });
     const team = await owner.teams.create({ name: "Platform" });
     await owner.teams.addMember({ teamId: team.id, memberId: bob.member.id });
@@ -185,7 +185,7 @@ describe("projects.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const owner = createRouterClient(router, { context: admin });
     const team = await owner.teams.create({ name: "Platform" });
     await owner.projects.create({ name: "deevy", key: "DEV", teamId: team.id });
@@ -200,7 +200,7 @@ describe("projects.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     await createRouterClient(router, { context: admin }).projects.create({
       name: "deevy",
       key: "DEV",
@@ -236,7 +236,7 @@ describe("projects.archive", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     await createRouterClient(router, { context: admin }).projects.create({
       name: "deevy",
       key: "DEV",

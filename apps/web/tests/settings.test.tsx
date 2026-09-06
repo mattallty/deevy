@@ -10,7 +10,7 @@ const stub = vi.hoisted(() => ({
       kind: "human",
       handle: "ada",
       suspendedAt: null,
-      user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net", image: null },
+      user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com", image: null },
     },
     {
       id: "m-bob",
@@ -18,12 +18,12 @@ const stub = vi.hoisted(() => ({
       kind: "human",
       handle: "bob",
       suspendedAt: new Date(),
-      user: { id: "u-bob", name: "Bob Vance", email: "bob@flippable.net", image: null },
+      user: { id: "u-bob", name: "Bob Vance", email: "bob@example.com", image: null },
     },
   ],
   rules: [
-    { id: "r-1", kind: "email_domain", value: "flippable.net", createdAt: new Date() },
-    { id: "r-2", kind: "github_org", value: "flippable", createdAt: new Date() },
+    { id: "r-1", kind: "email_domain", value: "example.com", createdAt: new Date() },
+    { id: "r-2", kind: "github_org", value: "acme", createdAt: new Date() },
   ],
 }));
 
@@ -68,8 +68,8 @@ describe("the allowlist settings page", () => {
     mount(<AllowlistPage />);
 
     const rules = await screen.findByRole("table");
-    expect(within(rules).getByText("flippable.net")).toBeTruthy();
-    expect(within(rules).getByText("flippable")).toBeTruthy();
+    expect(within(rules).getByText("example.com")).toBeTruthy();
+    expect(within(rules).getByText("acme")).toBeTruthy();
     expect(within(rules).getByText("Email domain")).toBeTruthy();
     expect(within(rules).getByText("GitHub organization")).toBeTruthy();
   });

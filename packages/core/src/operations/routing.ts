@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation } from "./registry.ts";
+import { newId } from "../ids.ts";
 
 /**
  * Routing rules: which kind of Notification, for which Project, reaches which
@@ -100,7 +101,7 @@ export const routing = {
       if (input.rules.length > 0) {
         await context.db.insert(routingRuleTable).values(
           input.rules.map((rule) => ({
-            id: crypto.randomUUID(),
+            id: newId("routingRule"),
             workspaceId: context.workspace.id,
             notificationKind: rule.notificationKind,
             projectId: rule.projectId,

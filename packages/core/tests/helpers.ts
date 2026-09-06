@@ -6,6 +6,7 @@ import { openDatabase } from "@deevy/adapters/node";
 import type { Session } from "../src/auth.ts";
 import type { AppContext } from "../src/operations/registry.ts";
 import type { ApiKeys, ApiKeySummary } from "../src/keys.ts";
+import { newId } from "../src/ids.ts";
 
 export const migrationsFolder = new URL("../../db/drizzle", import.meta.url).pathname;
 
@@ -51,7 +52,7 @@ export type MemberContext = AppContext & {
 export function contextFor(db: Db, member: Member, workspace: Workspace): MemberContext {
   const session = {
     session: {
-      id: crypto.randomUUID(),
+      id: newId("session"),
       userId: member.userId,
       token: "test",
       expiresAt: new Date(),
@@ -86,18 +87,18 @@ export async function memberContext(
 ): Promise<MemberContext> {
   const name = options.name ?? "Ada";
   const email = options.email ?? `${name.toLowerCase()}@example.com`;
-  const userId = crypto.randomUUID();
+  const userId = newId("user");
   await db.insert(user).values({ id: userId, name, email });
 
   let found = await db.query.workspace.findFirst();
   if (!found) {
-    const id = crypto.randomUUID();
+    const id = newId("workspace");
     await db.insert(workspace).values({ id, name: "deevy", slug: "deevy" });
     found = await db.query.workspace.findFirst({ where: { id } });
   }
   const ws = found as Workspace;
 
-  const memberId = crypto.randomUUID();
+  const memberId = newId("member");
   await db.insert(member).values({
     id: memberId,
     workspaceId: ws.id,

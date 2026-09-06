@@ -1,0 +1,98 @@
+/**
+ * What a Notification says, precisely (docs/plans/ui-redesign-2.md slice C):
+ * the actor is drawn as a chip by the caller; this gives the verb with its
+ * object — which Gate, which State — the tone the row takes, and the words
+ * a Human or an Agent wrote when there are any: the comment, the note, the
+ * question, the summary. Everything comes from the Event the row carries.
+ */
+export type NotificationTone = "human" | "agent" | "gate" | "muted" | "destructive";
+
+export interface NotificationText {
+  verb: string;
+  excerpt: string | null;
+  tone: NotificationTone;
+}
+
+export interface DescribableNotification {
+  kind: string;
+  issue: { state?: { name: string } | null } | null;
+  event: { kind: string; payload: unknown };
+  comment?: { id: string; body: string | null } | null;
+}
+
+const text = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+export function describeNotification(row: DescribableNotification): NotificationText {
+  const payload =
+    row.event.payload && typeof row.event.payload === "object" && !Array.isArray(row.event.payload)
+      ? (row.event.payload as Record<string, unknown>)
+      : {};
+  const stateName = row.issue?.state?.name ?? "a";
+  const gate = text(payload.state) ?? stateName;
+
+  switch (row.kind) {
+    case "assignment":
+      return {
+        verb: payload.byStateRule
+          ? `assigned it to you, entering ${stateName}`
+          : "assigned it to you",
+        excerpt: null,
+        tone: "human",
+      };
+    case "mention": {
+      if (row.event.kind.startsWith("comment.")) {
+        return {
+          verb: "mentioned you",
+          excerpt: row.comment ? (row.comment.body ?? "(the comment was withdrawn)") : null,
+          tone: "human",
+        };
+      }
+      const edits = payload as { description?: { to?: unknown }; title?: { to?: unknown } };
+      return {
+        verb: "mentioned you in the description",
+        excerpt: text(edits.description?.to) ?? text(edits.title?.to),
+        tone: "human",
+      };
+    }
+    case "gate_awaiting":
+      switch (row.event.kind) {
+        case "gate.rejected":
+          return { verb: `rejected the ${gate} Gate`, excerpt: text(payload.note), tone: "gate" };
+        case "gate.approved":
+          return {
+            verb: `approved the ${gate} Gate → ${text(payload.to) ?? stateName}`,
+            excerpt: text(payload.note),
+            tone: "gate",
+          };
+        case "issue.moved":
+          return {
+            verb: `moved it into the ${text(payload.to) ?? stateName} Gate`,
+            excerpt: null,
+            tone: "gate",
+          };
+        case "issue.created":
+          return { verb: `created it in the ${stateName} Gate`, excerpt: null, tone: "gate" };
+        case "run.awaiting_input":
+          return { verb: `is waiting at the ${stateName} Gate`, excerpt: null, tone: "gate" };
+        default:
+          return { verb: `is waiting at the ${stateName} Gate`, excerpt: null, tone: "gate" };
+      }
+    case "run_awaiting_input":
+      return { verb: "asks a question", excerpt: text(payload.question), tone: "agent" };
+    case "run_finished":
+      return row.event.kind === "run.failed"
+        ? { verb: "failed a Run", excerpt: text(payload.summary), tone: "destructive" }
+        : { verb: "finished a Run", excerpt: text(payload.summary), tone: "agent" };
+    case "run_answered": {
+      const ruling = row.event.kind === "gate.rejected" ? "rejected" : "approved";
+      return {
+        verb: `${ruling} the ${gate} Gate your Agent asked about`,
+        excerpt: text(payload.note),
+        tone: "muted",
+      };
+    }
+    default:
+      return { verb: row.kind, excerpt: null, tone: "muted" };
+  }
+}

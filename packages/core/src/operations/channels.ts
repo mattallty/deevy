@@ -5,6 +5,7 @@ import { z } from "zod";
 import { appendEvent } from "../events.ts";
 import { postSlackMessage } from "../slack.ts";
 import { NoInput, defineOperation } from "./registry.ts";
+import { newId } from "../ids.ts";
 
 /**
  * Channels: where Notifications are delivered (CONTEXT.md). Only Slack is
@@ -92,7 +93,7 @@ export const channels = {
     }),
     output: ChannelView,
     handler: async ({ input, context }) => {
-      const id = crypto.randomUUID();
+      const id = newId("channel");
       const [row] = await context.db
         .insert(channelTable)
         .values({

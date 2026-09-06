@@ -38,7 +38,7 @@ const { ConsentPage } = await import("../src/routes/consent.tsx");
 
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada" },
+    { workspaceName: "Acme Team", memberName: "Ada" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -76,7 +76,7 @@ describe("the MCP clients settings page", () => {
 
     await waitFor(() => expect(stub.revoked).toHaveLength(1));
     expect(stub.revoked[0]).toEqual({ clientId: "https://claude.ai/mcp/client" });
-    expect(await screen.findByText(/No MCP client is connected as you yet/)).toBeTruthy();
+    expect(await screen.findByText("No MCP clients yet")).toBeTruthy();
   });
 });
 

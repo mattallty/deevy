@@ -1,178 +1,370 @@
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useMatches, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
-  FolderKanban,
-  GitBranch,
-  Inbox,
-  Bell,
-  Radio,
-  Settings,
-  ShieldCheck,
-  Tags,
-  Users,
   Bot,
-  Plug,
-  UsersRound,
-  Webhook,
+  ChevronsUpDown,
+  CircleUser,
+  FolderKanban,
+  Inbox,
+  ListTodo,
+  LogOut,
+  Monitor,
+  Moon,
+  Search,
+  Settings,
+  Sun,
 } from "lucide-react";
-import type { ComponentType } from "react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { useTheme } from "next-themes";
+import { useState } from "react";
+import { AppBreadcrumb } from "@/components/app-breadcrumb";
+import { CommandPalette } from "@/components/command-palette";
+import { Shortcut } from "@/components/kbd-hint";
+import { MemberChip } from "@/components/member-chip";
+import { NewIssueButton, NewIssueProvider } from "@/components/new-issue";
+import { ShortcutsSheet } from "@/components/shortcuts-sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
+  sidebarMenuButtonVariants,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
-import { NewIssueButton } from "@/components/new-issue";
-import { useQuery } from "@tanstack/react-query";
 import { useLiveEvents } from "@/lib/live";
 import { orpc } from "@/lib/orpc";
-
-interface NavItem {
-  to: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  /** Placeholders until the slice that fills them in (docs/plans/m1.md). */
-  soon?: boolean;
-}
-
-const work: NavItem[] = [
-  { to: "/", label: "Projects", icon: FolderKanban },
-  { to: "/inbox", label: "Inbox", icon: Inbox },
-];
-
-const settings: NavItem[] = [
-  { to: "/settings/workspace", label: "Workspace", icon: Settings },
-  { to: "/settings/teams", label: "Teams", icon: UsersRound },
-  { to: "/settings/labels", label: "Labels", icon: Tags },
-  { to: "/settings/repositories", label: "Repositories", icon: GitBranch },
-  { to: "/settings/channels", label: "Channels", icon: Radio },
-  { to: "/settings/webhooks", label: "Webhooks", icon: Webhook },
-  { to: "/settings/notifications", label: "Notifications", icon: Bell },
-  { to: "/settings/members", label: "Members", icon: Users },
-  { to: "/settings/agents", label: "Agents", icon: Bot },
-  { to: "/settings/mcp-clients", label: "MCP clients", icon: Plug },
-  { to: "/settings/allowlist", label: "Allowlist", icon: ShieldCheck },
-];
+import { useShortcut } from "@/lib/shortcuts";
+import { cn } from "@/lib/utils";
 
 export interface ShellProps {
   workspaceName: string;
   memberName: string;
+  /** The signed-in Member, for the chip in the footer. Absent, the name alone is shown. */
+  member?: {
+    id: string;
+    kind: "human" | "agent";
+    handle: string | null;
+    role: "admin" | "member";
+    image: string | null;
+  };
 }
 
-/** The frame every signed-in page sits in: the Workspace sidebar, a header, and the route. */
-export function AppShell({ workspaceName, memberName }: ShellProps) {
+/**
+ * The frame every signed-in page sits in (docs/plans/ui-redesign.md, slice 1):
+ * a sidebar that folds to its icons, with the Inbox as its only badge, the
+ * Projects listed rather than hidden behind a page, and Settings as a door to
+ * its own area; the command palette on ⌘K; and the page, full width.
+ */
+export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   // Mounted once for the whole signed-in app, so one stream serves every page.
   useLiveEvents(true);
+  const navigate = useNavigate();
+  // A page that lays out its own panes (the Inbox) opts out of the shell's padding.
+  const bleed = useMatches().some((match) => match.staticData.bleed === true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  // "My Agents' Issues" is offered to a Sponsor and to nobody else.
+  const sponsorsAgents = (members.data?.members ?? []).some(
+    (candidate) => candidate.kind === "agent" && candidate.sponsorId === member?.id,
+  );
+
+  useShortcut("mod+k", () => setPaletteOpen((open) => !open), { global: true });
+  useShortcut("?", () => setShortcutsOpen((open) => !open));
+  useShortcut("g i", () => void navigate({ to: "/inbox" }));
+  useShortcut("g m", () => void navigate({ to: "/", search: { assignee: "me" } }));
+  useShortcut("g a", () => void navigate({ to: "/", search: {} }));
+  useShortcut("g p", () => void navigate({ to: "/projects" }));
+  useShortcut("g s", () => void navigate({ to: "/settings/workspace" }));
+
+  const me = {
+    id: member?.id ?? "me",
+    kind: member?.kind ?? ("human" as const),
+    handle: member?.handle ?? null,
+    user: { name: memberName, image: member?.image ?? null },
+  };
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-1">
-            <span className="truncate font-semibold">{workspaceName}</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <NavGroup label="Work" items={work} withInboxBadge />
-          <NavGroup label="Settings" items={settings} />
-        </SidebarContent>
-      </Sidebar>
+      <NewIssueProvider>
+        <Sidebar collapsible="icon">
+          <SidebarHeader>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={workspaceName}
+                  render={<Link to="/" />}
+                  className="font-semibold"
+                >
+                  <span
+                    aria-hidden
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-xs text-primary-foreground"
+                  >
+                    {workspaceName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="truncate">{workspaceName}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Search or jump" onClick={() => setPaletteOpen(true)}>
+                  <Search />
+                  <span className="text-muted-foreground">Search or jump…</span>
+                  <Shortcut keys="mod+k" className="ml-auto" />
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarHeader>
 
-      <SidebarInset>
-        <header className="flex h-12 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4" />
-          <span className="flex-1" />
-          {/* In the header rather than on a Project, so it is one click from
-              anywhere and `c` from anywhere (components/new-issue.tsx). */}
-          <NewIssueButton />
-          <Separator orientation="vertical" className="h-4" />
-          <span className="text-sm">{memberName}</span>
-          <SignOutButton />
-        </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 p-6">
-          <Outlet />
-        </main>
-      </SidebarInset>
-      <Toaster />
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Inbox" render={<Link to="/inbox" />}>
+                      <Inbox />
+                      <span>Inbox</span>
+                    </SidebarMenuButton>
+                    <InboxBadge />
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip="My Issues"
+                      render={
+                        <Link
+                          to="/"
+                          search={{ assignee: "me" }}
+                          activeOptions={{ exact: true, includeSearch: true }}
+                        />
+                      }
+                    >
+                      <CircleUser />
+                      <span>My Issues</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  {sponsorsAgents ? (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        tooltip="My Agents' Issues"
+                        render={
+                          <Link
+                            to="/"
+                            search={{ assignee: "agents:me" }}
+                            activeOptions={{ exact: true, includeSearch: true }}
+                          />
+                        }
+                      >
+                        <Bot />
+                        <span>My Agents&apos; Issues</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ) : null}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip="All Issues"
+                      render={
+                        <Link
+                          to="/"
+                          search={{}}
+                          activeOptions={{ exact: true, includeSearch: true }}
+                        />
+                      }
+                    >
+                      <ListTodo />
+                      <span>All Issues</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Projects" render={<Link to="/projects" />}>
+                      <FolderKanban />
+                      <span>Projects</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {projects.data && projects.data.projects.length > 0 ? (
+              <SidebarGroup>
+                <SidebarGroupLabel>Projects</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {projects.data.projects.map((project) => (
+                      <SidebarMenuItem key={project.id}>
+                        <SidebarMenuButton
+                          tooltip={project.name}
+                          render={<Link to="/projects/$key" params={{ key: project.key }} />}
+                        >
+                          <span className="flex size-4 shrink-0 items-center justify-center font-mono text-[10px] font-medium text-muted-foreground">
+                            {project.key.slice(0, 3)}
+                          </span>
+                          <span className="truncate">{project.name}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ) : null}
+          </SidebarContent>
+
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Settings" render={<Link to="/settings/workspace" />}>
+                  <Settings />
+                  <span>Settings</span>
+                  <Shortcut keys="g s" className="ml-auto" />
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <MemberMenu me={me} />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+          <SidebarRail />
+        </Sidebar>
+
+        <SidebarInset>
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
+            <SidebarTrigger />
+            <AppBreadcrumb />
+            <span className="flex-1" />
+            {/* In the top bar, so it is one click from anywhere and `c` from anywhere. */}
+            <NewIssueButton variant="default" size="default" withShortcut />
+          </div>
+          {/* SidebarInset is the <main>; this is the page inside it. */}
+          <div
+            className={cn("min-w-0 flex-1", bleed ? "flex min-h-0 flex-col" : "flex flex-col p-6")}
+          >
+            <Outlet />
+          </div>
+        </SidebarInset>
+
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          projects={(projects.data?.projects ?? []).map(({ key, name }) => ({ key, name }))}
+          onShowShortcuts={() => setShortcutsOpen(true)}
+        />
+        <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+        <Toaster />
+      </NewIssueProvider>
     </SidebarProvider>
   );
 }
 
-function NavGroup({
-  label,
-  items,
-  withInboxBadge = false,
-}: {
-  label: string;
-  items: NavItem[];
-  withInboxBadge?: boolean;
-}) {
-  // useLiveEvents invalidates this on any Event, so the badge follows the log.
-  const unread = useQuery({
-    ...orpc.inbox.unreadCount.queryOptions({ input: {} }),
-    enabled: withInboxBadge,
-  });
-
+/** The unread count, live: useLiveEvents re-reads the inbox on every Event that could owe one. */
+function InboxBadge() {
+  const unread = useQuery(orpc.inbox.unreadCount.queryOptions({ input: {} }));
+  const count = unread.data?.unread ?? 0;
+  if (count === 0) return null;
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {items.map(({ to, label: text, icon: Icon, soon }) => (
-            <SidebarMenuItem key={to}>
-              {soon ? (
-                <SidebarMenuButton disabled tooltip={`${text} arrives in a later slice`}>
-                  <Icon />
-                  <span>{text}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">soon</span>
-                </SidebarMenuButton>
-              ) : (
-                <SidebarMenuButton
-                  tooltip={text}
-                  render={<Link to={to} activeOptions={{ exact: to === "/" }} />}
-                >
-                  <Icon />
-                  <span>{text}</span>
-                  {to === "/inbox" && (unread.data?.unread ?? 0) > 0 ? (
-                    <span
-                      aria-label={`${unread.data?.unread} unread`}
-                      className="ml-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
-                    >
-                      {unread.data?.unread}
-                    </span>
-                  ) : null}
-                </SidebarMenuButton>
-              )}
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
+    <SidebarMenuBadge
+      aria-label={`${String(count)} unread`}
+      // A count, not an alarm: quiet grey that reads on the row's rest, hover and active tints.
+      className="rounded-full bg-muted-foreground/15 px-1.5 text-[11px] font-medium text-foreground/75 tabular-nums"
+    >
+      {count}
+    </SidebarMenuBadge>
   );
 }
 
-function SignOutButton() {
+function MemberMenu({
+  me,
+}: {
+  me: {
+    id: string;
+    kind: "human" | "agent";
+    handle: string | null;
+    user: { name: string; image: string | null };
+  };
+}) {
+  const { theme, setTheme } = useTheme();
+  // Folded to icons (the Settings area does this), the trigger is the avatar alone.
+  const folded = useSidebar().state === "collapsed";
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={async () => {
-        const { authClient } = await import("@/lib/auth");
-        await authClient.signOut();
-      }}
-    >
-      Sign out
-    </Button>
+    <DropdownMenu>
+      {/* The trigger is the button itself, dressed as a sidebar item: handing a
+          SidebarMenuButton to the trigger's `render` loses the click on the way
+          through two render layers, and a menu that does not open is worse than
+          a tooltip that is missing. */}
+      <DropdownMenuTrigger
+        data-slot="sidebar-menu-button"
+        data-size="lg"
+        aria-label={me.user.name}
+        className={cn(
+          sidebarMenuButtonVariants({ size: "lg" }),
+          "min-w-0 group-data-[collapsible=icon]:justify-center",
+        )}
+      >
+        <MemberChip member={me} size="md" className="min-w-0 flex-1" avatarOnly={folded} />
+        <ChevronsUpDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-56">
+        {/* A Base UI menu label lives inside a group, or the menu throws as it opens. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col">
+            <span>{me.user.name}</span>
+            {me.handle ? (
+              <span className="font-mono text-xs font-normal text-muted-foreground">
+                @{me.handle}
+              </span>
+            ) : null}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Theme</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
+            <DropdownMenuRadioItem value="system">
+              <Monitor />
+              System
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="light">
+              <Sun />
+              Light
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="dark">
+              <Moon />
+              Dark
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={async () => {
+            const { authClient } = await import("@/lib/auth");
+            await authClient.signOut();
+          }}
+        >
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

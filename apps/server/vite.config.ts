@@ -6,7 +6,10 @@ export default defineConfig({
     tasks: { test: { command: "vp test", output: [] } },
   },
   pack: {
-    entry: ["src/index.ts"],
+    // The seed is a second entry rather than a script run from source: Node
+    // cannot resolve the workspace packages' `.ts` exports on its own, and the
+    // pack already knows how (docs/DEVELOPMENT.md, "Running without an OAuth App").
+    entry: ["src/index.ts", "src/seed.ts"],
     platform: "node",
     format: "esm",
     dts: false,

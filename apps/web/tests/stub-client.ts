@@ -38,6 +38,9 @@ const emptyIssue = {
 // client shape, and a stub only ever implements the operations a test touches.
 export function stubClient(overrides: StubOverrides = {}): never {
   const base: Record<string, Record<string, StubOperation>> = {
+    health: {
+      ping: async () => ({ ok: true, time: new Date(0).toISOString(), devSignIn: false }),
+    },
     me: {
       get: async () => ({
         user: {},

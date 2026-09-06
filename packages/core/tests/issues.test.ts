@@ -1,7 +1,8 @@
 import { createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
-import { memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { agentContext, memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -158,6 +159,56 @@ describe("issues.list", () => {
   });
 });
 
+describe("issues.list across the Workspace", () => {
+  it("lists every Project's Issues when none is named, newest change first, keyed per Project", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    await client.projects.create({ name: "Operations", key: "OPS" });
+    await client.issues.create({ projectKey: "DEV", title: "First" });
+    const later = await client.issues.create({ projectKey: "OPS", title: "Second" });
+    await client.issues.update({ key: "DEV-1", title: "First, touched" });
+
+    const all = await client.issues.list({});
+    expect(all.issues.map((issue) => issue.key)).toEqual(["DEV-1", later.key]);
+    expect(all.nextCursor).toBeNull();
+  });
+
+  it("finds an Issue by key, by number, or by a word of its title with q", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withProject(db);
+    await client.projects.create({ name: "Operations", key: "OPS" });
+    await client.issues.create({ projectKey: "DEV", title: "Ship the Event log" });
+    await client.issues.create({ projectKey: "DEV", title: "Retry webhook deliveries" });
+    await client.issues.create({ projectKey: "OPS", title: "Rotate the OAuth secret" });
+
+    const keys = async (q: string) =>
+      (await client.issues.list({ q })).issues.map((issue) => issue.key).sort();
+    expect(await keys("dev-2")).toEqual(["DEV-2"]);
+    expect(await keys("1")).toEqual(["DEV-1", "OPS-1"]);
+    expect(await keys("event LOG")).toEqual(["DEV-1"]);
+    expect(await keys("the")).toEqual(["DEV-1", "OPS-1"]);
+    expect(await keys("nothing here")).toEqual([]);
+    expect(await keys("ZZZ-9")).toEqual([]);
+  });
+
+  it("shows an Agent only the Projects it was granted", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client, project } = await withProject(db);
+    await client.projects.create({ name: "Operations", key: "OPS" });
+    await client.issues.create({ projectKey: "DEV", title: "Seen" });
+    await client.issues.create({ projectKey: "OPS", title: "Unseen" });
+    const agent = await agentContext(db, { sponsor: admin.member, grants: [project.id] });
+    const asAgent = createRouterClient(router, { context: agent });
+
+    const mine = await asAgent.issues.list({});
+    expect(mine.issues.map((issue) => issue.key)).toEqual(["DEV-1"]);
+    expect((await asAgent.issues.list({ q: "Unseen" })).issues).toEqual([]);
+  });
+});
+
 describe("issues.update", () => {
   it("changes the title and description and records what changed", async () => {
     const { db, close } = testDb();
@@ -184,7 +235,7 @@ describe("issues.update", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { admin, client } = await withProject(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     const issue = await client.issues.create({ projectKey: "DEV", title: "Draft" });
 
     await client.issues.update({ key: "DEV-1", assigneeMemberId: admin.member.id });
@@ -208,7 +259,7 @@ describe("issues.update", () => {
     await client.issues.create({ projectKey: "DEV", title: "Draft" });
 
     await expect(
-      client.issues.update({ key: "DEV-1", assigneeMemberId: crypto.randomUUID() }),
+      client.issues.update({ key: "DEV-1", assigneeMemberId: newId("member") }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 

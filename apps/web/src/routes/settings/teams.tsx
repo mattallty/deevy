@@ -1,16 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
 /** Teams and who is on them. A Team owns Projects and can be mentioned; it is not a permission wall. */
@@ -35,16 +45,14 @@ export function TeamsPage() {
   const failed = create.error ?? remove.error ?? addMember.error ?? removeMember.error;
 
   return (
-    <section className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Teams</h1>
-        <p className="text-sm text-muted-foreground">
-          A Team owns Projects and can be mentioned. Every Human still sees every Project.
-        </p>
-      </header>
-
+    <SettingsPage
+      title="Teams"
+      description={
+        <>A Team owns Projects and can be mentioned. Every Human still sees every Project.</>
+      }
+    >
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) create.mutate({ name: name.trim() });
@@ -68,7 +76,17 @@ export function TeamsPage() {
 
       {teams.isPending ? <p className="text-muted-foreground">Loading Teams…</p> : null}
       {teams.data?.teams.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No Teams yet.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users aria-hidden />
+            </EmptyMedia>
+            <EmptyTitle>No Teams yet</EmptyTitle>
+            <EmptyDescription>
+              A Team owns Projects and can be mentioned as one. Create the first above.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       <div className="flex flex-col gap-4">
@@ -98,7 +116,7 @@ export function TeamsPage() {
                   {member.role === "admin" ? <Badge variant="outline">admin</Badge> : null}
                   <span className="flex-1" />
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={removeMember.isPending}
                     onClick={() => removeMember.mutate({ teamId: team.id, memberId: member.id })}
@@ -121,7 +139,7 @@ export function TeamsPage() {
           </article>
         ))}
       </div>
-    </section>
+    </SettingsPage>
   );
 }
 
@@ -148,11 +166,13 @@ function AddToTeam({ teamId, taken, members, onAdd }: AddToTeamProps) {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {available.map((member) => (
-            <SelectItem key={member.id} value={member.id}>
-              {member.user.name}
-            </SelectItem>
-          ))}
+          <SelectGroup>
+            {available.map((member) => (
+              <SelectItem key={member.id} value={member.id}>
+                {member.user.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
       <Button

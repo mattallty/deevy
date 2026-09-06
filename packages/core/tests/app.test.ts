@@ -45,6 +45,14 @@ describe("createApp", () => {
     expect(docs.headers.get("content-type")).toContain("text/html");
   });
 
+  it("tells a signed-out SPA whether sign-in is stubbed", async () => {
+    const context = anonymous();
+    const ping = async (app: ReturnType<typeof createApp>) =>
+      (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
+    expect((await ping(createApp({ db: context.db }))).devSignIn).toBe(false);
+    expect((await ping(createApp({ db: context.db, devSignIn: true }))).devSignIn).toBe(true);
+  });
+
   it("rejects session and member operations for anonymous callers", async () => {
     const context = anonymous();
     const client = createRouterClient(router, { context });
@@ -72,10 +80,10 @@ describe("bootstrapWorkspace", () => {
     await bootstrapWorkspace(
       db,
       { userId: "u1", email: "Ada@Example.com" },
-      { adminEmail: "ada@example.com", workspaceName: "Flippable Team" },
+      { adminEmail: "ada@example.com", workspaceName: "Acme Team" },
     );
     const ws = await db.query.workspace.findFirst({ with: { members: true } });
-    expect(ws?.slug).toBe("flippable-team");
+    expect(ws?.slug).toBe("acme-team");
     expect(ws?.members).toHaveLength(1);
     expect(ws?.members[0]).toMatchObject({ userId: "u1", role: "admin", kind: "human" });
 
@@ -107,7 +115,7 @@ describe("bootstrapWorkspace", () => {
   });
 
   it("slugifies names", () => {
-    expect(slugify("Flippable Team!")).toBe("flippable-team");
+    expect(slugify("Acme Team!")).toBe("acme-team");
     expect(slugify("   ")).toBe("workspace");
   });
 });

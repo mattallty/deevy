@@ -213,7 +213,7 @@ describe("repositories", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client } = await withIssue(db);
-    const bob = await memberContext(db, { name: "Bob", email: "bob@flippable.net" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
     await client.repositories.create({
       provider: "github",
       name: "mattallty/deevy",

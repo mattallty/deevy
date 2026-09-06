@@ -96,3 +96,10 @@ _Avoid_: destination, provider, integration
 **Event**:
 An immutable record of one change in a Workspace: what changed, which Member did it, and when.
 _Avoid_: activity, log entry, audit record
+
+**Id**:
+What names one row, in a shape that says what it is: a short prefix, an underscore, twelve characters —
+`iss_k3xr8v2m9qpw` is an Issue, `mem_…` a Member, `run_…` a Run, `proj_…` a Project (the map is in
+`docs/adr/0015-ids-are-prefixed-nanoids.md`). An Issue's **key**, `DEV-42`, is its public handle and not its id;
+an Event's **seq** is a number, its place in the record.
+_Avoid_: uuid, guid, primary key (in prose)

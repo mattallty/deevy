@@ -11,6 +11,7 @@ import { z } from "zod";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation, type ContextFor } from "./registry.ts";
 import { SubscriptionSecret, SubscriptionUrl } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 /**
  * Webhook subscriptions: the URLs deevy tells when something happens, which is
@@ -192,7 +193,7 @@ export const webhooks = {
       const memberId = input.memberId ?? null;
       await assertMayCreate(context, memberId);
 
-      const id = crypto.randomUUID();
+      const id = newId("webhook");
       const [row] = await context.db
         .insert(webhookSubscriptionTable)
         .values({

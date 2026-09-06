@@ -185,6 +185,11 @@
           "type": "string",
           "pattern": "^[A-Z]{2,6}$"
         },
+        "q": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
         "after": {
           "type": "integer",
           "minimum": 0,
@@ -211,10 +216,7 @@
           "minimum": 1,
           "maximum": 200
         }
-      },
-      "required": [
-        "projectKey"
-      ]
+      }
     }
   },
   {

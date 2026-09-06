@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption, selectedLabel } from "./select.ts";
 
 const created = vi.fn(async () => ({
   id: "new-issue",
@@ -29,8 +30,24 @@ vi.mock("../src/lib/orpc.ts", async () => {
     projects: {
       list: async () => ({
         projects: [
-          { id: "p1", key: "DEV", name: "deevy", description: null, team: null, archivedAt: null },
-          { id: "p2", key: "OPS", name: "ops", description: null, team: null, archivedAt: null },
+          {
+            id: "p1",
+            key: "DEV",
+            name: "deevy",
+            description: null,
+            team: null,
+            archivedAt: null,
+            states: [],
+          },
+          {
+            id: "p2",
+            key: "OPS",
+            name: "ops",
+            description: null,
+            team: null,
+            archivedAt: null,
+            states: [],
+          },
         ],
       }),
     },
@@ -44,7 +61,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 /** The shell, on a route that has nothing to do with Issues. */
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { memory: true, initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -79,10 +96,8 @@ describe("creating an Issue from anywhere", () => {
     const router = await mountAt("/inbox");
 
     fireEvent.click(screen.getByRole("button", { name: /new issue/i }));
-    // The Projects are fetched only once the dialog is open, so the option has
-    // to exist before the select can be set to it.
-    await screen.findByRole("option", { name: /ops/i });
-    fireEvent.change(screen.getByLabelText(/project/i), { target: { value: "OPS" } });
+    // The Projects are fetched once the dialog is open; the select lists them when opened.
+    await pickOption(screen.getByLabelText(/project/i), /ops/i);
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: "Ship the launch page" },
     });
@@ -98,6 +113,17 @@ describe("creating an Issue from anywhere", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/issues/DEV-7"));
   });
 
+  it("already knows the Project when opened from its pages", async () => {
+    await mountAt("/projects/OPS");
+
+    fireEvent.click(screen.getByRole("button", { name: /new issue/i }));
+    // The select shows the Project of the page, with no pick needed.
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() =>
+      expect(selectedLabel(within(dialog).getByLabelText(/project/i))).toBe("ops (OPS)"),
+    );
+  });
+
   it("opens on `c`, the key every tool of this kind uses", async () => {
     await mountAt("/inbox");
 
@@ -107,9 +133,9 @@ describe("creating an Issue from anywhere", () => {
   });
 
   it("leaves `c` alone while the Human is typing into something else", async () => {
-    await mountAt("/projects/DEV");
+    await mountAt("/settings/labels");
 
-    const field = await screen.findByLabelText(/new issue/i);
+    const field = await screen.findByLabelText("Name");
     field.focus();
     fireEvent.keyDown(field, { key: "c" });
 

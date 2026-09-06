@@ -1,0 +1,93 @@
+/**
+ * Every row deevy creates gets an id that says what it is (ADR-0015):
+ * a short prefix, an underscore, and twelve characters from `0-9a-z` —
+ * `iss_k3xr8v2m9qpw`. Readable in an Event payload, an MCP argument or a URL,
+ * copy-pasteable, safe to say aloud; about 62 bits of randomness per id, from
+ * the Web Crypto API so the same code runs on Node and on Workers. The Event
+ * `seq`, Issue keys (`DEV-42`) and API key secrets (`deevy_sk_…`) are not ids
+ * of this kind and stay as they are.
+ */
+export const idPrefixes = {
+  workspace: "ws",
+  member: "mem",
+  team: "team",
+  project: "proj",
+  state: "st",
+  decision: "dec",
+  issue: "iss",
+  comment: "cmt",
+  document: "doc",
+  documentVersion: "docv",
+  link: "lnk",
+  label: "lbl",
+  run: "run",
+  activity: "act",
+  notification: "ntf",
+  webhook: "whk",
+  delivery: "dlv",
+  channel: "chan",
+  repository: "repo",
+  routingRule: "rte",
+  allowlistRule: "alw",
+  // Better Auth's own models, through its generateId hook (auth.ts).
+  user: "usr",
+  session: "ses",
+  account: "acct",
+  verification: "ver",
+  apikey: "key",
+  jwks: "jwk",
+  oauthClient: "oacl",
+  oauthResource: "oars",
+  oauthClientAssertion: "oaca",
+} as const;
+
+export type IdKind = keyof typeof idPrefixes;
+
+const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+export const ID_LENGTH = 12;
+
+/** Twelve symbols from the 36-letter alphabet, without modulo bias. */
+function randomBody(): string {
+  let out = "";
+  const bytes = new Uint8Array(ID_LENGTH * 2);
+  while (out.length < ID_LENGTH) {
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      // 252 is the largest multiple of 36 below 256; above it the draw is redone.
+      if (byte < 252 && out.length < ID_LENGTH) out += ALPHABET[byte % 36];
+    }
+  }
+  return out;
+}
+
+export function newId(kind: IdKind): string {
+  return `${idPrefixes[kind]}_${randomBody()}`;
+}
+
+/** Better Auth's models by the names it uses; anything unknown keeps its model name as the prefix. */
+const authModels: Record<string, IdKind> = {
+  user: "user",
+  session: "session",
+  account: "account",
+  verification: "verification",
+  apikey: "apikey",
+  jwks: "jwks",
+  oauthClient: "oauthClient",
+  oauth_client: "oauthClient",
+  oauthResource: "oauthResource",
+  oauth_resource: "oauthResource",
+  oauthClientAssertion: "oauthClientAssertion",
+  oauth_client_assertion: "oauthClientAssertion",
+};
+
+export function authId(model: string): string {
+  const kind = authModels[model];
+  return kind ? newId(kind) : `${model.toLowerCase()}_${randomBody()}`;
+}
+
+/** Whether `value` is an id of `kind` (or of any kind, when none is given). */
+export function isId(value: unknown, kind?: IdKind): value is string {
+  if (typeof value !== "string") return false;
+  const prefix = kind ? idPrefixes[kind] : "[a-z]{2,6}";
+  return new RegExp(`^${prefix}_[0-9a-z]{${String(ID_LENGTH)}}$`).test(value);
+}

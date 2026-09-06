@@ -1,4 +1,5 @@
 import { fetchClientMetadataResource as shapeCheckTransport } from "@deevy/core/cimd";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
 import { readEnv } from "../src/env.ts";
 import { fetchClientMetadataResource as strictTransport } from "../src/cimd.ts";
@@ -71,5 +72,47 @@ describe("the runner's environment", () => {
     const env = readEnv({ DEEVY_RUN_STALE_MINUTES: "5", DEEVY_SWEEP_INTERVAL_SECONDS: "10" });
     expect(env.runStaleMinutes).toBe(5);
     expect(env.sweepIntervalSeconds).toBe(10);
+  });
+});
+
+describe("the development GitHub stub", () => {
+  it("is off unless asked for, and reported as such", async () => {
+    expect(readEnv({}).devStubGithub).toBe(false);
+    const { app, close } = testServer();
+    const body = (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
+    expect(body.devSignIn).toBe(false);
+    close();
+  });
+
+  it("is on for DEEVY_DEV_STUB_GITHUB=1, and health.ping says so", async () => {
+    const env = readEnv({ DEEVY_DEV_STUB_GITHUB: "1" });
+    expect(env.devStubGithub).toBe(true);
+    const { app, close } = buildServer({
+      ...env,
+      databasePath: ":memory:",
+      migrationsFolder,
+      baseURL: "http://localhost:3000",
+      secret: "test-secret-test-secret-test-secret-1234",
+    });
+    const body = (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
+    expect(body.devSignIn).toBe(true);
+    close();
+  });
+
+  it("is refused in production rather than ignored", () => {
+    expect(() => readEnv({ DEEVY_DEV_STUB_GITHUB: "1", NODE_ENV: "production" })).toThrow(
+      /production/,
+    );
+  });
+
+  /**
+   * The entry imports the very file the acceptance walk and the Workers smoke
+   * prepend to their bundles, so there is one stub and one place for it to be
+   * wrong. Asserted on the source, because the entry itself listens on a port.
+   */
+  it("installs the stub the harnesses use, from where they read it", () => {
+    const entry = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    expect(entry).toContain('import("../../web/scripts/stub-github.js")');
+    expect(existsSync(new URL("../../web/scripts/stub-github.js", import.meta.url))).toBe(true);
   });
 });

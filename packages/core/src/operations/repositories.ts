@@ -5,6 +5,7 @@ import { RepositorySchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation } from "./registry.ts";
+import { newId } from "../ids.ts";
 
 export const repositories = {
   list: defineOperation({
@@ -45,7 +46,7 @@ export const repositories = {
       if (taken) {
         throw new ORPCError("CONFLICT", { message: "That Repository is already registered" });
       }
-      const id = crypto.randomUUID();
+      const id = newId("repository");
       const [row] = await context.db
         .insert(repositoryTable)
         .values({

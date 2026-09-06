@@ -7,6 +7,7 @@ import { appendEvent } from "../src/events.ts";
 import { router } from "../src/operations/index.ts";
 import { triggersFor } from "../src/triggers.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -181,7 +182,7 @@ describe("the recursion guard", () => {
         {
           kind,
           subjectType: "run",
-          subjectId: crypto.randomUUID(),
+          subjectId: newId("issue"),
           projectId: project.id,
           payload: { issueId: created.id },
         },

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption, selectedLabel } from "./select.ts";
 
 const stub = vi.hoisted(() => ({
   agents: [
@@ -23,7 +24,7 @@ const stub = vi.hoisted(() => ({
         kind: "human",
         handle: "ada",
         suspendedAt: null,
-        user: { id: "u-ada", name: "Ada Lovelace", email: "ada@flippable.net", image: null },
+        user: { id: "u-ada", name: "Ada Lovelace", email: "ada@example.com", image: null },
       },
       webhookUrl: null,
       scheduleMinutes: null,
@@ -74,7 +75,7 @@ const { createAppRouter } = await import("../src/router.tsx");
 /** The page links to an Agent's own page, so it is mounted through the router. */
 async function mountAt(path: string) {
   const router = createAppRouter(
-    { workspaceName: "Flippable Team", memberName: "Ada Lovelace" },
+    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
     { initialEntries: [path] },
   );
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -127,14 +128,14 @@ describe("an Agent's schedule", () => {
     await mountAt("/settings/agents");
 
     const idle = await screen.findByRole("row", { name: /idle/i });
-    expect((within(idle).getByLabelText(/schedule/i) as HTMLSelectElement).value).toBe("60");
+    expect(selectedLabel(within(idle).getByLabelText(/schedule/i))).toBe("Hourly");
 
     const planner = await screen.findByRole("row", { name: /planner/i });
-    const picker = within(planner).getByLabelText(/schedule/i) as HTMLSelectElement;
+    const picker = within(planner).getByLabelText(/schedule/i);
     // Never is the default: an Agent that only reacts to what happens.
-    expect(picker.value).toBe("");
+    expect(selectedLabel(picker)).toBe("Never");
 
-    fireEvent.change(picker, { target: { value: "60" } });
+    await pickOption(picker, "Hourly");
 
     await waitFor(() => expect(stub.scheduled).toHaveLength(1));
     expect(stub.scheduled[0]).toEqual({ memberId: "m-planner", scheduleMinutes: 60 });
