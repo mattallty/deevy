@@ -107,8 +107,13 @@ jobs:
           restore-keys: |
             vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.shard.name }}-
 
+      # A pull request replays a suite whose inputs — every file it read, less
+      # vitest's own results directory (each package's vite.config) — match a
+      # cached run; a push to main runs every suite for real and is what seeds
+      # the cache pull requests restore from. Vite+ cannot see env reads, so a
+      # test that depends on one is the one thing a replay would miss.
       - name: Test
-        run: vp run ${{ matrix.shard.filters }} test
+        run: vp run ${{ github.event_name == 'push' && '--no-cache' || '' }} ${{ matrix.shard.filters }} test
 
       - name: Save the task cache
         uses: actions/cache/save@v6
