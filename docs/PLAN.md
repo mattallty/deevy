@@ -87,12 +87,14 @@ One typed core, projected three ways (ADR-0005):
   with TanStack Query (ADR-0009).
 - **MCP server** speaking the 2026-07-28 revision in stateless form through the TypeScript SDK v2 per-request
   handler, serving 2025-era clients through the SDK's legacy stateless mode. Tools are projected from the same
-  oRPC procedures by walking the router and registering each procedure's schemas. The v1 set is twenty tools:
-  `issues_list`, `issues_get`, `issues_create`, `issues_update`, `issues_set_labels`; `documents_get`,
-  `documents_write`; `comments_create`; `labels_list`, `labels_create`; `links_list`, `links_add`,
-  `links_remove`; `inbox_list`; `runs_start`, `runs_list`, `runs_get`, `runs_post_activity`,
-  `runs_request_approval`, `runs_finish`. Renaming or deleting a Label, and ruling on a Gate, stay off it: a
-  Label is Workspace-scoped and a Gate is a Human's to rule on.
+  oRPC procedures by walking the router and registering each procedure's schemas. The set is twenty-three
+  tools, and each says which way it faces (ADR-0016): `issues_list`, `issues_get`, `issues_create`,
+  `issues_update`, `issues_move`, `issues_set_labels`; `projects_get`; `documents_get`, `documents_write`;
+  `comments_create`; `labels_list`, `labels_create`; `links_list`, `links_add`, `links_remove`; `inbox_list`;
+  `runs_list`, `runs_get` for anyone; `runs_start`, `runs_post_activity`, `runs_request_approval`,
+  `runs_finish` for an Agent alone, because a Run is its attempt; `runs_answer` for a Human alone. A client
+  is offered what it may call. Renaming or deleting a Label, and ruling on a Gate, stay off it: a Label is
+  Workspace-scoped and a Gate is a Human's to rule on.
 - **Events** delivered as signed webhooks to Agents and to generic subscribers, and consumed internally by the
   SSE stream, the inbox, and Slack.
 
@@ -164,8 +166,8 @@ per-invocation cap.
 
 The three things M2 left are closed. The **`delivery` table has its uniqueness guard** back, as a unique
 `(target, targetId, eventSeq)` with the matching one on `notification`, so a message duplicated by an
-at-least-once queue costs one POST. The **v1 tool set matches the promise above**, at the twenty tools listed
-there. And the **DNS-rebinding gap closes on Node and narrows on Workers**, which is not the single answer M2
+at-least-once queue costs one POST. The **v1 tool set matches the promise above**, at the twenty tools M2 had
+listed; ADR-0016 later widened it to the twenty-three above and said which way each faces. And the **DNS-rebinding gap closes on Node and narrows on Workers**, which is not the single answer M2
 expected: `apps/server/src/cimd.ts` resolves with `node:dns`, checks every address, and connects to one that
 passed with the name kept for SNI, so the address checked is the address used. workerd has no primitive that
 pins an address to a connection while preserving SNI, so the Workers transport puts a DNS-over-HTTPS

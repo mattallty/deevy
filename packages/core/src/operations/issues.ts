@@ -216,11 +216,15 @@ export const issues = {
 
   move: defineOperation({
     name: "issues.move",
-    summary: "Put an Issue in another State of its Project's Workflow",
+    summary:
+      "Put an Issue in another State of its Project's Workflow; a Gate is left by a ruling, never by a move",
     method: "POST",
     path: "/issues/{key}/move",
     auth: "member",
     agents: true,
+    // A tool, because it is the one thing a Human working an Issue from their
+    // own client does most (ADR-0016). `assertLeavable` keeps a Gate a ruling's.
+    mcp: true,
     input: z.object({ key: z.string(), stateId: z.string() }),
     output: IssueDetailSchema,
     handler: async ({ input, context }) => {

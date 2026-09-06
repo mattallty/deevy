@@ -45,11 +45,14 @@ export const projects = {
 
   get: defineOperation({
     name: "projects.get",
-    summary: "One Project by its key, with its Workflow",
+    summary:
+      "One Project by its key, with its Workflow: the States an Issue can be moved to, and which are Gates",
     method: "GET",
     path: "/projects/{key}",
     auth: "member",
     agents: true,
+    // A tool so that `issues_move` has somewhere to learn a State's id (ADR-0016).
+    mcp: true,
     input: z.object({ key: ProjectKeyLookup }),
     output: ProjectWithStatesSchema,
     handler: async ({ input, context }) => {

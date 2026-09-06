@@ -38,16 +38,14 @@ export const runs = {
     path: "/issues/{issueKey}/runs",
     auth: "member",
     agents: true,
+    agentsOnly: true,
     mcp: true,
     input: z.object({ issueKey: z.string() }),
     output: RunSchema,
     handler: async ({ input, context }) => {
       const { issue, project } = await requireIssue(context, input.issueKey);
-      // An Agent runs as itself; a Human starting one by hand has to say for
-      // which Agent, which arrives with the triggers in slice 4.
-      if (context.member.kind !== "agent") {
-        throw new ORPCError("BAD_REQUEST", { message: "Only an Agent can start its own Run" });
-      }
+      // An Agent runs as itself, and the registry has already refused a Human
+      // (ADR-0016): a Human who wants an Agent to work assigns it the Issue.
       // One attempt at a time: a second open Run on the same Issue by the same
       // Agent is two attempts claiming one outcome (docs/plans/m2.md).
       const already = await context.db.query.run.findFirst({
@@ -90,6 +88,7 @@ export const runs = {
     path: "/runs/{runId}/activities",
     auth: "member",
     agents: true,
+    agentsOnly: true,
     mcp: true,
     input: z.object({
       runId: z.string(),
@@ -145,11 +144,14 @@ export const runs = {
     method: "POST",
     path: "/runs/{runId}/answer",
     auth: "member",
+    mcp: true,
     input: z.object({ runId: z.string(), body: z.string().min(1).max(20_000) }),
     output: z.object({ run: RunSchema, activity: ActivitySchema }),
     handler: async ({ input, context }) => {
       // No `agents: true`: an elicitation asks a Human, and the registry
-      // refuses an Agent this operation without a check of its own.
+      // refuses an Agent this operation without a check of its own. It is a
+      // tool all the same, because the Human's own MCP client is one place
+      // they read the question (ADR-0016).
       const { run, issue, project, key } = await requireRun(context, input.runId);
       const status = statusAfterAnswer(run.status);
 
@@ -186,6 +188,7 @@ export const runs = {
     path: "/runs/{runId}/finish",
     auth: "member",
     agents: true,
+    agentsOnly: true,
     mcp: true,
     input: z.object({
       runId: z.string(),
@@ -219,6 +222,7 @@ export const runs = {
     path: "/runs/{runId}/request-approval",
     auth: "member",
     agents: true,
+    agentsOnly: true,
     mcp: true,
     input: z.object({ runId: z.string() }),
     output: GateApprovalSchema,

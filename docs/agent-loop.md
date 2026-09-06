@@ -9,8 +9,9 @@ Which identity a Claude Code carries is decided by its credential and by nothing
 an Agent's API key, so it is that Agent: its own Member, its own Runs, its Sponsor one hop away. The same
 Claude Code on a person's laptop, pointed at the same endpoint with no header, signs that person in over
 OAuth and is that person (docs/OPERATIONS.md, "A Human's own MCP client"): its comments and Documents are
-theirs, it reads their inbox, and it cannot open a Run, because a Run is one Agent's attempt. Nothing a
-Human drives is ever registered as an Agent; an Agent is only ever something a Sponsor created.
+theirs, it reads their inbox, and it cannot open a Run, because a Run is one Agent's attempt (ADR-0016).
+Nothing a Human drives is ever registered as an Agent; an Agent is only ever something a Sponsor created.
+[as-yourself.md](./as-yourself.md) is that example's own page.
 
 It is an example, not a product, and it is the CLI configuration a person can copy. The runtime that ships is
 `apps/claude-agent`, a service built on the Claude Agent SDK (docs/plans/m4.md); it configures the same MCP

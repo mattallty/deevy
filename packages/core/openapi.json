@@ -5763,7 +5763,7 @@
     "/projects/{key}": {
       "get": {
         "operationId": "projects.get",
-        "summary": "One Project by its key, with its Workflow",
+        "summary": "One Project by its key, with its Workflow: the States an Issue can be moved to, and which are Gates",
         "parameters": [
           {
             "in": "path",
@@ -11293,7 +11293,7 @@
     "/issues/{key}/move": {
       "post": {
         "operationId": "issues.move",
-        "summary": "Put an Issue in another State of its Project's Workflow",
+        "summary": "Put an Issue in another State of its Project's Workflow; a Gate is left by a ruling, never by a move",
         "parameters": [
           {
             "in": "path",

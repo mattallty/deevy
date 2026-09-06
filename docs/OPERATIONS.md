@@ -97,8 +97,8 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler d1 execute deevy --remote --command "select name from sqlite_master where type='table' order by name"
    ```
 
-   The first lists the twenty-two files in `packages/db/migrations`, asks to confirm, and reports each as
-   applied. The second then says there is nothing left to apply. The third lists deevy's tables plus
+   The first lists every file in `packages/db/migrations` — twenty-four as of migration `0024` — asks to
+   confirm, and reports each as applied. The second then says there is nothing left to apply. The third lists deevy's tables plus
    wrangler's own `d1_migrations`. Applying twice is a no-op. Nothing here touches the local D1 that
    `vp run web#test:workers` uses; `--remote` is the whole difference.
 
@@ -353,8 +353,14 @@ by a Client ID Metadata Document, `https://claude.ai/oauth/claude-code-client-me
 granted RFC 8252's loopback port variance to IP literals only, though its CIMD plugin had accepted the name
 into the same client row (better-auth#10937). 1.7.3 extends the variance to `localhost`, which is why deevy
 pins that line and no earlier one. With it the consent page appears, the tool list loads, a comment posted
-from that session is the Human's in the Event log, its inbox is the Human's, and `runs_start` answers "Only
-an Agent can start its own Run".
+from that session is the Human's in the Event log, and its inbox is the Human's.
+
+What that client is offered is decided by the same registry that authorizes it (ADR-0016): the tool set less
+the four that write a Run — `runs_start`, `runs_post_activity`, `runs_request_approval`, `runs_finish` are an
+Agent's alone, and a Human naming one anyway is refused with "Only an Agent can do that" — plus `runs_answer`,
+which is a Human's. `issues_move` and `projects_get` face both. [as-yourself.md](./as-yourself.md) is the
+worked example: the `CLAUDE.md` snippet a person puts in the repository they work in, beside the Agent's in
+[agent-loop.md](./agent-loop.md).
 
 Two documents make this discoverable, and both are served from the instance origin rather than from under
 `/api/auth`, because RFC 8414 and RFC 9728 both build a metadata URL by inserting the well-known segment
