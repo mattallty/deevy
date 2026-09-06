@@ -1,0 +1,529 @@
+{
+  "projectId": "f31de3d8-4386-4076-9e94-0526d48ffb90",
+  "pkg": "@deevy/design-system",
+  "globalName": "Deevy",
+  "shape": "package",
+  "buildCmd": "node apps/web/design-system/build.mjs",
+  "entry": "apps/web/design-system/dist/index.js",
+  "srcDir": "../src/components",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "dist/index.css",
+  "docsDir": "dist/docs",
+  "dtsPropsFor": {
+    "MemberChip": "/** What `members.list` carries: a Human or an Agent, with a name and an optional picture. */ member: { id: string; kind: \"human\" | \"agent\"; handle?: string | null; suspendedAt?: Date | string | null; user: { name: string; image?: string | null } }; size?: \"xs\" | \"sm\" | \"md\" | \"lg\"; /** The handle in mono after the name, as `@handle`, where the name alone is ambiguous. */ showHandle?: boolean; /** The Human accountable for this Agent, for the tooltip. */ sponsorName?: string | null; className?: string; /** Only the avatar, where there is no room for a name: the folded sidebar. */ avatarOnly?: boolean;",
+    "StateBadge": "/** A State: a dot coloured by its category, or an amber diamond when it is a Gate. */ state: { name: string; isGate: boolean; category: \"backlog\" | \"active\" | \"done\" }; size?: \"sm\" | \"md\"; className?: string;",
+    "LabelBadge": "/** A Label: `scope` is the small pill inside the badge (`epic` in `[[epic] Agent loop]`), `color` one of LABEL_COLORS. */ label: { scope: string | null; name: string; color: string }; /** `solid` paints the badge in the Label colour (Settings); `outline` keeps it quiet and colours only the scope pill (rows, cards). */ variant?: \"solid\" | \"outline\"; className?: string;",
+    "LabelText": "label: { scope: string | null; name: string; color: string }; scopeClassName?: string; scopeStyle?: React.CSSProperties;",
+    "DataTable": "/** One entry per column; `cell` renders the row's value, `sortValue` makes the column sortable. */ columns: { id: string; header: React.ReactNode; cell: (row: any) => React.ReactNode; sortValue?: (row: any) => string | number | null | undefined; className?: string; headerClassName?: string }[]; /** Flat rows, or `groups` of them with a header row between. */ rows?: any[]; groups?: { id: string; header: React.ReactNode; rows: any[]; collapsed?: boolean; onToggle?: () => void }[]; getRowId: (row: any) => string; /** The row the keyboard is on; the page owns it. */ selectedId?: string | null; onSelect?: (id: string) => void; /** A click or Enter on a row. */ onOpen?: (id: string) => void; /** Renders skeleton rows. */ loading?: boolean; /** What to say when there are no rows; the lucide icon says what kind of thing is missing. */ empty?: { title: React.ReactNode; description?: React.ReactNode; icon?: React.ComponentType<{ className?: string }>; action?: React.ReactNode }; /** 32px rows, or 40px. */ density?: \"compact\" | \"comfortable\"; className?: string; \"aria-label\"?: string;",
+    "StateFields": "/** The State as the Workflow editor holds it while it is being edited. */ state: { uid: string; id?: string; name: string; isGate: boolean; category: \"backlog\" | \"active\" | \"done\"; documentName: string | null; documentTemplate: string | null; triggerAgentMemberId: string | null; approverMemberIds: string[] }; /** Makes the ids unique when several States are on one page. */ index: number; /** The Agents that may be assigned on entering the State. */ agents: { id: string; user: { name: string } }[]; onEdit: (change: Partial<{ uid: string; id?: string; name: string; isGate: boolean; category: \"backlog\" | \"active\" | \"done\"; documentName: string | null; documentTemplate: string | null; triggerAgentMemberId: string | null; approverMemberIds: string[] }>) => void; /** The Document template control; the default is a plain Textarea. */ renderTemplate?: (state: { uid: string; id?: string; name: string; isGate: boolean; category: \"backlog\" | \"active\" | \"done\"; documentName: string | null; documentTemplate: string | null; triggerAgentMemberId: string | null; approverMemberIds: string[] }, onEdit: (change: object) => void) => React.ReactNode; /** The approvers control for a Gate: render an ApproversPicker here. */ renderApprovers: (state: { uid: string; id?: string; name: string; isGate: boolean; category: \"backlog\" | \"active\" | \"done\"; documentName: string | null; documentTemplate: string | null; triggerAgentMemberId: string | null; approverMemberIds: string[] }, onEdit: (change: object) => void) => React.ReactNode; /** One column (a narrow card) rather than a wrapping row. */ stacked?: boolean;",
+    "ApproversPicker": "/** The input's id, so the \"Approvers for <State>\" label reaches it. */ id: string; /** Only Humans are offered: an Agent never decides a Gate. */ humans: { id: string; kind: \"human\" | \"agent\"; handle?: string | null; suspendedAt?: Date | string | null; user: { name: string; image?: string | null } }[]; /** The chosen Member ids; empty means any Human may decide. */ value: string[]; onChange: (memberIds: string[]) => void;",
+    "IssueFilters": "/** The filters as they ride in the URL. */ value: { project?: string; state?: string; assignee?: string; kind?: \"human\" | \"agent\"; open?: \"0\" | \"1\"; group?: \"state\" | \"none\"; view?: \"list\" | \"board\"; q?: string; peek?: string }; onChange: (patch: Partial<{ project?: string; state?: string; assignee?: string; kind?: \"human\" | \"agent\"; open?: \"0\" | \"1\"; group?: \"state\" | \"none\"; view?: \"list\" | \"board\"; q?: string; peek?: string }>) => void; projects: { key: string; name: string }[]; states: { name: string; isGate: boolean; category: \"backlog\" | \"active\" | \"done\" }[]; members: ({ id: string; kind: \"human\" | \"agent\"; handle?: string | null; suspendedAt?: Date | string | null; user: { name: string; image?: string | null } } & { sponsorId?: string | null })[]; /** Whether the signed-in Human sponsors any Agent, which is when \"My Agents\" is offered. */ sponsorsAgents: boolean; hideProject?: boolean; /** On a board the rows are already grouped; the Group control would lie. */ hideGroup?: boolean; /** Offer List / Board. */ showView?: boolean;"
+  },
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DataTable": {
+      "cardMode": "column"
+    },
+    "SettingsPage": {
+      "cardMode": "column"
+    },
+    "PageHeader": {
+      "cardMode": "column"
+    },
+    "Kanban": {
+      "cardMode": "column"
+    },
+    "Sidebar": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "IssueFilters": {
+      "cardMode": "column"
+    },
+    "AlertDialog": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "Sheet": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "Command": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogAction": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogCancel": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogDescription": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogFooter": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogHeader": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogMedia": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogOverlay": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogPortal": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogTitle": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "AlertDialogTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "ApproversPicker": {
+      "cardMode": "column"
+    },
+    "ButtonGroup": {
+      "cardMode": "column"
+    },
+    "ButtonGroupSeparator": {
+      "cardMode": "column"
+    },
+    "ButtonGroupText": {
+      "cardMode": "column"
+    },
+    "Collapsible": {
+      "cardMode": "column"
+    },
+    "CollapsibleContent": {
+      "cardMode": "column"
+    },
+    "CollapsibleTrigger": {
+      "cardMode": "column"
+    },
+    "Combobox": {
+      "cardMode": "single"
+    },
+    "ComboboxChip": {
+      "cardMode": "single"
+    },
+    "ComboboxChips": {
+      "cardMode": "single"
+    },
+    "ComboboxChipsInput": {
+      "cardMode": "single"
+    },
+    "ComboboxCollection": {
+      "cardMode": "single"
+    },
+    "ComboboxContent": {
+      "cardMode": "single"
+    },
+    "ComboboxEmpty": {
+      "cardMode": "single"
+    },
+    "ComboboxGroup": {
+      "cardMode": "single"
+    },
+    "ComboboxInput": {
+      "cardMode": "single"
+    },
+    "ComboboxItem": {
+      "cardMode": "single"
+    },
+    "ComboboxLabel": {
+      "cardMode": "single"
+    },
+    "ComboboxList": {
+      "cardMode": "single"
+    },
+    "ComboboxSeparator": {
+      "cardMode": "single"
+    },
+    "ComboboxTrigger": {
+      "cardMode": "single"
+    },
+    "ComboboxValue": {
+      "cardMode": "single"
+    },
+    "CommandDialog": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandEmpty": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandGroup": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandInput": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandItem": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandList": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandSeparator": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "CommandShortcut": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogClose": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogDescription": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogFooter": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogHeader": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogOverlay": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogPortal": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogTitle": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DialogTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuCheckboxItem": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuGroup": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuItem": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuLabel": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuPortal": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuRadioGroup": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuRadioItem": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuSeparator": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuShortcut": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuSub": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuSubContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuSubTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "DropdownMenuTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "KanbanBoard": {
+      "cardMode": "column"
+    },
+    "KanbanColumn": {
+      "cardMode": "column"
+    },
+    "KanbanColumnContent": {
+      "cardMode": "column"
+    },
+    "KanbanColumnHandle": {
+      "cardMode": "column"
+    },
+    "KanbanItem": {
+      "cardMode": "column"
+    },
+    "KanbanItemHandle": {
+      "cardMode": "column"
+    },
+    "KanbanOverlay": {
+      "cardMode": "column"
+    },
+    "PopoverContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "PopoverDescription": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "PopoverHeader": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "PopoverTitle": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "PopoverTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "ScrollArea": {
+      "cardMode": "column"
+    },
+    "ScrollBar": {
+      "cardMode": "column"
+    },
+    "Select": {
+      "cardMode": "single"
+    },
+    "SelectContent": {
+      "cardMode": "single"
+    },
+    "SelectGroup": {
+      "cardMode": "single"
+    },
+    "SelectItem": {
+      "cardMode": "single"
+    },
+    "SelectLabel": {
+      "cardMode": "single"
+    },
+    "SelectScrollDownButton": {
+      "cardMode": "single"
+    },
+    "SelectScrollUpButton": {
+      "cardMode": "single"
+    },
+    "SelectSeparator": {
+      "cardMode": "single"
+    },
+    "SelectTrigger": {
+      "cardMode": "single"
+    },
+    "SelectValue": {
+      "cardMode": "single"
+    },
+    "SheetClose": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SheetContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SheetDescription": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SheetFooter": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SheetHeader": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SheetTitle": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SheetTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "StateFields": {
+      "cardMode": "column"
+    },
+    "Toaster": {
+      "cardMode": "single"
+    },
+    "TooltipContent": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "TooltipProvider": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "TooltipTrigger": {
+      "cardMode": "single",
+      "viewport": "720x560"
+    },
+    "SidebarContent": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarFooter": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarGroup": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarGroupAction": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarGroupContent": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarGroupLabel": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarHeader": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarInput": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarInset": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenu": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuAction": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuBadge": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuButton": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuItem": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuSkeleton": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuSub": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuSubButton": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarMenuSubItem": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarProvider": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarRail": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarSeparator": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    },
+    "SidebarTrigger": {
+      "cardMode": "column",
+      "viewport": "900x700"
+    }
+  },
+  "componentSrcMap": {
+    "Kanban": "regrouped-by-docs",
+    "Timeline": "regrouped-by-docs",
+    "Sortable": "regrouped-by-docs"
+  },
+  "storyImports": {
+    "bundle": [".design-sync/previews/"]
+  },
+  "libOverrides": {
+    "story-imports.mjs": "skip rule-2 resolution for imports from inside node_modules (lucide-react cost 30s per preview)"
+  },
+  "guidelinesGlob": ["../../../.claude/skills/deevy-ui/SKILL.md"],
+  "readmeHeader": ".design-sync/conventions.md"
+}
