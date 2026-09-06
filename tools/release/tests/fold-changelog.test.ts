@@ -57,7 +57,7 @@ async function fold(changelogs: Record<string, string>) {
       rootManifest: JSON.parse(await readFile(path.join(dir, "package.json"), "utf8")) as {
         version: string;
       },
-      leftovers: packages.filter((pkg) => existsSync(path.join(dir, pkg, "CHANGELOG.md"))),
+      leftovers: packages.filter((pkg) => existsSync(path.join(dir, pkg, "CHANGELOG.md"))).sort(),
     };
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -90,6 +90,15 @@ const withChanges = {
 - Updated dependencies
   - @deevy/core@0.5.0
   - @deevy/adapters@0.5.0
+`,
+  "apps/server": `# @deevy/server
+
+## 0.5.0
+
+### Patch Changes
+
+- @deevy/adapters@0.5.1
+  - @deevy/core@0.5.1
 `,
   "apps/claude-agent": `# @deevy/claude-agent
 
@@ -126,11 +135,16 @@ describe("folding the per-package changelogs", { timeout: 30_000 }, () => {
     expect(changelog).toContain("- **claude-agent** — The runtime stops polling");
   });
 
-  it("drops dependency bullets in both shapes changesets writes them", async () => {
+  it("drops dependency bullets in all three shapes changesets writes them", async () => {
     const { changelog } = await fold(withChanges);
     expect(changelog).not.toContain("Updated dependencies");
     expect(changelog).not.toContain("@deevy/db@0.5.0");
     expect(changelog).not.toContain("@deevy/adapters@0.5.0");
+    // The third shape: a dependency bullet that itself heads an indented list,
+    // with no "Updated dependencies" line above it. Matching the whole bullet
+    // rather than its first line lets this one through, and it reached the root
+    // changelog of a real release before this test existed.
+    expect(changelog).not.toContain("@deevy/core@0.5.1");
   });
 
   it("says so rather than writing an empty entry", async () => {
@@ -150,9 +164,36 @@ describe("folding the per-package changelogs", { timeout: 30_000 }, () => {
     expect(rootManifest.version).toBe("0.5.0");
   });
 
-  it("deletes the per-package files it folded", async () => {
+  it("leaves the per-package files where changesets/action can read them back", async () => {
+    // Deleting them fails the release: the action reads each package's changelog
+    // after the version command to compose the Version PR's body, and the first
+    // run of this ended in an ENOENT for exactly that. They stay out of the
+    // commit by being gitignored, not by being removed.
     const { leftovers } = await fold(withChanges);
-    expect(leftovers).toEqual([]);
+    expect(leftovers).toEqual(Object.keys(withChanges).sort());
+  });
+
+  it("folds only the newest section of a file that kept its history", async () => {
+    // A fresh CI checkout never has one, but a local run accumulates: the file
+    // that was left behind above is appended to by the next `changeset version`.
+    const { changelog } = await fold({
+      "packages/core": `# @deevy/core
+
+## 0.5.0
+
+### Minor Changes
+
+- Issues can be filtered by the Gate they are waiting on.
+
+## 0.4.1
+
+### Patch Changes
+
+- Something released a long time ago.
+`,
+    });
+    expect(changelog).toContain("Issues can be filtered by the Gate they are waiting on.");
+    expect(changelog).not.toContain("Something released a long time ago.");
   });
 
   it("refuses a group whose versions drifted apart", async () => {

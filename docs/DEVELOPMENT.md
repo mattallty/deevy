@@ -135,8 +135,10 @@ Some notes on the mechanics, because they surprise people:
 - **`changeset status --since=origin/main` reads changesets from git, not from disk.** Run it before
   committing and it reports no changeset even when the file is sitting there — it is only a false failure
   locally, because CI always runs it against a commit that contains the file.
-- **The per-package `CHANGELOG.md` files are gitignored scratch.** `changeset version` writes them,
-  `tools/release/scripts/fold-changelog.ts` folds them into the root `CHANGELOG.md` and deletes them.
+- **The per-package `CHANGELOG.md` files are gitignored scratch.** `changeset version` writes them and
+  `tools/release/scripts/fold-changelog.ts` folds them into the root `CHANGELOG.md`. They are left on disk on
+  purpose — `changesets/action` reads them back — and stay out of the commit by being gitignored. Delete them
+  by hand whenever you like; only the newest section of each is ever read.
 
 ## The two snapshots CI diffs
 

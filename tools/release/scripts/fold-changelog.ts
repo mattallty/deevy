@@ -4,11 +4,17 @@
  *
  * deevy ships two Docker images from one version tag, so a changelog per package
  * describes an artefact nobody downloads (docs/plans/commits-and-changelogs.md).
- * Changesets has no option to stop writing them, so they are gitignored, folded
- * here, and deleted — which is also what makes this deterministic: a per-package
- * file only ever holds the release being made, never a history to diff against.
+ * Changesets has no option to stop writing them, so they are gitignored and
+ * folded here.
+ *
+ * They are deliberately left on disk. `changesets/action` reads them back after
+ * the version command to compose the Version PR's body, so deleting them fails
+ * the release with an ENOENT — which is exactly how the first run of this ended.
+ * Being gitignored is what keeps them out of the commit, and only the newest
+ * `## x.y.z` section is ever read, so a file that accumulates history locally
+ * folds the same as a fresh one in CI.
  */
-import { readFile, writeFile, rm } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -54,13 +60,16 @@ function sectionsOf(changelog: string): Map<string, string[]> {
     const heading = parts[i]!.trim();
     const bullets = bulletsOf(parts[i + 1] ?? "")
       // Generated for every package in a fixed group, and meaningless when the
-      // group is one product with one version. Two shapes, both seen: the
-      // `Updated dependencies` bullet with its indented list, and a bare
-      // `- @deevy/db@0.5.0` where the dependency moved on its own.
-      .filter(
-        (bullet) =>
-          !bullet.startsWith("- Updated dependencies") && !/^- \S+@\d+\.\d+\.\d+$/.test(bullet),
-      );
+      // group is one product with one version. Three shapes, all three seen in
+      // real output: `- Updated dependencies` heading an indented list, a bare
+      // `- @deevy/db@0.5.0`, and a `- @deevy/adapters@0.4.1` that itself heads an
+      // indented list. Only the bullet's FIRST line decides — matching against
+      // the whole bullet lets the third shape through, because the continuation
+      // lines mean it no longer ends where the pattern expects.
+      .filter((bullet) => {
+        const first = bullet.split("\n", 1)[0]!;
+        return !first.startsWith("- Updated dependencies") && !/^- \S+@\d+\.\d+\.\d+$/.test(first);
+      });
     if (bullets.length > 0) out.set(heading, [...(out.get(heading) ?? []), ...bullets]);
   }
   return out;
@@ -70,7 +79,7 @@ const order = ["Major Changes", "Minor Changes", "Patch Changes"];
 
 async function main() {
   const collected = new Map<string, Bullet[]>();
-  const written: string[] = [];
+  const found: string[] = [];
   let version: string | undefined;
 
   for (const dir of packageDirs) {
@@ -88,7 +97,7 @@ async function main() {
 
     const changelogPath = path.join(root, dir, "CHANGELOG.md");
     if (!existsSync(changelogPath)) continue;
-    written.push(changelogPath);
+    found.push(changelogPath);
 
     for (const [heading, bullets] of sectionsOf(await readFile(changelogPath, "utf8"))) {
       const into = collected.get(heading) ?? [];
@@ -133,8 +142,7 @@ async function main() {
     rootManifest.replace(/"version": "[^"]*"/, `"version": "${version}"`),
   );
 
-  await Promise.all(written.map((file) => rm(file)));
-  process.stdout.write(`Folded ${written.length} changelog(s) into CHANGELOG.md at ${version}.\n`);
+  process.stdout.write(`Folded ${found.length} changelog(s) into CHANGELOG.md at ${version}.\n`);
 }
 
 await main();
