@@ -16,6 +16,8 @@ export interface ToolDescriptor {
   readOnly: boolean;
   /** Whether an Agent principal may call it; the tools/list filter reads this. */
   agents: boolean;
+  /** Whether only an Agent may: the same filter leaves it off a Human's list (ADR-0016). */
+  agentsOnly: boolean;
   procedure: AnyProcedure;
   inputSchema: unknown;
   outputSchema: unknown;
@@ -63,6 +65,7 @@ function collect(node: unknown, found: ToolDescriptor[]): void {
       summary: meta.summary,
       readOnly: meta.method === "GET",
       agents: meta.agents === true,
+      agentsOnly: meta.agentsOnly === true,
       procedure: node,
       ...schemasOf(node),
     });

@@ -9,6 +9,7 @@ export interface ToolManifestEntry {
   summary: string;
   readOnly: boolean;
   agents: boolean;
+  agentsOnly: boolean;
   inputSchema: unknown;
 }
 
@@ -28,6 +29,7 @@ export async function toolManifest(): Promise<ToolManifestEntry[]> {
       summary: tool.summary,
       readOnly: tool.readOnly,
       agents: tool.agents,
+      agentsOnly: tool.agentsOnly,
       inputSchema,
     });
   }

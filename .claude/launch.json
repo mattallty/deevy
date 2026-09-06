@@ -15,7 +15,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        ". \"$HOME/.config/vite-plus/env\" 2>/dev/null; DEEVY_DEV_STUB_GITHUB=1 DEEVY_DATABASE_PATH=./data/stub.sqlite command vp run -r --parallel dev"
+        ". \"$HOME/.config/vite-plus/env\" 2>/dev/null; DEEVY_DEV_STUB_GITHUB=1 DEEVY_DATABASE_PATH=./data/stub.sqlite BETTER_AUTH_URL=http://localhost:5173 command vp run -r --parallel dev"
       ],
       "port": 5173
     }

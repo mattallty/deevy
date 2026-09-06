@@ -186,13 +186,16 @@ function inputSchemaJson(server: McpServer, tool: ToolDescriptor): AdvertisedSch
 
 /**
  * What this caller is offered. An Agent is not shown the tools it is refused,
- * and a caller who is no Member of this Workspace is offered nothing, because
- * a seventy-tool list it cannot call costs it its context window for nothing.
+ * a Human is not shown the tools that are an Agent's alone (ADR-0016), and a
+ * caller who is no Member of this Workspace is offered nothing, because a
+ * seventy-tool list it cannot call costs it its context window for nothing.
  */
 export function visibleTools(tools: ToolDescriptor[], context: AppContext): ToolDescriptor[] {
   const member = context.member;
   if (!member || !context.workspace || member.suspendedAt) return [];
-  return member.kind === "agent" ? tools.filter((tool) => tool.agents) : tools;
+  return member.kind === "agent"
+    ? tools.filter((tool) => tool.agents)
+    : tools.filter((tool) => !tool.agentsOnly);
 }
 
 /** One tool call, which is one call of the very same procedure /api and /rpc call. */

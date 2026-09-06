@@ -97,8 +97,8 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler d1 execute deevy --remote --command "select name from sqlite_master where type='table' order by name"
    ```
 
-   The first lists the twenty-two files in `packages/db/migrations`, asks to confirm, and reports each as
-   applied. The second then says there is nothing left to apply. The third lists deevy's tables plus
+   The first lists every file in `packages/db/migrations` — twenty-four as of migration `0024` — asks to
+   confirm, and reports each as applied. The second then says there is nothing left to apply. The third lists deevy's tables plus
    wrangler's own `d1_migrations`. Applying twice is a no-op. Nothing here touches the local D1 that
    `vp run web#test:workers` uses; `--remote` is the whole difference.
 
@@ -329,17 +329,38 @@ Gate.
 ## A Human's own MCP client
 
 A Human points their own client at the same endpoint with no header at all, and acts as themselves rather
-than as an Agent:
+than as an Agent. The same Claude Code that is an Agent when it carries an Agent's key is that Human when it
+carries none: the credential decides the identity, never the software, and nothing a Human drives is ever
+registered as an Agent.
 
 ```bash
 claude mcp add --transport http deevy "$DEEVY_URL/mcp"
+claude mcp login deevy
 ```
 
 deevy is its own OAuth 2.1 authorization server (ADR-0007). The client discovers it from the 401 challenge,
 sends the Human to deevy in a browser to sign in and consent, and is issued an access token bound to
-`${BETTER_AUTH_URL}/mcp`. The Human sees every client that consented under Settings, MCP clients, and can
-revoke one there. Revoking removes the consent and the refresh token; an access token already issued expires
-on its own within the hour.
+`${BETTER_AUTH_URL}/mcp`. `claude mcp add` only records the server; the dance starts from `claude mcp login`,
+or from the `/mcp` menu of an interactive session. `--no-browser` prints the authorization URL instead of
+opening one, and expects the redirect URL pasted back, so it needs a terminal. The Human sees every client
+that consented under Settings, MCP clients, and can revoke one there. Revoking removes the consent and the
+refresh token; an access token already issued expires on its own within the hour.
+
+**Walked on 2026-09-06 with Claude Code 2.1.261**, against a local instance. Claude Code identifies itself
+by a Client ID Metadata Document, `https://claude.ai/oauth/claude-code-client-metadata`, sends PKCE S256 and
+`resource`, and redirects to `http://localhost:<ephemeral port>/callback` while its document registers
+`http://localhost/callback` with no port. Better Auth 1.7.2 refused that with `invalid_redirect`: its matcher
+granted RFC 8252's loopback port variance to IP literals only, though its CIMD plugin had accepted the name
+into the same client row (better-auth#10937). 1.7.3 extends the variance to `localhost`, which is why deevy
+pins that line and no earlier one. With it the consent page appears, the tool list loads, a comment posted
+from that session is the Human's in the Event log, and its inbox is the Human's.
+
+What that client is offered is decided by the same registry that authorizes it (ADR-0016): the tool set less
+the four that write a Run — `runs_start`, `runs_post_activity`, `runs_request_approval`, `runs_finish` are an
+Agent's alone, and a Human naming one anyway is refused with "Only an Agent can do that" — plus `runs_answer`,
+which is a Human's. `issues_move` and `projects_get` face both. [as-yourself.md](./as-yourself.md) is the
+worked example: the `CLAUDE.md` snippet a person puts in the repository they work in, beside the Agent's in
+[agent-loop.md](./agent-loop.md).
 
 Two documents make this discoverable, and both are served from the instance origin rather than from under
 `/api/auth`, because RFC 8414 and RFC 9728 both build a metadata URL by inserting the well-known segment
@@ -669,6 +690,13 @@ docker run -d --name deevy ... ghcr.io/mattallty/deevy:v0.1.4   # same -v deevy-
 
 Take a backup first (below). Migrations only ever move forward: there is no down migration, so restoring a
 backup is how you go back.
+
+**From an image built on Better Auth 1.7.0 to 1.7.2**, which is every tag before the pin moved to 1.7.3 on
+2026-09-06: migration `0024` drops the `account.issuer` column and its unique index, which 1.7.3 no longer
+writes (its release restored the 1.6 account schema). The Node migrator applies it at startup like any other.
+On Workers, run `wrangler d1 migrations apply deevy --remote` **before** deploying the new Worker: while the
+`NOT NULL` column is still there, 1.7.3 refuses every new sign-up and every account link, and existing
+sessions carry on as if nothing were wrong.
 
 ## Backup and restore
 

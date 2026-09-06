@@ -530,3 +530,16 @@ describe("runs.requestApproval", () => {
     expect(feed.activities[1]?.body).toContain("Plan Gate on DEV-1 was rejected: Thin on tests");
   });
 });
+
+describe("a Run, seen from a Human", () => {
+  it("is an Agent's alone: the registry refuses a Human before the handler runs", async () => {
+    const { asAdmin } = await workspaceWithAgent();
+
+    // The mirror of "An Agent cannot do that" (ADR-0011): one middleware, one
+    // message, no per-handler check to forget (ADR-0016).
+    await expect(asAdmin.runs.start({ issueKey: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Only an Agent can do that",
+    });
+  });
+});

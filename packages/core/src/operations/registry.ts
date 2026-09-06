@@ -87,6 +87,15 @@ export interface OperationMeta {
    */
   agents?: true;
   /**
+   * Only an Agent Member may call this: the operation is one side of a Run,
+   * which is one Agent's attempt on an Issue, so a Human is refused with the
+   * same middleware that refuses an Agent an unmarked operation (ADR-0016).
+   * Sayable only beside `agents: true` on a `member` operation. The MCP
+   * `tools/list` filter reads it, so a Human's own client is never offered a
+   * tool it cannot call.
+   */
+  agentsOnly?: true;
+  /**
    * Only a cookie session may call this: a Human present in deevy's own UI. A
    * delegated credential, an Agent's API key or a Human MCP client's OAuth
    * token, is refused. assertHuman checks the Member's kind, which would let a
@@ -106,10 +115,14 @@ export interface OperationMeta {
 /**
  * `agents` is sayable on the rungs an Agent could reach, and never on `admin`:
  * ADR-0004's "never administer" is a compile error rather than a test.
+ * `agentsOnly` is sayable only beside `agents: true` on a `member` operation,
+ * so an operation cannot be an Agent's alone without first being an Agent's.
  */
-export type AgentAccess<TAuth extends AuthRule> = TAuth extends "member" | "session"
-  ? { agents?: true }
-  : { agents?: never };
+export type AgentAccess<TAuth extends AuthRule> = TAuth extends "member"
+  ? { agents?: true; agentsOnly?: never } | { agents: true; agentsOnly?: true }
+  : TAuth extends "session"
+    ? { agents?: true; agentsOnly?: never }
+    : { agents?: never; agentsOnly?: never };
 
 /**
  * A streaming operation: the same shape, but its handler returns an async
@@ -178,6 +191,11 @@ function authorize(meta: OperationMeta) {
     if (!context.member || !context.workspace || context.member.suspendedAt) {
       throw new ORPCError("FORBIDDEN", { message: "Not a Member of this Workspace" });
     }
+    // The mirror of the agent rule above: a Run is an Agent's, so its writing
+    // side is refused to a Human here rather than in each handler (ADR-0016).
+    if (meta.agentsOnly && context.member.kind !== "agent") {
+      throw new ORPCError("FORBIDDEN", { message: "Only an Agent can do that" });
+    }
     if (rule === "admin" && context.member.role !== "admin") {
       throw new ORPCError("FORBIDDEN", { message: "Only an admin of this Workspace can do that" });
     }
@@ -197,6 +215,7 @@ export function defineOperation<
     path: def.path,
     auth: def.auth,
     ...(def.agents ? { agents: def.agents } : {}),
+    ...(def.agentsOnly ? { agentsOnly: def.agentsOnly } : {}),
     ...(def.sessionOnly ? { sessionOnly: def.sessionOnly } : {}),
     ...(def.mcp ? { mcp: def.mcp } : {}),
   };
@@ -226,6 +245,7 @@ export function defineStreamOperation<TAuth extends AuthRule, TInput extends z.Z
     path: def.path,
     auth: def.auth,
     ...(def.agents ? { agents: def.agents } : {}),
+    ...(def.agentsOnly ? { agentsOnly: def.agentsOnly } : {}),
     ...(def.sessionOnly ? { sessionOnly: def.sessionOnly } : {}),
     ...(def.mcp ? { mcp: def.mcp } : {}),
   };

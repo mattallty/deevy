@@ -382,3 +382,94 @@ describe("what an Agent is told when a tool call fails", () => {
     expect(reported).toEqual([bug, internal]);
   });
 });
+
+/**
+ * The same Workspace, plus a key for the admin Human. deevy's UI only issues
+ * keys to Agents; this one stands in for the OAuth token a Human's own client
+ * holds, which resolvePrincipal turns into the same Member (oauth.test.ts).
+ */
+async function workspaceWithHumanKey() {
+  const ws = await workspaceWithAgent();
+  const issued = await ws.auth.api.createApiKey({
+    body: { userId: ws.admin.member.userId, name: "laptop" },
+  });
+  return { ...ws, humanKey: issued.key };
+}
+
+describe("a Human's own client", () => {
+  it("is offered what a Human may call, and nothing that is an Agent's alone", async () => {
+    const { app, humanKey, key } = await workspaceWithHumanKey();
+
+    const human = toolNames(await mcp(app, humanKey, "tools/list", {}));
+    const agent = toolNames(await mcp(app, key, "tools/list", {}));
+
+    // The writing side of a Run faces the Agent (ADR-0016)...
+    for (const name of [
+      "runs_start",
+      "runs_post_activity",
+      "runs_request_approval",
+      "runs_finish",
+    ]) {
+      expect(human).not.toContain(name);
+      expect(agent).toContain(name);
+    }
+    // ...answering one faces the Human, and the rest faces both.
+    expect(human).toContain("runs_answer");
+    expect(agent).not.toContain("runs_answer");
+    for (const name of ["issues_move", "projects_get", "runs_list", "runs_get", "inbox_list"]) {
+      expect(human).toContain(name);
+      expect(agent).toContain(name);
+    }
+  });
+
+  it("is refused a Run by the middleware when it names the tool anyway", async () => {
+    const { app, humanKey } = await workspaceWithHumanKey();
+
+    const answer = await mcp(app, humanKey, "tools/call", {
+      name: "runs_start",
+      arguments: { issueKey: "DEV-1" },
+    });
+
+    expect(answer.result?.isError).toBe(true);
+    expect(answer.result?.content).toEqual([{ type: "text", text: "Only an Agent can do that" }]);
+  });
+
+  it("moves an Issue between States, and is still stopped at a Gate", async () => {
+    const { app, humanKey, client } = await workspaceWithHumanKey();
+
+    // `projects_get` is where a client learns the States and their ids.
+    const project = await mcp(app, humanKey, "tools/call", {
+      name: "projects_get",
+      arguments: { key: "DEV" },
+    });
+    const answered = project.result?.structuredContent as
+      | { states: Array<{ id: string; name: string; isGate: boolean }> }
+      | undefined;
+    const states = answered?.states ?? [];
+    const build = states.find((state) => state.name === "Build");
+    const review = states.find((state) => state.name === "Review");
+    if (!build || !review) throw new Error("the default workflow lost a State");
+
+    // DEV-1 sits in the Plan Gate, and a move is not a ruling (ADR-0004).
+    const refused = await mcp(app, humanKey, "tools/call", {
+      name: "issues_move",
+      arguments: { key: "DEV-1", stateId: build.id },
+    });
+    expect(refused.result?.isError).toBe(true);
+    expect(refused.result?.content).toEqual([
+      { type: "text", text: "DEV-1 is in the Plan Gate; approve or reject it" },
+    ]);
+
+    // The ruling happens in deevy (ADR-0010); Build is then left like any State.
+    await client.gates.approve({ key: "DEV-1" });
+    const moved = await mcp(app, humanKey, "tools/call", {
+      name: "issues_move",
+      arguments: { key: "DEV-1", stateId: review.id },
+    });
+    expect(moved.result?.isError).toBeUndefined();
+    expect(moved.result?.structuredContent).toMatchObject({
+      key: "DEV-1",
+      state: { name: "Review" },
+    });
+  });
+});

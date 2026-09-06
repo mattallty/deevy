@@ -43,6 +43,10 @@ describe("the committed tool manifest", () => {
       "issues_create",
       "issues_get",
       "issues_list",
+      // The one thing a Human working an Issue from their own client does
+      // most, and an Agent's way to hand on an Issue it is done with. A Gate
+      // is still left by a ruling and never by a move (ADR-0016).
+      "issues_move",
       "issues_set_labels",
       "issues_update",
       "labels_create",
@@ -52,6 +56,11 @@ describe("the committed tool manifest", () => {
       // Removing one is bounded by the rule that an Agent may only take back
       // what its own Run attached (docs/plans/m3.md, slice 1).
       "links_remove",
+      // Where `issues_move` learns a State's id, and which States are Gates.
+      "projects_get",
+      // The Human side of a Run: answering an Agent's question from the
+      // client the Human read it in. Not an Agent's, and the manifest says so.
+      "runs_answer",
       "runs_finish",
       // Without it an Agent cannot read its own Activity feed, so a Human's
       // answer to a free-form elicitation never reaches the loop that asked.
@@ -74,12 +83,33 @@ describe("the committed tool manifest", () => {
 
     // An Agent may clear its own inbox (docs/plans/m4.md, slice 1), and does it
     // over the HTTP API with the same key: the caller is the loop keeping its
-    // own books rather than the model, so the twenty tools PLAN.md promises
-    // stay twenty.
+    // own books rather than the model, so bookkeeping never grows the set.
     expect(names).toContain("inbox_list");
     expect(names).not.toContain("inbox_mark_read");
     expect(names).not.toContain("inbox_mark_all_read");
     expect(names).not.toContain("inbox_unread_count");
+  });
+
+  it("says which way each tool faces, so a client is offered only what it may call", async () => {
+    const manifest = await toolManifest();
+    const facing = (name: string) => manifest.find((tool) => tool.name === name);
+
+    // The writing side of a Run is an Agent's alone: a Run is one Agent's
+    // attempt on an Issue, and a Human is present for their own work (ADR-0016).
+    for (const name of [
+      "runs_start",
+      "runs_post_activity",
+      "runs_request_approval",
+      "runs_finish",
+    ]) {
+      expect(facing(name)).toMatchObject({ agents: true, agentsOnly: true });
+    }
+    // Its reading side is anyone's, and answering is a Human's.
+    expect(facing("runs_list")).toMatchObject({ agents: true, agentsOnly: false });
+    expect(facing("runs_get")).toMatchObject({ agents: true, agentsOnly: false });
+    expect(facing("runs_answer")).toMatchObject({ agents: false, agentsOnly: false });
+    // Nothing is an Agent's alone without being an Agent's at all.
+    for (const tool of manifest) if (tool.agentsOnly) expect(tool.agents).toBe(true);
   });
 
   it("widens Labels and Links no further than that", async () => {
