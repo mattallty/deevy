@@ -104,8 +104,10 @@ in the tests, and never as noise in the HTTP one.
 `test` is a Vite+ task in each package's `vite.config.ts`, so `vp run … test` fingerprints it: the arguments,
 the env vars it names, and every file the suite actually read, which Vite+ observes at the file system rather
 than reads off a declared graph. A change to `packages/core/src` re-runs every suite that imports it, and
-nothing else. The one path excluded is vitest's own results directory (`node_modules/.vite/**`): a fresh
-runner never has it, and until it was excluded (2026-09-06) no shard ever replayed. On a pull request a suite
+nothing else. Two tool-managed files are excluded, relative to each package: vitest's own results directory
+(`node_modules/.vite/**`), which a fresh runner never has, and pnpm's install record
+(`../../node_modules/.modules.yaml`), whose `prunedAt` and `storeDir` are the machine's. Until both were
+excluded (2026-09-06) no shard ever replayed, and the cache steps in `ci.yml` cost time for nothing. On a pull request a suite
 whose inputs match a cached run replays its recorded output; a push to `main` runs with `--no-cache`, so the
 default branch always executes for real and is what seeds the cache the next pull request restores. Vite+
 cannot see a test reading an env var, so a suite that depended on one is the case a replay would miss; deevy's
