@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -120,29 +118,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the inbox", () => {
   it("says who did what on which Issue, and quotes what they wrote", async () => {
-    await mountAt("/inbox");
+    await mountAt("/inbox", { memberName: "Ada" });
 
     const list = await screen.findByRole("list", { name: "Notifications" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(3);
@@ -155,7 +135,7 @@ describe("the inbox", () => {
   });
 
   it("offers Mark read only on the ones still unread", async () => {
-    await mountAt("/inbox");
+    await mountAt("/inbox", { memberName: "Ada" });
 
     const list = await screen.findByRole("list", { name: "Notifications" });
     const buttons = within(list).getAllByRole("button", { name: "Mark read" });
@@ -166,7 +146,7 @@ describe("the inbox", () => {
   });
 
   it("marks several selected rows read at once", async () => {
-    await mountAt("/inbox");
+    await mountAt("/inbox", { memberName: "Ada" });
 
     await screen.findByRole("list", { name: "Notifications" });
     fireEvent.click(screen.getByRole("checkbox", { name: "Select assigned it to you" }));
@@ -179,7 +159,7 @@ describe("the inbox", () => {
   });
 
   it("marks everything read at once", async () => {
-    await mountAt("/inbox");
+    await mountAt("/inbox", { memberName: "Ada" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Mark all read" }));
 
@@ -187,7 +167,7 @@ describe("the inbox", () => {
   });
 
   it("opens the Issue a Notification is about beside the list, marks it read, and puts the Gate in front", async () => {
-    await mountAt("/inbox");
+    await mountAt("/inbox", { memberName: "Ada" });
 
     const list = await screen.findByRole("list", { name: "Notifications" });
     fireEvent.click(within(list).getByText("rejected the Spec Gate"));
@@ -201,7 +181,7 @@ describe("the inbox", () => {
   });
 
   it("shows only what is unread when asked", async () => {
-    await mountAt("/inbox?unread=1");
+    await mountAt("/inbox?unread=1", { memberName: "Ada" });
 
     const list = await screen.findByRole("list", { name: "Notifications" });
     // n2 is read, so two rows stay.
@@ -216,7 +196,7 @@ describe("the inbox", () => {
     stub.notifications.push({ ...n1, id: "n4", eventId: 6 });
     stub.persistReads = true;
     try {
-      await mountAt("/inbox?unread=1");
+      await mountAt("/inbox?unread=1", { memberName: "Ada" });
       const list = await screen.findByRole("list", { name: "Notifications" });
       expect(within(list).getAllByRole("listitem")).toHaveLength(3);
 
@@ -239,7 +219,7 @@ describe("the inbox", () => {
 
 describe("the sidebar", () => {
   it("badges the Inbox with the unread count", async () => {
-    await mountAt("/");
+    await mountAt("/", { memberName: "Ada" });
 
     expect(await screen.findByLabelText("2 unread")).toBeTruthy();
   });

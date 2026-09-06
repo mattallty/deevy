@@ -1,11 +1,23 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
-import { IssueFilters, type FilterState, type IssuesSearch } from "@/components/issue-filters";
+import {
+  IssueBoard,
+  groupIntoColumns,
+  type BoardColumn,
+  type BoardIssue,
+} from "@/components/issue-board";
+import {
+  ISSUE_PAGE,
+  IssueFilters,
+  issueFilterInput,
+  type FilterState,
+  type IssuesSearch,
+} from "@/components/issue-filters";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { orpc } from "@/lib/orpc";
+import { useRowSelection } from "@/lib/row-selection";
 
 /** On a Project's Board a column is one State. */
 const byStateId = (issue: BoardIssue) => issue.state.id;
@@ -40,35 +52,21 @@ export function BoardPage({
       ),
     [memberList, myId],
   );
-  const assigneeMemberId =
-    search.assignee === "me"
-      ? (myId ?? undefined)
-      : search.assignee && !["agents:me", "none"].includes(search.assignee)
-        ? search.assignee
-        : undefined;
+  // The same question the Issues home asks, with this Project fixed; every
+  // filter is the server's (components/issue-filters.tsx).
+  const filterInput = issueFilterInput(search, myId, projectKey);
   const issues = useQuery(
     orpc.issues.list.queryOptions({
-      input: {
-        projectKey,
-        ...(assigneeMemberId ? { assigneeMemberId } : {}),
-        ...(search.open === "0" ? {} : { open: true }),
-        limit: 200,
-      },
-      enabled: search.assignee !== "me" || myId !== null,
+      input: filterInput ?? { projectKey, limit: ISSUE_PAGE },
+      enabled: filterInput !== null,
     }),
   );
 
   const states = workflow.data?.states ?? [];
-  const cards = useMemo(() => {
-    const all = (issues.data?.issues ?? []) as unknown as BoardIssue[];
-    return all.filter((issue) => {
-      if (search.kind && issue.assignee?.kind !== search.kind) return false;
-      if (search.assignee === "none" && issue.assignee) return false;
-      if (search.assignee === "agents:me" && !(issue.assignee && myAgentIds.has(issue.assignee.id)))
-        return false;
-      return true;
-    });
-  }, [issues.data, search.kind, search.assignee, myAgentIds]);
+  const cards = useMemo(
+    () => (issues.data?.issues ?? []) as unknown as BoardIssue[],
+    [issues.data],
+  );
 
   // One Project: a column is a State, and a drop lands in exactly that State.
   const columns = useMemo<BoardColumn[]>(
@@ -87,6 +85,17 @@ export function BoardPage({
     isGate: state.isGate,
     category: state.category as FilterState["category"],
   }));
+
+  // The cards as they are on screen, column by column, for j and k; Enter
+  // peeks and o opens, as on the Issues home (lib/row-selection.ts).
+  const visibleKeys = useMemo(() => {
+    const value = groupIntoColumns(columns, cards, byStateId);
+    return columns.flatMap((column) => (value[column.id] ?? []).map((card) => card.key));
+  }, [columns, cards]);
+  const peek = (key: string) => onSearch({ peek: key });
+  const openFull = (key: string) =>
+    void navigate({ to: "/issues/$issueKey", params: { issueKey: key } });
+  const { selected, select } = useRowSelection(visibleKeys, { peek, openFull });
 
   if (workflow.isError) {
     return (
@@ -120,15 +129,23 @@ export function BoardPage({
         issues={cards}
         columnOf={byStateId}
         loading={workflow.isPending || issues.isPending}
-        onOpen={(key) => onSearch({ peek: key })}
+        selectedKey={selected}
+        onSelect={select}
+        onOpen={peek}
         onDragStart={() => search.peek && onSearch({ peek: undefined })}
       />
+
+      {issues.data?.hasMore ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          Showing the first {ISSUE_PAGE} Issues. Narrow the filters to see the rest.
+        </p>
+      ) : null}
 
       <SidePeek
         issueKey={search.peek ?? null}
         modal={false}
         onClose={() => onSearch({ peek: undefined })}
-        onOpenFull={(key) => void navigate({ to: "/issues/$issueKey", params: { issueKey: key } })}
+        onOpenFull={openFull}
       />
     </section>
   );

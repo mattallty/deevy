@@ -176,6 +176,40 @@ describe("the Run lifecycle", () => {
     ]);
   });
 
+  it("carries each Run's last three Activities and their count in the list", async () => {
+    const { db, asAdmin, asAgent } = await workspaceWithAgent();
+    await asAdmin.issues.create({ projectKey: "DEV", title: "Second thing" });
+    const busy = await asAgent.runs.start({ issueKey: "DEV-1" });
+    const quiet = await asAgent.runs.start({ issueKey: "DEV-2" });
+    const posted: string[] = [];
+    for (const body of ["one", "two", "three", "four", "five"]) {
+      const { activity: row } = await asAgent.runs.postActivity({
+        runId: busy.id,
+        kind: "action",
+        body,
+      });
+      posted.push(row.id);
+    }
+    // Spaced out, so the order is the feed's and not the millisecond's.
+    for (const [at, id] of posted.entries()) {
+      await db
+        .update(activity)
+        .set({ createdAt: new Date(Date.now() - 10_000 + at * 1_000) })
+        .where(eq(activity.id, id));
+    }
+
+    const page = await asAdmin.runs.list({ issueKey: "DEV-1" });
+    expect(page.runs).toHaveLength(1);
+    expect(page.runs[0]?.activityCount).toBe(5);
+    expect(page.runs[0]?.lastActivities.map((row) => row.body)).toEqual(["three", "four", "five"]);
+    expect(page.runs[0]?.lastActivities[0]?.createdAt).toBeInstanceOf(Date);
+
+    const empty = await asAdmin.runs.list({ issueKey: "DEV-2" });
+    expect(empty.runs.map((row) => [row.id, row.activityCount, row.lastActivities])).toEqual([
+      [quiet.id, 0, []],
+    ]);
+  });
+
   it("attributes evidence to the Run that found it", async () => {
     const { asAdmin, asAgent } = await workspaceWithAgent();
     const started = await asAgent.runs.start({ issueKey: "DEV-1" });

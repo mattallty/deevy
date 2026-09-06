@@ -1,8 +1,11 @@
 /**
  * From the Dice UI registry — `@diceui/sortable`, added 2026-09-05 with
- * `pnpm dlx shadcn@latest add @diceui/sortable` (it also wrote lib/compose-refs.ts). MIT
- * (sadmann7/diceui); dnd-kit underneath, no Radix. Ours to edit; re-adding brings the upstream back to
- * components/ui, so move it here again (.claude/skills/deevy-ui, "Registries").
+ * `pnpm dlx shadcn@latest add @diceui/sortable`. MIT (sadmann7/diceui); dnd-kit underneath, no Radix.
+ * Ours to edit; re-adding brings the upstream back to components/ui, so move it here again
+ * (.claude/skills/deevy-ui, "Registries"). Upstream's `asChild` is Radix's Slot; here it is Base UI's
+ * `useRender` with the child as the `render` element (2026-09-06, #10 item 7), so the child's own
+ * props win over the sortable's, as they do everywhere else in this tree, and refs merge through
+ * `useRender`'s own `ref` list rather than a vendored compose-refs.
  */
 "use client";
 
@@ -42,12 +45,17 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Slot } from "@/lib/slot";
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 
-import { useComposedRefs } from "@/lib/compose-refs";
 import { cn } from "@/lib/utils";
+
+/** With `asChild`, the one child is the element rendered; anything else falls back to the default tag. */
+function asRenderElement(children: React.ReactNode): React.ReactElement | undefined {
+  return React.isValidElement(children) ? children : undefined;
+}
 
 const orientationConfig = {
   vertical: {
@@ -310,18 +318,21 @@ function SortableContent(props: SortableContentProps) {
 
   const context = useSortableContext(CONTENT_NAME);
 
-  const ContentPrimitive = asChild ? Slot : "div";
+  // A hook, so it runs on every render; `enabled` is what withoutSlot means to it.
+  // The defaults sit in a variable so `data-*` attributes pass the literal check (as kanban.tsx does).
+  const defaults = { "data-slot": "sortable-content", ...(asChild ? {} : { children }) };
+  const element = useRender({
+    defaultTagName: "div",
+    render: asChild ? asRenderElement(children) : undefined,
+    ref: ref ?? null,
+    props: mergeProps<"div">(defaults, contentProps),
+    enabled: !withoutSlot,
+  });
 
   return (
     <SortableContentContext.Provider value={true}>
       <SortableContext items={context.items} strategy={strategyProp ?? context.strategy}>
-        {withoutSlot ? (
-          children
-        ) : (
-          <ContentPrimitive data-slot="sortable-content" {...contentProps} ref={ref}>
-            {children}
-          </ContentPrimitive>
-        )}
+        {withoutSlot ? children : element}
       </SortableContext>
     </SortableContentContext.Provider>
   );
@@ -354,7 +365,8 @@ interface SortableItemProps extends React.ComponentProps<"div"> {
 }
 
 function SortableItem(props: SortableItemProps) {
-  const { value, style, asHandle, asChild, disabled, className, ref, ...itemProps } = props;
+  const { value, style, asHandle, asChild, disabled, className, children, ref, ...itemProps } =
+    props;
 
   const inSortableContent = React.useContext(SortableContentContext);
   const inSortableOverlay = React.useContext(SortableOverlayContext);
@@ -390,8 +402,6 @@ function SortableItem(props: SortableItemProps) {
     [disabled, asHandle, setNodeRef, setActivatorNodeRef],
   );
 
-  const composedRef = useComposedRefs(ref, onNodeRefChange);
-
   const composedStyle = React.useMemo<React.CSSProperties>(() => {
     return {
       transform: CSS.Translate.toString(transform),
@@ -412,35 +422,39 @@ function SortableItem(props: SortableItemProps) {
     [id, attributes, listeners, setActivatorNodeRef, isDragging, disabled],
   );
 
-  const ItemPrimitive = asChild ? Slot : "div";
+  const defaults = {
+    id,
+    "data-disabled": disabled,
+    "data-dragging": isDragging ? "" : undefined,
+    "data-slot": "sortable-item",
+    style: composedStyle,
+    className: cn(
+      "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-hidden",
+      {
+        "touch-none select-none": asHandle,
+        "cursor-default": context.flatCursor,
+        "data-dragging:cursor-grabbing": !context.flatCursor,
+        "cursor-grab": !isDragging && asHandle && !context.flatCursor,
+        "opacity-50": isDragging,
+        "pointer-events-none opacity-50": disabled,
+      },
+      className,
+    ),
+  };
+  const element = useRender({
+    defaultTagName: "div",
+    render: asChild ? asRenderElement(children) : undefined,
+    ref: [ref ?? null, onNodeRefChange],
+    props: mergeProps<"div">(
+      defaults,
+      itemProps,
+      asChild ? {} : { children },
+      asHandle && !disabled ? attributes : {},
+      asHandle && !disabled ? listeners : {},
+    ),
+  });
 
-  return (
-    <SortableItemContext.Provider value={itemContext}>
-      <ItemPrimitive
-        id={id}
-        data-disabled={disabled}
-        data-dragging={isDragging ? "" : undefined}
-        data-slot="sortable-item"
-        {...itemProps}
-        {...(asHandle && !disabled ? attributes : {})}
-        {...(asHandle && !disabled ? listeners : {})}
-        ref={composedRef}
-        style={composedStyle}
-        className={cn(
-          "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-hidden",
-          {
-            "touch-none select-none": asHandle,
-            "cursor-default": context.flatCursor,
-            "data-dragging:cursor-grabbing": !context.flatCursor,
-            "cursor-grab": !isDragging && asHandle && !context.flatCursor,
-            "opacity-50": isDragging,
-            "pointer-events-none opacity-50": disabled,
-          },
-          className,
-        )}
-      />
-    </SortableItemContext.Provider>
-  );
+  return <SortableItemContext.Provider value={itemContext}>{element}</SortableItemContext.Provider>;
 }
 
 interface SortableItemHandleProps extends React.ComponentProps<"button"> {
@@ -448,7 +462,7 @@ interface SortableItemHandleProps extends React.ComponentProps<"button"> {
 }
 
 function SortableItemHandle(props: SortableItemHandleProps) {
-  const { asChild, disabled, className, ref, ...itemHandleProps } = props;
+  const { asChild, disabled, className, children, ref, ...itemHandleProps } = props;
 
   const context = useSortableContext(ITEM_HANDLE_NAME);
   const itemContext = useSortableItemContext(ITEM_HANDLE_NAME);
@@ -465,29 +479,31 @@ function SortableItemHandle(props: SortableItemHandleProps) {
     [isDisabled, setActivatorNodeRef],
   );
 
-  const composedRef = useComposedRefs(ref, onActivatorNodeRef);
-
-  const HandlePrimitive = asChild ? Slot : "button";
-
-  return (
-    <HandlePrimitive
-      type="button"
-      aria-controls={itemContext.id}
-      data-disabled={isDisabled}
-      data-dragging={itemContext.isDragging ? "" : undefined}
-      data-slot="sortable-item-handle"
-      {...itemHandleProps}
-      {...(isDisabled ? {} : itemContext.attributes)}
-      {...(isDisabled ? {} : itemContext.listeners)}
-      ref={composedRef}
-      className={cn(
-        "select-none disabled:pointer-events-none disabled:opacity-50",
-        context.flatCursor ? "cursor-default" : "cursor-grab data-dragging:cursor-grabbing",
-        className,
-      )}
-      disabled={isDisabled}
-    />
-  );
+  const defaults = {
+    type: "button" as const,
+    "aria-controls": itemContext.id,
+    "data-disabled": isDisabled,
+    "data-dragging": itemContext.isDragging ? "" : undefined,
+    "data-slot": "sortable-item-handle",
+    className: cn(
+      "select-none disabled:pointer-events-none disabled:opacity-50",
+      context.flatCursor ? "cursor-default" : "cursor-grab data-dragging:cursor-grabbing",
+      className,
+    ),
+    disabled: isDisabled,
+  };
+  return useRender({
+    defaultTagName: "button",
+    render: asChild ? asRenderElement(children) : undefined,
+    ref: [ref ?? null, onActivatorNodeRef],
+    props: mergeProps<"button">(
+      defaults,
+      itemHandleProps,
+      asChild ? {} : { children },
+      isDisabled ? {} : itemContext.attributes,
+      isDisabled ? {} : itemContext.listeners,
+    ),
+  });
 }
 
 const SortableOverlayContext = React.createContext(false);

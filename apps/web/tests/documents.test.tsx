@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { pickOption } from "./select.ts";
 
@@ -58,29 +56,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Documents section on an Issue", () => {
   it("shows one tab per Document and renders the current version as markdown", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     const tabs = await screen.findByRole("tablist", { name: "Documents" });
     expect(
@@ -92,7 +72,7 @@ describe("the Documents section on an Issue", () => {
   });
 
   it("writes a new version from the editor", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit intent" }));
     fireEvent.change(screen.getByLabelText("Body"), {
@@ -108,7 +88,7 @@ describe("the Documents section on an Issue", () => {
   });
 
   it("lets an older version be read", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     await pickOption(await screen.findByLabelText("Version"), "1");
 

@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -54,36 +52,18 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Webhooks settings page", () => {
   it("lists the subscriptions and what each one asked for", async () => {
-    await mountAt("/settings/webhooks");
+    await mountAt("/settings/webhooks", { memberName: "Ada" });
 
     expect(await screen.findByText("https://runtime.example/deevy")).toBeTruthy();
     expect(screen.getByText("run.*")).toBeTruthy();
   });
 
   it("subscribes a URL, with a secret the browser makes and the server never returns", async () => {
-    await mountAt("/settings/webhooks");
+    await mountAt("/settings/webhooks", { memberName: "Ada" });
 
     fireEvent.change(await screen.findByLabelText("URL"), {
       target: { value: "https://runtime.example/other" },
@@ -102,7 +82,7 @@ describe("the Webhooks settings page", () => {
   });
 
   it("shows how the last attempts went, and asks for one again", async () => {
-    await mountAt("/settings/webhooks");
+    await mountAt("/settings/webhooks", { memberName: "Ada" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Deliveries" }));
 

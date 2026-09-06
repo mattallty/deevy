@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -55,36 +53,18 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Channels settings page", () => {
   it("lists the Channels by name and where they point, never the webhook itself", async () => {
-    await mountAt("/settings/channels");
+    await mountAt("/settings/channels", { memberName: "Ada" });
 
     expect(await screen.findByText("#deevy")).toBeTruthy();
     expect(screen.getByText("hooks.slack.com")).toBeTruthy();
   });
 
   it("adds a Slack incoming webhook from the form", async () => {
-    await mountAt("/settings/channels");
+    await mountAt("/settings/channels", { memberName: "Ada" });
 
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "#alerts" } });
     fireEvent.change(screen.getByLabelText("Incoming webhook URL"), {
@@ -101,7 +81,7 @@ describe("the Channels settings page", () => {
   });
 
   it("proves a Channel works with the Test button, and says what came back", async () => {
-    await mountAt("/settings/channels");
+    await mountAt("/settings/channels", { memberName: "Ada" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Test" }));
 
@@ -110,7 +90,7 @@ describe("the Channels settings page", () => {
   });
 
   it("adds a routing rule and saves the whole set", async () => {
-    await mountAt("/settings/channels");
+    await mountAt("/settings/channels", { memberName: "Ada" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Add rule" }));
     fireEvent.click(screen.getByRole("button", { name: "Save routing" }));

@@ -34,7 +34,8 @@ vi.mock("../src/lib/orpc.ts", async () => {
     documents: {},
     links: {},
     inbox: {},
-    runs: {},
+    // stillChanging tells a Run's detail from its list by key, so both need a shape.
+    runs: { get: async () => ({}), list: async () => ({ runs: [] }) },
     agents: {},
     labels: {},
     repositories: {},
@@ -62,7 +63,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { keysFor, useLiveEvents } = await import("../src/lib/live.ts");
+const { keysFor, stillChanging, useLiveEvents } = await import("../src/lib/live.ts");
 
 function Probe() {
   useLiveEvents(true);
@@ -192,5 +193,26 @@ describe("keysFor", () => {
     expect(JSON.stringify(keysFor({ subjectType: "issue", projectId: "p1" }))).not.toContain(
       '"me"',
     );
+  });
+});
+
+describe("stillChanging", () => {
+  it("leaves a finished Run's detail alone and re-reads everything else", async () => {
+    const { orpc } = await import("../src/lib/orpc.ts");
+    const queryClient = new QueryClient();
+    const finished = orpc.runs.get.queryKey({ input: { runId: "run-done" } });
+    const working = orpc.runs.get.queryKey({ input: { runId: "run-busy" } });
+    // The predicate reads one field, so a partial Run is all the cache needs.
+    const seed = (key: unknown, data: unknown) =>
+      queryClient.setQueryData(key as never, data as never);
+    seed(finished, { id: "run-done", finishedAt: new Date(), activities: [] });
+    seed(working, { id: "run-busy", finishedAt: null, activities: [] });
+    seed(orpc.runs.list.queryKey({ input: { issueKey: "DEV-1" } }), { runs: [] });
+
+    const cache = queryClient.getQueryCache();
+    const verdict = (key: unknown) => stillChanging(cache.find({ queryKey: key as never })!);
+    expect(verdict(finished)).toBe(false);
+    expect(verdict(working)).toBe(true);
+    expect(verdict(orpc.runs.list.queryKey({ input: { issueKey: "DEV-1" } }))).toBe(true);
   });
 });

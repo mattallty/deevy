@@ -87,6 +87,9 @@ describe("a Team's Members", () => {
       "team.member_added",
       "team.member_removed",
     ]);
+    // Names beside the ids, so the log reads without a lookup.
+    expect(page.events[1]?.payload).toMatchObject({ memberName: "Bob", teamName: "Platform" });
+    expect(page.events[2]?.payload).toMatchObject({ memberName: "Bob", teamName: "Platform" });
   });
 
   it("adding the same Member twice is not an error and does not duplicate them", async () => {

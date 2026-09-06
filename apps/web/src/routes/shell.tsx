@@ -53,6 +53,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { authClient } from "@/lib/auth";
 import { useLiveEvents } from "@/lib/live";
 import { orpc } from "@/lib/orpc";
 import { useShortcut } from "@/lib/shortcuts";
@@ -356,12 +357,7 @@ function MemberMenu({
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={async () => {
-            const { authClient } = await import("@/lib/auth");
-            await authClient.signOut();
-          }}
-        >
+        <DropdownMenuItem onClick={() => authClient.signOut()}>
           <LogOut />
           Sign out
         </DropdownMenuItem>

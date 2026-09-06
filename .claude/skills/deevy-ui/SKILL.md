@@ -33,7 +33,10 @@ rules) and `frontend-design` (design process) beside it.
   Issue, State, Gate, Run, Activity, Document, Event, Notification, Channel. "Board" is the column view of a
   Project, never a Project. Never "ticket", "task", "status", "user", "bot".
 - **Base UI, not Radix.** `apps/web/components.json` is `"style": "base-mira"`. Custom triggers use
-  `render={<Link … />}` (and `nativeButton={false}` on a Button that renders an anchor), never `asChild`.
+  `render={<Link … />}` (and `nativeButton={false}` on a Button that renders an anchor — without it Base
+  UI warns on every render, which is what CI's stderr shows), never `asChild`. `nativeButton={false}`
+  gives the anchor a button role, so navigation a test finds as a `link` (the not-found page's ways out) is
+  a `<Link className={buttonVariants(…)}>` instead: a real link dressed as a button.
   Nothing under `apps/web` may import `@radix-ui/*`.
 - Work from `apps/web` so the `shadcn` skill's `shadcn info` finds `components.json`. Add components with
   `pnpm dlx shadcn@latest add <item> --overwrite`; it rewrites `pnpm-workspace.yaml` and pins versions, so
@@ -196,9 +199,13 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
   takes `q` — an Issue key, a number, or a word of the title. Its REST path is `/issues`, with everything as
   query parameters; MCP and RPC callers name it the same as before. One list per screen, never a fan-out.
 - **Filters live in the URL** (`components/issue-filters.tsx`: `IssuesSearch`, `parseIssuesSearch`), so a
-  view is a link and Back undoes a filter. The server filters Project, Assignee, open and `q`; State (by
-  name, folded across Projects), Human/Agent and "my Agents" fold client-side. `assignee=me` becomes the
-  Member id from `me.get`; `agents:me` is the Agents whose `sponsorId` is me.
+  view is a link and Back undoes a filter. **Every filter is the server's** (2026-09-06, #10): `issueFilterInput(search, myId, projectKey?)` turns the URL into
+  the one `issues.list` input the Issues home, the Board and the palette send — `stateName` (a name, folded
+  across Projects), `assigneeKind`, `unassigned`, `sponsorMemberId` for "my Agents", `assigneeMemberId`
+  for `me` — and returns null while `me.get` has not said who "me" is. Nothing folds over the page in the
+  browser any more: past 200 Issues that fold lied. The list holds `ISSUE_PAGE` (200) and the server says
+  `hasMore`; the page then reads "Showing the first 200 Issues. Narrow the filters to see the rest." and
+  the count is "200+".
 - **`components/data-table.tsx`** is hand-rolled on `ui/table`: client sort per column, group rows that
   fold, skeleton, `Empty`, `aria-selected` on the keyboard row. No TanStack Table — it went to v9 with a new
   API and this list needs none of a grid. A row's accessible name is its text.
@@ -310,8 +317,10 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `useNavigate()`: a route's navigate takes its own path as `from`, and the Board lost `/board` the moment a
   peek opened.
 - **`components/diceui/sortable.tsx`** is `@diceui/sortable` (MIT, dnd-kit) with `radix-ui`'s `Slot`
-  replaced by `lib/slot.tsx` (twenty lines: clone the child with merged props and composed refs) — the CLI
-  had added `radix-ui` to the catalog, which the no-Radix rule forbids; it also wrote `lib/compose-refs.ts`.
+  replaced by Base UI's `useRender` (`@base-ui/react/use-render` + `merge-props`, the pattern
+  `reui/kanban.tsx` uses): `asChild` hands the one child to `render`, so the child's own props win and
+  refs merge through `useRender`'s `ref` list. The CLI had added `radix-ui` to the catalog, which the
+  no-Radix rule forbids; a vendored `lib/slot.tsx` + `lib/compose-refs.ts` stood in until 2026-09-06 (#10).
   The Workflow editor's States are `SortableItem asChild` around each `<li>` with a "Drag <State>" handle;
   the "Move up/down" buttons stay for the keyboard and the tests. New draft States carry a `uid`.
 - Under a Project the Workflow editor's heading is an `h2`: the Project's name is the page's `h1`.

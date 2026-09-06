@@ -2,12 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { DataTable, type DataColumn } from "@/components/data-table";
-import { MemberChip } from "@/components/member-chip";
+import { MemberChip, type ChipMember } from "@/components/member-chip";
 import { SettingsPage } from "@/components/settings-page";
 import { Badge } from "@/components/ui/badge";
 import { ScrollText, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { describeEvent } from "@/lib/event-text";
+import { describeEvent, toneClass } from "@/lib/event-text";
+import { useEventContext } from "@/lib/mentions";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 import {
@@ -40,19 +41,13 @@ interface EventRow {
   seq: number;
   kind: string;
   actorMemberId: string | null;
+  /** Who did it, joined by the server; null when deevy itself did. */
+  actor: ChipMember | null;
   subjectType: string;
   subjectId: string;
   projectId: string | null;
   payload: unknown;
   createdAt: string | Date;
-}
-
-/** The hue a kind's family carries elsewhere in the UI: Gates amber, Runs the Agent's. */
-function kindClass(kind: string): string {
-  if (kind.startsWith("gate.")) return "border-gate/50 text-gate-foreground dark:text-gate";
-  if (kind.startsWith("run.")) return "border-agent/50 text-agent";
-  if (kind.startsWith("member.") || kind.startsWith("agent.")) return "border-human/50 text-human";
-  return "";
 }
 
 /**
@@ -80,23 +75,9 @@ export function EventLogPage() {
       },
     }),
   );
-  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
-  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
-  const labelById = useMemo(
-    () =>
-      new Map(
-        (labels.data?.labels ?? []).map((label) => [
-          label.id,
-          label.scope ? `${label.scope}: ${label.name}` : label.name,
-        ]),
-      ),
-    [labels.data],
-  );
-  const memberById = useMemo(
-    () => new Map((members.data?.members ?? []).map((member) => [member.id, member])),
-    [members.data],
-  );
+  // Names for what an older payload only numbers; the actor rides on the row.
+  const eventContext = useEventContext();
   const projectById = useMemo(
     () => new Map((projects.data?.projects ?? []).map((project) => [project.id, project])),
     [projects.data],
@@ -126,37 +107,42 @@ export function EventLogPage() {
       {
         id: "kind",
         header: "Kind",
-        cell: (row) => (
-          <Badge variant="outline" className={cn("font-mono font-normal", kindClass(row.kind))}>
-            {row.kind}
-          </Badge>
-        ),
+        // In the tone the sentence takes, so a rejection reads red here as it
+        // does in the Activity, and a Gate amber.
+        cell: (row) => {
+          const said = describeEvent(
+            { kind: row.kind, payload: row.payload, actorKind: row.actor?.kind ?? null },
+            eventContext,
+          );
+          return (
+            <Badge
+              variant="outline"
+              className={cn("font-mono font-normal", said ? toneClass[said.tone] : "")}
+            >
+              {row.kind}
+            </Badge>
+          );
+        },
         className: "w-48",
       },
       {
         id: "actor",
         header: "Actor",
-        cell: (row) => {
-          const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
-          return actor ? (
-            <MemberChip member={actor} size="xs" />
+        cell: (row) =>
+          row.actor ? (
+            <MemberChip member={row.actor} size="xs" />
           ) : (
             <span className="text-xs text-muted-foreground">deevy</span>
-          );
-        },
+          ),
         className: "w-44",
       },
       {
         id: "what",
         header: "What",
         cell: (row) => {
-          const actor = row.actorMemberId ? memberById.get(row.actorMemberId) : undefined;
           const said = describeEvent(
-            { kind: row.kind, payload: row.payload, actorKind: actor?.kind ?? null },
-            {
-              memberName: (id) => memberById.get(id)?.user.name,
-              labelName: (id) => labelById.get(id),
-            },
+            { kind: row.kind, payload: row.payload, actorKind: row.actor?.kind ?? null },
+            eventContext,
           );
           if (!said) return <span className="text-xs text-muted-foreground">a Run step</span>;
           return (
@@ -195,7 +181,7 @@ export function EventLogPage() {
         className: "w-56",
       },
     ],
-    [memberById, labelById, projectById],
+    [eventContext, projectById],
   );
 
   return (

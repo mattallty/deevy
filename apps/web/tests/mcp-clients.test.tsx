@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -33,30 +32,12 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
+const { mountAt } = await import("./mount.tsx");
 const { ConsentPage } = await import("../src/routes/consent.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
 
 describe("the MCP clients settings page", () => {
   it("gives the endpoint and the command that needs no header", async () => {
-    await mountAt("/settings/mcp-clients");
+    await mountAt("/settings/mcp-clients", { memberName: "Ada" });
 
     expect(await screen.findByText(`${window.location.origin}/mcp`)).toBeTruthy();
     const command = screen.getByText(/claude mcp add/);
@@ -66,7 +47,7 @@ describe("the MCP clients settings page", () => {
   });
 
   it("lists the clients acting as this Human and revokes one", async () => {
-    await mountAt("/settings/mcp-clients");
+    await mountAt("/settings/mcp-clients", { memberName: "Ada" });
 
     expect(await screen.findByText("Claude Code")).toBeTruthy();
     expect(screen.getByText("https://claude.ai/mcp/client")).toBeTruthy();

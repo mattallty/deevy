@@ -5,7 +5,10 @@
  * a Human or an Agent wrote when there are any: the comment, the note, the
  * question, the summary. Everything comes from the Event the row carries.
  */
-export type NotificationTone = "human" | "agent" | "gate" | "muted" | "destructive";
+import type { EventTone } from "@/lib/event-text";
+
+/** A Notification speaks in the same tones an Event does; one palette serves both. */
+export type NotificationTone = EventTone;
 
 export interface NotificationText {
   verb: string;

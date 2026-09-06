@@ -7,7 +7,19 @@ export default defineConfig({
     // without opting all of them in. Per package rather than at the root,
     // because a root task also applies to the workspace root, which has no test
     // config of its own and would run vitest over the whole tree.
-    tasks: { test: { command: "vp test", output: [] } },
+    tasks: {
+      // Tracked by what the suite reads, less two tool-managed files that differ
+      // on every CI runner and kept every shard from replaying until 2026-09-06:
+      // vitest's own results directory, and pnpm's install record (its prunedAt
+      // and storeDir are the machine's). Patterns are relative to this package;
+      // `**` does not reach the workspace root. A source this suite imports
+      // still counts, as does a dependency's file under node_modules.
+      test: {
+        command: "vp test",
+        input: [{ auto: true }, "!node_modules/.vite/**", "!../../node_modules/.modules.yaml"],
+        output: [],
+      },
+    },
   },
   test: {
     include: ["tests/**/*.test.ts"],

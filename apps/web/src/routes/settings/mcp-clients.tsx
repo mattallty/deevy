@@ -1,22 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plug } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
@@ -41,6 +26,55 @@ export function McpClientsPage() {
   );
 
   const rows = clients.data?.clients ?? [];
+  type ClientRow = (typeof rows)[number];
+  const columns: DataColumn<ClientRow>[] = [
+    {
+      id: "client",
+      header: "Client",
+      cell: (client) => (
+        <span className="font-medium">
+          {client.name ?? client.clientId}
+          <span className="block font-mono text-xs text-muted-foreground">{client.clientId}</span>
+        </span>
+      ),
+      sortValue: (client) => client.name ?? client.clientId,
+      className: "w-full",
+    },
+    {
+      id: "scopes",
+      header: "Allowed",
+      cell: (client) => (
+        <span className="text-muted-foreground">
+          {client.scopes.length > 0 ? client.scopes.join(", ") : "Everything you can do"}
+        </span>
+      ),
+    },
+    {
+      id: "since",
+      header: "Since",
+      cell: (client) => (
+        <span className="text-muted-foreground">
+          {client.consentedAt ? client.consentedAt.toLocaleDateString() : "—"}
+        </span>
+      ),
+      sortValue: (client) => client.consentedAt?.getTime() ?? null,
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: (client) => (
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={revoke.isPending}
+          onClick={() => revoke.mutate({ clientId: client.clientId })}
+        >
+          Revoke
+        </Button>
+      ),
+      className: "text-right",
+    },
+  ];
 
   return (
     <SettingsPage
@@ -68,67 +102,24 @@ export function McpClientsPage() {
       </SettingsSection>
 
       {revoke.error ? <p className="text-sm text-destructive">{revoke.error.message}</p> : null}
-      {clients.isPending ? <Skeleton className="h-24 w-full" /> : null}
       {clients.isError ? (
         <p className="text-sm text-destructive">
           Could not load your MCP clients: {clients.error.message}
         </p>
-      ) : null}
-
-      {rows.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Client</TableHead>
-              <TableHead>Allowed</TableHead>
-              <TableHead>Since</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((client) => (
-              <TableRow key={client.clientId}>
-                <TableCell className="font-medium">
-                  {client.name ?? client.clientId}
-                  <span className="block font-mono text-xs text-muted-foreground">
-                    {client.clientId}
-                  </span>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {client.scopes.length > 0 ? client.scopes.join(", ") : "Everything you can do"}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {client.consentedAt ? client.consentedAt.toLocaleDateString() : "—"}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={revoke.isPending}
-                    onClick={() => revoke.mutate({ clientId: client.clientId })}
-                  >
-                    Revoke
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-
-      {clients.data && rows.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Plug aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No MCP clients yet</EmptyTitle>
-            <EmptyDescription>
-              Nothing is connected as you. Add one with the command above.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
+      ) : (
+        <DataTable
+          aria-label="MCP clients"
+          columns={columns}
+          rows={rows}
+          getRowId={(client) => client.clientId}
+          loading={clients.isPending}
+          empty={{
+            icon: Plug,
+            title: "No MCP clients yet",
+            description: "Nothing is connected as you. Add one with the command above.",
+          }}
+        />
+      )}
 
       {rows.length > 0 ? (
         <p className="text-sm text-muted-foreground">

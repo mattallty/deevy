@@ -1,5 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({ devSignIn: false }));
@@ -16,15 +15,8 @@ vi.mock("../src/lib/orpc.ts", async () => {
 });
 
 const { DevSignIn, SignedOut } = await import("../src/App.tsx");
+const { mount } = await import("./mount.tsx");
 const { orpc } = await import("../src/lib/orpc.ts");
-
-function mount(node: React.ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return {
-    ...render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>),
-    queryClient,
-  };
-}
 
 afterEach(() => {
   stub.devSignIn = false;

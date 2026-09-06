@@ -198,7 +198,28 @@
         "stateId": {
           "type": "string"
         },
+        "stateName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
         "assigneeMemberId": {
+          "type": "string"
+        },
+        "assigneeKind": {
+          "type": "string",
+          "enum": [
+            "human",
+            "agent"
+          ]
+        },
+        "unassigned": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "sponsorMemberId": {
           "type": "string"
         },
         "labelId": {

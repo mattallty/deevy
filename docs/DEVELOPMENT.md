@@ -99,6 +99,21 @@ They answer different questions. `openapi.json` is the whole HTTP surface, every
 the `sessionOnly` flag touches the OpenAPI meta, so an authorization change shows up in the MCP snapshot and
 in the tests, and never as noise in the HTTP one.
 
+## What CI replays
+
+`test` is a Vite+ task in each package's `vite.config.ts`, so `vp run … test` fingerprints it: the arguments,
+the env vars it names, and every file the suite actually read, which Vite+ observes at the file system rather
+than reads off a declared graph. A change to `packages/core/src` re-runs every suite that imports it, and
+nothing else. Two tool-managed files are excluded, relative to each package: vitest's own results directory
+(`node_modules/.vite/**`), which a fresh runner never has, and pnpm's install record
+(`../../node_modules/.modules.yaml`), whose `prunedAt` and `storeDir` are the machine's. Until both were
+excluded (2026-09-06) no shard ever replayed, and the cache steps in `ci.yml` cost time for nothing. On a pull request a suite
+whose inputs match a cached run replays its recorded output; a push to `main` runs with `--no-cache`, so the
+default branch always executes for real and is what seeds the cache the next pull request restores. Vite+
+cannot see a test reading an env var, so a suite that depended on one is the case a replay would miss; deevy's
+are stubbed and deterministic. To force a full run on a pull request, re-run the job after a change to any
+`vite.config.ts`, or run `vp run -r --no-cache test` locally.
+
 ## Changing a Better Auth plugin
 
 The options that shape Better Auth's tables live twice: `packages/core/src/auth.ts` is the runtime, and

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, like, lt } from "drizzle-orm";
 import { z } from "zod";
 import { event as eventTable } from "@deevy/db";
-import { EventSchema } from "../schemas.ts";
+import { EventSchema, MemberWithUserSchema } from "../schemas.ts";
 import { eventIterator } from "@orpc/server";
 import { subscribeToEvents } from "../live.ts";
 import { defineOperation, defineStreamOperation } from "./registry.ts";
@@ -41,7 +41,12 @@ export const events = {
       limit: z.coerce.number().int().min(1).max(500).default(100),
     }),
     output: z.object({
-      events: z.array(EventSchema),
+      events: z.array(
+        EventSchema.extend({
+          /** Who did it; null when deevy itself did (a bootstrap, a sweep). */
+          actor: MemberWithUserSchema.nullable(),
+        }),
+      ),
       /** The seq of the last Event returned, or null when the page is empty. */
       nextCursor: z.number().int().nullable(),
     }),
@@ -69,9 +74,28 @@ export const events = {
         )
         .orderBy(order === "desc" ? desc(eventTable.seq) : asc(eventTable.seq))
         .limit(input.limit);
+      // The actors of the page in one query, the way inbox.list does it, so a
+      // screen reads who did what without a Members lookup of its own.
+      const actorIds = [
+        ...new Set(rows.flatMap((row) => (row.actorMemberId ? [row.actorMemberId] : []))),
+      ];
+      const actors =
+        actorIds.length > 0
+          ? await context.db.query.member.findMany({
+              where: { id: { in: actorIds } },
+              with: { user: true },
+            })
+          : [];
+      const actorById = new Map(actors.map((actor) => [actor.id, actor]));
       // The cursor is the last row's seq either way: `after` it going forward,
       // `before` it going back.
-      return { events: rows, nextCursor: rows.at(-1)?.seq ?? null };
+      return {
+        events: rows.map((row) => ({
+          ...row,
+          actor: row.actorMemberId ? (actorById.get(row.actorMemberId) ?? null) : null,
+        })),
+        nextCursor: rows.at(-1)?.seq ?? null,
+      };
     },
   }),
 

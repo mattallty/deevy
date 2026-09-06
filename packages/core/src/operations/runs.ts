@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   activity as activityTable,
@@ -26,7 +26,7 @@ import {
 } from "../runs.ts";
 import { gateApprovers, gateUrl } from "../workflow.ts";
 import { defineOperation } from "./registry.ts";
-import type { Run } from "@deevy/db";
+import type { Activity, Run } from "@deevy/db";
 import { assertOwnRun, parseRunCursor, requireIssue, requireRun, runView } from "./shared.ts";
 import { newId } from "../ids.ts";
 
@@ -378,7 +378,18 @@ export const runs = {
       limit: z.coerce.number().int().min(1).max(200).default(50),
     }),
     output: z.object({
-      runs: z.array(RunSchema),
+      runs: z.array(
+        RunSchema.extend({
+          /**
+           * The last few Activities, oldest first, so a card can show what a
+           * Run did last without one `runs.get` per Run; `runs.get` has the
+           * whole feed (docs/plans/ui-redesign.md, review of #8).
+           */
+          lastActivities: z.array(ActivitySchema),
+          /** How many Activities the Run has in all, so a card knows there are more. */
+          activityCount: z.number().int(),
+        }),
+      ),
       /** The position of the last Run returned, or null when the page is empty. */
       nextCursor: z.string().nullable(),
     }),
@@ -424,8 +435,16 @@ export const runs = {
         .limit(input.limit);
 
       const last = rows.at(-1);
+      const trailing = await trailingActivities(
+        context.db,
+        rows.map((row) => row.run.id),
+      );
       return {
-        runs: rows.map((row) => runView(row.run, issueKey(row.projectKey, row.number))),
+        runs: rows.map((row) => ({
+          ...runView(row.run, issueKey(row.projectKey, row.number)),
+          lastActivities: trailing.get(row.run.id)?.rows ?? [],
+          activityCount: trailing.get(row.run.id)?.total ?? 0,
+        })),
         nextCursor: last ? `${last.run.createdAt.getTime()}:${last.run.id}` : null,
       };
     },
@@ -451,3 +470,47 @@ export const runs = {
     },
   }),
 };
+
+/** How many of a Run's Activities a list carries: what a folded card shows. */
+export const TRAILING_ACTIVITIES = 3;
+
+/**
+ * The last few Activities of each Run, and how many there are, in one query:
+ * a window over `activity` ranks each Run's rows newest first and counts
+ * them, and only the top of each partition comes back. One statement for the
+ * whole page, since D1 budgets per statement (docs/plans/m3.md).
+ */
+async function trailingActivities(
+  db: Parameters<typeof requireRun>[0]["db"],
+  runIds: string[],
+): Promise<Map<string, { rows: Activity[]; total: number }>> {
+  const byRun = new Map<string, { rows: Activity[]; total: number }>();
+  if (runIds.length === 0) return byRun;
+  const ranked = db
+    .select({
+      id: activityTable.id,
+      runId: activityTable.runId,
+      kind: activityTable.kind,
+      body: activityTable.body,
+      payload: activityTable.payload,
+      createdAt: activityTable.createdAt,
+      rank: sql<number>`row_number() over (partition by ${activityTable.runId} order by ${activityTable.createdAt} desc, ${activityTable.id} desc)`.as(
+        "rank",
+      ),
+      total: sql<number>`count(*) over (partition by ${activityTable.runId})`.as("total"),
+    })
+    .from(activityTable)
+    .where(inArray(activityTable.runId, runIds))
+    .as("ranked");
+  const rows = await db
+    .select()
+    .from(ranked)
+    .where(lte(ranked.rank, TRAILING_ACTIVITIES))
+    .orderBy(asc(ranked.createdAt), asc(ranked.id));
+  for (const { rank: _rank, total, ...row } of rows) {
+    const entry = byRun.get(row.runId) ?? { rows: [], total };
+    entry.rows.push(row);
+    byRun.set(row.runId, entry);
+  }
+  return byRun;
+}

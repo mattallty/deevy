@@ -1,12 +1,9 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { pickOption } from "./select.ts";
 
-const stub = vi.hoisted(() => ({
-  listed: [] as unknown[],
-  ada: {
+const stub = vi.hoisted(() => {
+  const ada = {
     id: "m-ada",
     kind: "human",
     role: "admin",
@@ -20,30 +17,36 @@ const stub = vi.hoisted(() => ({
       image: null,
       kind: "human",
     },
-  },
-  events: [
-    {
-      seq: 12,
-      kind: "gate.approved",
-      actorMemberId: "m-ada",
-      subjectType: "issue",
-      subjectId: "i1",
-      projectId: "p1",
-      payload: { state: "Intent" },
-      createdAt: new Date("2026-09-05T10:02:00Z"),
-    },
-    {
-      seq: 11,
-      kind: "run.started",
-      actorMemberId: null,
-      subjectType: "run",
-      subjectId: "r1",
-      projectId: "p1",
-      payload: null,
-      createdAt: new Date("2026-09-05T10:01:00Z"),
-    },
-  ],
-}));
+  };
+  return {
+    listed: [] as unknown[],
+    ada,
+    events: [
+      {
+        seq: 12,
+        kind: "gate.approved",
+        actorMemberId: "m-ada",
+        actor: ada,
+        subjectType: "issue",
+        subjectId: "i1",
+        projectId: "p1",
+        payload: { state: "Intent" },
+        createdAt: new Date("2026-09-05T10:02:00Z"),
+      },
+      {
+        seq: 11,
+        kind: "run.started",
+        actorMemberId: null,
+        actor: null,
+        subjectType: "run",
+        subjectId: "r1",
+        projectId: "p1",
+        payload: null,
+        createdAt: new Date("2026-09-05T10:01:00Z"),
+      },
+    ],
+  };
+});
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
@@ -77,23 +80,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada Lovelace" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Event log", () => {
   it("lists the Workspace's Events newest first, with actor, kind and subject", async () => {
@@ -106,6 +93,8 @@ describe("the Event log", () => {
     expect(rows[0]?.textContent).toContain("Ada Lovelace");
     expect(rows[1]?.textContent).toContain("run.started");
     expect(rows[1]?.textContent).toContain("deevy");
+    // The actor came with the Event; no Members lookup was needed for it.
+    expect(within(rows[0]!).getByText("Ada Lovelace")).toBeTruthy();
     // Asked newest first.
     expect(stub.listed.at(-1)).toMatchObject({ order: "desc" });
   });

@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const ada = {
@@ -60,7 +58,11 @@ const issue = (
   createdAt: new Date("2026-09-05T09:00:00Z"),
 });
 
-const stub = vi.hoisted(() => ({ listed: [] as unknown[] }));
+const stub = vi.hoisted(() => ({
+  listed: [] as unknown[],
+  /** How many Issues a page holds; the real server caps at 200, a test at fewer. */
+  pageSize: Number.POSITIVE_INFINITY,
+}));
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
@@ -84,17 +86,31 @@ vi.mock("../src/lib/orpc.ts", async () => {
       }),
     },
     issues: {
-      list: async (input: unknown) => {
+      // Filters the way the server does, so what the page shows is what it asked for.
+      list: async (input: {
+        stateName?: string;
+        assigneeKind?: string;
+        unassigned?: boolean;
+        sponsorMemberId?: string;
+        assigneeMemberId?: string;
+        limit?: number;
+      }) => {
         stub.listed.push(input);
-        return {
-          issues: [
-            issue("DEV-1", "Ship the Event log", intent, ada),
-            issue("DEV-2", "Retry webhook deliveries", build, planner),
-            issue("DEV-3", "Already shipped", done, null),
-            issue("OPS-1", "Rotate the secret", todo, null),
-          ],
-          nextCursor: null,
-        };
+        const all = [
+          issue("DEV-1", "Ship the Event log", intent, ada),
+          issue("DEV-2", "Retry webhook deliveries", build, planner),
+          issue("DEV-3", "Already shipped", done, null),
+          issue("OPS-1", "Rotate the secret", todo, null),
+        ].filter(
+          (row) =>
+            (!input.stateName || row.state.name === input.stateName) &&
+            (!input.assigneeKind || row.assignee?.kind === input.assigneeKind) &&
+            (!input.unassigned || row.assignee === null) &&
+            (!input.sponsorMemberId || row.assignee?.sponsorId === input.sponsorMemberId) &&
+            (!input.assigneeMemberId || row.assignee?.id === input.assigneeMemberId),
+        );
+        const limit = Math.min(input.limit ?? 50, stub.pageSize);
+        return { issues: all.slice(0, limit), nextCursor: null, hasMore: all.length > limit };
       },
       get: async () => ({
         ...issue("DEV-1", "Ship the Event log", intent, ada),
@@ -108,32 +124,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    {
-      workspaceName: "Acme Team",
-      memberName: "Ada Lovelace",
-      member: { ...ada, image: null },
-    },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  await act(async () => {
-    await router.load();
-  });
-  return router;
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Issues home", () => {
   it("lists every open Issue grouped by State, folding Done", async () => {
-    await mountAt("/");
+    await mountAt("/", { member: { ...ada, image: null } });
 
     const table = await screen.findByRole("table", { name: "Issues" });
     expect(within(table).getByRole("row", { name: /DEV-1 Ship the Event log/ })).toBeTruthy();
@@ -148,14 +143,14 @@ describe("the Issues home", () => {
   });
 
   it("unfolds Done on click", async () => {
-    await mountAt("/");
+    await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(within(table).getByText("Done"));
     expect(await within(table).findByRole("row", { name: /Already shipped/ })).toBeTruthy();
   });
 
   it("reads the filters from the URL and titles the view by them", async () => {
-    await mountAt("/?assignee=me&kind=human");
+    await mountAt("/?assignee=me&kind=human", { member: { ...ada, image: null } });
 
     expect(await screen.findByRole("heading", { name: "My Issues", level: 1 })).toBeTruthy();
     // "me" became the Member id on the way to the server.
@@ -164,17 +159,47 @@ describe("the Issues home", () => {
     expect(within(table).getByRole("row", { name: /DEV-1/ })).toBeTruthy();
   });
 
-  it("offers My Agents to a Sponsor and folds their Issues client-side", async () => {
-    await mountAt("/?assignee=agents:me");
+  it("offers My Agents to a Sponsor and asks the server for their Issues", async () => {
+    await mountAt("/?assignee=agents:me", { member: { ...ada, image: null } });
 
     expect(await screen.findByRole("heading", { name: "My Agents' Issues" })).toBeTruthy();
     const table = await screen.findByRole("table", { name: "Issues" });
     expect(within(table).getByRole("row", { name: /DEV-2/ })).toBeTruthy();
     expect(within(table).queryByRole("row", { name: /DEV-1/ })).toBeNull();
+    // The Sponsor, not a fold over the page: past 200 Issues the fold lied.
+    expect(stub.listed.at(-1)).toMatchObject({ sponsorMemberId: "m-ada" });
+    expect(stub.listed.at(-1)).not.toHaveProperty("assigneeMemberId");
+  });
+
+  it("sends every filter to the server: State by name, kind, and Unassigned", async () => {
+    await mountAt("/?state=Build&kind=agent", { member: { ...ada, image: null } });
+    const table = await screen.findByRole("table", { name: "Issues" });
+    expect(within(table).getByRole("row", { name: /DEV-2/ })).toBeTruthy();
+    expect(within(table).queryByRole("row", { name: /DEV-1/ })).toBeNull();
+    expect(stub.listed.at(-1)).toMatchObject({ stateName: "Build", assigneeKind: "agent" });
+
+    await mountAt("/?assignee=none", { member: { ...ada, image: null } });
+    await waitFor(() => expect(stub.listed.at(-1)).toMatchObject({ unassigned: true }));
+  });
+
+  it("says when the page is the first 200 of more, and counts with a plus", async () => {
+    stub.pageSize = 2;
+    try {
+      await mountAt("/", { member: { ...ada, image: null } });
+      const table = await screen.findByRole("table", { name: "Issues" });
+      expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
+      expect(stub.listed.at(-1)).toMatchObject({ limit: 200 });
+      expect(
+        screen.getByText("Showing the first 200 Issues. Narrow the filters to see the rest."),
+      ).toBeTruthy();
+      expect(screen.getByText("2+ Issues open")).toBeTruthy();
+    } finally {
+      stub.pageSize = Number.POSITIVE_INFINITY;
+    }
   });
 
   it("writes a filter to the URL", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     await screen.findByRole("table", { name: "Issues" });
 
     fireEvent.click(screen.getByRole("button", { name: "All", pressed: false }));
@@ -186,7 +211,7 @@ describe("the Issues home", () => {
   });
 
   it("opens a row beside the list with Enter, and the page with o", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
 
     fireEvent.keyDown(document.body, { key: "j" });
@@ -209,7 +234,7 @@ describe("the Issues home", () => {
   });
 
   it("opens a row by clicking it", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(within(table).getByRole("row", { name: /OPS-1/ }));
     await act(async () => {
@@ -221,7 +246,7 @@ describe("the Issues home", () => {
 
 describe("the Issues home with nothing to show", () => {
   it("says the filters are what emptied it, and clears them", async () => {
-    const router = await mountAt("/?state=Nowhere");
+    const router = await mountAt("/?state=Nowhere", { member: { ...ada, image: null } });
 
     expect(await screen.findByText("No Issues match your filters")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
@@ -235,7 +260,7 @@ describe("the Issues home with nothing to show", () => {
 
 describe("the board view of the Issues home", () => {
   it("toggles to the Board, writing view to the URL and hiding Group by", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ view: "board" }));
@@ -245,7 +270,7 @@ describe("the board view of the Issues home", () => {
   });
 
   it("keeps the Board when its toggle is pressed again", async () => {
-    const router = await mountAt("/?view=board");
+    const router = await mountAt("/?view=board", { member: { ...ada, image: null } });
     await screen.findByRole("region", { name: "Intent" });
     // Base UI hands a single-select group [] on a second click; the view stays.
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
@@ -258,7 +283,7 @@ describe("the board view of the Issues home", () => {
   });
 
   it("folds same-named States into one column across Projects and keeps the Gate ruling on a card", async () => {
-    await mountAt("/?view=board");
+    await mountAt("/?view=board", { member: { ...ada, image: null } });
     const intent = await screen.findByRole("region", { name: "Intent" });
     const names = [...document.querySelectorAll('[data-slot="board-column"]')].map((column) =>
       column.getAttribute("aria-label"),
