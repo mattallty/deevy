@@ -98,6 +98,9 @@ go through the catalog.
   Round 3 (2026-09-06) chose them as indigo's neighbours — sky & rose, with amber the one warm colour, so a
   Gate jumps — from six analogous candidates. **Labels choose among eight swatches** (`lib/label-colors.ts`:
   sky, rose, amber, indigo, green, red, slate, violet; white text on each), never a free colour.
+  A Label is `LabelBadge` (`components/label-badge.tsx`): the scope as a small pill inside the badge, then
+  the name — `[[epic] Agent loop]`, never `epic: Agent loop` on screen; `solid` in Settings, `outline` on
+  rows and cards. The badge names itself `labelText(label)` (`epic: Agent loop`), which is what a test reads.
   Both themes; a real System/Light/Dark toggle. Round 1's warm Plex look is history (`docs/plans/ui-redesign.md`).
 - **Layout.** Full-bleed frame, 240px sidebar collapsing to 48px, edge-to-edge lists with a 40px filter bar,
   720px side-peek, Issue page = main + 300px rail with the Gate ruling card always on top. Cards only for

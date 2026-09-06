@@ -12,7 +12,9 @@ import {
   ComboboxValue,
   useComboboxAnchor,
 } from "@/components/ui/combobox";
+import { LabelBadge, LabelText } from "@/components/label-badge";
 import { labelText } from "@/lib/labels";
+import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 
@@ -80,10 +82,16 @@ export function LabelPicker({ issueKey, labels, shortcutScope = PAGE_SCOPE }: Pi
                 value.map((label) => (
                   <ComboboxChip
                     key={label.id}
+                    aria-label={labelText(label)}
                     removeLabel={`Remove ${labelText(label)}`}
+                    className={cn(label.scope && "pl-0.5")}
                     style={{ borderLeft: `3px solid ${label.color}` }}
                   >
-                    {labelText(label)}
+                    <LabelText
+                      label={label}
+                      scopeClassName="text-white"
+                      scopeStyle={{ backgroundColor: label.color }}
+                    />
                   </ComboboxChip>
                 ))
               }
@@ -103,12 +111,7 @@ export function LabelPicker({ issueKey, labels, shortcutScope = PAGE_SCOPE }: Pi
             <ComboboxList>
               {(label: PickerLabel) => (
                 <ComboboxItem key={label.id} value={label}>
-                  <span
-                    aria-hidden
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ background: label.color }}
-                  />
-                  {labelText(label)}
+                  <LabelBadge label={label} />
                 </ComboboxItem>
               )}
             </ComboboxList>

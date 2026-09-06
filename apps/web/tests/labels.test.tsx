@@ -69,11 +69,14 @@ async function mountAt(path: string) {
 }
 
 describe("the Labels settings page", () => {
-  it("lists Labels, showing a scoped one as scope: name", async () => {
+  it("lists Labels, a scoped one as its scope in a pill then its name", async () => {
     await mountAt("/settings/labels");
 
     expect(await screen.findByText("backend")).toBeTruthy();
-    expect(screen.getByText("epic: Checkout")).toBeTruthy();
+    // The eye sees [[epic] Checkout]; the badge names itself `epic: Checkout`.
+    const scoped = screen.getByLabelText("epic: Checkout");
+    expect(scoped.textContent).toBe("epicCheckout");
+    expect(within(scoped).getByText("epic")).toBeTruthy();
   });
 
   it("creates a Label from the form, splitting scope from name", async () => {

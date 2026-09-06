@@ -13,7 +13,7 @@ import {
   type KanbanMoveEvent,
 } from "@/components/reui/kanban";
 import { StateBadge } from "@/components/state-badge";
-import { Badge } from "@/components/ui/badge";
+import { LabelBadge } from "@/components/label-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +42,7 @@ export interface BoardIssue {
     handle?: string | null;
     user: { name: string; image?: string | null };
   } | null;
-  labels: Array<{ id: string; name: string; scope: string | null }>;
+  labels: Array<{ id: string; name: string; scope: string | null; color: string }>;
   updatedAt: string | Date;
 }
 
@@ -331,9 +331,7 @@ export function BoardCard({
       {issue.labels.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {issue.labels.slice(0, 3).map((label) => (
-            <Badge key={label.id} variant="outline" className="font-normal">
-              {label.scope ? `${label.scope}: ${label.name}` : label.name}
-            </Badge>
+            <LabelBadge key={label.id} label={label} />
           ))}
         </div>
       ) : null}

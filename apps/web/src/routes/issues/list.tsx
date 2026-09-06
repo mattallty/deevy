@@ -14,7 +14,7 @@ import { MemberChip } from "@/components/member-chip";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { StateBadge } from "@/components/state-badge";
-import { Badge } from "@/components/ui/badge";
+import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
 import { categoryOrder, foldStates } from "@/lib/states";
 import { useShortcut } from "@/lib/shortcuts";
@@ -238,13 +238,7 @@ export function IssuesPage({
         <span className="flex min-w-0 items-center gap-2 overflow-hidden">
           <span className="min-w-0 truncate font-medium">{row.title}</span>
           {row.labels.slice(0, 2).map((label) => (
-            <Badge
-              key={label.id}
-              variant="outline"
-              className="hidden shrink-0 font-normal sm:inline-flex"
-            >
-              {label.scope ? `${label.scope}: ${label.name}` : label.name}
-            </Badge>
+            <LabelBadge key={label.id} label={label} className="hidden shrink-0 sm:inline-flex" />
           ))}
           {row.labels.length > 2 ? (
             <span className="hidden text-xs text-muted-foreground sm:inline">

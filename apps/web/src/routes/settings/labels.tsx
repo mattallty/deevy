@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label as FieldLabel } from "@/components/ui/label";
@@ -13,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { labelText } from "@/lib/labels";
+import { LabelBadge } from "@/components/label-badge";
 import { SettingsPage } from "@/components/settings-page";
 import { labelColors } from "@/lib/label-colors";
 import { orpc } from "@/lib/orpc";
@@ -131,9 +130,7 @@ export function LabelsPage() {
             {labels.data.labels.map((label) => (
               <TableRow key={label.id}>
                 <TableCell>
-                  <Badge style={{ backgroundColor: label.color, color: "#fff" }}>
-                    {labelText(label)}
-                  </Badge>
+                  <LabelBadge label={label} variant="solid" />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
