@@ -27,6 +27,7 @@ import { useMentionables } from "@/lib/mentions";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc.ts";
+import { isNotFound, NotFoundPage } from "@/routes/not-found";
 
 const UNASSIGNED = "unassigned";
 
@@ -78,6 +79,9 @@ export function IssuePage({
 
   if (issue.isPending) return <p className="text-muted-foreground">Loading {issueKey}…</p>;
   if (issue.isError) {
+    if (isNotFound(issue.error)) {
+      return <NotFoundPage what={`Issue ${issueKey}`} detail={issue.error.message} />;
+    }
     return (
       <p className="text-destructive">
         Could not load {issueKey}: {issue.error.message}

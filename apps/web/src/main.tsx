@@ -3,12 +3,21 @@ import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import { isNotFound } from "./routes/not-found.tsx";
 import "./index.css";
 
 // A list re-read within five seconds of the last read is the same list: the
 // live stream invalidates what an Event changed, so a mounted screen never
 // needs to refetch merely because a component remounted (lib/live.ts).
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000 } } });
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5_000,
+      // A thing that does not exist will not appear on the third try: say so at once.
+      retry: (failureCount, error) => !isNotFound(error) && failureCount < 3,
+    },
+  },
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

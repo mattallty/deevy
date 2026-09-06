@@ -136,6 +136,10 @@ string` erases the literal and every typed `to` in the app stops compiling.
   its children straight into the Dialog, so the cmdk `<Command>` root is ours to add inside it. cmdk itself
   depends on `@radix-ui/react-dialog` and friends — the one sanctioned transitive Radix dependency, because
   it is what shadcn ships for Base UI projects too; nothing under `apps/web/src` imports Radix directly.
+- **Nowhere is a page.** `routes/not-found.tsx` is the root route's `notFoundComponent` and what the Issue
+  and Project pages render when the API says `NOT_FOUND` (`isNotFound`, which the QueryClient also uses to
+  skip retries): inside the shell, `h1` "There is nothing here" or "There is no Issue DEV-999", the path or
+  the API's message, then Go back / All Issues / Inbox.
 - **Base UI menus.** A `DropdownMenuLabel` must sit inside a `DropdownMenuGroup` (or a radio group) or the
   menu throws the moment it opens. Make a menu's trigger the DOM button itself (`DropdownMenuTrigger
 className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}`: a `tooltip` there turns

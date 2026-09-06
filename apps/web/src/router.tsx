@@ -19,6 +19,7 @@ import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
 import { TokensPage } from "./routes/dev/tokens.tsx";
 import { InboxPage, parseInboxSearch } from "./routes/inbox.tsx";
+import { NotFoundPage } from "./routes/not-found.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectIssuesTab, ProjectLayout } from "./routes/projects/project.tsx";
@@ -48,6 +49,8 @@ const rootRoute = createRootRouteWithContext<ShellProps>()({
   component: function Root() {
     return <AppShell {...rootRoute.useRouteContext()} />;
   },
+  // A URL no route claims renders inside the shell, not as the router's bare <p>.
+  notFoundComponent: () => <NotFoundPage />,
 });
 
 // Home is the Issues you may see; the filters and the peek ride in the URL, so

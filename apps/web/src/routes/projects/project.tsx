@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 import { IssuesPage } from "@/routes/issues/list";
+import { isNotFound, NotFoundPage } from "@/routes/not-found";
 
 const tabs = [
   { label: "Issues", to: "" },
@@ -29,6 +30,9 @@ export function ProjectLayout({ projectKey }: { projectKey: string }) {
 
   if (project.isPending) return <p className="text-muted-foreground">Loading Project…</p>;
   if (project.isError) {
+    if (isNotFound(project.error)) {
+      return <NotFoundPage what={`Project ${projectKey}`} detail={project.error.message} />;
+    }
     return (
       <p className="text-destructive">
         Could not load {projectKey}: {project.error.message}
