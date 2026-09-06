@@ -2,14 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Bot } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import {
   Dialog,
   DialogContent,
@@ -21,14 +15,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { MemberChip } from "@/components/member-chip";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
@@ -84,10 +70,137 @@ export function AgentsPage() {
   const reinstate = useMutation(orpc.agents.reinstate.mutationOptions({ onSuccess: refresh }));
   const failed = suspend.error ?? reinstate.error ?? update.error;
 
-  if (agents.isPending) return <p className="text-muted-foreground">Loading Agents…</p>;
   if (agents.isError) {
     return <p className="text-destructive">Could not load Agents: {agents.error.message}</p>;
   }
+
+  type AgentRow = NonNullable<typeof agents.data>["agents"][number];
+  const columns: DataColumn<AgentRow>[] = [
+    {
+      id: "agent",
+      header: "Agent",
+      cell: (agent) => (
+        <Link
+          to="/settings/agents/$memberId"
+          params={{ memberId: agent.id }}
+          className="underline-offset-4 hover:underline"
+        >
+          <MemberChip
+            member={{
+              id: agent.id,
+              kind: "agent",
+              handle: agent.handle,
+              suspendedAt: agent.suspendedAt,
+              user: agent.user,
+            }}
+            showHandle
+          />
+        </Link>
+      ),
+      sortValue: (agent) => agent.user.name,
+      className: "w-full",
+    },
+    {
+      id: "sponsor",
+      header: "Sponsor",
+      cell: (agent) =>
+        agent.sponsor ? (
+          <MemberChip
+            member={{ id: agent.sponsor.id, kind: "human", user: agent.sponsor.user }}
+            size="xs"
+          />
+        ) : (
+          <span className="text-destructive">No Sponsor</span>
+        ),
+      sortValue: (agent) => agent.sponsor?.user.name ?? "",
+    },
+    {
+      id: "grants",
+      header: "Can see",
+      cell: (agent) => (
+        <span className="text-muted-foreground">
+          {grantSummary(agent.grantedProjectIds.length)}
+        </span>
+      ),
+      sortValue: (agent) => agent.grantedProjectIds.length,
+    },
+    {
+      id: "schedule",
+      header: "Schedule",
+      cell: (agent) => (
+        <Select
+          value={agent.scheduleMinutes === null ? NEVER : String(agent.scheduleMinutes)}
+          disabled={update.isPending}
+          onValueChange={(next) => {
+            if (next === null) return;
+            update.mutate({
+              memberId: agent.id,
+              scheduleMinutes: next === NEVER ? null : Number(next),
+            });
+          }}
+        >
+          <SelectTrigger size="sm" aria-label={`Schedule for ${agent.user.name}`} className="w-44">
+            <SelectValue>
+              {(selected: string) =>
+                selected === NEVER
+                  ? "Never"
+                  : (intervals.find((interval) => String(interval.minutes) === selected)?.label ??
+                    selected)
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value={NEVER}>Never</SelectItem>
+            </SelectGroup>
+            <SelectSeparator />
+            <SelectGroup>
+              {intervals.map((interval) => (
+                <SelectItem key={interval.minutes} value={String(interval.minutes)}>
+                  {interval.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (agent) => (
+        <span className="flex items-center justify-end gap-2">
+          {agent.suspendedAt ? (
+            <>
+              <Badge variant="outline">Suspended</Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reinstate.isPending}
+                onClick={() => reinstate.mutate({ memberId: agent.id })}
+              >
+                Reinstate
+              </Button>
+            </>
+          ) : (
+            <>
+              <Badge variant="secondary">Active</Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={suspend.isPending}
+                onClick={() => suspend.mutate({ memberId: agent.id })}
+              >
+                Suspend
+              </Button>
+            </>
+          )}
+        </span>
+      ),
+      className: "text-right",
+      headerClassName: "text-right",
+    },
+  ];
 
   return (
     <SettingsPage
@@ -110,136 +223,18 @@ export function AgentsPage() {
         </code>
       </SettingsSection>
 
-      {agents.data.agents.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Bot aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No Agents yet</EmptyTitle>
-            <EmptyDescription>
-              Create one above to give it an identity and an API key.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Agent</TableHead>
-              <TableHead>Sponsor</TableHead>
-              <TableHead>Can see</TableHead>
-              <TableHead>Schedule</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {agents.data.agents.map((agent) => (
-              <TableRow key={agent.id}>
-                <TableCell>
-                  <Link
-                    to="/settings/agents/$memberId"
-                    params={{ memberId: agent.id }}
-                    className="underline-offset-4 hover:underline"
-                  >
-                    <MemberChip
-                      member={{
-                        id: agent.id,
-                        kind: "agent",
-                        handle: agent.handle,
-                        suspendedAt: agent.suspendedAt,
-                        user: agent.user,
-                      }}
-                      showHandle
-                    />
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  {agent.sponsor ? (
-                    <MemberChip
-                      member={{ id: agent.sponsor.id, kind: "human", user: agent.sponsor.user }}
-                      size="xs"
-                    />
-                  ) : (
-                    <span className="text-destructive">No Sponsor</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {grantSummary(agent.grantedProjectIds.length)}
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={agent.scheduleMinutes === null ? NEVER : String(agent.scheduleMinutes)}
-                    disabled={update.isPending}
-                    onValueChange={(next) => {
-                      if (next === null) return;
-                      update.mutate({
-                        memberId: agent.id,
-                        scheduleMinutes: next === NEVER ? null : Number(next),
-                      });
-                    }}
-                  >
-                    <SelectTrigger
-                      size="sm"
-                      aria-label={`Schedule for ${agent.user.name}`}
-                      className="w-44"
-                    >
-                      <SelectValue>
-                        {(selected: string) =>
-                          selected === NEVER
-                            ? "Never"
-                            : (intervals.find((interval) => String(interval.minutes) === selected)
-                                ?.label ?? selected)
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value={NEVER}>Never</SelectItem>
-                      </SelectGroup>
-                      <SelectSeparator />
-                      <SelectGroup>
-                        {intervals.map((interval) => (
-                          <SelectItem key={interval.minutes} value={String(interval.minutes)}>
-                            {interval.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="flex items-center justify-end gap-2 text-right">
-                  {agent.suspendedAt ? (
-                    <>
-                      <Badge variant="outline">Suspended</Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={reinstate.isPending}
-                        onClick={() => reinstate.mutate({ memberId: agent.id })}
-                      >
-                        Reinstate
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Badge variant="secondary">Active</Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={suspend.isPending}
-                        onClick={() => suspend.mutate({ memberId: agent.id })}
-                      >
-                        Suspend
-                      </Button>
-                    </>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      <DataTable
+        aria-label="Agents"
+        columns={columns}
+        rows={agents.data?.agents ?? []}
+        getRowId={(agent) => agent.id}
+        loading={agents.isPending}
+        empty={{
+          icon: Bot,
+          title: "No Agents yet",
+          description: "Create one above to give it an identity and an API key.",
+        }}
+      />
     </SettingsPage>
   );
 }

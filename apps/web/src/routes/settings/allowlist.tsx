@@ -1,14 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,14 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 
@@ -58,6 +44,38 @@ export function AllowlistPage() {
   );
   const remove = useMutation(orpc.allowlist.remove.mutationOptions({ onSuccess: refresh }));
   const failed = add.error ?? remove.error;
+
+  type RuleRow = NonNullable<typeof rules.data>["rules"][number];
+  const columns: DataColumn<RuleRow>[] = [
+    {
+      id: "kind",
+      header: "Match on",
+      cell: (rule) => <span className="text-muted-foreground">{kindLabels[rule.kind]}</span>,
+      sortValue: (rule) => kindLabels[rule.kind],
+    },
+    {
+      id: "value",
+      header: "Value",
+      cell: (rule) => <span className="font-medium">{rule.value}</span>,
+      sortValue: (rule) => rule.value,
+      className: "w-full",
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: (rule) => (
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={remove.isPending}
+          onClick={() => remove.mutate({ ruleId: rule.id })}
+        >
+          Remove
+        </Button>
+      ),
+      className: "text-right",
+    },
+  ];
 
   return (
     <SettingsPage
@@ -103,52 +121,23 @@ export function AllowlistPage() {
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
-      {rules.isPending ? <p className="text-muted-foreground">Loading rules…</p> : null}
       {rules.isError ? (
         <p className="text-destructive">Could not load the allowlist: {rules.error.message}</p>
-      ) : null}
-      {rules.data ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Match on</TableHead>
-              <TableHead>Value</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rules.data.rules.map((rule) => (
-              <TableRow key={rule.id}>
-                <TableCell className="text-muted-foreground">{kindLabels[rule.kind]}</TableCell>
-                <TableCell className="font-medium">{rule.value}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate({ ruleId: rule.id })}
-                  >
-                    Remove
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-      {rules.data?.rules.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ShieldCheck aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No rules yet</EmptyTitle>
-            <EmptyDescription>
-              Nobody new can join until there is one. Add a domain or an address above.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
+      ) : (
+        <DataTable
+          aria-label="Allowlist"
+          columns={columns}
+          rows={rules.data?.rules ?? []}
+          getRowId={(rule) => rule.id}
+          loading={rules.isPending}
+          empty={{
+            icon: ShieldCheck,
+            title: "No rules yet",
+            description:
+              "Nobody new can join until there is one. Add a domain or an address above.",
+          }}
+        />
+      )}
     </SettingsPage>
   );
 }

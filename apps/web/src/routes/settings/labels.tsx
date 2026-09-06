@@ -1,25 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Tags } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label as FieldLabel } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { LabelBadge } from "@/components/label-badge";
 import { SettingsPage } from "@/components/settings-page";
 import { LABEL_COLORS } from "@/lib/label-colors";
@@ -48,6 +33,32 @@ export function LabelsPage() {
   );
   const remove = useMutation(orpc.labels.delete.mutationOptions({ onSuccess: refresh }));
   const failed = create.error ?? remove.error;
+
+  type LabelRow = NonNullable<typeof labels.data>["labels"][number];
+  const columns: DataColumn<LabelRow>[] = [
+    {
+      id: "label",
+      header: "Label",
+      cell: (label) => <LabelBadge label={label} variant="solid" />,
+      sortValue: (label) => `${label.scope ?? ""} ${label.name}`,
+      className: "w-full",
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: (label) => (
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={remove.isPending}
+          onClick={() => remove.mutate({ labelId: label.id })}
+        >
+          Delete
+        </Button>
+      ),
+      className: "text-right",
+    },
+  ];
 
   return (
     <SettingsPage
@@ -124,51 +135,19 @@ export function LabelsPage() {
       </form>
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
-      {labels.isPending ? <Skeleton className="h-32 w-full" /> : null}
 
-      {labels.data && labels.data.labels.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Label</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {labels.data.labels.map((label) => (
-              <TableRow key={label.id}>
-                <TableCell>
-                  <LabelBadge label={label} variant="solid" />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate({ labelId: label.id })}
-                  >
-                    Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-
-      {labels.data?.labels.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Tags aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No Labels yet</EmptyTitle>
-            <EmptyDescription>
-              Add one above; an Issue then carries it, one per scope.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
+      <DataTable
+        aria-label="Labels"
+        columns={columns}
+        rows={labels.data?.labels ?? []}
+        getRowId={(label) => label.id}
+        loading={labels.isPending}
+        empty={{
+          icon: Tags,
+          title: "No Labels yet",
+          description: "Add one above; an Issue then carries it, one per scope.",
+        }}
+      />
     </SettingsPage>
   );
 }

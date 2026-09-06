@@ -1,25 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { GitBranch } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 import {
@@ -54,6 +39,38 @@ export function RepositoriesPage() {
   );
   const remove = useMutation(orpc.repositories.delete.mutationOptions({ onSuccess: refresh }));
   const failed = create.error ?? remove.error;
+
+  type RepositoryRow = NonNullable<typeof repositories.data>["repositories"][number];
+  const columns: DataColumn<RepositoryRow>[] = [
+    {
+      id: "name",
+      header: "Repository",
+      cell: (repository) => <span className="font-medium">{repository.name}</span>,
+      sortValue: (repository) => repository.name,
+    },
+    {
+      id: "url",
+      header: "URL",
+      cell: (repository) => <span className="text-muted-foreground">{repository.url}</span>,
+      sortValue: (repository) => repository.url,
+      className: "w-full",
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: (repository) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={remove.isPending}
+          onClick={() => remove.mutate({ repositoryId: repository.id })}
+        >
+          Forget
+        </Button>
+      ),
+      className: "text-right",
+    },
+  ];
 
   return (
     <SettingsPage
@@ -117,51 +134,19 @@ export function RepositoriesPage() {
       </form>
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
-      {repositories.isPending ? <Skeleton className="h-32 w-full" /> : null}
 
-      {repositories.data && repositories.data.repositories.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Repository</TableHead>
-              <TableHead>URL</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {repositories.data.repositories.map((repository) => (
-              <TableRow key={repository.id}>
-                <TableCell className="font-medium">{repository.name}</TableCell>
-                <TableCell className="text-muted-foreground">{repository.url}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate({ repositoryId: repository.id })}
-                  >
-                    Forget
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-
-      {repositories.data?.repositories.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <GitBranch aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No Repositories yet</EmptyTitle>
-            <EmptyDescription>
-              Register one above, so a pull request can link to its Issue.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
+      <DataTable
+        aria-label="Repositories"
+        columns={columns}
+        rows={repositories.data?.repositories ?? []}
+        getRowId={(repository) => repository.id}
+        loading={repositories.isPending}
+        empty={{
+          icon: GitBranch,
+          title: "No Repositories yet",
+          description: "Register one above, so a pull request can link to its Issue.",
+        }}
+      />
     </SettingsPage>
   );
 }

@@ -1,25 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { MessageSquare } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 import {
@@ -121,6 +106,48 @@ export function ChannelsPage() {
   const rows = channels.data?.channels ?? [];
   const failed = create.error ?? remove.error ?? test.error ?? save.error;
 
+  type ChannelRow = (typeof rows)[number];
+  const columns: DataColumn<ChannelRow>[] = [
+    {
+      id: "name",
+      header: "Channel",
+      cell: (channel) => <span className="font-medium">{channel.name}</span>,
+      sortValue: (channel) => channel.name,
+    },
+    {
+      id: "host",
+      header: "Posts to",
+      cell: (channel) => <span className="text-muted-foreground">{channel.webhookHost}</span>,
+      sortValue: (channel) => channel.webhookHost,
+      className: "w-full",
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: (channel) => (
+        <span className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={test.isPending}
+            onClick={() => test.mutate({ channelId: channel.id })}
+          >
+            Test
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate({ channelId: channel.id })}
+          >
+            Remove
+          </Button>
+        </span>
+      ),
+      className: "text-right",
+    },
+  ];
+
   return (
     <SettingsPage
       title="Channels"
@@ -165,59 +192,19 @@ export function ChannelsPage() {
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
       {tested ? <p className="text-sm text-muted-foreground">{tested}</p> : null}
-      {channels.isPending ? <Skeleton className="h-24 w-full" /> : null}
 
-      {rows.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Channel</TableHead>
-              <TableHead>Posts to</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((channel) => (
-              <TableRow key={channel.id}>
-                <TableCell className="font-medium">{channel.name}</TableCell>
-                <TableCell className="text-muted-foreground">{channel.webhookHost}</TableCell>
-                <TableCell className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={test.isPending}
-                    onClick={() => test.mutate({ channelId: channel.id })}
-                  >
-                    Test
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate({ channelId: channel.id })}
-                  >
-                    Remove
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-
-      {channels.data && rows.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <MessageSquare aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No Channels yet</EmptyTitle>
-            <EmptyDescription>
-              Connect one above, and route a kind of Notification to it.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
+      <DataTable
+        aria-label="Channels"
+        columns={columns}
+        rows={rows}
+        getRowId={(channel) => channel.id}
+        loading={channels.isPending}
+        empty={{
+          icon: MessageSquare,
+          title: "No Channels yet",
+          description: "Connect one above, and route a kind of Notification to it.",
+        }}
+      />
 
       <SettingsSection
         title="Routing"

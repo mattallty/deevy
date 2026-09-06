@@ -1,25 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Webhook } from "lucide-react";
+import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc";
 
@@ -93,6 +79,73 @@ export function WebhooksPage() {
   const rows = subscriptions.data?.subscriptions ?? [];
   const failed = create.error ?? remove.error ?? update.error ?? redeliver.error;
 
+  type SubscriptionRow = (typeof rows)[number];
+  const columns: DataColumn<SubscriptionRow>[] = [
+    {
+      id: "url",
+      header: "URL",
+      cell: (subscription) => <span className="font-medium">{subscription.url}</span>,
+      sortValue: (subscription) => subscription.url,
+      className: "w-full",
+    },
+    {
+      id: "kinds",
+      header: "Events",
+      cell: (subscription) => (
+        <span className="text-muted-foreground">
+          {(subscription.kinds ?? ["Everything"]).join(", ")}
+        </span>
+      ),
+    },
+    {
+      id: "state",
+      header: "State",
+      cell: (subscription) => (
+        <span className="text-muted-foreground">{subscription.disabledAt ? "Off" : "On"}</span>
+      ),
+      sortValue: (subscription) => (subscription.disabledAt ? "Off" : "On"),
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: (subscription) => (
+        <span className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setOpen((current) => (current === subscription.id ? null : subscription.id))
+            }
+          >
+            Deliveries
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={update.isPending}
+            onClick={() =>
+              update.mutate({
+                subscriptionId: subscription.id,
+                disabled: subscription.disabledAt === null,
+              })
+            }
+          >
+            {subscription.disabledAt ? "Switch on" : "Switch off"}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate({ subscriptionId: subscription.id })}
+          >
+            Remove
+          </Button>
+        </span>
+      ),
+      className: "text-right",
+    },
+  ];
+
   return (
     <SettingsPage
       title="Webhooks"
@@ -155,79 +208,19 @@ export function WebhooksPage() {
         </p>
       ) : null}
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
-      {subscriptions.isPending ? <Skeleton className="h-24 w-full" /> : null}
 
-      {rows.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>URL</TableHead>
-              <TableHead>Events</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead className="text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((subscription) => (
-              <TableRow key={subscription.id}>
-                <TableCell className="font-medium">{subscription.url}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {(subscription.kinds ?? ["Everything"]).join(", ")}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {subscription.disabledAt ? "Off" : "On"}
-                </TableCell>
-                <TableCell className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setOpen((current) => (current === subscription.id ? null : subscription.id))
-                    }
-                  >
-                    Deliveries
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={update.isPending}
-                    onClick={() =>
-                      update.mutate({
-                        subscriptionId: subscription.id,
-                        disabled: subscription.disabledAt === null,
-                      })
-                    }
-                  >
-                    {subscription.disabledAt ? "Switch on" : "Switch off"}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate({ subscriptionId: subscription.id })}
-                  >
-                    Remove
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-
-      {subscriptions.data && rows.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Webhook aria-hidden />
-            </EmptyMedia>
-            <EmptyTitle>No Webhooks yet</EmptyTitle>
-            <EmptyDescription>
-              Subscribe a URL above; every Event it names is delivered there.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
+      <DataTable
+        aria-label="Webhooks"
+        columns={columns}
+        rows={rows}
+        getRowId={(subscription) => subscription.id}
+        loading={subscriptions.isPending}
+        empty={{
+          icon: Webhook,
+          title: "No Webhooks yet",
+          description: "Subscribe a URL above; every Event it names is delivered there.",
+        }}
+      />
 
       {open ? (
         <SettingsSection
