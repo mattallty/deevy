@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Shortcut } from "@/components/kbd-hint";
-import { MemberChip } from "@/components/member-chip";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { Button } from "@/components/ui/button";
@@ -245,8 +244,9 @@ export function InboxPage({
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="flex flex-wrap items-baseline gap-x-1.5">
+                      {/* The name alone: the glyph on the left already says what happened. */}
                       {notification.actor ? (
-                        <MemberChip member={notification.actor} size="xs" />
+                        <span className="font-medium">{notification.actor.user.name}</span>
                       ) : (
                         <span className="text-muted-foreground">deevy</span>
                       )}

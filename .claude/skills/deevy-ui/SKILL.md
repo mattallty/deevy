@@ -353,7 +353,7 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   (`"__any"`, `"__none"`), never `""`. `ui/native-select.tsx` is gone. In a test, `pickOption(trigger, name)`
   from `tests/select.ts` drives one (ArrowDown opens, Enter on the highlighted option chooses — a click
   does not), and `selectedLabel(trigger)` reads it.
-- **The Inbox** is one flat two-line list (`ul aria-label="Notifications"`): actor chip · verb · on KEY,
+- **The Inbox** is one flat two-line list (`ul aria-label="Notifications"`): actor's name (no chip: the kind glyph on the left is enough) · verb · on KEY,
   the Issue title, the quote. `lib/notification-text.ts` phrases it from the joined Event, actor and
   comment; a checkbox per row and `x` select, a `toolbar "Selection"` marks several read.
 - **Any Issue list is also a board.** `view=board` in the URL, `lib/states.ts` `foldStates` for the
