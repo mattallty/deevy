@@ -253,6 +253,37 @@ scripted session, which is the proof the supervisor did not notice.
 
 ---
 
+### Found by building the slice
+
+**The three open questions, answered by running the CLI.** `--setting-sources ""` is accepted and loads
+nothing; with `--strict-mcp-config` a server planted in the session home's `.claude.json` was not
+connected, which is the case that matters. `--output-format stream-json` carries the `system` /
+`permission_denied` message with the tool name and the CLI's own sentence about the refusal, so `denied`
+keeps its source. The `result` message carries `usage` and `total_cost_usd`; the recorded fixture cost
+$0.02 on the smallest model, which is what a fixture should cost.
+
+**The stream lists every built-in tool in `init`, allowed or not.** `tools` in the init message is what
+exists, not what is granted; `--allowedTools` governs permission and the list does not shrink. The
+`ready` event still carries it for the log, and nothing decides anything on it.
+
+**A session gets a home of its own, which the plan did not ask for.** The runner makes a `HOME` per session
+and removes it after. It fell out of the Cursor and Copilot recipes needing a home the supervisor writes
+into, and it closes a gap the environment allowlist had left open: a session's shell could read the
+operator's dotfiles, and on a laptop that is where credentials live. The cost is that git inside the
+session has no global configuration, which the delivery step never needed because it passes the author
+with `-c`.
+
+**Usage is logged, not written into deevy.** The plan wanted it on the `runs_finish` summary's last line;
+the model finishes its own Run, and a finished Run takes no more writes. So `done` carries it, `WorkResult`
+carries it, and the loop logs it beside the outcome. The after-v1 cost-per-Run item now has one number per
+Run to start from, whichever harness produced it.
+
+**The image installs a CLI, and one script decides which.** `harness.sh` takes a name and installs that
+CLI at the version the recipe was tested against; the Dockerfile's `HARNESS` build argument passes it in
+and sets `DEEVY_AGENT_HARNESS` to match. Slice 6 adds the other three cases and the tags.
+
+---
+
 ## Slice 3: OpenCode (M)
 
 **Goal.** The same Run, worked by OpenCode against whichever provider the operator gives it a key for.

@@ -13,13 +13,18 @@ export interface Config {
    * of the runtime's identity (ADR-0001).
    */
   key: string;
+  /**
+   * Which coding-agent CLI works the Runs, by the name its recipe registers
+   * (src/harness/index.ts). The supervisor is the same whichever it is.
+   */
+  harness: string;
   /** How long to wait before asking deevy for work again when there was none. */
   pollSeconds: number;
   /** How long one Run may take before the session working it is aborted. */
   runTimeoutSeconds: number;
-  /** The model the session runs on. */
+  /** The model the session runs on, in the harness's own naming. */
   model: string;
-  /** How hard it thinks. Raise it for work that is more than a Document. */
+  /** How hard it thinks, where the harness has the knob. Raise it for work that is more than a Document. */
   effort: "low" | "medium" | "high" | "xhigh" | "max";
   /** A backstop on a session that will not stop. The timeout is the real bound. */
   maxTurns: number;
@@ -79,6 +84,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
   return {
     url: required(env, "DEEVY_URL").replace(/\/+$/, ""),
     key: required(env, "DEEVY_AGENT_KEY"),
+    harness: env.DEEVY_AGENT_HARNESS ?? "claude-code",
     pollSeconds: positive(env.DEEVY_AGENT_POLL_SECONDS, 30),
     // Thirty minutes is deevy's own stale window (docs/plans/m2.md): a session
     // allowed to outlive it would be reported stale by the sweep while it was

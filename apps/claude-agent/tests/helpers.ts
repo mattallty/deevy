@@ -22,6 +22,7 @@ const baseURL = "http://localhost:3000";
 export const testConfig: Config = {
   url: baseURL,
   key: "unset",
+  harness: "claude-code",
   pollSeconds: 1,
   runTimeoutSeconds: 60,
   model: "claude-opus-5",

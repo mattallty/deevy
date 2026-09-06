@@ -1,0 +1,199 @@
+import type { SessionEvent } from "../session.ts";
+import { deevyToolNames } from "../tools.ts";
+import type { Harness, HarnessContext } from "./contract.ts";
+
+/** The deevy tools, namespaced the way Claude Code sees an MCP tool. */
+export const deevyTools: ReadonlyArray<string> = deevyToolNames.map(
+  (tool) => `mcp__deevy__${tool}`,
+);
+
+/**
+ * What the session gets on top of deevy when it has a repository to work in.
+ *
+ * Each one is here for a reason: the file tools for the checkout, `Bash` for
+ * the build and the tests, and the web tools for documentation an Issue points
+ * at. Without a repository none of these are granted — a shell with nothing to
+ * run is not a default worth having, and the tool surface following the
+ * configuration means nobody gets one by forgetting (docs/plans/m4.md).
+ */
+export const repositoryTools: ReadonlyArray<string> = [
+  "Read",
+  "Write",
+  "Edit",
+  "Glob",
+  "Grep",
+  "Bash",
+  "WebSearch",
+  "WebFetch",
+];
+
+/**
+ * What is refused even where it would otherwise be reachable.
+ *
+ * The supervisor owns git and the credential to use it, so a session reaching
+ * for a push or a pull request is a bug rather than initiative, and denying it
+ * makes that ownership enforced instead of hoped for. Nothing else is listed:
+ * a denylist beside an allowlist invites the belief that the allowlist has
+ * holes this patches, and it does not.
+ */
+export const deniedTools: ReadonlyArray<string> = [
+  "Bash(git push:*)",
+  "Bash(git remote:*)",
+  "Bash(git config:*)",
+  "Bash(gh:*)",
+];
+
+/**
+ * Claude Code, headless: `claude -p` with the stream the Agent SDK reads,
+ * driven directly (ADR-0018).
+ *
+ * The argv is the whole security boundary for this harness and is asserted
+ * whole by a test. Each flag answers one of ADR-0014's bounds: the tools are
+ * granted by name and refused rather than parked (`--allowedTools`,
+ * `--permission-prompts none`), nothing on disk configures the session
+ * (`--setting-sources ""`, `--strict-mcp-config`, and the strip list for the
+ * files a repository could ship), and the MCP server is the supervisor's
+ * loopback proxy with no credential (src/proxy.ts).
+ */
+export const claudeCode: Harness = {
+  name: "claude-code",
+  binary: "claude",
+  env: {
+    // Nothing is required: on a laptop Claude Code may be signed in, and in a
+    // container `ANTHROPIC_API_KEY` is how it is given a credential. `CLAUDE_`
+    // is deliberately not a prefix here: that is the host tooling's own state,
+    // and inheriting it is what let a session authenticate as somebody's editor.
+    requires: [],
+    names: [],
+    prefixes: ["ANTHROPIC_"],
+  },
+  // What a repository could ship to configure this CLI. `CLAUDE.md` stays: it
+  // is input, and input is untrusted rather than forbidden (ADR-0014).
+  strip: [".mcp.json", ".claude"],
+  argv({ config, input, instructions }: HarnessContext): string[] {
+    const tools = config.repo ? [...deevyTools, ...repositoryTools] : [...deevyTools];
+    return [
+      // The prompt first: the tool lists below are variadic and would take a
+      // positional argument after them as one more tool.
+      "-p",
+      input.prompt,
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      // The supervisor's proxy, with no credential (src/proxy.ts). A person's
+      // `.mcp.json` names deevy's own endpoint and carries the header instead
+      // (docs/agent-loop.md); the difference is who holds the key.
+      "--mcp-config",
+      JSON.stringify({ mcpServers: { deevy: { type: "http", url: input.mcpUrl } } }),
+      "--strict-mcp-config",
+      // No settings from anywhere: not the session's home, not the clone.
+      "--setting-sources",
+      "",
+      // Nobody is here to answer a prompt, so anything not granted is refused
+      // rather than parked. `bypassPermissions` appears nowhere in this
+      // repository: an allowlist grants what was meant and nothing else.
+      "--permission-mode",
+      "default",
+      "--permission-prompts",
+      "none",
+      "--allowedTools",
+      ...tools,
+      ...(config.repo ? ["--disallowedTools", ...deniedTools] : []),
+      "--append-system-prompt-file",
+      instructions,
+      "--model",
+      config.model,
+      "--effort",
+      config.effort,
+      "--max-turns",
+      String(config.maxTurns),
+    ];
+  },
+  parse: toSessionEvents,
+  bounds: [
+    "**Claude Code** is granted its tools by name (`--allowedTools`), refuses anything else rather than",
+    'asking (`--permission-prompts none`), loads no settings from disk (`--setting-sources ""`) and no',
+    "MCP server but the runtime's proxy (`--strict-mcp-config`); `.mcp.json` and `.claude/` are removed",
+    "from the clone before it starts, and `CLAUDE.md` is read as input. A refused tool is a",
+    "`permission_denied` message in its stream, which the runtime writes into the Run's feed. Not bounded:",
+    "what `Bash` runs in the repository, the network, and tokens.",
+  ].join(" "),
+};
+
+/** As much of one Claude Code stream-json message as the runtime reads. */
+interface StreamMessage {
+  type?: string;
+  subtype?: string;
+  tools?: string[];
+  mcp_servers?: Array<{ name: string; status: string }>;
+  tool_name?: string;
+  decision_reason?: string;
+  message?: { content?: Array<{ type: string; name?: string; text?: string }> } | string;
+  is_error?: boolean;
+  result?: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  total_cost_usd?: number;
+}
+
+/**
+ * What the runtime reads out of one line of the stream.
+ *
+ * The stream is the Agent SDK's message union, which has dozens of members and
+ * grows; the supervisor cares about four things. Keeping the narrowing here
+ * means a new message kind is a no-op rather than an error somewhere that
+ * reasons about Runs.
+ */
+export function toSessionEvents(line: string): SessionEvent[] {
+  let message: StreamMessage;
+  try {
+    message = JSON.parse(line) as StreamMessage;
+  } catch {
+    return [];
+  }
+  if (message.type === "system" && message.subtype === "init") {
+    return [{ type: "ready", tools: message.tools ?? [], servers: message.mcp_servers ?? [] }];
+  }
+  if (message.type === "system" && message.subtype === "permission_denied") {
+    const said = typeof message.message === "string" ? message.message : "";
+    return [
+      {
+        type: "denied",
+        name: message.tool_name ?? "?",
+        reason: message.decision_reason ?? said,
+      },
+    ];
+  }
+  if (message.type === "assistant" && typeof message.message === "object") {
+    const events: SessionEvent[] = [];
+    for (const block of message.message.content ?? []) {
+      if (block.type === "tool_use" && block.name) events.push({ type: "tool", name: block.name });
+      if (block.type === "text" && block.text) events.push({ type: "text", text: block.text });
+    }
+    return events;
+  }
+  if (message.type === "result") {
+    const ok = message.subtype === "success" && !message.is_error;
+    const usage = message.usage
+      ? {
+          inputTokens: message.usage.input_tokens ?? 0,
+          outputTokens: message.usage.output_tokens ?? 0,
+          ...(message.total_cost_usd === undefined ? {} : { costUsd: message.total_cost_usd }),
+        }
+      : undefined;
+    return [
+      {
+        type: "done",
+        ok,
+        // An error result carries no prose, so its subtype is the whole of what
+        // the CLI is willing to say, and it is what the Run's error Activity
+        // will quote.
+        detail:
+          message.subtype === "success"
+            ? (message.result ?? "")
+            : `The session ended: ${message.subtype ?? "unknown"}`,
+        ...(usage ? { usage } : {}),
+      },
+    ];
+  }
+  return [];
+}

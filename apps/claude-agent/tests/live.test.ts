@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { buildSession } from "../src/sdk.ts";
+import { harnessFor } from "../src/harness/index.ts";
+import { buildSession } from "../src/harness/run.ts";
 import { runOnce } from "../src/work.ts";
 import { instance, testConfig } from "./helpers.ts";
 
 /**
- * The one test that calls the model, and so the one test that costs money.
+ * The one test that calls the model through a real harness, and so the one
+ * test that costs money.
  *
  * CI does not set `DEEVY_AGENT_LIVE`, and neither does `vp run -r test`: a
  * milestone whose suite needs a paid key is a milestone nobody runs twice
@@ -53,7 +55,7 @@ describe("Claude, working a real Issue", () => {
       const pass = await runOnce({
         deevy: deevy.deevy,
         proxy: deevy.proxy,
-        session: buildSession(config),
+        session: buildSession(config, harnessFor(config)),
         runTimeoutMs: 10 * 60 * 1000,
       });
 

@@ -9,7 +9,7 @@ export {
   type Ruling,
   type Run,
 } from "./deevy.ts";
-export { type Session, type SessionEvent, type SessionInput } from "./session.ts";
+export { type Session, type SessionEvent, type SessionInput, type Usage } from "./session.ts";
 export { deevyToolNames } from "./tools.ts";
 export {
   mcpEnvelope,
@@ -27,19 +27,24 @@ export {
   type WorkOptions,
   type WorkResult,
 } from "./work.ts";
+export type { Harness, HarnessContext } from "./harness/contract.ts";
+export { sessionEnv, sessionEnvAllowed } from "./harness/env.ts";
+export { harnesses, harnessFor, missingFor } from "./harness/index.ts";
 export {
   buildSession,
+  environmentFor,
+  runHarness,
+  stripFromClone,
+  type RunOptions,
+} from "./harness/run.ts";
+export {
+  claudeCode,
   deevyTools,
   deniedTools,
-  linkAbort,
   repositoryTools,
-  sessionEnv,
-  sessionEnvAllowed,
-  sessionEnvAllowedPrefixes,
-  readInstructions,
-  sessionOptions,
   toSessionEvents,
-} from "./sdk.ts";
+} from "./harness/claude-code.ts";
+export { instructionsPath, readInstructions } from "./instructions.ts";
 export { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 export {
   forgeFor,

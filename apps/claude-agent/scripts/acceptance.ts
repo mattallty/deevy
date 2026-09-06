@@ -269,6 +269,7 @@ export async function walk(origin: string, label: string): Promise<string> {
     const config = {
       url: origin,
       key,
+      harness: "claude-code",
       pollSeconds: 1,
       runTimeoutSeconds: 120,
       model: "scripted",

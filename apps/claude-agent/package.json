@@ -8,9 +8,7 @@
     "start": "node dist/main.mjs",
     "acceptance": "node scripts/acceptance.ts"
   },
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "catalog:"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@deevy/adapters": "workspace:*",
     "@deevy/core": "workspace:*",

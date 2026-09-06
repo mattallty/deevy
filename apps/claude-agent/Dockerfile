@@ -2,7 +2,8 @@
 #   docker build -f apps/claude-agent/Dockerfile -t deevy-agent .
 #
 # It is not deevy. It holds one Agent's API key, reaches a deevy instance over
-# HTTP, and runs Claude against the Issues that Agent is assigned (ADR-0003).
+# HTTP, and runs a coding-agent CLI against the Issues that Agent is assigned
+# (ADR-0003). `--build-arg HARNESS=<name>` picks the CLI; see harness.sh.
 FROM ghcr.io/voidzero-dev/vite-plus:0.3.0 AS build
 WORKDIR /src
 COPY --chown=vp:vp . .
@@ -10,16 +11,20 @@ RUN vp install --frozen-lockfile
 RUN vp run claude-agent#build
 
 # The bundle is one file plus the instructions it appends to its system prompt.
-# The Agent SDK stays external because it resolves a platform-specific CLI
-# binary at runtime, so it is installed here at the version the catalog pins.
+# The harness is a CLI the runtime spawns (docs/plans/harnesses.md), installed
+# here at a pinned version; `HARNESS` picks which, and the image is tagged by it.
+ARG HARNESS=claude-code
 FROM node:24-slim AS runtime
+ARG HARNESS
 ENV NODE_ENV=production
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/apps/claude-agent/dist ./dist
-RUN npm install --omit=dev --no-package-lock @anthropic-ai/claude-agent-sdk@0.3.261
+COPY apps/claude-agent/harness.sh /usr/local/bin/install-harness
+RUN install-harness "$HARNESS"
+ENV DEEVY_AGENT_HARNESS=$HARNESS
 
 # The session gets a shell from slice 5, and it is not going to get root with
 # it. The container is the boundary (docs/plans/m4.md).

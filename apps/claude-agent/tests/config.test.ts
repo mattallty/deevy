@@ -13,6 +13,7 @@ describe("configuration", () => {
     expect(readConfig({ ...enough, DEEVY_URL: "https://deevy.example.com/" })).toEqual({
       url: "https://deevy.example.com",
       key: "deevy_sk_x",
+      harness: "claude-code",
       pollSeconds: 30,
       model: "claude-opus-5",
       effort: "high",

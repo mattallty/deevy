@@ -19,13 +19,12 @@ async function manifest(): Promise<Manifest> {
  * stranger would: over HTTP and MCP, with an API key and nothing else.
  */
 describe("the boundary", () => {
-  it("takes nothing from the workspace at runtime", async () => {
+  it("takes nothing from the workspace at runtime, and since ADR-0018 nothing at all", async () => {
     const { dependencies = {} } = await manifest();
 
-    expect(
-      Object.entries(dependencies).filter(([, range]) => range.startsWith("workspace:")),
-    ).toEqual([]);
-    expect(Object.keys(dependencies).filter((name) => name.startsWith("@deevy/"))).toEqual([]);
+    // The harness is a CLI the image installs and the runtime finds on PATH;
+    // the runtime itself is `node:` and nothing else.
+    expect(dependencies).toEqual({});
   });
 
   it("lets its tests reach in, because standing a real deevy up is what they are for", async () => {
@@ -38,6 +37,9 @@ describe("the boundary", () => {
     const sources = [
       "config.ts",
       "deevy.ts",
+      "harness/claude-code.ts",
+      "harness/contract.ts",
+      "harness/run.ts",
       "proxy.ts",
       "session.ts",
       "tools.ts",

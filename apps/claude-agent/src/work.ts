@@ -2,7 +2,7 @@ import { DeevyError, isOpen, type Deevy, type Ruling, type Run } from "./deevy.t
 import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
 import type { Proxy } from "./proxy.ts";
-import type { Session, SessionEvent } from "./session.ts";
+import type { Session, SessionEvent, Usage } from "./session.ts";
 import { openWorkspace, type Workspace, type WorkspaceOptions } from "./workspace.ts";
 
 export interface WorkResult {
@@ -14,6 +14,8 @@ export interface WorkResult {
   failedBy?: string;
   /** The branch and pull request this Run produced, when it changed anything. */
   delivered?: Delivery;
+  /** What the session spent, when its harness said. */
+  usage?: Usage;
 }
 
 export interface Pass {
@@ -234,6 +236,7 @@ export async function workRun(
   // that a session in a loop fills the feed with them.
   let denialsLeft = 5;
   let delivered: Delivery | null = null;
+  let usage: Usage | undefined;
 
   // A refusal is the one thing in the feed the model cannot report accurately
   // about itself, because all it sees is an error. Not a failure: the session
@@ -268,7 +271,10 @@ export async function workRun(
         signal,
       })) {
         if (event.type === "denied") await refused(event);
-        if (event.type === "done" && !event.ok) failure = event.detail;
+        if (event.type === "done") {
+          usage = event.usage;
+          if (!event.ok) failure = event.detail;
+        }
       }
     }
   } catch (error) {
@@ -310,7 +316,7 @@ export async function workRun(
   // whatever it reported (docs/agent-loop.md). Ask deevy rather than believe
   // the session: a Run it finished is finished, and one it left open is the
   // supervisor's to close.
-  const evidence = delivered ? { delivered } : {};
+  const evidence = { ...(delivered ? { delivered } : {}), ...(usage ? { usage } : {}) };
   const settled = await deevy.run(run.id);
   if (settled.status !== "pending" && settled.status !== "active" && settled.status !== "stale") {
     return { runId: run.id, issueKey: run.issueKey, status: settled.status, ...evidence };

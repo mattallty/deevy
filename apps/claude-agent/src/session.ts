@@ -42,7 +42,17 @@ export type SessionEvent =
   | { type: "denied"; name: string; reason: string }
   /** Something the session said. Kept for the log; the Run's own narration is the model's. */
   | { type: "text"; text: string }
-  /** The session ended. `ok` is whether it ended on purpose. */
-  | { type: "done"; ok: boolean; detail: string };
+  /**
+   * The session ended. `ok` is whether it ended on purpose. `usage` is what it
+   * spent, as far as the harness reports it; a harness that reports nothing
+   * leaves it out, and the supervisor logs what it gets.
+   */
+  | { type: "done"; ok: boolean; detail: string; usage?: Usage };
+
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
 
 export type Session = (input: SessionInput) => AsyncIterable<SessionEvent>;

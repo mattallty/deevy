@@ -1,10 +1,13 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { readConfig } from "./config.ts";
 import { DeevyError, createDeevy } from "./deevy.ts";
 import { forgeFor } from "./forge.ts";
+import { harnessFor, missingFor } from "./harness/index.ts";
+import { buildSession } from "./harness/run.ts";
 import { createReceiver, startListener } from "./receiver.ts";
 import { startLoop } from "./loop.ts";
 import { openProxy } from "./proxy.ts";
-import { buildSession } from "./sdk.ts";
 import { deevyToolNames } from "./tools.ts";
 import { runOnce } from "./work.ts";
 import { openWorkspace } from "./workspace.ts";
@@ -30,10 +33,40 @@ function configOrExit() {
 }
 
 const config = configOrExit();
+
+/**
+ * The harness, before anything else is spent on it: the binary must be on
+ * PATH and answer `--version`, and whatever its recipe requires of the
+ * environment must be there. A harness the container cannot run is found at
+ * boot, not at the first Run (docs/plans/harnesses.md, convention 27).
+ */
+const harness = (() => {
+  try {
+    return harnessFor(config);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+})();
+const missing = missingFor(harness);
+if (missing.length > 0) {
+  console.error(
+    `${harness.name} needs ${missing.join(", ")} set, and the runtime refuses to start without it`,
+  );
+  process.exit(1);
+}
+const version = await promisify(execFile)(harness.binary, ["--version"]).catch((error: unknown) => {
+  console.error(
+    `${harness.binary} could not be run (${error instanceof Error ? error.message : String(error)}); the runtime needs it on PATH`,
+  );
+  process.exit(1);
+});
+console.log(`harness ${harness.name}: ${version.stdout.trim() || version.stderr.trim()}`);
+
 const deevy = createDeevy({ config });
 const work = {
   deevy,
-  session: buildSession(config),
+  session: buildSession(config, harness),
   // The key and the tool list stay here; the session gets a loopback URL.
   proxy: (options: { onDenied: (name: string) => Promise<void> }) =>
     openProxy({ url: config.url, key: config.key, tools: deevyToolNames, ...options }),
@@ -73,8 +106,11 @@ const loop = startLoop({
   pollSeconds: config.pollSeconds,
   onPass: (pass) => {
     for (const result of [...pass.resumed, ...pass.worked]) {
+      const spent = result.usage
+        ? ` (${String(result.usage.inputTokens)} in, ${String(result.usage.outputTokens)} out${result.usage.costUsd === undefined ? "" : `, $${result.usage.costUsd.toFixed(4)}`})`
+        : "";
       console.log(
-        `${result.issueKey} ${result.status}${result.failedBy ? `: ${result.failedBy}` : ""}`,
+        `${result.issueKey} ${result.status}${result.failedBy ? `: ${result.failedBy}` : ""}${spent}`,
       );
     }
   },
