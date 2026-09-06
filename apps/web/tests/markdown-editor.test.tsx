@@ -1,6 +1,7 @@
 import { Editor } from "@tiptap/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { Markdown, proseClassName } from "../src/components/markdown.tsx";
 import { MarkdownEditor } from "../src/components/markdown-editor.tsx";
 import { editorExtensions, toMarkdown } from "../src/components/tiptap-editor.tsx";
 
@@ -76,6 +77,54 @@ describe("the markdown round trip", () => {
     expect(roundTrip("Looks right, @planner — ship it.", "inline")).toBe(
       "Looks right, @planner — ship it.",
     );
+  });
+});
+
+/**
+ * The selectors `proseClassName` lays a task item out as a row with: every
+ * `[&_<selector>]:flex` class, `_` standing for a space. jsdom has no layout,
+ * so a test checks that the item each renderer emits is one those match.
+ */
+function rowSelectors(): string[] {
+  const suffix = "]:flex";
+  return proseClassName
+    .split(" ")
+    .filter((name) => name.startsWith("[&_") && name.endsWith(suffix))
+    .map((name) => name.slice("[&_".length, -suffix.length).replaceAll("_", " "));
+}
+
+describe("a task list", () => {
+  const source = "- [ ] the cursor\n- [x] the table";
+
+  it("is rows in the editor: each item one li the prose classes lay out, checkbox first", async () => {
+    render(<MarkdownEditor value={source} onChange={() => {}} />);
+    const rich = await screen.findByRole("textbox");
+    await waitFor(() => expect(rich.querySelectorAll("li")).toHaveLength(2));
+    const items = [...rich.querySelectorAll("li")];
+    expect(items.map((li) => li.textContent?.trim())).toEqual([
+      expect.stringContaining("the cursor"),
+      expect.stringContaining("the table"),
+    ]);
+    for (const li of items) {
+      // Tiptap's node view: `li > label > input` then `li > div > p` — and the
+      // li carries no data-type, which is what once left the checkbox stacked
+      // above its text.
+      expect(li.querySelector(":scope > label > input[type=checkbox]")).toBeTruthy();
+      expect(li.querySelector(":scope > div > p")).toBeTruthy();
+      expect(rowSelectors().some((selector) => li.matches(selector))).toBe(true);
+    }
+    expect(items[1]?.querySelector<HTMLInputElement>("input")?.checked).toBe(true);
+  });
+
+  it("is rows when read: remark-gfm's li is one the same prose classes lay out", () => {
+    const { container } = render(<Markdown>{source}</Markdown>);
+    const items = [...container.querySelectorAll("li")];
+    expect(items).toHaveLength(2);
+    for (const li of items) {
+      expect(li.querySelector(":scope > input[type=checkbox]")).toBeTruthy();
+      expect(rowSelectors().some((selector) => li.matches(selector))).toBe(true);
+    }
+    expect(items[1]?.querySelector<HTMLInputElement>("input")?.checked).toBe(true);
   });
 });
 
