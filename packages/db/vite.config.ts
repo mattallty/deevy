@@ -4,10 +4,17 @@ export default defineConfig({
   run: {
     // Cached, and per package: see packages/core/vite.config.ts.
     tasks: {
-      // Tracked by what the suite reads, less vitest's own results directory: a
-      // tool cache a fresh CI runner never has, which is why no shard ever
-      // replayed before 2026-09-06. A source this suite imports still counts.
-      test: { command: "vp test", input: [{ auto: true }, "!node_modules/.vite/**"], output: [] },
+      // Tracked by what the suite reads, less two tool-managed files that differ
+      // on every CI runner and kept every shard from replaying until 2026-09-06:
+      // vitest's own results directory, and pnpm's install record (its prunedAt
+      // and storeDir are the machine's). Patterns are relative to this package;
+      // `**` does not reach the workspace root. A source this suite imports
+      // still counts, as does a dependency's file under node_modules.
+      test: {
+        command: "vp test",
+        input: [{ auto: true }, "!node_modules/.vite/**", "!../../node_modules/.modules.yaml"],
+        output: [],
+      },
     },
   },
   test: {
