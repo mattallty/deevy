@@ -165,7 +165,11 @@ export function AgentsPage() {
                     });
                   }}
                 >
-                  <SelectTrigger aria-label={`Schedule for ${agent.user.name}`} className="w-44">
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={`Schedule for ${agent.user.name}`}
+                    className="w-44"
+                  >
                     <SelectValue>
                       {(selected: string) =>
                         selected === NEVER

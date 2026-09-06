@@ -77,7 +77,8 @@ export function MembersPage() {
                       updateRole.mutate({ memberId: member.id, role: role as "admin" | "member" })
                     }
                   >
-                    <SelectTrigger aria-label={`Role of ${member.user.name}`}>
+                    {/* Small in a row, so the row keeps its 40px like the rows without a control. */}
+                    <SelectTrigger size="sm" aria-label={`Role of ${member.user.name}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
