@@ -247,4 +247,29 @@ describe("a session that runs its own git", () => {
       ["https://forge.test/pull/1", pass.worked[0].runId],
     ]);
   });
+
+  it("puts what the Agent said when it finished onto the pull request", async () => {
+    const deevy = await assigned();
+    const repo = await remote();
+    const forge = stubForge();
+
+    const session = scripted([
+      async (input) => {
+        await writeFile(join(input.cwd, "health.ts"), "export const ok = true;\n");
+        const [run] = await deevy.deevy.runs("pending");
+        await deevy.deevy.finishRun(
+          run.id,
+          "completed",
+          "Added a health endpoint, and a smoke that proves it answers.",
+        );
+      },
+      finished,
+    ]);
+
+    await runOnce({ ...work(deevy, repo, forge), session });
+
+    expect(forge.opened[0]).toMatchObject({
+      title: "DEV-1: Added a health endpoint, and a smoke that proves it answers.",
+    });
+  });
 });

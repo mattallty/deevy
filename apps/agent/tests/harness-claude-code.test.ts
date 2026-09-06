@@ -182,6 +182,9 @@ describe("what the session may read from disk", () => {
 
     expect(shipped).toContain("## Working an Issue in deevy");
     expect(shipped).toContain("runs_request_approval");
+    // What it is now free to do, and what its own words are used for.
+    expect(shipped).toContain("git");
+    expect(shipped).toContain("what a reviewer reads");
     // The one thing an Agent must not try, in the file that tells it so.
     expect(shipped).toContain("do not approve one");
   });

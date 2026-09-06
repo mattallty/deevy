@@ -14,6 +14,23 @@ export interface DeliverOptions {
   runId: string;
   /** Who the commit is by. The Agent, because everything it does is its own. */
   author: { name: string; email: string };
+  /**
+   * What the Agent said when it finished, which is what a reviewer reads.
+   *
+   * Its reasoning is in the Run's feed and nobody opening a pull request goes
+   * looking there; this is the one line that reaches the code review. Absent —
+   * a Run that finished without a summary — the runtime's own line stands, so
+   * nothing regresses (docs/plans/agent-owns-git.md).
+   */
+  summary?: string;
+}
+
+/** The Agent's words as one line, or the runtime's when it left none. */
+export function titleFor(issueKey: string, summary?: string): string {
+  const first = (summary ?? "").trim().split("\n")[0]?.trim() ?? "";
+  if (first === "") return `${issueKey}: worked by a deevy Agent`;
+  const room = 100 - issueKey.length - 2;
+  return `${issueKey}: ${first.length > room ? `${first.slice(0, room - 1)}…` : first}`;
 }
 
 /**
@@ -52,7 +69,7 @@ export async function deliver(options: DeliverOptions): Promise<Delivery | null>
     "commit",
     "--quiet",
     "-m",
-    `${issueKey}: worked by a deevy Agent`,
+    titleFor(issueKey, options.summary),
   ]);
   const commit = await workspace.git(["rev-parse", "HEAD"]);
   await workspace.git(["push", "--quiet", "origin", branch]);
@@ -61,8 +78,9 @@ export async function deliver(options: DeliverOptions): Promise<Delivery | null>
     ? await options.forge.open({
         branch,
         base,
-        title: `${issueKey}: worked by a deevy Agent`,
+        title: titleFor(issueKey, options.summary),
         body: [
+          ...(options.summary ? [options.summary.trim(), ""] : []),
           `Opened by a deevy Agent working ${issueKey}.`,
           "",
           `The Run that produced it is \`${runId}\`, and its Activity feed in deevy is the account`,

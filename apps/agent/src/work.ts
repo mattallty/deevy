@@ -1,5 +1,5 @@
 import { DeevyError, isOpen, type Deevy, type Ruling, type Run } from "./deevy.ts";
-import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
+import { deliver, titleFor, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
 import type { GitProxy } from "./git-proxy.ts";
 import type { Proxy } from "./proxy.ts";
@@ -315,9 +315,13 @@ export async function workRun(
         // pushing anything: a session that delivered has delivered, and a
         // second branch beside its own is noise (ADR-0019).
         const own = branchesPushed(await movedSince(workspace, before), workspace.repo.baseBranch);
+        // What the Agent said when it finished, which is what a reviewer
+        // reads: its reasoning is in the feed, and nobody opening a pull
+        // request goes looking there (docs/plans/agent-owns-git.md).
+        const said = (await deevy.run(run.id).catch(() => null))?.summary ?? undefined;
         delivered =
           own.length > 0
-            ? await attribute(own, workspace, options, run)
+            ? await attribute(own, workspace, options, run, said)
             : await (options.deliver ?? deliver)({
                 workspace,
                 forge: options.forge ?? null,
@@ -327,6 +331,7 @@ export async function workRun(
                   name: "deevy Agent",
                   email: "agent@deevy.invalid",
                 },
+                ...(said ? { summary: said } : {}),
               });
       } catch (error) {
         // The work happened; only the record of it failed. Say so in the feed
@@ -483,6 +488,7 @@ async function attribute(
   workspace: Workspace,
   options: WorkOptions,
   run: Run,
+  summary?: string,
 ): Promise<Delivery> {
   const [first] = own;
   const forge = options.forge ?? null;
@@ -490,8 +496,9 @@ async function attribute(
     ? await forge.open({
         branch: first.branch,
         base: workspace.repo?.baseBranch ?? "main",
-        title: `${run.issueKey}: worked by a deevy Agent`,
+        title: titleFor(run.issueKey, summary),
         body: [
+          ...(summary ? [summary.trim(), ""] : []),
           `Opened by a deevy Agent working ${run.issueKey}, on the branch it pushed itself.`,
           "",
           `The Run that produced it is \`${run.id}\`, and its Activity feed in deevy is the account`,
