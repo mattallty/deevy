@@ -8,8 +8,8 @@ import { currentScope, useShortcut, useShortcutScope } from "../src/lib/shortcut
 
 /**
  * The leaf components every screen is built from (docs/plans/ui-redesign.md).
- * A restyle that drops the visible "Gate" or a Member's name fails here before
- * it fails on the Board.
+ * A restyle that drops the word "Gate" (a screen reader's, since the diamond is
+ * the eye's) or a Member's name fails here before it fails on the Board.
  */
 describe("MemberChip", () => {
   it("shows the name and says which kind of Member it is", () => {
@@ -34,7 +34,7 @@ describe("MemberChip", () => {
 });
 
 describe("StateBadge", () => {
-  it("names a Gate out loud", () => {
+  it("names a Gate, for a screen reader", () => {
     render(<StateBadge state={{ name: "Intent", isGate: true, category: "backlog" }} />);
     expect(screen.getByText("Intent")).toBeTruthy();
     expect(screen.getByText("Gate")).toBeTruthy();

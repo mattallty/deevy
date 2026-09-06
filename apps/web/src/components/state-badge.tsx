@@ -13,9 +13,10 @@ const dots = {
 } as const;
 
 /**
- * A State, as a dot coloured by its category; a Gate, as an amber diamond and
- * the word — visible, because a Gate is the one State a Human is owed, and
- * because the Board's tests look for it (CONTEXT.md, .claude/skills/deevy-ui).
+ * A State, as a dot coloured by its category; a Gate, as an amber diamond. The
+ * diamond says it all to the eye — a second "Gate" beside it read as a doublon
+ * — so the word is there for a screen reader and the tests only
+ * (CONTEXT.md, .claude/skills/deevy-ui).
  */
 export function StateBadge({
   state,
@@ -48,7 +49,7 @@ export function StateBadge({
         />
       )}
       <span>{state.name}</span>
-      {state.isGate ? <span className="text-xs font-medium text-gate">Gate</span> : null}
+      {state.isGate ? <span className="sr-only">Gate</span> : null}
     </span>
   );
 }

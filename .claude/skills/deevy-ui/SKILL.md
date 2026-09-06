@@ -262,7 +262,7 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `onMove` callback, so it never applies a move itself: a card leaving a Gate column opens the ruling dialog
   ("Decide the <State> Gate on <key>", dialog with Approve/Reject) and anything else is `issues.move`.
   Columns are `KanbanColumn render={<section data-slot="board-column" aria-label={state.name}/>}` with the
-  `StateBadge` header (visible "Gate"), `disabled` so columns do not reorder. A click on a card opens the
+  `StateBadge` header (the word "Gate" is `sr-only`: the amber diamond is the eye's, since 2026-09-06), `disabled` so columns do not reorder. A click on a card opens the
   peek (`?peek=`); the peek is `modal={false}` here and `onDragStart` closes it.
 - **Filters** are the shared `IssueFilters` with `hideProject` and `nativeAssignee` — the Assignee is a plain
   `<select>` on the Board because its test drives it with a change event.
