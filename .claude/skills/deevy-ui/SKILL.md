@@ -314,8 +314,10 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `useNavigate()`: a route's navigate takes its own path as `from`, and the Board lost `/board` the moment a
   peek opened.
 - **`components/diceui/sortable.tsx`** is `@diceui/sortable` (MIT, dnd-kit) with `radix-ui`'s `Slot`
-  replaced by `lib/slot.tsx` (twenty lines: clone the child with merged props and composed refs) — the CLI
-  had added `radix-ui` to the catalog, which the no-Radix rule forbids; it also wrote `lib/compose-refs.ts`.
+  replaced by Base UI's `useRender` (`@base-ui/react/use-render` + `merge-props`, the pattern
+  `reui/kanban.tsx` uses): `asChild` hands the one child to `render`, so the child's own props win and
+  refs merge through `useRender`'s `ref` list. The CLI had added `radix-ui` to the catalog, which the
+  no-Radix rule forbids; a vendored `lib/slot.tsx` + `lib/compose-refs.ts` stood in until 2026-09-06 (#10).
   The Workflow editor's States are `SortableItem asChild` around each `<li>` with a "Drag <State>" handle;
   the "Move up/down" buttons stay for the keyboard and the tests. New draft States carry a `uid`.
 - Under a Project the Workflow editor's heading is an `h2`: the Project's name is the page's `h1`.
