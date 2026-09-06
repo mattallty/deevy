@@ -57,9 +57,13 @@ export function SettingsLayout() {
 
   return (
     <div className="flex min-h-full">
+      {/* At `lg`, not `md`: this nav is 235px and the primary sidebar beside it
+          is 256, so at 768 the page itself was left 161px and every second
+          Settings page pushed the window sideways. Below that the strip below
+          is the whole navigation. */}
       <nav
         aria-label="Settings"
-        className="hidden w-56 shrink-0 flex-col gap-5 border-r px-3 py-5 md:flex"
+        className="hidden w-56 shrink-0 flex-col gap-5 border-r px-3 py-5 lg:flex"
       >
         {settingsNav.map(({ group, pages }) => (
           <div key={group} className="flex flex-col gap-1">
@@ -87,10 +91,10 @@ export function SettingsLayout() {
         ))}
       </nav>
       <div className="flex min-w-0 flex-1 flex-col p-6">
-        {/* Below md the sidebar above is gone; the same pages, as one strip of tabs that scrolls. */}
+        {/* Below lg the nav beside is gone; the same pages, as one strip of tabs that scrolls. */}
         <nav
           aria-label="Settings pages"
-          className="-mx-6 -mt-6 mb-6 flex overflow-x-auto border-b px-6 md:hidden"
+          className="-mx-6 -mt-6 mb-6 flex overflow-x-auto border-b px-6 lg:hidden"
         >
           {settingsNav.flatMap(({ pages }) =>
             pages.map((page) => {
@@ -113,7 +117,11 @@ export function SettingsLayout() {
             }),
           )}
         </nav>
-        <div className="mx-auto flex w-full max-w-[1100px] flex-1 flex-col">
+        {/* A container, so a page lays itself out by the room it actually has:
+            behind the sidebar and this nav, a viewport breakpoint says nothing
+            about the width a form on it gets (routes/issues/issue.tsx does the
+            same). Pages use `@sm:`…`@3xl:`, never `sm:`…`xl:`. */}
+        <div className="@container mx-auto flex w-full max-w-[1100px] flex-1 flex-col">
           <Outlet />
         </div>
       </div>

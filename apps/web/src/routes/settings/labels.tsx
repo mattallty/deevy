@@ -71,8 +71,13 @@ export function LabelsPage() {
       }
     >
       <form
-        // One grid: a label line, then a 32px control row, so the four labels and the four controls each sit on one line.
-        className="grid items-start gap-3 rounded-lg border bg-card p-4 sm:grid-cols-[10rem_minmax(0,1fr)_auto_auto]"
+        // One grid: a label line, then a 32px control row, so the four labels and
+        // the four controls each sit on one line. The four columns need ~570px
+        // between them — the eight swatches alone are 246px and will not shrink —
+        // so the breakpoint is the settings column's own width (@container in
+        // routes/settings/layout.tsx), not the window's: behind the sidebar and
+        // the Settings nav, a 900px window leaves this form about 350px.
+        className="grid items-start gap-3 rounded-lg border bg-card p-4 @2xl:grid-cols-[10rem_minmax(0,1fr)_auto_auto]"
         onSubmit={(submitted) => {
           submitted.preventDefault();
           if (name.trim()) {
@@ -124,8 +129,9 @@ export function LabelsPage() {
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          {/* An empty label line, so the button shares the control row. */}
-          <FieldLabel aria-hidden className="invisible">
+          {/* An empty label line, so the button shares the control row — but only
+              once there is a row to share: stacked, it is a blank gap. */}
+          <FieldLabel aria-hidden className="invisible hidden @2xl:block">
             Add
           </FieldLabel>
           <Button type="submit" disabled={create.isPending || !name.trim()}>

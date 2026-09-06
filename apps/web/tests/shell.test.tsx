@@ -99,12 +99,12 @@ describe("the app shell", () => {
     await mountAt("/settings/members");
     await screen.findByRole("heading", { name: "Members" });
 
-    // Both are in the DOM; the stylesheet shows one per width (md:hidden / hidden md:flex).
+    // Both are in the DOM; the stylesheet shows one per width (lg:hidden / hidden lg:flex).
     const strip = screen.getByRole("navigation", { name: "Settings pages" });
-    expect(strip.className).toContain("md:hidden");
+    expect(strip.className).toContain("lg:hidden");
     expect(strip.className).toContain("overflow-x-auto");
     const desktop = screen.getByRole("navigation", { name: "Settings" });
-    expect(desktop.className).toContain("md:flex");
+    expect(desktop.className).toContain("lg:flex");
     const links = within(strip).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual(
       within(desktop)
