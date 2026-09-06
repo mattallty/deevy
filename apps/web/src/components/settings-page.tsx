@@ -79,27 +79,37 @@ export function SettingsRow({
   hint,
   htmlFor,
   children,
+  below,
 }: {
   label: ReactNode;
   hint?: ReactNode;
   /** Names the control this row is about, so the label is the control's label. */
   htmlFor?: string;
   children: ReactNode;
+  /**
+   * A form the row opens, across the row's whole width rather than inside the
+   * column the control sits in: squeezed in beside the label it takes the width
+   * from the words, and a one-line hint becomes a six-line sliver.
+   */
+  below?: ReactNode;
 }) {
   const name = <span className="text-sm font-medium">{label}</span>;
   return (
-    <div className="grid items-start gap-x-6 gap-y-3 border-t py-3.5 last:border-b @lg:grid-cols-[minmax(0,1fr)_auto]">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        {htmlFor ? (
-          <label htmlFor={htmlFor} className="w-fit cursor-pointer">
-            {name}
-          </label>
-        ) : (
-          name
-        )}
-        {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
+    <div className="flex flex-col gap-3 border-t py-3.5 last:border-b">
+      <div className="grid items-start gap-x-6 gap-y-3 @lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          {htmlFor ? (
+            <label htmlFor={htmlFor} className="w-fit cursor-pointer">
+              {name}
+            </label>
+          ) : (
+            name
+          )}
+          {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
+        </div>
+        <div className="flex min-w-0 flex-col items-start gap-2 @lg:items-end">{children}</div>
       </div>
-      <div className="flex min-w-0 flex-col items-start gap-2 @lg:items-end">{children}</div>
+      {below}
     </div>
   );
 }

@@ -162,9 +162,14 @@ function Identity({ canRename }: { canRename: boolean }) {
         {autosave.status === "idle" && canRename ? "The name saves as you change it." : null}
       </p>
 
-      <ul className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      {/* Ruled apart, not just spaced: four numbers in a row with nothing between
+          them read as one number with four parts. */}
+      <ul className="flex flex-wrap items-center gap-y-3">
         {counts.map((count) => (
-          <li key={count.of} className="flex flex-col">
+          <li
+            key={count.of}
+            className="flex flex-col border-l px-5 first:border-l-0 first:pl-0 last:pr-0"
+          >
             <span className="text-lg font-semibold tabular-nums">{count.n}</span>
             <span className="text-xs text-muted-foreground">{count.of}</span>
           </li>

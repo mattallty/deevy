@@ -60,6 +60,61 @@ export function AllowlistRow() {
           ? "Nobody new can join until there is a rule. Only the admin in DEEVY_ADMIN_EMAIL gets in."
           : "A sign-in matching any of these joins the Workspace as a Member."
       }
+      below={
+        adding ? (
+          <form
+            // Stacked until the row is wide enough for a line of fields: side by
+            // side in 340px the domain shrank to a sliver and Cancel fell off it.
+            className="flex flex-col gap-3 rounded-md border bg-card p-3 @md:flex-row @md:flex-wrap @md:items-end"
+            onSubmit={(submitted) => {
+              submitted.preventDefault();
+              if (value.trim()) add.mutate({ kind, value: value.trim() });
+            }}
+          >
+            <div className="flex flex-col gap-2 @md:w-48">
+              <Label htmlFor="rule-kind">Match on</Label>
+              <Select value={kind} onValueChange={(next) => setKind(next as RuleKind)}>
+                <SelectTrigger id="rule-kind" className="w-full">
+                  <SelectValue>{(selected: RuleKind) => kindLabels[selected]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
+                    <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2 @md:min-w-48 @md:flex-1">
+              <Label htmlFor="rule-value">
+                {kind === "email_domain" ? "Domain" : "Organization login"}
+              </Label>
+              <Input
+                id="rule-value"
+                value={value}
+                autoFocus
+                placeholder={kind === "email_domain" ? "example.com" : "acme"}
+                onChange={(changed) => setValue(changed.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={add.isPending || !value.trim()}>
+                Add rule
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false);
+                  setValue("");
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null
+      }
     >
       <div className="flex flex-wrap items-center gap-2 @lg:justify-end">
         {listed.map((rule) => (
@@ -90,57 +145,6 @@ export function AllowlistRow() {
           </Button>
         ) : null}
       </div>
-
-      {adding ? (
-        <form
-          className="flex flex-wrap items-end gap-2 @lg:justify-end"
-          onSubmit={(submitted) => {
-            submitted.preventDefault();
-            if (value.trim()) add.mutate({ kind, value: value.trim() });
-          }}
-        >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="rule-kind">Match on</Label>
-            <Select value={kind} onValueChange={(next) => setKind(next as RuleKind)}>
-              <SelectTrigger id="rule-kind" className="w-48">
-                <SelectValue>{(selected: RuleKind) => kindLabels[selected]}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
-                  <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="rule-value">
-              {kind === "email_domain" ? "Domain" : "Organization login"}
-            </Label>
-            <Input
-              id="rule-value"
-              value={value}
-              autoFocus
-              className="w-48"
-              placeholder={kind === "email_domain" ? "example.com" : "acme"}
-              onChange={(changed) => setValue(changed.target.value)}
-            />
-          </div>
-          <Button type="submit" disabled={add.isPending || !value.trim()}>
-            Add rule
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setAdding(false);
-              setValue("");
-            }}
-          >
-            Cancel
-          </Button>
-        </form>
-      ) : null}
 
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
       {rules.isError ? (
