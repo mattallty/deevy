@@ -534,7 +534,8 @@ made the four recipes smaller rather than larger.
 
 **The plan's acceptance matrix was theatre, and was not built.** Running the scripted session "once per
 harness" would exercise nothing, since a scripted session never spawns a CLI. What proves each image is its
-smoke in CI: every image starts with `--once` against the CI deevy and must print `harness <name>: <version>`
+smoke in CI, on `main` and in the release (a pull request builds the default image only, since four
+installs per push is four installs): every image starts with `--once` against the CI deevy and must print `harness <name>: <version>`
 before deevy refuses the key, and the Cursor and Copilot images must refuse earlier still, at the credential
 their recipe requires. The acceptance walk runs once and is harness-blind, which is the claim.
 
