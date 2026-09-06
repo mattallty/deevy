@@ -73,7 +73,12 @@ export function IssuePage({
     orpc.issues.update.mutationOptions({
       onSuccess: async () => {
         setEditing(false);
-        await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
+        // The timeline and the Runs on this page read the edit too.
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: orpc.issues.key() }),
+          queryClient.invalidateQueries({ queryKey: orpc.events.key() }),
+          queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+        ]);
       },
     }),
   );
@@ -281,16 +286,22 @@ function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueP
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftDescription, setDraftDescription] = useState(description ?? "");
   const mentionables = useMentionables();
+  // One door for the Save button and ⌘Enter in the editor: neither sends an
+  // empty title, and neither sends twice while a save is in flight.
+  const submit = () => {
+    if (pending || !draftTitle.trim()) return;
+    onSave({
+      title: draftTitle.trim(),
+      description: draftDescription.trim() === "" ? null : draftDescription,
+    });
+  };
 
   return (
     <form
       className="flex flex-col gap-3"
       onSubmit={(submitted) => {
         submitted.preventDefault();
-        onSave({
-          title: draftTitle.trim(),
-          description: draftDescription.trim() === "" ? null : draftDescription,
-        });
+        submit();
       }}
     >
       <div className="flex flex-col gap-2">
@@ -311,12 +322,7 @@ function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueP
           mentions={mentionables}
           rows={10}
           placeholder="What this Issue is, and why."
-          onSubmit={() =>
-            onSave({
-              title: draftTitle.trim(),
-              description: draftDescription.trim() === "" ? null : draftDescription,
-            })
-          }
+          onSubmit={submit}
         />
       </div>
       <div className="flex gap-2">

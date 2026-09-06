@@ -7,6 +7,9 @@ import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { orpc } from "@/lib/orpc";
 
+/** On a Project's Board a column is one State. */
+const byStateId = (issue: BoardIssue) => issue.state.id;
+
 /**
  * The Project's Issues as one column per State (docs/plans/ui-redesign.md slice
  * 7), on the shared IssueBoard: a drop is a move, a Gate is left by a ruling,
@@ -98,7 +101,7 @@ export function BoardPage({
     <section className="flex flex-col gap-4">
       <PageHeader
         title="Board"
-        description={`${projectKey} by State. A card leaves a Gate by a ruling, not a drop.`}
+        description={`${projectKey} by State. An Issue leaves a Gate by a ruling, not a drop.`}
       >
         <IssueFilters
           value={search}
@@ -115,7 +118,7 @@ export function BoardPage({
       <IssueBoard
         columns={columns}
         issues={cards}
-        columnOf={(issue) => issue.state.id}
+        columnOf={byStateId}
         loading={workflow.isPending || issues.isPending}
         onOpen={(key) => onSearch({ peek: key })}
         onDragStart={() => search.peek && onSearch({ peek: undefined })}

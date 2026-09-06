@@ -209,10 +209,12 @@ describe("the Project's tabs", () => {
     await mountAt("/projects/DEV/settings");
 
     const name = (await screen.findByLabelText("Name")) as HTMLInputElement;
+    // stub.saved is shared across tests and never reset: nothing may be added to it.
+    const before = stub.saved.length;
     fireEvent.change(name, { target: { value: "   " } });
     fireEvent.blur(name);
     expect(await screen.findByText("A Project needs a name")).toBeTruthy();
     expect(name.value).toBe("deevy");
-    expect(stub.saved.some((call) => (call as { name?: string }).name === "")).toBe(false);
+    expect(stub.saved).toHaveLength(before);
   });
 });

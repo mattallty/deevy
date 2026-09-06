@@ -41,6 +41,64 @@ describe("describeNotification", () => {
     ).toBe("created it in the Intent Gate");
   });
 
+  it("names the Gate from the Event, not from where the Issue is now", () => {
+    // The Issue has moved on to Intent; the Event remembers where it was created.
+    expect(
+      describeNotification({
+        kind: "gate_awaiting",
+        issue,
+        event: { kind: "issue.created", payload: { key: "DEV-9", state: "Triage" } },
+      }).verb,
+    ).toBe("created it in the Triage Gate");
+    expect(
+      describeNotification({
+        kind: "gate_awaiting",
+        issue,
+        event: { kind: "run.awaiting_input", payload: { gateStateId: "s2", state: "Review" } },
+      }),
+    ).toEqual({ verb: "is waiting at the Review Gate", excerpt: null, tone: "gate" });
+    // Without the name, the Issue's current State is the best there is.
+    expect(
+      describeNotification({
+        kind: "gate_awaiting",
+        issue,
+        event: { kind: "run.awaiting_input", payload: { gateStateId: "s2" } },
+      }).verb,
+    ).toBe("is waiting at the Intent Gate");
+  });
+
+  it("tells an Agent's Sponsor what was answered: a ruling by name, or a plain answer", () => {
+    expect(
+      describeNotification({
+        kind: "run_answered",
+        issue,
+        event: {
+          kind: "run.answered",
+          payload: { gateStateId: "s1", ruling: "rejected", state: "Spec", note: "Not yet." },
+        },
+      }),
+    ).toEqual({
+      verb: "rejected the Spec Gate your Agent asked about",
+      excerpt: "Not yet.",
+      tone: "muted",
+    });
+    expect(
+      describeNotification({
+        kind: "run_answered",
+        issue,
+        event: { kind: "run.answered", payload: { ruling: "approved", state: "Spec" } },
+      }).verb,
+    ).toBe("approved the Spec Gate your Agent asked about");
+    // A question answered is not a Gate decided.
+    expect(
+      describeNotification({
+        kind: "run_answered",
+        issue,
+        event: { kind: "run.answered", payload: { activityId: "a1" } },
+      }),
+    ).toEqual({ verb: "answered your Agent's question", excerpt: null, tone: "muted" });
+  });
+
   it("quotes the question, the summary and the comment", () => {
     expect(
       describeNotification({

@@ -340,6 +340,7 @@ export const runs = {
             issueId: issue.id,
             activityId: id,
             gateStateId: gate.id,
+            state: gate.name,
             url,
             question: `${key} is in the ${gate.name} Gate`,
           },

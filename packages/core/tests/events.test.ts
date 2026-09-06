@@ -118,6 +118,69 @@ describe("events.list newest first", () => {
   });
 });
 
+describe("events.list before a seq", () => {
+  it("pages toward the start when no order is given, with a cursor that falls", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const context = await memberContext(db, { role: "admin" });
+    const client = createRouterClient(router, { context });
+    const kinds = [
+      "workspace.created",
+      "member.joined",
+      "project.created",
+      "issue.created",
+    ] as const;
+    for (const kind of kinds) {
+      await appendEvent(context, {
+        kind,
+        subjectType: "workspace",
+        subjectId: context.workspace.id,
+      });
+    }
+    const newest = await client.events.list({ order: "desc", limit: 1 });
+    const top = newest.nextCursor ?? 0;
+
+    // `before` alone reads as a page turned back: without this, the default
+    // `asc` handed back the oldest Events with a cursor pointing forward, and
+    // everything between was unreachable.
+    const back = await client.events.list({ before: top, limit: 2 });
+    expect(back.events.map((event) => event.kind)).toEqual(["project.created", "member.joined"]);
+    expect(back.nextCursor).toBeLessThan(top);
+    const further = await client.events.list({ before: back.nextCursor ?? 0, limit: 2 });
+    expect(further.events.map((event) => event.kind)).toEqual(["workspace.created"]);
+    expect(further.nextCursor).toBeLessThan(back.nextCursor ?? 0);
+    // Said outright, `asc` still wins: a window read between two seqs.
+    const window = await client.events.list({ after: 0, before: top, order: "asc", limit: 2 });
+    expect(window.events.map((event) => event.kind)).toEqual([
+      "workspace.created",
+      "member.joined",
+    ]);
+  });
+});
+
+describe("events.list by kind family", () => {
+  it("returns only the kinds under the prefix", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const alice = await memberContext(db, { role: "admin", name: "Alice" });
+    const client = createRouterClient(router, { context: alice });
+    await client.projects.create({ name: "deevy", key: "DEV" });
+    const issue = await client.issues.create({ projectKey: "DEV", title: "Gated" });
+    await client.gates.approve({ key: issue.key });
+
+    const gates = await client.events.list({ kindPrefix: "gate" });
+    expect(gates.events.map((event) => event.kind)).toEqual(["gate.approved"]);
+    const issues = await client.events.list({ kindPrefix: "issue" });
+    expect(issues.events.length).toBeGreaterThan(0);
+    expect(issues.events.every((event) => event.kind.startsWith("issue."))).toBe(true);
+    // A family, not a free-text prefix: `gate.app` would need escaping and is refused.
+    await expect(client.events.list({ kindPrefix: "gate.app" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    expect((await client.events.list({ kindPrefix: "nothing" })).events).toEqual([]);
+  });
+});
+
 describe("events.list scoping", () => {
   it("never returns Events belonging to another Workspace", async () => {
     const { db, close } = testDb();

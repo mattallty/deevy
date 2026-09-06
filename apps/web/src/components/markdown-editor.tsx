@@ -21,7 +21,7 @@ export interface MarkdownEditorProps {
   /** ⌘Enter. */
   onSubmit?: () => void;
   autoFocus?: boolean;
-  /** The id a Label points at: it lands on the Source textarea, the plain form control. */
+  /** The id a Label points at: it lands on whichever view is showing, so the Label always reaches a visible control. */
   id?: string;
   "aria-label"?: string;
   /** Rows the Source textarea shows; the rich editor sizes itself. */
@@ -34,7 +34,10 @@ export interface MarkdownEditorProps {
  * of one text: the rich editor, and a Source tab that is a plain textarea —
  * `aria-label="Body"` — so anything the rich view cannot model is still there
  * to read and change, and so a test can type into it in jsdom. The textarea is
- * always mounted; the tab only decides which of the two is shown.
+ * always mounted; the tab only decides which of the two is shown, and which
+ * one carries `id`, so a Label points at the control that is on screen. Both
+ * carry the accessible name; a test that wants the textarea asks for it by
+ * `{ selector: "textarea" }`.
  */
 export function MarkdownEditor({
   value,
@@ -51,7 +54,8 @@ export function MarkdownEditor({
 }: MarkdownEditorProps) {
   const [view, setView] = useState<"edit" | "source">("edit");
   const generated = useId();
-  const textareaId = id ?? `${generated}-source`;
+  const editorId = view === "edit" ? id : undefined;
+  const textareaId = view === "source" ? (id ?? `${generated}-source`) : `${generated}-source`;
 
   return (
     <div
@@ -80,6 +84,8 @@ export function MarkdownEditor({
             value={value}
             onChange={onChange}
             mode={mode}
+            aria-label={ariaLabel}
+            {...(editorId ? { id: editorId } : {})}
             {...(placeholder ? { placeholder } : {})}
             {...(mentions ? { mentions } : {})}
             {...(onSubmit ? { onSubmit } : {})}
@@ -108,7 +114,9 @@ export function MarkdownEditor({
           view !== "source" && "hidden",
         )}
       />
-      {mentions ? <SourceMentions value={value} onChange={onChange} mentions={mentions} /> : null}
+      {mentions && view === "source" ? (
+        <SourceMentions value={value} onChange={onChange} mentions={mentions} />
+      ) : null}
     </div>
   );
 }

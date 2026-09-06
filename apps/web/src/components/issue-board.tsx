@@ -88,8 +88,9 @@ export function groupIntoColumns(
   const grouped: Record<string, BoardIssue[]> = {};
   for (const column of columns) grouped[column.id] = [];
   for (const issue of issues) (grouped[columnOf(issue)] ??= []).push(issue);
+  const changedAt = new Map(issues.map((issue) => [issue, new Date(issue.updatedAt).getTime()]));
   for (const list of Object.values(grouped)) {
-    list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    list.sort((a, b) => changedAt.get(b)! - changedAt.get(a)!);
   }
   return grouped;
 }
@@ -168,7 +169,6 @@ export function IssueBoardView({
             <KanbanColumn
               key={column.id}
               value={column.id}
-              disabled
               render={
                 <section
                   data-slot="board-column"
@@ -346,8 +346,11 @@ function GateDialog({ issue, onClose }: { issue: BoardIssue | null; onClose: () 
   const done = async () => {
     setNote("");
     onClose();
-    await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
-    await queryClient.invalidateQueries({ queryKey: orpc.inbox.key() });
+    await Promise.all(
+      [orpc.issues.key(), orpc.inbox.key(), orpc.runs.key()].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
   };
   const approve = useMutation(orpc.gates.approve.mutationOptions({ onSuccess: done }));
   const reject = useMutation(orpc.gates.reject.mutationOptions({ onSuccess: done }));

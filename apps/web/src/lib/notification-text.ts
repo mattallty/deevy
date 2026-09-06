@@ -72,11 +72,12 @@ export function describeNotification(row: DescribableNotification): Notification
             tone: "gate",
           };
         case "issue.created":
-          return { verb: `created it in the ${stateName} Gate`, excerpt: null, tone: "gate" };
-        case "run.awaiting_input":
-          return { verb: `is waiting at the ${stateName} Gate`, excerpt: null, tone: "gate" };
+          // The first State's name rides in the payload; older Events fall
+          // back to where the Issue is now.
+          return { verb: `created it in the ${gate} Gate`, excerpt: null, tone: "gate" };
         default:
-          return { verb: `is waiting at the ${stateName} Gate`, excerpt: null, tone: "gate" };
+          // run.awaiting_input carries the Gate's name as `state`.
+          return { verb: `is waiting at the ${gate} Gate`, excerpt: null, tone: "gate" };
       }
     case "run_awaiting_input":
       return { verb: "asks a question", excerpt: text(payload.question), tone: "agent" };
@@ -85,7 +86,17 @@ export function describeNotification(row: DescribableNotification): Notification
         ? { verb: "failed a Run", excerpt: text(payload.summary), tone: "destructive" }
         : { verb: "finished a Run", excerpt: text(payload.summary), tone: "agent" };
     case "run_answered": {
-      const ruling = row.event.kind === "gate.rejected" ? "rejected" : "approved";
+      // A Gate ruling carries `ruling` and the Gate's name; a plain answer to
+      // an Agent's question carries neither, and claims no ruling.
+      const ruling =
+        payload.ruling === "rejected"
+          ? "rejected"
+          : payload.ruling === "approved"
+            ? "approved"
+            : null;
+      if (!ruling) {
+        return { verb: "answered your Agent's question", excerpt: null, tone: "muted" };
+      }
       return {
         verb: `${ruling} the ${gate} Gate your Agent asked about`,
         excerpt: text(payload.note),

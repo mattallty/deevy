@@ -351,6 +351,57 @@ describe("runs.requestApproval", () => {
     expect(told.map((row) => row.recipientMemberId)).toEqual([agent.member.id]);
   });
 
+  it("says which Gate it waits on, and what was ruled, in the Events it appends", async () => {
+    const { asAdmin, asAgent } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+    await asAdmin.gates.approve({ key: "DEV-1", note: "Go on then" });
+
+    // The inbox and the log render these without reading the Gate again, so
+    // the Event names the State and, once decided, says which way.
+    const { events } = await asAdmin.events.list({ subjectType: "run", subjectId: run.id });
+    expect(events.find((event) => event.kind === "run.awaiting_input")?.payload).toMatchObject({
+      issueId: expect.any(String),
+      state: "Plan",
+    });
+    expect(events.find((event) => event.kind === "run.answered")?.payload).toMatchObject({
+      ruling: "approved",
+      state: "Plan",
+      note: "Go on then",
+    });
+  });
+
+  it("carries a rejection the same way, and a plain answer carries no ruling", async () => {
+    const { asAdmin, asAgent } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+    await asAgent.runs.requestApproval({ runId: run.id });
+    await asAdmin.gates.reject({ key: "DEV-1" });
+
+    const { events } = await asAdmin.events.list({ subjectType: "run", subjectId: run.id });
+    expect(events.find((event) => event.kind === "run.answered")?.payload).toEqual({
+      issueId: expect.any(String),
+      gateStateId: expect.any(String),
+      ruling: "rejected",
+      state: "Plan",
+      note: null,
+    });
+
+    // Back in Spec now; the Agent asks a question instead, and a Human answers it.
+    await asAgent.runs.postActivity({ runId: run.id, kind: "elicitation", body: "Which DB?" });
+    await asAdmin.runs.answer({ runId: run.id, body: "SQLite" });
+    const answers = (await asAdmin.events.list({ subjectType: "run", subjectId: run.id })).events
+      .filter((event) => event.kind === "run.answered")
+      .map((event) => event.payload);
+    expect(answers).toHaveLength(2);
+    expect(answers[1]).not.toHaveProperty("ruling");
+    expect(answers[1]).not.toHaveProperty("state");
+    expect(answers[1]).not.toHaveProperty("note");
+  });
+
   it("asks the Humans the Gate names, and not the Sponsor behind the Run", async () => {
     const { db, admin, asAdmin, asAgent } = await workspaceWithAgent();
     const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });

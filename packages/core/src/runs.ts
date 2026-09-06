@@ -208,30 +208,48 @@ export async function lastGateRequest(db: Db, runId: string): Promise<AskedGate 
   return null;
 }
 
+/** What a Human decided at a Gate, as the `run.answered` Event carries it. */
+export interface GateRuling {
+  /** The Gate State ruled on. */
+  stateId: string;
+  state: string;
+  ruling: "approved" | "rejected";
+  note?: string | null;
+}
+
 /**
  * A decision on a Gate un-blocks whatever Run was waiting on it, the way a
  * Human's answer un-blocks an elicitation (docs/plans/m2.md). Called from
  * `gates.approve` and `gates.reject`: the Human decides in deevy's UI, and the
- * Agent that asked carries on without being told twice.
+ * Agent that asked carries on without being told twice. The Event says what
+ * was decided, so the inbox and the log can tell an approval from a rejection
+ * without reading the Gate again; a plain answer (`runs.answer`) carries none
+ * of that.
  */
 export async function resumeGateRuns(
   source: EventSource & { db: Db },
   issue: { id: string; projectId: string },
-  stateId: string,
+  decided: GateRuling,
 ): Promise<void> {
   const waiting = await source.db.query.run.findMany({
     where: { issueId: issue.id, status: "awaiting_input" },
   });
   for (const row of waiting) {
     const asked = await lastGateRequest(source.db, row.id);
-    if (!asked || asked.answered || asked.request.gateStateId !== stateId) continue;
+    if (!asked || asked.answered || asked.request.gateStateId !== decided.stateId) continue;
     await setRunStatus(source.db, row, "active", { touchActivity: true });
     await appendEvent(source, {
       kind: "run.answered",
       subjectType: "run",
       subjectId: row.id,
       projectId: issue.projectId,
-      payload: { issueId: issue.id, gateStateId: stateId },
+      payload: {
+        issueId: issue.id,
+        gateStateId: decided.stateId,
+        ruling: decided.ruling,
+        state: decided.state,
+        note: decided.note ?? null,
+      },
     });
   }
 }

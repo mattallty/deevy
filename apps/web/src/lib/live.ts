@@ -34,7 +34,8 @@ export function keysFor(event: LiveEvent): QueryKey[] {
       keys.push(orpc.projects.key(), orpc.workflow.key(), orpc.issues.key());
       break;
     case "member":
-      keys.push(orpc.members.key(), orpc.agents.key(), orpc.inbox.key());
+      // me.get carries the caller's role and suspension, which are Member Events.
+      keys.push(orpc.members.key(), orpc.agents.key(), orpc.inbox.key(), orpc.me.key());
       break;
     case "team":
       keys.push(orpc.teams.key());
@@ -55,7 +56,8 @@ export function keysFor(event: LiveEvent): QueryKey[] {
       keys.push(orpc.webhooks.key());
       break;
     case "workspace":
-      keys.push(orpc.workspace.key());
+      // routing.updated is a Workspace Event, and me.get carries the Workspace's name.
+      keys.push(orpc.workspace.key(), orpc.routing.key(), orpc.me.key());
       break;
     default:
       if (event.projectId) keys.push(orpc.issues.key());

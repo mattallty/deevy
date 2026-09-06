@@ -16,10 +16,14 @@ vi.mock("../src/lib/orpc.ts", async () => {
 });
 
 const { DevSignIn, SignedOut } = await import("../src/App.tsx");
+const { orpc } = await import("../src/lib/orpc.ts");
 
 function mount(node: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
+  return {
+    ...render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>),
+    queryClient,
+  };
 }
 
 afterEach(() => {
@@ -29,9 +33,13 @@ afterEach(() => {
 
 describe("SignedOut", () => {
   it("offers GitHub sign-in, and nothing else on a real instance", async () => {
-    mount(<SignedOut />);
+    const { queryClient } = mount(<SignedOut />);
     expect(screen.getByRole("button", { name: "Sign in with GitHub" })).toBeTruthy();
-    await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
+    // The form's absence means something only once health.ping has answered.
+    await waitFor(() =>
+      expect(queryClient.getQueryState(orpc.health.ping.queryKey())?.status).toBe("success"),
+    );
+    expect(screen.queryByRole("form")).toBeNull();
     expect(screen.queryByLabelText("Email")).toBeNull();
   });
 

@@ -28,6 +28,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type ComponentType,
@@ -407,18 +408,23 @@ export default function TiptapEditor({
   const submitRef = useRef(onSubmit);
   submitRef.current = onSubmit;
   const lastEmitted = useRef(value);
-
-  const editor = useEditor({
-    extensions: editorExtensions({
-      mode,
-      placeholder,
-      mentions: () => mentionRef.current,
-      onSubmit: () => submitRef.current?.(),
-    }),
-    content: value,
-    contentType: "markdown",
-    autofocus: autoFocus ? "end" : false,
-    editorProps: {
+  // useEditor compares its options on every render and re-applies any that
+  // changed, so the extensions, the editor props and the content are kept
+  // stable: the callbacks reach the latest props through the refs above, and
+  // `value` after the first render is loaded by the effect below.
+  const initial = useRef(value);
+  const extensions = useMemo(
+    () =>
+      editorExtensions({
+        mode,
+        placeholder,
+        mentions: () => mentionRef.current,
+        onSubmit: () => submitRef.current?.(),
+      }),
+    [mode, placeholder],
+  );
+  const editorProps = useMemo(
+    () => ({
       attributes: {
         class: cn(proseClassName, "min-h-24 px-3 py-2 outline-none", className),
         ...(id ? { id } : {}),
@@ -426,7 +432,16 @@ export default function TiptapEditor({
         role: "textbox",
         "aria-multiline": "true",
       },
-    },
+    }),
+    [className, id, ariaLabel],
+  );
+
+  const editor = useEditor({
+    extensions,
+    content: initial.current,
+    contentType: "markdown",
+    autofocus: autoFocus ? "end" : false,
+    editorProps,
     onUpdate: ({ editor: current }) => {
       const markdown = toMarkdown(current);
       lastEmitted.current = markdown;

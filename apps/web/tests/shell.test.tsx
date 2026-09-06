@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../src/lib/orpc.ts", async () => {
@@ -116,6 +116,30 @@ describe("the app shell", () => {
     expect(within(sidebar()).queryByRole("link", { name: "Members" })).toBeNull();
   });
 
+  it("offers the same Settings pages as a strip of tabs where the sidebar is hidden", async () => {
+    await mountAt("/settings/allowlist");
+    await screen.findByRole("heading", { name: "Allowlist" });
+
+    // Both are in the DOM; the stylesheet shows one per width (md:hidden / hidden md:flex).
+    const strip = screen.getByRole("navigation", { name: "Settings pages" });
+    expect(strip.className).toContain("md:hidden");
+    expect(strip.className).toContain("overflow-x-auto");
+    const desktop = screen.getByRole("navigation", { name: "Settings" });
+    expect(desktop.className).toContain("md:flex");
+    const links = within(strip).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual(
+      within(desktop)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    );
+    expect(
+      within(strip).getByRole("link", { name: "Allowlist" }).getAttribute("aria-current"),
+    ).toBe("page");
+    expect(within(strip).getByRole("link", { name: "Members" }).getAttribute("href")).toBe(
+      "/settings/members",
+    );
+  });
+
   it("renders the Allowlist page at /settings/allowlist", async () => {
     await mountAt("/settings/allowlist");
 
@@ -170,6 +194,14 @@ describe("keyboard help and the focused Issue", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     fireEvent.keyDown(document.body, { key: "k", metaKey: true });
     expect(await screen.findByRole("option", { name: /Keyboard shortcuts/ })).toBeTruthy();
+  });
+
+  it("? closes the sheet it opened: the open sheet owns the keys, and ? is global", async () => {
+    await mountAt("/");
+    fireEvent.keyDown(document.body, { key: "?", shiftKey: true });
+    expect(await screen.findByRole("heading", { name: "Keyboard" })).toBeTruthy();
+    fireEvent.keyDown(document.body, { key: "?", shiftKey: true });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Keyboard" })).toBeNull());
   });
 
   it("the palette acts on the Issue the peek holds open", async () => {

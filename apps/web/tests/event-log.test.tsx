@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { pickOption } from "./select.ts";
 
@@ -56,9 +56,14 @@ vi.mock("../src/lib/orpc.ts", async () => {
       }),
     },
     events: {
-      list: async (input: unknown) => {
+      // Filters by kind the way the server does, so the page need not.
+      list: async (input: { kindPrefix?: string }) => {
         stub.listed.push(input);
-        return { events: stub.events, nextCursor: 11 };
+        const prefix = input.kindPrefix;
+        const events = prefix
+          ? stub.events.filter((event) => event.kind.startsWith(`${prefix}.`))
+          : stub.events;
+        return { events, nextCursor: 11 };
       },
       // The base stub's subscribe stays quiet on its own; overriding the namespace drops it.
       subscribe: async () => {
@@ -105,16 +110,23 @@ describe("the Event log", () => {
     expect(stub.listed.at(-1)).toMatchObject({ order: "desc" });
   });
 
-  it("filters by kind on the page and opens a payload", async () => {
+  it("asks the server for one kind and opens a payload", async () => {
     await mountAt("/settings/events");
-    const table = await screen.findByRole("table", { name: "Event log" });
+    await screen.findByRole("table", { name: "Event log" });
 
     await pickOption(screen.getByLabelText("Kind"), "run.*");
-    expect(within(table).queryByText("gate.approved")).toBeNull();
-    expect(within(table).getByText("run.started")).toBeTruthy();
+    // The filter is the query's, so a page is a full page of matches. The
+    // table is rebuilt after the skeleton, so it is found again.
+    await waitFor(() => expect(stub.listed.at(-1)).toMatchObject({ kindPrefix: "run" }));
+    await waitFor(() => {
+      const filtered = screen.getByRole("table", { name: "Event log" });
+      expect(within(filtered).queryByText("gate.approved")).toBeNull();
+      expect(within(filtered).getByText("run.started")).toBeTruthy();
+    });
 
     await pickOption(screen.getByLabelText("Kind"), "Every kind");
-    fireEvent.click(within(table).getByText("gate.approved"));
+    await waitFor(() => expect(stub.listed.at(-1)).not.toHaveProperty("kindPrefix"));
+    fireEvent.click(await screen.findByText("gate.approved"));
     expect((await screen.findByLabelText("Payload of 12")).textContent).toContain(
       '"state": "Intent"',
     );

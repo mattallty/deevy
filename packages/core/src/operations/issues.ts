@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { issue as issueTable } from "@deevy/db";
+import { issue as issueTable, type Db } from "@deevy/db";
 import { insertIssue, isSelfOrDescendant, issueKey, nextIssueNumber } from "../issues.ts";
 import { oneLabelPerScope, replaceIssueLabels } from "../labels.ts";
 import { resolveMentions } from "../mentions.ts";
@@ -77,7 +77,9 @@ export const issues = {
         subjectType: "issue",
         subjectId: created.id,
         projectId: project.id,
-        payload: { key: issueKey(project.key, number), title: created.title },
+        // The State it landed in, so a reader of the log or the inbox sees
+        // where the Issue started, not where it is now.
+        payload: { key: issueKey(project.key, number), title: created.title, state: first.name },
       });
       await openStateDocument(context, created.id, project.id, first);
       return loadIssue(context, created.id);
@@ -108,7 +110,10 @@ export const issues = {
        * exactly that Issue; anything else matches titles, case-insensitively.
        */
       q: z.string().trim().min(1).max(200).optional(),
-      /** Return Issues numbered above this. Only meaningful with a projectKey. */
+      /**
+       * Return Issues numbered above this. A cursor over numbers means
+       * nothing across Projects, so it is ignored without a projectKey.
+       */
       after: z.coerce.number().int().nonnegative().optional(),
       stateId: z.string().optional(),
       assigneeMemberId: z.string().optional(),
@@ -128,22 +133,31 @@ export const issues = {
         : await visibleProjects(context);
       const keyOf = new Map(projects.map((project) => [project.id, project.key]));
       const only = projects.length === 1 ? projects[0] : undefined;
+      // The cursor and the search each constrain `number`, so they sit side by
+      // side under AND rather than in one object where the later would win:
+      // `q: "DEV-12"` past a cursor of 20 is nothing, not DEV-12.
+      const clauses: SearchClause[] = [];
+      if (input.projectKey && input.after !== undefined) {
+        clauses.push({ number: { gt: input.after } });
+      }
+      if (input.q !== undefined) clauses.push(searchClause(input.q, projects));
       const rows = await context.db.query.issue.findMany({
         where: {
           ...(only ? { projectId: only.id } : { projectId: { in: [...keyOf.keys()] } }),
-          ...(input.after === undefined ? {} : { number: { gt: input.after } }),
           ...(input.stateId === undefined ? {} : { stateId: input.stateId }),
           ...(input.assigneeMemberId === undefined
             ? {}
             : { assigneeMemberId: input.assigneeMemberId }),
           ...(input.open ? { closedAt: { isNull: true } } : {}),
           ...(input.labelId === undefined ? {} : { labels: { id: input.labelId } }),
-          ...(input.q === undefined ? {} : searchClause(input.q, projects)),
+          ...(clauses.length > 0 ? { AND: clauses } : {}),
         },
         with: issueWith,
         // A Project's list reads in key order and pages; the Workspace's reads
         // as a feed, and a cursor over numbers means nothing across Projects.
-        orderBy: input.projectKey ? { number: "asc" } : { updatedAt: "desc" },
+        // Two changes in one millisecond would otherwise land in scan order,
+        // so the id breaks the tie the same way every time.
+        orderBy: input.projectKey ? { number: "asc" } : { updatedAt: "desc", id: "desc" },
         limit: input.limit,
       });
       return {
@@ -414,19 +428,35 @@ async function visibleProjects(context: ContextFor<"member">) {
   });
 }
 
+/** One condition of an Issue query, in the relational query builder's own filter shape. */
+type SearchClause = NonNullable<
+  NonNullable<Parameters<Db["query"]["issue"]["findMany"]>[0]>["where"]
+>;
+
 /**
  * What `q` means: `DEV-12` is exactly that Issue, a bare number is that number
  * in any Project (or a title containing it), anything else is a word of the
  * title. SQLite's LIKE is case-insensitive for ASCII, which is what a key or
  * a title is.
  */
-function searchClause(q: string, projects: Array<{ id: string; key: string }>) {
+function searchClause(q: string, projects: Array<{ id: string; key: string }>): SearchClause {
   const asKey = /^([A-Za-z]{2,6})-(\d+)$/.exec(q);
   if (asKey) {
     const project = projects.find((candidate) => candidate.key === asKey[1]?.toUpperCase());
     return project ? { projectId: project.id, number: Number(asKey[2]) } : { number: -1 };
   }
-  const pattern = `%${q.replace(/[%_]/g, (char) => `\\${char}`)}%`;
-  if (/^\d+$/.test(q)) return { OR: [{ number: Number(q) }, { title: { like: pattern } }] };
-  return { title: { like: pattern } };
+  const title = titleContains(q);
+  if (/^\d+$/.test(q)) return { OR: [{ number: Number(q) }, title] };
+  return title;
+}
+
+/**
+ * A title containing `q` as typed: `%` and `_` are LIKE's wildcards and a
+ * backslash is the escape character this names, so all three are escaped
+ * first. The relational `like` filter emits no ESCAPE clause, which is why
+ * this is raw SQL: without it "100%" matched every title with "100" in it.
+ */
+function titleContains(q: string): SearchClause {
+  const pattern = `%${q.replace(/[%_\\]/g, (char) => `\\${char}`)}%`;
+  return { RAW: (table) => sql`${table.title} LIKE ${pattern} ESCAPE '\\'` };
 }

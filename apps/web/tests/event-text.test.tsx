@@ -101,6 +101,44 @@ describe("describeEvent", () => {
     });
   });
 
+  it("gives a comment the voice of whoever wrote it", () => {
+    expect(
+      describeEvent({ kind: "comment.created", payload: { commentId: "c1" }, actorKind: "agent" }),
+    ).toMatchObject({ text: "commented", tone: "agent" });
+    expect(
+      describeEvent({ kind: "comment.edited", payload: { commentId: "c1" }, actorKind: "human" }),
+    ).toMatchObject({ text: "edited a comment", tone: "human" });
+    // No kind known: a Human's, as before.
+    expect(describeEvent({ kind: "comment.deleted", payload: { commentId: "c1" } })).toMatchObject({
+      text: "withdrew a comment",
+      tone: "human",
+    });
+  });
+
+  it("names the Gate a Run waits at when the Event carries it", () => {
+    expect(
+      describeEvent({
+        kind: "run.awaiting_input",
+        payload: { gateStateId: "s1", state: "Intent", url: "https://x" },
+        actorKind: "agent",
+      }),
+    ).toMatchObject({ text: "is waiting at the Intent Gate", tone: "gate" });
+    expect(
+      describeEvent({ kind: "run.awaiting_input", payload: { gateStateId: "s1" } })?.text,
+    ).toBe("is waiting at a Gate");
+    expect(
+      describeEvent({
+        kind: "run.awaiting_input",
+        payload: { question: "Exponential or fixed?" },
+        actorKind: "agent",
+      }),
+    ).toMatchObject({
+      text: "is waiting on a Human",
+      detail: "Exponential or fixed?",
+      tone: "agent",
+    });
+  });
+
   it("reads the Workspace's own Events for the log", () => {
     expect(
       describeEvent({

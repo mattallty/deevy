@@ -40,14 +40,14 @@ let pendingPrefix: { key: string; at: number } | null = null;
 let installed = false;
 
 /** Whether the keystroke belongs to something the Human is writing in. */
-export function isTyping(target: EventTarget | null): boolean {
+function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 /** The single token a keydown is, in the binding syntax. */
-export function tokenOf(event: KeyboardEvent): string {
+function tokenOf(event: KeyboardEvent): string {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key.toLowerCase();
   const parts: string[] = [];
   if (event.metaKey || event.ctrlKey) parts.push("mod");
@@ -59,7 +59,8 @@ export function tokenOf(event: KeyboardEvent): string {
   return parts.join("+");
 }
 
-function activeScope(): string {
+/** The scope on top of the stack, for tests and the shortcut sheet. */
+export function activeScope(): string {
   return scopes[scopes.length - 1] ?? PAGE_SCOPE;
 }
 
@@ -151,9 +152,4 @@ export function useShortcutScope(name: string, active = true) {
 export function isMac(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Mac|iPhone|iPad/.test(navigator.platform) || /Mac/.test(navigator.userAgent);
-}
-
-/** The scope stack as it stands, for tests and the shortcut sheet. */
-export function currentScope(): string {
-  return activeScope();
 }

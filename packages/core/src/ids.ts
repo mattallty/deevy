@@ -38,6 +38,12 @@ export const idPrefixes = {
   jwks: "jwk",
   oauthClient: "oacl",
   oauthResource: "oars",
+  oauthClientResource: "oacr",
+  oauthAccessToken: "oaat",
+  oauthRefreshToken: "oart",
+  oauthConsent: "oacs",
+  // Reserved, never minted: the oauth-provider plugin gives a client
+  // assertion its own jti as the id, and Better Auth keeps that one.
   oauthClientAssertion: "oaca",
 } as const;
 
@@ -64,7 +70,13 @@ export function newId(kind: IdKind): string {
   return `${idPrefixes[kind]}_${randomBody()}`;
 }
 
-/** Better Auth's models by the names it uses; anything unknown keeps its model name as the prefix. */
+/**
+ * Better Auth's models by the names its `generateId` hook passes: the schema
+ * keys, which are camelCase even where the table is snake_case. A model
+ * missing here is refused rather than given a made-up prefix, because the
+ * first row a new plugin writes is the moment to add its line, and an id
+ * `isId` rejects would surface somewhere far less obvious.
+ */
 const authModels: Record<string, IdKind> = {
   user: "user",
   session: "session",
@@ -73,16 +85,22 @@ const authModels: Record<string, IdKind> = {
   apikey: "apikey",
   jwks: "jwks",
   oauthClient: "oauthClient",
-  oauth_client: "oauthClient",
   oauthResource: "oauthResource",
-  oauth_resource: "oauthResource",
+  oauthClientResource: "oauthClientResource",
+  oauthAccessToken: "oauthAccessToken",
+  oauthRefreshToken: "oauthRefreshToken",
+  oauthConsent: "oauthConsent",
   oauthClientAssertion: "oauthClientAssertion",
-  oauth_client_assertion: "oauthClientAssertion",
 };
 
 export function authId(model: string): string {
   const kind = authModels[model];
-  return kind ? newId(kind) : `${model.toLowerCase()}_${randomBody()}`;
+  if (!kind) {
+    throw new Error(
+      `No id prefix for Better Auth model "${model}": add it to idPrefixes and authModels (ids.ts)`,
+    );
+  }
+  return newId(kind);
 }
 
 /** Whether `value` is an id of `kind` (or of any kind, when none is given). */

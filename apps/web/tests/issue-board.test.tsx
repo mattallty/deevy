@@ -1,5 +1,7 @@
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vite-plus/test";
 import {
+  IssueBoardView,
   groupIntoColumns,
   planDrop,
   type BoardColumn,
@@ -135,5 +137,44 @@ describe("groupIntoColumns", () => {
     const grouped = groupIntoColumns(columns, [older, newer], (card) => card.state.name);
     expect(grouped.Build!.map((card) => card.key)).toEqual(["OPS-3", "DEV-2"]);
     expect(grouped.Intent).toEqual([]);
+  });
+});
+
+describe("IssueBoardView", () => {
+  it("draws every column at full strength: nothing is disabled just because columns stay put", () => {
+    const columns: BoardColumn[] = foldStates(projects).map((state) => ({
+      id: state.name,
+      name: state.name,
+      isGate: state.isGate,
+      category: state.category,
+      resolveTarget: (card) => state.byProject.get(card.projectId) ?? null,
+    }));
+    const value = groupIntoColumns(
+      columns,
+      [
+        issue("DEV-1", "p-dev", {
+          id: "d-build",
+          name: "Build",
+          isGate: false,
+          category: "active",
+        }),
+      ],
+      (card) => card.state.name,
+    );
+    render(
+      <IssueBoardView
+        columns={columns}
+        value={value}
+        onOpen={() => {}}
+        onDecide={() => {}}
+        onDrop={() => {}}
+      />,
+    );
+    for (const name of ["Intent", "Build"]) {
+      const column = screen.getByRole("region", { name });
+      expect(column.classList.contains("opacity-50")).toBe(false);
+      expect(column.hasAttribute("data-disabled")).toBe(false);
+    }
+    expect(screen.getAllByText("DEV-1").length).toBeGreaterThan(0);
   });
 });

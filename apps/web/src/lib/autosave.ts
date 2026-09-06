@@ -21,6 +21,9 @@ export function useAutosave<T>(save: (value: T) => Promise<unknown>, delay = 600
     async (value: T) => {
       const mine = ++sequence.current;
       last.current = value;
+      // A previous save's "saved → idle" timer must not overwrite this one's status.
+      if (settle.current) clearTimeout(settle.current);
+      settle.current = null;
       setStatus("saving");
       setError(null);
       try {

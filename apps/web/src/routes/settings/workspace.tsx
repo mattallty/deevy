@@ -19,7 +19,12 @@ export function WorkspacePage() {
 
   const save = useMutation(
     orpc.workspace.update.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.workspace.key() }),
+      // The sidebar's name comes from me.get, so both re-read.
+      onSuccess: () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: orpc.workspace.key() }),
+          queryClient.invalidateQueries({ queryKey: orpc.me.key() }),
+        ]),
     }),
   );
 

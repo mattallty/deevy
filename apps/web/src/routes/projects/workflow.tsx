@@ -41,6 +41,33 @@ import {
 /** Base UI's Select wants a value for "nowhere"; the empty string is not one. */
 const NOWHERE = "__nowhere";
 
+/** A State as `workflow.get` and `workflow.update` return it. */
+interface ServerState {
+  id: string;
+  name: string;
+  isGate: boolean;
+  category: string;
+  documentName: string | null;
+  documentTemplate: string | null;
+  triggerAgentMemberId: string | null;
+  approverMemberIds?: string[] | null;
+}
+
+/** The server's States as the editor's working copy; a saved State's `uid` is its id. */
+function toDraft(states: ServerState[]): DraftState[] {
+  return states.map((state) => ({
+    uid: state.id,
+    id: state.id,
+    name: state.name,
+    isGate: state.isGate,
+    category: state.category as StateCategory,
+    documentName: state.documentName,
+    documentTemplate: state.documentTemplate,
+    triggerAgentMemberId: state.triggerAgentMemberId,
+    approverMemberIds: state.approverMemberIds ?? [],
+  }));
+}
+
 export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
@@ -54,28 +81,18 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
 
   // The server's Workflow is the starting point; edits are local until saved.
+  // Seeds the initial load (and a Reset) only: a save seeds from its own response.
   useEffect(() => {
-    if (workflow.data && draft === null) {
-      setDraft(
-        workflow.data.states.map((state) => ({
-          uid: state.id,
-          id: state.id,
-          name: state.name,
-          isGate: state.isGate,
-          category: state.category as StateCategory,
-          documentName: state.documentName,
-          documentTemplate: state.documentTemplate,
-          triggerAgentMemberId: state.triggerAgentMemberId,
-          approverMemberIds: state.approverMemberIds ?? [],
-        })),
-      );
-    }
+    if (workflow.data && draft === null) setDraft(toDraft(workflow.data.states));
   }, [workflow.data, draft]);
 
   const save = useMutation(
     orpc.workflow.update.mutationOptions({
-      onSuccess: async () => {
-        setDraft(null);
+      // The draft becomes what the server now holds, from the response itself:
+      // emptying it and waiting for the refetch would re-seed from the stale
+      // query in between, and the rename just saved would look unsaved again.
+      onSuccess: async (saved) => {
+        setDraft(toDraft(saved.states));
         setRemoved([]);
         setMoveIssuesTo(null);
         await queryClient.invalidateQueries({ queryKey: orpc.workflow.key() });
@@ -111,6 +128,8 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
   const drop = (at: number) => {
     const state = draft[at];
     if (state?.id) setRemoved([...removed, state.id]);
+    // A deleted State is nowhere to move Issues to.
+    if (state?.id && state.id === moveIssuesTo) setMoveIssuesTo(null);
     setDraft(draft.filter((_, index) => index !== at));
     setSelectedUid(draft[at + 1]?.uid ?? draft[at - 1]?.uid ?? null);
   };
@@ -339,6 +358,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           onClick={() => {
             setDraft(null);
             setRemoved([]);
+            setMoveIssuesTo(null);
           }}
         >
           Reset

@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-export interface SettingsPage {
+export interface SettingsNavPage {
   label: string;
   to: string;
 }
@@ -13,7 +13,7 @@ export interface SettingsPage {
  * links (docs/plans/ui-redesign.md). Shared with the command palette, so a
  * page is reachable by the same name from either.
  */
-export const settingsNav: Array<{ group: string; pages: SettingsPage[] }> = [
+export const settingsNav: Array<{ group: string; pages: SettingsNavPage[] }> = [
   {
     group: "Workspace",
     pages: [
@@ -98,6 +98,32 @@ export function SettingsLayout() {
         ))}
       </nav>
       <div className="flex min-w-0 flex-1 flex-col p-6">
+        {/* Below md the sidebar above is gone; the same pages, as one strip of tabs that scrolls. */}
+        <nav
+          aria-label="Settings pages"
+          className="-mx-6 -mt-6 mb-6 flex overflow-x-auto border-b px-6 md:hidden"
+        >
+          {settingsNav.flatMap(({ pages }) =>
+            pages.map((page) => {
+              const active = pathname === page.to || pathname.startsWith(`${page.to}/`);
+              return (
+                <Link
+                  key={page.to}
+                  to={page.to}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap hover:text-foreground",
+                    active
+                      ? "border-primary font-medium text-foreground"
+                      : "border-transparent text-muted-foreground",
+                  )}
+                >
+                  {page.label}
+                </Link>
+              );
+            }),
+          )}
+        </nav>
         <div className="mx-auto flex w-full max-w-[880px] flex-1 flex-col">
           <Outlet />
         </div>

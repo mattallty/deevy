@@ -84,7 +84,7 @@ describe("MarkdownEditor", () => {
     const onChange = vi.fn();
     render(<MarkdownEditor value={"## Problem\n\nNo reader."} onChange={onChange} />);
 
-    const source = screen.getByLabelText("Body") as HTMLTextAreaElement;
+    const source = screen.getByLabelText("Body", { selector: "textarea" }) as HTMLTextAreaElement;
     expect(source.value).toBe("## Problem\n\nNo reader.");
     // The rich editor mounts (lazily) and does not re-serialize on load.
     await waitFor(() => expect(document.querySelector(".tiptap")).toBeTruthy());
@@ -97,7 +97,7 @@ describe("MarkdownEditor", () => {
     render(<MarkdownEditor value="" onChange={onChange} onSubmit={onSubmit} mode="inline" />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Source" }));
-    const source = screen.getByLabelText("Body");
+    const source = screen.getByLabelText("Body", { selector: "textarea" });
     fireEvent.change(source, { target: { value: "A note" } });
     expect(onChange).toHaveBeenCalledWith("A note");
     fireEvent.keyDown(source, { key: "Enter", metaKey: true });
@@ -105,7 +105,24 @@ describe("MarkdownEditor", () => {
   });
 
   it("has a toolbar in block mode and none inline", async () => {
-    render(<MarkdownEditor value="x" onChange={() => {}} />);
+    const block = render(<MarkdownEditor value="x" onChange={() => {}} />);
     expect(await screen.findByRole("toolbar", { name: "Formatting" })).toBeTruthy();
+    block.unmount();
+
+    render(<MarkdownEditor value="x" onChange={() => {}} mode="inline" />);
+    await waitFor(() => expect(document.querySelector(".tiptap")).toBeTruthy());
+    expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("names the rich textbox and points the id at the view that is showing", async () => {
+    render(<MarkdownEditor id="body" aria-label="Comment" value="" onChange={() => {}} />);
+    const rich = await screen.findByRole("textbox", { name: "Comment" });
+    expect(rich.classList.contains("tiptap")).toBe(true);
+    expect(rich.id).toBe("body");
+    expect(screen.getByLabelText("Comment", { selector: "textarea" }).id).not.toBe("body");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
+    expect(screen.getByLabelText("Comment", { selector: "textarea" }).id).toBe("body");
+    expect(rich.id).toBe("");
   });
 });

@@ -42,6 +42,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
     routing: {},
     webhooks: {},
     workspace: {},
+    me: {},
     events: {
       list: async () => ({ events: [], nextCursor: null }),
       subscribe: async (input: unknown) => {
@@ -61,7 +62,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { useLiveEvents } = await import("../src/lib/live.ts");
+const { keysFor, useLiveEvents } = await import("../src/lib/live.ts");
 
 function Probe() {
   useLiveEvents(true);
@@ -173,5 +174,23 @@ describe("useLiveEvents", () => {
     expect(all).toContain("comments");
     expect(all).toContain("inbox");
     expect(all).not.toContain("members");
+  });
+});
+
+describe("keysFor", () => {
+  it("re-reads what a Workspace Event and a Member Event show besides themselves", () => {
+    // routing.updated is a Workspace Event, and me.get carries the Workspace's name.
+    const workspace = JSON.stringify(keysFor({ subjectType: "workspace", projectId: null }));
+    expect(workspace).toContain('"workspace"');
+    expect(workspace).toContain('"routing"');
+    expect(workspace).toContain('"me"');
+    // A role change or a suspension reaches the caller through me.get.
+    const member = JSON.stringify(keysFor({ subjectType: "member", projectId: null }));
+    expect(member).toContain('"members"');
+    expect(member).toContain('"me"');
+    // And an Issue Event still leaves the caller alone.
+    expect(JSON.stringify(keysFor({ subjectType: "issue", projectId: "p1" }))).not.toContain(
+      '"me"',
+    );
   });
 });

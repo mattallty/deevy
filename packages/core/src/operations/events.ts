@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, like, lt } from "drizzle-orm";
 import { z } from "zod";
 import { event as eventTable } from "@deevy/db";
 import { EventSchema } from "../schemas.ts";
@@ -21,8 +21,20 @@ export const events = {
        * turns to next (docs/plans/ui-redesign.md slice 10).
        */
       before: z.coerce.number().int().positive().optional(),
-      /** Oldest first is the stream's order; newest first is a log's. */
-      order: z.enum(["asc", "desc"]).default("asc"),
+      /**
+       * Oldest first is the stream's order; newest first is a log's. Left
+       * out, it is `asc`, except with `before` alone, where it is `desc`: a
+       * page before a seq is a page turned back, and its cursor must keep
+       * going back.
+       */
+      order: z.enum(["asc", "desc"]).optional(),
+      /** Only Events whose kind starts with this family, e.g. `gate` or `run`. */
+      kindPrefix: z
+        .string()
+        .regex(/^[a-z_]+$/, "A kind family is lowercase letters and underscores")
+        .min(1)
+        .max(40)
+        .optional(),
       subjectType: z.string().optional(),
       subjectId: z.string().optional(),
       projectId: z.string().optional(),
@@ -34,6 +46,7 @@ export const events = {
       nextCursor: z.number().int().nullable(),
     }),
     handler: async ({ input, context }) => {
+      const order = input.order ?? (input.before === undefined ? "asc" : "desc");
       const rows = await context.db
         .select()
         .from(eventTable)
@@ -42,6 +55,11 @@ export const events = {
             eq(eventTable.workspaceId, context.workspace.id),
             input.after === undefined ? undefined : gt(eventTable.seq, input.after),
             input.before === undefined ? undefined : lt(eventTable.seq, input.before),
+            // Kinds are dotted lowercase (events.ts), so the prefix needs no
+            // escaping: the schema refuses anything LIKE could misread.
+            input.kindPrefix === undefined
+              ? undefined
+              : like(eventTable.kind, `${input.kindPrefix}.%`),
             input.subjectType === undefined
               ? undefined
               : eq(eventTable.subjectType, input.subjectType),
@@ -49,7 +67,7 @@ export const events = {
             input.projectId === undefined ? undefined : eq(eventTable.projectId, input.projectId),
           ),
         )
-        .orderBy(input.order === "desc" ? desc(eventTable.seq) : asc(eventTable.seq))
+        .orderBy(order === "desc" ? desc(eventTable.seq) : asc(eventTable.seq))
         .limit(input.limit);
       // The cursor is the last row's seq either way: `after` it going forward,
       // `before` it going back.

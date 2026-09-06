@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,26 +34,29 @@ export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
   const teams = useQuery(orpc.teams.list.queryOptions({ input: {} }));
   const me = useQuery(orpc.me.get.queryOptions());
   const refresh = () => queryClient.invalidateQueries({ queryKey: orpc.projects.key() });
-  const update = useMutation(orpc.projects.update.mutationOptions({ onSuccess: refresh }));
+  // What the fields show: the server's values until a keystroke, then the draft.
+  const [name, setName] = useState<string | null>(null);
+  const [description, setDescription] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  const update = useMutation(
+    orpc.projects.update.mutationOptions({
+      // A save landing resets the draft of the field it carried, and only that
+      // one: a Team change must not wipe a name still being typed.
+      onSuccess: async (_saved, variables) => {
+        if ("name" in variables) setName(null);
+        if ("description" in variables) setDescription(null);
+        await refresh();
+      },
+    }),
+  );
   const archive = useMutation(orpc.projects.archive.mutationOptions({ onSuccess: refresh }));
 
   type Change = { name?: string; description?: string | null; teamId?: string | null };
   const autosave = useAutosave<Change>((change) =>
     update.mutateAsync({ key: projectKey, ...change }),
   );
-
-  // What the fields show: the server's values until a keystroke, then the draft.
-  const [name, setName] = useState<string | null>(null);
-  const [description, setDescription] = useState<string | null>(null);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  // A save landing resets the drafts to what the server now has.
-  useEffect(() => {
-    if (autosave.status === "saved") {
-      setName(null);
-      setDescription(null);
-    }
-  }, [autosave.status]);
 
   if (project.isPending) return <Skeleton className="h-48 w-full" />;
   if (project.isError) return <p className="text-destructive">{project.error.message}</p>;

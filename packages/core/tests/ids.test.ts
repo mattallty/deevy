@@ -26,12 +26,39 @@ describe("newId", () => {
     expect(ids.size).toBe(5_000);
   });
 
-  it("gives Better Auth's models their prefixes, and an unknown model its own name", () => {
+  it("gives Better Auth's models their prefixes, and refuses one it does not know", () => {
     expect(authId("user")).toMatch(/^usr_[0-9a-z]{12}$/);
     expect(authId("session")).toMatch(/^ses_[0-9a-z]{12}$/);
     expect(authId("apikey")).toMatch(/^key_[0-9a-z]{12}$/);
-    expect(authId("oauth_client")).toMatch(/^oacl_[0-9a-z]{12}$/);
-    expect(authId("somethingNew")).toMatch(/^somethingnew_[0-9a-z]{12}$/);
+    expect(authId("oauthClient")).toMatch(/^oacl_[0-9a-z]{12}$/);
+    // A new plugin table must fail loudly, not mint a prefix isId rejects.
+    expect(() => authId("somethingNew")).toThrow(/somethingNew/);
+    // generateId receives the camelCase schema key, never the table name.
+    expect(() => authId("oauth_client")).toThrow();
+  });
+
+  it("knows every model Better Auth creates on this instance", () => {
+    // The auth core, the api-key and jwt plugins, and the oauth-provider
+    // plugin's tables (auth.ts). oauthClientAssertion is created with the
+    // plugin's own jti as its id, but the map keeps the prefix reserved.
+    const models = [
+      "user",
+      "session",
+      "account",
+      "verification",
+      "apikey",
+      "jwks",
+      "oauthClient",
+      "oauthResource",
+      "oauthClientResource",
+      "oauthRefreshToken",
+      "oauthAccessToken",
+      "oauthConsent",
+      "oauthClientAssertion",
+    ];
+    for (const model of models) {
+      expect(isId(authId(model)), model).toBe(true);
+    }
   });
 });
 
