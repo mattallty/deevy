@@ -1,5 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { pickOption, selectedLabel } from "./select.ts";
 
@@ -110,15 +109,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
 });
 
 const { WorkflowPage } = await import("../src/routes/projects/workflow.tsx");
-
-function mount() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <WorkflowPage projectKey="DEV" />
-    </QueryClientProvider>,
-  );
-}
+const { mount } = await import("./mount.tsx");
 
 async function states() {
   const list = await screen.findByRole("list", { name: "States" });
@@ -134,7 +125,7 @@ async function open(name: string) {
 
 describe("the Agent a State triggers", () => {
   it("offers every Agent per State and shows the rule the State already carries", async () => {
-    mount();
+    mount(<WorkflowPage projectKey="DEV" />);
     expect(await states()).toHaveLength(3);
 
     const intent = await open("Intent");
@@ -150,7 +141,7 @@ describe("the Agent a State triggers", () => {
   });
 
   it("saves the rule with the rest of the Workflow", async () => {
-    mount();
+    mount(<WorkflowPage projectKey="DEV" />);
     const intent = await open("Intent");
     const picker = within(intent).getByLabelText("Assign an Agent on entering");
     await pickOption(picker, "Builder");
@@ -167,7 +158,7 @@ describe("the Agent a State triggers", () => {
 
 describe("the approvers a Gate names", () => {
   it("offers the Workspace's Humans on a Gate, and nothing on a State that is not one", async () => {
-    mount();
+    mount(<WorkflowPage projectKey="DEV" />);
     const intent = await open("Intent");
 
     // A combobox: typing filters, ArrowDown opens, the options are portalled.
@@ -186,7 +177,7 @@ describe("the approvers a Gate names", () => {
 
   it("saves the Humans it names with the rest of the Workflow", async () => {
     stub.saved.length = 0;
-    mount();
+    mount(<WorkflowPage projectKey="DEV" />);
     const intent = await open("Intent");
     const picker = await within(intent).findByLabelText("Approvers for Intent");
     fireEvent.keyDown(picker, { key: "ArrowDown" });
@@ -207,7 +198,7 @@ describe("the approvers a Gate names", () => {
 describe("the order and the template", () => {
   it("moves a State with the arrows and counts the change", async () => {
     stub.saved.length = 0;
-    mount();
+    mount(<WorkflowPage projectKey="DEV" />);
     const plan = await open("Plan");
     expect(screen.getByText("No changes")).toBeTruthy();
     fireEvent.click(within(plan).getByRole("button", { name: "Move Plan up" }));
@@ -222,7 +213,7 @@ describe("the order and the template", () => {
 
   it("edits a Document template in the editor's Source tab", async () => {
     stub.saved.length = 0;
-    mount();
+    mount(<WorkflowPage projectKey="DEV" />);
     const build = await open("Build");
     fireEvent.change(within(build).getByLabelText("Document it asks for"), {
       target: { value: "plan" },
@@ -248,7 +239,7 @@ describe("saving", () => {
     stub.getDelayMs = 30;
     stub.remembers = true;
     try {
-      mount();
+      mount(<WorkflowPage projectKey="DEV" />);
       const intent = await open("Intent");
       fireEvent.change(within(intent).getByLabelText("Name"), { target: { value: "Backlog" } });
       expect(screen.getByText(/1 unsaved change/)).toBeTruthy();

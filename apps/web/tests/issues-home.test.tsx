@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const ada = {
@@ -126,32 +124,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    {
-      workspaceName: "Acme Team",
-      memberName: "Ada Lovelace",
-      member: { ...ada, image: null },
-    },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  await act(async () => {
-    await router.load();
-  });
-  return router;
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Issues home", () => {
   it("lists every open Issue grouped by State, folding Done", async () => {
-    await mountAt("/");
+    await mountAt("/", { member: { ...ada, image: null } });
 
     const table = await screen.findByRole("table", { name: "Issues" });
     expect(within(table).getByRole("row", { name: /DEV-1 Ship the Event log/ })).toBeTruthy();
@@ -166,14 +143,14 @@ describe("the Issues home", () => {
   });
 
   it("unfolds Done on click", async () => {
-    await mountAt("/");
+    await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(within(table).getByText("Done"));
     expect(await within(table).findByRole("row", { name: /Already shipped/ })).toBeTruthy();
   });
 
   it("reads the filters from the URL and titles the view by them", async () => {
-    await mountAt("/?assignee=me&kind=human");
+    await mountAt("/?assignee=me&kind=human", { member: { ...ada, image: null } });
 
     expect(await screen.findByRole("heading", { name: "My Issues", level: 1 })).toBeTruthy();
     // "me" became the Member id on the way to the server.
@@ -183,7 +160,7 @@ describe("the Issues home", () => {
   });
 
   it("offers My Agents to a Sponsor and asks the server for their Issues", async () => {
-    await mountAt("/?assignee=agents:me");
+    await mountAt("/?assignee=agents:me", { member: { ...ada, image: null } });
 
     expect(await screen.findByRole("heading", { name: "My Agents' Issues" })).toBeTruthy();
     const table = await screen.findByRole("table", { name: "Issues" });
@@ -195,20 +172,20 @@ describe("the Issues home", () => {
   });
 
   it("sends every filter to the server: State by name, kind, and Unassigned", async () => {
-    await mountAt("/?state=Build&kind=agent");
+    await mountAt("/?state=Build&kind=agent", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
     expect(within(table).getByRole("row", { name: /DEV-2/ })).toBeTruthy();
     expect(within(table).queryByRole("row", { name: /DEV-1/ })).toBeNull();
     expect(stub.listed.at(-1)).toMatchObject({ stateName: "Build", assigneeKind: "agent" });
 
-    await mountAt("/?assignee=none");
+    await mountAt("/?assignee=none", { member: { ...ada, image: null } });
     await waitFor(() => expect(stub.listed.at(-1)).toMatchObject({ unassigned: true }));
   });
 
   it("says when the page is the first 200 of more, and counts with a plus", async () => {
     stub.pageSize = 2;
     try {
-      await mountAt("/");
+      await mountAt("/", { member: { ...ada, image: null } });
       const table = await screen.findByRole("table", { name: "Issues" });
       expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
       expect(stub.listed.at(-1)).toMatchObject({ limit: 200 });
@@ -222,7 +199,7 @@ describe("the Issues home", () => {
   });
 
   it("writes a filter to the URL", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     await screen.findByRole("table", { name: "Issues" });
 
     fireEvent.click(screen.getByRole("button", { name: "All", pressed: false }));
@@ -234,7 +211,7 @@ describe("the Issues home", () => {
   });
 
   it("opens a row beside the list with Enter, and the page with o", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
 
     fireEvent.keyDown(document.body, { key: "j" });
@@ -257,7 +234,7 @@ describe("the Issues home", () => {
   });
 
   it("opens a row by clicking it", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(within(table).getByRole("row", { name: /OPS-1/ }));
     await act(async () => {
@@ -269,7 +246,7 @@ describe("the Issues home", () => {
 
 describe("the Issues home with nothing to show", () => {
   it("says the filters are what emptied it, and clears them", async () => {
-    const router = await mountAt("/?state=Nowhere");
+    const router = await mountAt("/?state=Nowhere", { member: { ...ada, image: null } });
 
     expect(await screen.findByText("No Issues match your filters")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
@@ -283,7 +260,7 @@ describe("the Issues home with nothing to show", () => {
 
 describe("the board view of the Issues home", () => {
   it("toggles to the Board, writing view to the URL and hiding Group by", async () => {
-    const router = await mountAt("/");
+    const router = await mountAt("/", { member: { ...ada, image: null } });
     await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ view: "board" }));
@@ -293,7 +270,7 @@ describe("the board view of the Issues home", () => {
   });
 
   it("keeps the Board when its toggle is pressed again", async () => {
-    const router = await mountAt("/?view=board");
+    const router = await mountAt("/?view=board", { member: { ...ada, image: null } });
     await screen.findByRole("region", { name: "Intent" });
     // Base UI hands a single-select group [] on a second click; the view stays.
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
@@ -306,7 +283,7 @@ describe("the board view of the Issues home", () => {
   });
 
   it("folds same-named States into one column across Projects and keeps the Gate ruling on a card", async () => {
-    await mountAt("/?view=board");
+    await mountAt("/?view=board", { member: { ...ada, image: null } });
     const intent = await screen.findByRole("region", { name: "Intent" });
     const names = [...document.querySelectorAll('[data-slot="board-column"]')].map((column) =>
       column.getAttribute("aria-label"),

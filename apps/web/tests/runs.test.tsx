@@ -1,5 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => {
@@ -116,11 +115,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
 });
 
 const { IssueRuns } = await import("../src/components/run-card.tsx");
-
-function mount(ui: React.ReactNode) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
-}
+const { mount } = await import("./mount.tsx");
 
 describe("the Runs section on an Issue", () => {
   it("shows each Run with its status and what triggered it", async () => {

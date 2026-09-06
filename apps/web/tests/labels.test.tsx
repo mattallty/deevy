@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => {
@@ -48,29 +46,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the Labels settings page", () => {
   it("lists Labels, a scoped one as its scope in a pill then its name", async () => {
-    await mountAt("/settings/labels");
+    await mountAt("/settings/labels", { memberName: "Ada" });
 
     expect(await screen.findByText("backend")).toBeTruthy();
     // The eye sees [[epic] Checkout]; the badge names itself `epic: Checkout`.
@@ -80,7 +60,7 @@ describe("the Labels settings page", () => {
   });
 
   it("creates a Label from the form, splitting scope from name", async () => {
-    await mountAt("/settings/labels");
+    await mountAt("/settings/labels", { memberName: "Ada" });
 
     fireEvent.change(await screen.findByLabelText("Scope"), { target: { value: "epic" } });
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Billing" } });
@@ -96,7 +76,7 @@ describe("the Labels settings page", () => {
 
 describe("the Label picker on an Issue", () => {
   it("shows which Labels are on it and sets the whole selection", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     await screen.findByRole("group", { name: "Labels" });
     // The Issue's own Label is a chip; the rest are found by typing.
@@ -117,7 +97,7 @@ describe("the Label picker on an Issue", () => {
 
 describe("a Label's colour", () => {
   it("is one of the palette's swatches, not a free pick", async () => {
-    await mountAt("/settings/labels");
+    await mountAt("/settings/labels", { memberName: "Ada" });
     const group = await screen.findByRole("radiogroup", { name: "Color" });
     const swatches = within(group).getAllByRole("radio");
     expect(swatches.length).toBe(8);

@@ -1,5 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -38,12 +37,8 @@ vi.mock("../src/lib/orpc.ts", async () => {
 });
 
 const { MembersPage } = await import("../src/routes/settings/members.tsx");
+const { mount } = await import("./mount.tsx");
 const { AllowlistPage } = await import("../src/routes/settings/allowlist.tsx");
-
-function mount(ui: React.ReactNode) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
-}
 
 describe("the Members settings page", () => {
   it("lists every Member with their role and handle", async () => {

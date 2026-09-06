@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { pickOption } from "./select.ts";
 
@@ -93,7 +91,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
+const { mountAt } = await import("./mount.tsx");
 
 /** The board's columns, told apart from Sonner's Toaster, which is also a region. */
 async function findColumns() {
@@ -101,27 +99,9 @@ async function findColumns() {
   return [...document.querySelectorAll<HTMLElement>('[data-slot="board-column"]')];
 }
 
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
-
 describe("the board", () => {
   it("renders one column per State, in Workflow order, marking the Gates", async () => {
-    await mountAt("/projects/DEV/board");
+    await mountAt("/projects/DEV/board", { memberName: "Ada" });
 
     const columns = await findColumns();
     const names = columns.map((column) => column.getAttribute("aria-label"));
@@ -131,7 +111,7 @@ describe("the board", () => {
   });
 
   it("puts each Issue in its State's column, showing key, title and Assignee", async () => {
-    await mountAt("/projects/DEV/board");
+    await mountAt("/projects/DEV/board", { memberName: "Ada" });
 
     const columns = await findColumns();
     const intent = within(columns[0]!);
@@ -142,7 +122,7 @@ describe("the board", () => {
   });
 
   it("filters by Assignee", async () => {
-    await mountAt("/projects/DEV/board");
+    await mountAt("/projects/DEV/board", { memberName: "Ada" });
 
     await findColumns();
     await pickOption(screen.getByLabelText("Assignee"), /Ada/);
@@ -154,7 +134,7 @@ describe("the board", () => {
 
 describe("moving a card out of a Gate column", () => {
   it("asks for a decision instead of moving it", async () => {
-    await mountAt("/projects/DEV/board");
+    await mountAt("/projects/DEV/board", { memberName: "Ada" });
 
     await findColumns();
     // The card in Intent carries the Gate affordance rather than a plain move.
@@ -172,7 +152,7 @@ describe("moving a card out of a Gate column", () => {
 
 describe("a card", () => {
   it("opens beside the board when clicked, with the peek non-modal so a drag still works", async () => {
-    await mountAt("/projects/DEV/board");
+    await mountAt("/projects/DEV/board", { memberName: "Ada" });
     const columns = await findColumns();
 
     fireEvent.click(within(columns[3]!).getByText("In Build"));

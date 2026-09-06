@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => {
@@ -70,29 +68,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
   return { client, orpc: createTanstackQueryUtils(client) };
 });
 
-const { createAppRouter } = await import("../src/router.tsx");
-
-async function mountAt(path: string) {
-  const router = createAppRouter(
-    { workspaceName: "Acme Team", memberName: "Ada" },
-    { initialEntries: [path] },
-  );
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  // The router settles its matches in React state, so the load belongs
-  // inside act: `render` wraps its own work and cannot wrap this.
-  await act(async () => {
-    await router.load();
-  });
-}
+const { mountAt } = await import("./mount.tsx");
 
 describe("the comment thread", () => {
   it("shows each comment with its author, and marks a withdrawn one", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     const thread = await screen.findByRole("list", { name: "Activity" });
     const entries = within(thread).getAllByRole("listitem");
@@ -102,7 +82,7 @@ describe("the comment thread", () => {
   });
 
   it("posts what was typed", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     fireEvent.change(await screen.findByLabelText("Comment", { selector: "textarea" }), {
       target: { value: "ping @ada" },
@@ -117,7 +97,7 @@ describe("the comment thread", () => {
   });
 
   it("suggests Members and Teams after an @", async () => {
-    await mountAt("/issues/DEV-1");
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     // The Source view's own suggestions; the rich view has Tiptap's.
     fireEvent.click(await screen.findByRole("tab", { name: "Source" }));
