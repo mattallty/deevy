@@ -7,7 +7,7 @@ A release is two Docker images and one `vX.Y.Z` tag — see [docs/OPERATIONS.md]
 
 <!-- Entries are inserted below this line by `vp run version`. -->
 
-## 0.5.0-rc.0
+## 0.5.0
 
 ### Minor Changes
 
