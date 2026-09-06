@@ -57,6 +57,14 @@ to push `vX.Y.Z` and leaving `release.yml` on its tag trigger produces a release
 The tag is still created, because OPERATIONS.md and the image tags refer to it, and a hand-pushed `v*` tag
 still publishes — that route stays as the escape hatch for a release made outside this flow.
 
-An ordinary push to main also has no changesets waiting, so "no changesets" cannot be the signal to release.
-The guard is the tag: a version in `package.json` whose tag does not yet exist is one the Version PR just
-brought in.
+Releasing takes **two** conditions, and getting this wrong cost the first two attempts. "No changesets
+waiting" cannot be the signal on its own, because it is also true of every ordinary push to main — the tag is
+the rest of it, and a version whose tag does not exist yet is one the Version PR just brought in. But the
+changesets check is not redundant either: `changesets/action` runs the version command **in place**, so when
+changesets _were_ waiting the working tree and HEAD are already bumped by the time anything downstream looks
+at them. A tag step that reads the version without that gate tags the Version PR's own commit — which is not
+on `main` — and publishes it while its pull request is still open. Both conditions, and the version read from
+the commit rather than the working tree.
+
+The Version PR is also the one pull request that consumes changesets instead of adding one, so the gate that
+requires a changeset has to exempt it by branch name or it can never merge.

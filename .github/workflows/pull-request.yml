@@ -48,7 +48,11 @@ jobs:
   # question, which is most of the escape hatch. The label is the rest.
   changeset:
     name: A change that ships carries a changeset
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+    # The Version PR is the one pull request that consumes changesets rather than
+    # adding one, so this gate is guaranteed to fail on it.
+    if: >-
+      ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog')
+      && github.head_ref != 'changeset-release/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
