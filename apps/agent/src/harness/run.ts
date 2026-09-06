@@ -61,16 +61,22 @@ export async function stripFromClone(cwd: string, paths: ReadonlyArray<string>):
   }
 }
 
-/** The environment one harness's session gets. */
+/**
+ * The environment one harness's session gets: the allowlist, the session's
+ * own home, and last what the recipe sets for itself, which is given the
+ * context because a CLI's inline configuration is built from it.
+ */
 export function environmentFor(
   harness: Harness,
   config: Config,
   home: string,
   env: Record<string, string | undefined> = process.env,
+  context?: HarnessContext,
 ): Record<string, string> {
   return {
     ...sessionEnv(env, [...(config.passEnv ?? []), ...harness.env.names], harness.env.prefixes),
     HOME: home,
+    ...(context && harness.extraEnv ? harness.extraEnv(context) : {}),
   };
 }
 
@@ -92,7 +98,7 @@ export async function* runHarness(
   const graceMs = options.graceMs ?? 5_000;
   const stderrBytes = options.stderrBytes ?? 4_096;
   const argv = harness.argv(context);
-  const env = environmentFor(harness, context.config, context.home, options.env);
+  const env = environmentFor(harness, context.config, context.home, options.env, context);
 
   const child = spawn(harness.binary, argv, {
     cwd: input.cwd,

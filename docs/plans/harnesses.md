@@ -76,7 +76,7 @@ the container stays the sandbox for now. Any change to what an Agent may call.
 
 ## Conventions every slice follows
 
-M4's four conventions for `apps/claude-agent` ([m4.md](./m4.md), 19–22) hold. The spike adds five:
+M4's four conventions for `apps/agent` ([m4.md](./m4.md), 19–22) hold. The spike adds five:
 
 23. A harness is one file in `src/harness/` plus its fixture, and touches nothing outside them. The supervisor
     imports the registry in `src/harness/index.ts` and never a recipe by name.
@@ -325,6 +325,42 @@ the scripted session.
 
 ---
 
+### Found by building the slice
+
+Built by a sub-agent against `opencode-ai@1.18.29`; the machine's own 1.0.7 lacked `--dir` and the flags
+the docs describe, which is the churn the plan warned about, one CLI in.
+
+**`ask` does not block; it rejects and ends the turn.** In `run`, every `permission.asked` is answered
+`reject` with a stderr line, and the turn then stops as if the session had finished, exit code zero, no
+error event. A stray `ask` would look like a session that simply finished. The recipe has no `ask`, and a
+test walks every leaf of the `permission` block to pin it.
+
+**The survey's "no off switch for project config" was wrong for this version.** Merging is deep, so a
+project `opencode.json` key the inline config did not name would survive — but
+`OPENCODE_DISABLE_PROJECT_CONFIG=1` exists and removes the project file, `.opencode/` and its agents
+together. The recipe sets it; the strip list is the second fence, and stripping `.opencode/` also stops
+OpenCode running `npm install` and writing a `.gitignore` inside the clone, which it does for every such
+directory it finds.
+
+**MCP tools are addressable by name as `<server>_<tool>`,** so `deevy_issues_get: "allow"` sits beside
+`bash`. Rules are an ordered list and the last match wins, so `"*": "deny"` goes first; a tool whose only
+rule is deny is hidden from the model. Against a throwaway MCP server OpenCode connected and listed.
+
+**There is no init and no result message.** Usage is per `step_finish`, so the parser sums per session id
+and emits `done` on the `step_finish` whose reason is not another round of tool calls; `ready` is emitted
+on a session's first line and carries nothing. `{file:}` resolves inside inline config, so the
+instructions become a custom agent's prompt with no `prepare` at all.
+
+**The contract gained `extraEnv`.** Inline configuration lives in an environment variable the session's
+shell can read, so nothing in it is secret; a recipe needed a way to add variables of its own, and the
+Cursor and Copilot recipes used it the same day.
+
+**The fixture is authored, not recorded.** The only provider configured on this machine lacked one of its
+variables, so every line carries `"_authored": true` and the one real line is the credential-free error
+event. Recording a real one needs any provider key.
+
+---
+
 ## Slice 4: Cursor CLI (M)
 
 **Goal.** The same Run, worked by Cursor's `agent`.
@@ -354,6 +390,35 @@ the scripted session.
   is currently providing, and turning it on is a follow-up with its own test.
 
 **Acceptance test.** As slice 3, with `--harness cursor`.
+
+---
+
+### Found by building the slice
+
+Built by a sub-agent against Cursor CLI `2026.09.02-c22c1a3`, fetched as the tarball the installer would
+have written into the user's home; `harness.sh` does the same into `/opt`.
+
+**The allow list is documentation; the deny list is the fence.** `--force` is "allow unless explicitly
+denied", and a deny rule is a hard block checked before the allow list and before `--force`: the shell
+result is `rejected` with "Command is not allowed", in the stream, not a hang. So "no shell without a
+repository" can only be said as a denial, and the recipe writes `Read(**)`, `Write(**)`, `Shell(*)` and
+`WebFetch(*)` into `deny` when there is no repository.
+
+**A project's `.cursor/cli.json` replaces arrays rather than merging them,** so a repository could empty
+the deny list; the plan's "deny wins across scopes" holds only until the project overwrites it. An
+undocumented `--disable-project-configs` exists and is accepted, and `.cursor/` is stripped as well.
+Stripping it also drops `.cursor/rules`, which is input.
+
+**Instructions ride as a prompt prefix.** There is no home-level rules directory and no system-prompt flag.
+`stream-json` carries tool calls, refusals and `usage` (tokens, not cost); `system/init` lists nothing. No
+effort flag, though a parameterised model takes `[effort=high]` inside `--model`, which an operator can put
+in `DEEVY_AGENT_MODEL`.
+
+**The fixture is authored.** The CLI is not authenticated here and the desktop app does not share its
+credential; the credential-free stream is nothing on stdout, an error on stderr and exit 1, which the runner
+already turns into a `done`. Two files were written to the operator's real home by the first `--version`
+call, before the session home was set: the CLI's default `cli-config.json` and a compile cache. Both are
+harmless and are reported rather than deleted.
 
 ---
 
@@ -390,6 +455,33 @@ the scripted session.
 
 **Acceptance test.** As slice 3, with `--harness copilot`, plus a test that the token named in `requires` is
 not the git token: the recipe refuses to start if the two variables hold the same value.
+
+---
+
+### Found by building the slice
+
+Built by a sub-agent against `@github/copilot@1.0.83`, with six real `copilot -p` runs on a `gh` token.
+
+**There is a machine-readable output mode.** `--output-format json` emits one object per line:
+`session.mcp_servers_loaded`, `tool.execution_start` (MCP tools as `deevy-issues_get`),
+`tool.execution_complete` with `error.code: "denied"`, `assistant.message.content`, and a final `result`.
+The survey's "documents none" was out of date. What the stream does not carry is token or dollar totals —
+premium-request counts and durations only — so a Run worked by Copilot carries no usage. That is the tier
+downgrade, and it is output, not permissions.
+
+**Do not trust the working directory.** Headless runs work with it untrusted, and folder trust is exactly
+what loads a repository's `.mcp.json`, `.github/mcp.json`, hooks and plugins — shown by planting a server
+and watching `copilot mcp list` find it only after the directory was trusted. So the recipe never writes
+`trustedFolders`, the omission is the isolation bound, and `strip` is empty.
+
+**Three flags the plan did not know about.** `--disable-builtin-mcps`, or the built-in GitHub MCP server
+reaches GitHub with the token; `--no-remote-export`, or the session is exported to GitHub's web and mobile
+views by default; and `--secret-env-vars COPILOT_GITHUB_TOKEN`, which strips the token from the shell the
+session runs — an `echo` of it from inside answered "unset". In `-p` without `--allow-all-tools`, an
+unlisted tool is auto-denied, which is ADR-0014's refuse-not-prompt.
+
+**The fixture is entirely real**, recorded against a loopback MCP server with a real `deevy(issues_get)`
+call and a denied `git push`.
 
 ---
 
@@ -437,3 +529,33 @@ permissions. OpenCode's `ask` will block, and the recipe will have no `ask`. Cur
 permissions will be the one place a repository can widen something, and the strip list will be doing real
 work there. And the proxy will turn out to be the change that mattered most, because it is the one that
 made the four recipes smaller rather than larger.
+
+### Found by building the slice
+
+**The plan's acceptance matrix was theatre, and was not built.** Running the scripted session "once per
+harness" would exercise nothing, since a scripted session never spawns a CLI. What proves each image is its
+smoke in CI: every image starts with `--once` against the CI deevy and must print `harness <name>: <version>`
+before deevy refuses the key, and the Cursor and Copilot images must refuse earlier still, at the credential
+their recipe requires. The acceptance walk runs once and is harness-blind, which is the claim.
+
+**Four images, one Dockerfile, one script.** `harness.sh` takes the name and installs the pinned CLI: two
+by npm, Cursor by the tarball its installer would fetch, into `/opt` rather than a home. The release matrix
+tags `<harness>` and `<version>-<harness>` for each, and only Claude Code moves `latest` and the bare version,
+so the compose profile keeps pulling what it did.
+
+**Two fixtures are authored, two are real.** Claude Code's and Copilot's streams were recorded from real
+runs on this machine (a few cents on the smallest model, and premium requests on a `gh` token). OpenCode's
+and Cursor's could not be: no provider key and no Cursor credential were available, and the credential-free
+streams are recorded beside them. Both recipes' tests assert the `_authored` marks so nobody mistakes one for
+the other; recording the real ones needs one key each and is the first thing to do with them.
+
+**The rename happened.** `apps/claude-agent` is `apps/agent`, the package is `@deevy/agent`, the release
+tool's area list and the changeset group follow, and the historical plans and ADR-0013 keep the old name
+with a note. The image name `deevy-agent` already fit.
+
+**What was expected and what was found.** Copilot was expected to be the weakest tier and is, for output;
+its permissions turned out the most complete. OpenCode's `ask` was expected to block and instead rejects
+and ends the turn, which is the more dangerous of the two because it looks like success. Cursor's project
+scope was expected to widen things and does, by replacement. And the proxy was the change that made the
+recipes smaller: not one of them carries a credential for deevy, and the deevy-tool allowlist is enforced
+once.

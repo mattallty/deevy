@@ -53,6 +53,14 @@ export interface Harness {
   strip: ReadonlyArray<string>;
   /** Files the session needs, written under `home` before it starts. */
   prepare?(context: HarnessContext): Promise<void>;
+  /**
+   * Variables the recipe itself sets for the session, on top of what the
+   * operator's environment passes through (`env`): a CLI's inline
+   * configuration, a flag that turns project configuration off. Applied last,
+   * so nothing inherited overrides them, and never a credential, because the
+   * session's shell can read its own environment (ADR-0014).
+   */
+  extraEnv?(context: HarnessContext): Record<string, string>;
   /** The whole command line, less the binary. */
   argv(context: HarnessContext): string[];
   /** One line of stdout to zero or more events. */

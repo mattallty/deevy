@@ -13,7 +13,7 @@ import { instance, testConfig } from "./helpers.ts";
  * (docs/plans/m4.md, convention 20). Run it by hand, with an Anthropic
  * credential on the environment:
  *
- *     DEEVY_AGENT_LIVE=1 vp run claude-agent#test tests/live.test.ts
+ *     DEEVY_AGENT_LIVE=1 vp run agent#test tests/live.test.ts
  */
 const live = process.env.DEEVY_AGENT_LIVE === "1" ? it : it.skip;
 

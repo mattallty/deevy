@@ -1,5 +1,5 @@
 ---
-"@deevy/claude-agent": patch
+"@deevy/agent": patch
 ---
 
 The reference runtime drives Claude Code as a subprocess (`claude -p`) instead of through the Agent SDK,

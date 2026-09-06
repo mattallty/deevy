@@ -10,9 +10,11 @@ Worker in `docs/OPERATIONS.md`. Current milestone: M1 (Humans) done, in thirteen
 `docs/plans/m1.md`; M2 (Agents) done, in nine slices from `docs/plans/m2.md`, with a worked agent loop in
 `docs/agent-loop.md` and its counterpart for a Human's own Claude Code in `docs/as-yourself.md`; M3 (Workers) built in ten slices from `docs/plans/m3.md`, its end-to-end walk written up
 in `docs/m3-acceptance.md` and executed; M4 (Reference runtime) done, in ten slices from `docs/plans/m4.md`,
-shipping `apps/claude-agent`, whose acceptance walk is a script (`vp run claude-agent#acceptance`) that runs
+shipping `apps/agent`, whose acceptance walk is a script (`vp run agent#acceptance`) that runs
 both deployments locally on every commit — no Cloudflare account, no OAuth App, no repository on the internet
-(`docs/m4-acceptance.md`). v1 is complete;
+(`docs/m4-acceptance.md`); the harness spike then made the runtime `apps/agent`, driving Claude Code,
+OpenCode, Cursor CLI or Copilot CLI as a subprocess behind one contract (`docs/plans/harnesses.md`,
+`docs/harnesses.md`, ADR-0018). v1 is complete;
 what comes next is PLAN.md's after-v1 list.
 
 ## Commands
@@ -24,7 +26,7 @@ format, so pnpm 11 is required and pinned twice over: `devEngines.packageManager
 the prompt to wipe `node_modules`, so if an install hangs with no output, check `pnpm --version` first.
 `vp dev`, `vp build`, `vp test`, `vp check` are built-ins that ignore package.json scripts; `vp run <script>`
 runs scripts, `-r` recursively, `pkg#script` for one package (package names are `web`, `server`, `core`, `db`,
-`adapters`, `claude-agent`, `release`; `claude-agent` has its own `apps/claude-agent/README.md`, and
+`adapters`, `agent`, `release`; `agent` has its own `apps/agent/README.md`, and
 `release` is `tools/release`, which holds the changelog fold and the commit-message rules).
 
 - `vp check` (root): format, lint, typecheck the whole tree; `vp check --fix` applies formatting. Run it before

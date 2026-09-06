@@ -89,6 +89,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: verify
+    # One image per harness (docs/harnesses.md): `<harness>` and
+    # `<version>-<harness>` for each, and the bare version tags plus `latest`
+    # for Claude Code only, so the compose profile keeps pulling what it did.
+    strategy:
+      matrix:
+        harness: [claude-code, opencode, cursor, copilot]
     steps:
       - uses: actions/checkout@v7
 
@@ -111,20 +117,24 @@ jobs:
           # is main, so the caller passes the version instead. Exactly one of
           # these two pairs is enabled.
           tags: |
-            type=semver,pattern={{version}},enable=${{ inputs.version == '' }}
-            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' }}
-            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
-            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' }}
-            # A prerelease must never move `latest`. Both routes carry the
-            # version in a different place, and a `-` in it is what marks one:
-            # v0.5.0-rc.1 publishes under its own tags and leaves latest alone.
-            type=raw,value=latest,enable=${{ !contains(inputs.version || github.ref_name, '-') }}
+            type=semver,pattern={{version}}-${{ matrix.harness }},enable=${{ inputs.version == '' }}
+            type=raw,value=${{ inputs.version }}-${{ matrix.harness }},enable=${{ inputs.version != '' }}
+            type=semver,pattern={{version}},enable=${{ inputs.version == '' && matrix.harness == 'claude-code' }}
+            type=semver,pattern=v{{version}},enable=${{ inputs.version == '' && matrix.harness == 'claude-code' }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' && matrix.harness == 'claude-code' }}
+            type=raw,value=v${{ inputs.version }},enable=${{ inputs.version != '' && matrix.harness == 'claude-code' }}
+            # A prerelease must never move `latest` or a harness's moving tag.
+            # Both routes carry the version in a different place, and a `-` in
+            # it is what marks one: v0.5.0-rc.1 publishes under its own tags.
+            type=raw,value=${{ matrix.harness }},enable=${{ !contains(inputs.version || github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ !contains(inputs.version || github.ref_name, '-') && matrix.harness == 'claude-code' }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/claude-agent/Dockerfile
+          file: apps/agent/Dockerfile
+          build-args: HARNESS=${{ matrix.harness }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

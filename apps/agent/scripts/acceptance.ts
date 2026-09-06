@@ -7,7 +7,7 @@
  *
  * What is real: the supervisor. Discovery, the claim, the envelope, the Gate
  * round trip, the branch, the push, the pull request, the Link and the comment
- * are `apps/claude-agent/src` doing its own job against a deevy over a socket.
+ * are `apps/agent/src` doing its own job against a deevy over a socket.
  * What is scripted is the model's judgement — and the scripted session writes
  * over `/mcp` with the Agent's key, exactly as Claude would, so the surface is
  * the real one even though the reasoning is not.
@@ -16,8 +16,8 @@
  * `tests/live.test.ts`, which is skipped unless DEEVY_AGENT_LIVE=1 and can be
  * pointed at either deployment this script starts.
  *
- *   vp run claude-agent#acceptance              both deployments
- *   vp run claude-agent#acceptance -- --url ... one that is already running
+ *   vp run agent#acceptance              both deployments
+ *   vp run agent#acceptance -- --url ... one that is already running
  */
 import { execFile } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";

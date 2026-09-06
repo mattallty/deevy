@@ -277,19 +277,19 @@ and there is nothing to build one from. Everything else, an Agent's API key incl
 
 ## The reference agent runtime
 
-`apps/claude-agent` is the service on the other side of the MCP endpoint, and it has its own
-[README](../apps/claude-agent/README.md) (docs/plans/m4.md). It is in the workspace so `vp check` and
+`apps/agent` is the service on the other side of the MCP endpoint, and it has its own
+[README](../apps/agent/README.md) (docs/plans/m4.md). It is in the workspace so `vp check` and
 `vp run -r test` cover it, and it may not import `packages/core` or take a `workspace:*` runtime dependency — it talks to deevy the way a stranger does, which is what makes its tests a
 test of the surfaces rather than a second view of the same objects. A test asserts that.
 
 Against the dev server:
 
 ```bash
-vp run claude-agent#build
+vp run agent#build
 ```
 
 ```bash
-DEEVY_URL=http://localhost:3000 DEEVY_AGENT_KEY=<the key> node apps/claude-agent/dist/main.mjs --once
+DEEVY_URL=http://localhost:3000 DEEVY_AGENT_KEY=<the key> node apps/agent/dist/main.mjs --once
 ```
 
 Create the Agent, grant it a Project and issue its key under Settings, Agents first. `--once` makes one pass
@@ -304,7 +304,7 @@ are all testable for free. `tests/helpers.ts` has the harness.
 One test does call the model, and it is skipped unless you ask for it:
 
 ```bash
-DEEVY_AGENT_LIVE=1 vp run claude-agent#test tests/live.test.ts
+DEEVY_AGENT_LIVE=1 vp run agent#test tests/live.test.ts
 ```
 
 CI never sets it. A milestone whose suite needs a paid key is a milestone nobody runs twice.

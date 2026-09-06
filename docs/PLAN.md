@@ -174,7 +174,7 @@ pins an address to a connection while preserving SNI, so the Workers transport p
 pre-resolution in front of its shape check, and the residual race is written down in
 [OPERATIONS.md](./OPERATIONS.md#client-registration-and-what-is-known-to-be-weak) rather than claimed away.
 
-**M4 Reference runtime.** `apps/claude-agent`: a service holding one Agent's API key that finds the Issues
+**M4 Reference runtime.** `apps/agent`: a service holding one Agent's API key that finds the Issues
 that Agent is assigned, runs Claude against them through the Claude Agent SDK, stops at Gates, resumes when a
 Human rules, and delivers a branch and a pull request linked back to the Run that produced it. It reaches
 deevy over HTTP and MCP like any third party — no `packages/core` import, no `workspace:*` dependency — which
@@ -197,6 +197,13 @@ environment with the runtime's own secrets removed, a git credential the session
 Agent can approve — is
 [ADR-0014](./adr/0014-an-agents-input-is-untrusted-and-its-tools-are-not.md), along with what is deliberately
 not bounded.
+
+**Harness spike.** After v1, `apps/claude-agent` became `apps/agent`: the supervisor drives a coding-agent
+CLI as a subprocess behind the same session seam, four recipes are in the tree (Claude Code, OpenCode, Cursor
+CLI, GitHub Copilot CLI) and shipped as one image each, the Agent's key never enters a session's process
+tree, and [docs/harnesses.md](./harnesses.md) is how a fifth is added. Built in six slices from
+[harnesses.md](./plans/harnesses.md), recorded in
+[ADR-0018](./adr/0018-a-harness-is-a-cli-behind-the-session-seam.md).
 
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
 mirroring Documents into the Repository; the Slack app; email Channel; private Projects; four-eyes Gates;

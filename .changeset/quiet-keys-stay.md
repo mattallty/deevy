@@ -1,5 +1,5 @@
 ---
-"@deevy/claude-agent": patch
+"@deevy/agent": patch
 ---
 
 The reference runtime no longer hands its session the Agent's API key. The session reaches deevy through a

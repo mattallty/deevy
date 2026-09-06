@@ -20,7 +20,7 @@ const packages = [
   "packages/adapters",
   "apps/web",
   "apps/server",
-  "apps/claude-agent",
+  "apps/agent",
   "tools/release",
 ];
 
@@ -100,7 +100,7 @@ const withChanges = {
 - @deevy/adapters@0.5.1
   - @deevy/core@0.5.1
 `,
-  "apps/claude-agent": `# @deevy/claude-agent
+  "apps/agent": `# @deevy/agent
 
 ## 0.5.0
 
@@ -132,7 +132,7 @@ describe("folding the per-package changelogs", { timeout: 30_000 }, () => {
     expect(changelog.indexOf("### Minor Changes")).toBeLessThan(
       changelog.indexOf("### Patch Changes"),
     );
-    expect(changelog).toContain("- **claude-agent** — The runtime stops polling");
+    expect(changelog).toContain("- **agent** — The runtime stops polling");
   });
 
   it("drops dependency bullets in all three shapes changesets writes them", async () => {

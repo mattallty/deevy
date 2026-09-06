@@ -1,5 +1,5 @@
 {
-  "name": "@deevy/claude-agent",
+  "name": "@deevy/agent",
   "version": "0.4.1",
   "private": true,
   "type": "module",

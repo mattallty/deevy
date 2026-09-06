@@ -38,7 +38,10 @@ services:
   # and reads text anyone with Project access wrote (ADR-0014).
   agent:
     profiles: ["agent"]
-    image: ghcr.io/mattallty/deevy-agent:latest
+    # One image per harness: `latest` is Claude Code; `:opencode`, `:cursor` and
+    # `:copilot` carry the others, each wanting its own credential in place of
+    # ANTHROPIC_API_KEY (docs/harnesses.md).
+    image: ${DEEVY_AGENT_IMAGE:-ghcr.io/mattallty/deevy-agent:latest}
     restart: unless-stopped
     depends_on:
       deevy:
@@ -46,7 +49,8 @@ services:
     environment:
       DEEVY_URL: ${DEEVY_AGENT_URL:-http://deevy:3000}
       DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:?issue an API key for the Agent under Settings, Agents}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?the runtime runs Claude, and Claude needs a key}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEVY_AGENT_HARNESS: ${DEEVY_AGENT_HARNESS:-claude-code}
       DEEVY_AGENT_POLL_SECONDS: ${DEEVY_AGENT_POLL_SECONDS:-30}
       DEEVY_AGENT_MODEL: ${DEEVY_AGENT_MODEL:-claude-opus-5}
       # With a repository the session also gets file and shell tools, in a

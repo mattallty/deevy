@@ -1,5 +1,5 @@
 # The reference agent runtime. Build with the repository root as context:
-#   docker build -f apps/claude-agent/Dockerfile -t deevy-agent .
+#   docker build -f apps/agent/Dockerfile -t deevy-agent .
 #
 # It is not deevy. It holds one Agent's API key, reaches a deevy instance over
 # HTTP, and runs a coding-agent CLI against the Issues that Agent is assigned
@@ -8,7 +8,7 @@ FROM ghcr.io/voidzero-dev/vite-plus:0.3.0 AS build
 WORKDIR /src
 COPY --chown=vp:vp . .
 RUN vp install --frozen-lockfile
-RUN vp run claude-agent#build
+RUN vp run agent#build
 
 # The bundle is one file plus the instructions it appends to its system prompt.
 # The harness is a CLI the runtime spawns (docs/plans/harnesses.md), installed
@@ -19,10 +19,10 @@ ARG HARNESS
 ENV NODE_ENV=production
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+    && apt-get install -y --no-install-recommends git ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=build /src/apps/claude-agent/dist ./dist
-COPY apps/claude-agent/harness.sh /usr/local/bin/install-harness
+COPY --from=build /src/apps/agent/dist ./dist
+COPY apps/agent/harness.sh /usr/local/bin/install-harness
 RUN install-harness "$HARNESS"
 ENV DEEVY_AGENT_HARNESS=$HARNESS
 

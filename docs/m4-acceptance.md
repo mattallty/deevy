@@ -1,6 +1,6 @@
 # M4 acceptance: the reference runtime working an Issue end to end
 
-M4 is done when [PLAN.md](./PLAN.md)'s M2 scenario runs with `apps/claude-agent` driving it rather than a
+M4 is done when [PLAN.md](./PLAN.md)'s M2 scenario runs with `apps/agent` driving it rather than a
 person driving Claude Code by hand — on the Node deployment, and then on a Cloudflare Worker built from the
 same commit, with nothing changing but `DEEVY_URL`. That last part is the strongest evidence for
 [ADR-0006](./adr/0006-runtime-agnostic-core-node-first.md) anyone has produced: a client that cannot tell the
@@ -10,22 +10,22 @@ two deployments apart.
 Cloudflare account, no GitHub OAuth App and no repository on the internet:
 
 ```bash
-vp run claude-agent#acceptance
+vp run agent#acceptance
 ```
 
-Twenty-nine checks, fourteen against each deployment plus one comparing them. CI runs it after the Workers
+Thirty-one checks, fifteen against each deployment plus one comparing them. CI runs it after the Workers
 smoke.
 
 ## Why it needs nothing outside this machine
 
-| What the walk needs                        | What it uses instead                                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| A deployed Worker                          | `wrangler dev --local` — miniflare with a real local D1, no account                                                 |
-| The Docker image                           | The packed Node bundle, on a port it picks                                                                          |
-| A GitHub OAuth App, so a Human can sign in | `apps/web/scripts/stub-github.js`, prepended to whichever bundle is under test: the OAuth code is the email address |
-| A repository the Agent may push to         | A bare git repository in a temporary directory, and real `git`                                                      |
-| GitHub's pull-request API                  | A stub HTTP server, reached through `DEEVY_AGENT_GITHUB_API`                                                        |
-| An Anthropic key                           | A scripted session — see below                                                                                      |
+| What the walk needs                         | What it uses instead                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| A deployed Worker                           | `wrangler dev --local` — miniflare with a real local D1, no account                                                 |
+| The Docker image                            | The packed Node bundle, on a port it picks                                                                          |
+| A GitHub OAuth App, so a Human can sign in  | `apps/web/scripts/stub-github.js`, prepended to whichever bundle is under test: the OAuth code is the email address |
+| A repository the Agent may push to          | A bare git repository in a temporary directory, and real `git`                                                      |
+| GitHub's pull-request API                   | A stub HTTP server, reached through `DEEVY_AGENT_GITHUB_API`                                                        |
+| A model, and a coding-agent CLI to drive it | A scripted session — see below                                                                                      |
 
 Nothing is mocked on deevy's side. The Worker is the built Worker with its own bindings and asset routing;
 the Node server is the bundle the Docker image runs; sign-in is Better Auth's real OAuth dance with only the
@@ -34,18 +34,23 @@ far end replaced; and everything the runtime does goes over HTTP and `/mcp` on a
 ## What is real, and what is scripted
 
 **The supervisor is real.** Discovery, the claim, the envelope, the Gate round trip, the working directory,
-the branch, the push, the pull request, the Link and the comment are `apps/claude-agent/src` doing its own
+the branch, the push, the pull request, the Link and the comment are `apps/agent/src` doing its own
 job.
 
 **The model's judgement is scripted**, and the scripted session writes over `/mcp` with the Agent's key
 exactly as Claude would — `runs_list`, `runs_post_activity`, `documents_get`, `documents_write`,
 `runs_request_approval`, `runs_finish`. So the surface is the real one even though the reasoning is not.
 
-**What this cannot stand in for is Claude.** A scripted session always calls the right tool in the right
-order; a model may not. That is `apps/claude-agent/tests/live.test.ts`, skipped unless you ask:
+Since the harness spike ([docs/plans/harnesses.md](./plans/harnesses.md)) the scripted session reaches deevy
+the way a real one does, through the supervisor's loopback proxy with no credential, and the walk checks that
+a tool the runtime did not grant is refused there. Which CLI would have been spawned does not enter the walk
+at all: the supervisor is harness-blind, and each image's smoke in CI is what proves its CLI is there.
+
+**What this cannot stand in for is the model.** A scripted session always calls the right tool in the right
+order; a model may not. That is `apps/agent/tests/live.test.ts`, skipped unless you ask:
 
 ```bash
-DEEVY_AGENT_LIVE=1 vp run claude-agent#test tests/live.test.ts
+DEEVY_AGENT_LIVE=1 vp run agent#test tests/live.test.ts
 ```
 
 It needs an Anthropic key and spends money, so CI never runs it. **It has not been run.** Pointing it at
@@ -79,7 +84,7 @@ run.activity run.activity run.completed issue.link_added comment.created`, with 
 ## Running it against something else
 
 ```bash
-vp run claude-agent#acceptance -- --url https://deevy.example.com
+vp run agent#acceptance -- --url https://deevy.example.com
 ```
 
 It walks whatever is there, including a real deployment. It creates a Project `PLN` and an Agent `Planner`,

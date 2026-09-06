@@ -1,6 +1,6 @@
 # Research: coding-agent CLIs as harnesses for the reference runtime (2026-09-06)
 
-Input for the spike that generalizes `apps/claude-agent` from one harness to many. The runtime's supervisor
+Input for the spike that generalizes `apps/agent` from one harness to many. The runtime's supervisor
 (the Run claim, the envelope, the Gate resume, the clone, the delivery, the timeout) already only knows the
 `Session` seam in `src/session.ts`; what this list scores is whether each CLI can sit behind that seam
 **and** keep ADR-0014's bounds. Everything here is from vendor docs or the tool's own repository unless a row
