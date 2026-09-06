@@ -163,16 +163,18 @@ tools/release/scripts/fold-changelog.ts`. The fold:
 2. Takes each package's `CHANGELOG.md`, which after a `changeset version` on a gitignored file holds exactly
    this release's entries.
 3. Drops the dependency bullets, which `updateInternalDependencies` generates for a `fixed` group and which
-   say nothing a reader of a single-version product wants. **They come in two shapes**, which a trial run
-   found and a hand-written fixture would have missed: `- Updated dependencies` with an indented list, and a
-   bare `- @deevy/db@0.5.0` where the dependency moved on its own. A package with nothing at all gets `No
+   say nothing a reader of a single-version product wants. **They come in three shapes**, each found by a
+   trial run rather than by reasoning about them: `- Updated dependencies` heading an indented list, a bare
+   `- @deevy/db@0.5.0`, and a `- @deevy/adapters@0.4.1` that itself heads an indented list. Only a bullet's
+   first line can decide, because the third shape does not end where a whole-bullet pattern expects. A package with nothing at all gets `No
 changes in this release.` and no `###` section.
 4. Writes one `## X.Y.Z` section at the top of the root `CHANGELOG.md`, with `### Major/Minor/Patch` and the
    areas as a prefix. One changeset naming several packages writes the same bullet into each of their
    changelogs, so identical bullets are merged: `- **core, web** — Issues can be filtered by …`.
 5. Syncs the root `package.json`, which changesets never sees because the root is not a workspace member, and
    which is where `changesets.yml` reads the tag from.
-6. Deletes the per-package files.
+6. Leaves the per-package files alone. `changesets/action` reads them back to compose the Version PR, so
+   deleting them fails the release; gitignoring them is what keeps them out of the commit.
 
 `.gitignore` gains `packages/*/CHANGELOG.md`, `apps/*/CHANGELOG.md` and `tools/*/CHANGELOG.md`. The root `vite.config.ts` gains
 `CHANGELOG.md` to `fmt.ignorePatterns`, for the reason already written next to `mcp-tools.json` there: the
@@ -181,7 +183,8 @@ would otherwise reformat what it writes between `changeset add` and the commit.
 
 Tests: `tools/release/tests/fold-changelog.test.ts`, against fixtures copied verbatim out of a real
 `changeset version` run — one merged section, areas named once, bump levels in order, both dependency-bullet
-shapes gone, the root synced, the per-package files removed, and a drifted `fixed` group refused.
+shapes gone, the root synced, the per-package files left where the action can read them, a file that kept its history
+folded from its newest section only, and a drifted `fixed` group refused.
 
 ## Slice 4 — a pull request without a changeset does not merge
 

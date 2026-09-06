@@ -44,9 +44,10 @@ Gate` passes and the CONTEXT.md vocabulary keeps its capitals mid-sentence.
 Nothing here is published to npm; a release is two Docker images and a `vX.Y.Z` tag. So all seven workspace
 packages sit in a changesets `fixed` group with `privatePackages: { version: true, tag: false }`, and the one
 number they share is the image tag. Changesets writes a `CHANGELOG.md` per package and offers no way to stop
-it, so those are gitignored and folded into the root one by `tools/release/scripts/fold-changelog.ts`, which
-then deletes them — which is also what keeps the fold deterministic, since a per-package file only ever holds
-the release being made. If `@deevy/core` is ever published, splitting it out of the `fixed` group is one line.
+it, so those are gitignored and folded into the root one by `tools/release/scripts/fold-changelog.ts`. They are
+left on disk deliberately: `changesets/action` reads them back after the version command to compose the
+Version PR, and deleting them fails the release, which is how the first run of this ended. Being gitignored is
+what keeps them out of the commit, and only the newest section is ever read. If `@deevy/core` is ever published, splitting it out of the `fixed` group is one line.
 
 ## The release fires by call, not by tag
 
