@@ -6,6 +6,7 @@ import { CommentWithAuthorSchema } from "../schemas.ts";
 import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
 import { assertMayEdit, loadComment, requireComment, requireIssue } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 export const comments = {
   list: defineOperation({
@@ -43,7 +44,7 @@ export const comments = {
     output: CommentWithAuthorSchema,
     handler: async ({ input, context }) => {
       const { issue, project } = await requireIssue(context, input.issueKey);
-      const id = crypto.randomUUID();
+      const id = newId("comment");
       await context.db.insert(commentTable).values({
         id,
         issueId: issue.id,

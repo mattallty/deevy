@@ -11,6 +11,7 @@
 import { delivery, webhookSubscription, type Db, type Event } from "@deevy/db";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FetchLike } from "./slack.ts";
+import { newId } from "./ids.ts";
 
 /** How long a signed body stays acceptable, so a captured POST cannot be replayed later. */
 export const replayWindowSeconds = 5 * 60;
@@ -150,7 +151,7 @@ export async function deriveWebhookDeliveriesForMany(
     subscriptions
       .filter((subscription) => wants(subscription, event))
       .map((subscription) => ({
-        id: crypto.randomUUID(),
+        id: newId("delivery"),
         workspaceId,
         target: "webhook" as const,
         targetId: subscription.id,

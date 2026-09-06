@@ -11,6 +11,7 @@ import { z } from "zod";
 import { appendEvent, type EventSource } from "./events.ts";
 import { allocateHandle } from "./handles.ts";
 import { MemberSchema, UserSchema } from "./schemas.ts";
+import { newId } from "./ids.ts";
 
 /**
  * An Agent is a Member like any other (CONTEXT.md): a Better Auth user with
@@ -40,8 +41,8 @@ export interface CreateAgentInput {
 /** Inserts the user, the Member and the Agent row, and returns the Member id. */
 export async function createAgent(input: CreateAgentInput): Promise<string> {
   const handle = input.handle ?? (await allocateHandle(input.db, input.name));
-  const userId = crypto.randomUUID();
-  const memberId = crypto.randomUUID();
+  const userId = newId("user");
+  const memberId = newId("member");
   await input.db.insert(userTable).values({
     id: userId,
     name: input.name,
@@ -161,7 +162,7 @@ export async function setAgentWebhook(
     });
   }
   await db.insert(webhookSubscription).values({
-    id: crypto.randomUUID(),
+    id: newId("webhook"),
     workspaceId,
     memberId,
     url,

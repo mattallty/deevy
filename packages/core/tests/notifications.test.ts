@@ -13,6 +13,7 @@ import { slackMessage } from "../src/slack.ts";
 import { deliverDueChannelMessages, dueDeliveriesQuery } from "../src/work.ts";
 import { router } from "../src/operations/index.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -40,7 +41,7 @@ interface SlackChannelOptions {
 
 /** A Slack Channel and one rule pointing at it. */
 async function slackChannel(db: Db, options: SlackChannelOptions) {
-  const channelId = crypto.randomUUID();
+  const channelId = newId("channel");
   await db.insert(channelTable).values({
     id: channelId,
     workspaceId: options.workspaceId,
@@ -49,7 +50,7 @@ async function slackChannel(db: Db, options: SlackChannelOptions) {
     config: { webhookUrl },
   });
   await db.insert(routingRule).values({
-    id: crypto.randomUUID(),
+    id: newId("routingRule"),
     workspaceId: options.workspaceId,
     notificationKind: options.kind === undefined ? null : options.kind,
     projectId: options.projectId ?? null,

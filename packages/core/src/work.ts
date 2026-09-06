@@ -24,6 +24,7 @@ import {
 import { openStatuses } from "./runs.ts";
 import { postSlackMessage, slackMessage, type FetchLike, type SlackPayload } from "./slack.ts";
 import { deriveWebhookDeliveriesForMany, postWebhook } from "./webhooks.ts";
+import { newId } from "./ids.ts";
 
 /**
  * Background work, expressed the only way ADR-0006 allows: a bounded function
@@ -329,7 +330,7 @@ export async function sweepSchedules({
   result.more = result.more || !drained;
 
   const runs = owed.map((row) => ({
-    id: crypto.randomUUID(),
+    id: newId("run"),
     issueId: row.id,
     agentMemberId: row.agentMemberId as string,
     // Nobody asked for it. The clock is not a Member, and a Run with no

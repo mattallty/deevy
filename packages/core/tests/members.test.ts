@@ -2,6 +2,7 @@ import { createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -91,7 +92,7 @@ describe("members.updateRole", () => {
 
     const client = createRouterClient(router, { context: admin });
     await expect(
-      client.members.updateRole({ memberId: crypto.randomUUID(), role: "admin" }),
+      client.members.updateRole({ memberId: newId("member"), role: "admin" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

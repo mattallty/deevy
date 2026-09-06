@@ -7,6 +7,7 @@ import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation } from "./registry.ts";
 import { loadTeam, requireTeam, requireTeamOrAdmin } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 export const teams = {
   list: defineOperation({
@@ -40,7 +41,7 @@ export const teams = {
     }),
     output: TeamWithMembersSchema,
     handler: async ({ input, context }) => {
-      const id = crypto.randomUUID();
+      const id = newId("team");
       const handle = await allocateHandle(context.db, slugify(input.handle ?? input.name));
       await context.db
         .insert(teamTable)

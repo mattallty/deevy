@@ -2,6 +2,7 @@ import { createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
 import { agentContext, memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -258,7 +259,7 @@ describe("issues.update", () => {
     await client.issues.create({ projectKey: "DEV", title: "Draft" });
 
     await expect(
-      client.issues.update({ key: "DEV-1", assigneeMemberId: crypto.randomUUID() }),
+      client.issues.update({ key: "DEV-1", assigneeMemberId: newId("member") }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 

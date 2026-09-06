@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { bootstrapWorkspace, joinWorkspace } from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 /** An admin plus one allowlist rule: the arrangement every join test starts from. */
 async function allow(
@@ -14,7 +15,7 @@ async function allow(
 ) {
   const admin = await memberContext(db, { role: "admin", name: "Ada" });
   await db.insert(allowlistRule).values({
-    id: crypto.randomUUID(),
+    id: newId("allowlistRule"),
     workspaceId: admin.workspace.id,
     kind: kind as "email_domain" | "github_org",
     value,
@@ -34,7 +35,7 @@ describe("joinWorkspace", () => {
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     await db.insert(allowlistRule).values({
-      id: crypto.randomUUID(),
+      id: newId("allowlistRule"),
       workspaceId: admin.workspace.id,
       kind: "email_domain",
       value: "example.com",
@@ -56,7 +57,7 @@ describe("joinWorkspace", () => {
     closers.push(close);
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
     await db.insert(allowlistRule).values({
-      id: crypto.randomUUID(),
+      id: newId("allowlistRule"),
       workspaceId: admin.workspace.id,
       kind: "email_domain",
       value: "example.com",

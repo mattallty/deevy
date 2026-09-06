@@ -2,6 +2,7 @@ import { issue as issueTable, run as runTable, type Db, type Event, type Run } f
 import { eq } from "drizzle-orm";
 import type { EventInput } from "./events.ts";
 import { openRunFor } from "./runs.ts";
+import { newId } from "./ids.ts";
 
 /**
  * The four triggers (docs/PLAN.md) read the Event log rather than being spread
@@ -153,7 +154,7 @@ interface StartRunInput {
  */
 async function startRun(db: Db, input: StartRunInput): Promise<Run | null> {
   if (await openRunFor(db, input.issueId, input.agentMemberId)) return null;
-  const id = crypto.randomUUID();
+  const id = newId("run");
   await db.insert(runTable).values({
     id,
     issueId: input.issueId,

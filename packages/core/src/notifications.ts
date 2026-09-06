@@ -12,6 +12,7 @@ import {
 } from "@deevy/db";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { gateApprovers } from "./workflow.ts";
+import { newId } from "./ids.ts";
 
 /**
  * Notifications derive from the Event log rather than being written a second
@@ -43,7 +44,7 @@ export async function deriveNotifications(db: Db, event: Event): Promise<void> {
       .insert(notificationTable)
       .values(
         inbox.map(({ memberId, kind }) => ({
-          id: crypto.randomUUID(),
+          id: newId("notification"),
           recipientMemberId: memberId,
           kind,
           eventId: event.seq,
@@ -63,7 +64,7 @@ export async function deriveNotifications(db: Db, event: Event): Promise<void> {
       .insert(deliveryTable)
       .values(
         slack.map(({ channelId }) => ({
-          id: crypto.randomUUID(),
+          id: newId("delivery"),
           workspaceId: event.workspaceId,
           target: "slack" as const,
           targetId: channelId,

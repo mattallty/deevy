@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { appendEvent } from "../src/events.ts";
 import { router } from "../src/operations/index.ts";
 import { countingDb, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -62,7 +63,7 @@ describe("events.subscribe", () => {
     await appendEvent(context, {
       kind: "issue.created",
       subjectType: "issue",
-      subjectId: crypto.randomUUID(),
+      subjectId: newId("issue"),
     });
     await reading;
     controller.abort();
@@ -162,7 +163,7 @@ describe("a stream that has to end", () => {
     const appended = await appendEvent(context, {
       kind: "issue.created",
       subjectType: "issue",
-      subjectId: crypto.randomUUID(),
+      subjectId: newId("issue"),
     });
 
     const seen: Array<{ type: string; cursor?: number | null }> = [];
@@ -227,7 +228,7 @@ describe("a stream that has to end", () => {
     const first = await appendEvent(context, {
       kind: "issue.created",
       subjectType: "issue",
-      subjectId: crypto.randomUUID(),
+      subjectId: newId("issue"),
     });
     const stream = await client.events.subscribe({ after: 0 }, { signal: controller.signal });
 
@@ -238,7 +239,7 @@ describe("a stream that has to end", () => {
         appendEvent(context, {
           kind: "issue.updated",
           subjectType: "issue",
-          subjectId: crypto.randomUUID(),
+          subjectId: newId("issue"),
         }).then(resolve, reject);
       }, 500);
     });
@@ -254,7 +255,7 @@ describe("a stream that has to end", () => {
     const third = await appendEvent(context, {
       kind: "issue.moved",
       subjectType: "issue",
-      subjectId: crypto.randomUUID(),
+      subjectId: newId("issue"),
     });
 
     const resumed = await client.events.subscribe({ after: cursor }, { signal: controller.signal });

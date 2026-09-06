@@ -12,6 +12,7 @@ import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
 import type { ContextFor } from "./registry.ts";
 import { ProjectKeyLookup, requireProject, requireProjectOrAdmin } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 /**
  * A State plus the Humans its Gate names. They live in their own table because
@@ -198,7 +199,7 @@ export const workflow = {
             .where(eq(workflowStateTable.id, state.id));
           kept.push(state.id);
         } else {
-          const id = crypto.randomUUID();
+          const id = newId("state");
           await context.db.insert(workflowStateTable).values({
             id,
             projectId: project.id,

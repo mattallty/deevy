@@ -1,5 +1,6 @@
 import { issue as issueTable, project as projectTable, type Db, type Issue } from "@deevy/db";
 import { eq, sql } from "drizzle-orm";
+import { newId } from "./ids.ts";
 
 /** `DEV-42`: the Project's key and the Issue's number, derived and never stored twice. */
 export function issueKey(projectKey: string, number: number): string {
@@ -45,7 +46,7 @@ export async function insertIssue(db: Db, input: CreateIssueInput): Promise<Issu
   const [row] = await db
     .insert(issueTable)
     .values({
-      id: crypto.randomUUID(),
+      id: newId("issue"),
       projectId: input.projectId,
       number: input.number,
       title: input.title,

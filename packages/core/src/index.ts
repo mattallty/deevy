@@ -88,3 +88,4 @@ export {
   type SweepSchedulesOptions,
   type SweepStaleRunsOptions,
 } from "./work.ts";
+export { idPrefixes, isId, newId, type IdKind } from "./ids.ts";

@@ -5,6 +5,7 @@ import { bootstrapWorkspace } from "../src/auth.ts";
 import { appendEvent } from "../src/events.ts";
 import { router } from "../src/operations/index.ts";
 import { contextFor, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -122,7 +123,7 @@ describe("events.list scoping", () => {
     const { db, close } = testDb();
     closers.push(close);
     const context = await memberContext(db);
-    const other = crypto.randomUUID();
+    const other = newId("workspace");
     await db.insert(workspace).values({ id: other, name: "other", slug: "other" });
     await appendEvent(
       { db, workspace: { id: other }, member: null },

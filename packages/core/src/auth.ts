@@ -9,6 +9,7 @@ import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 import { fetchClientMetadataResource, type MetadataResourceFetch } from "./cimd.ts";
 import { appendEvent } from "./events.ts";
+import { authId, newId } from "./ids.ts";
 
 export interface AuthEnv {
   /** Public URL of the server; callbacks derive from it. */
@@ -45,6 +46,8 @@ export function createAuth({ db, env }: CreateAuthOptions) {
     basePath: AUTH_BASE_PATH,
     trustedOrigins: env.trustedOrigins,
     database: drizzleAdapter(db, { provider: "sqlite" }),
+    // Its rows get deevy's prefixed ids too (ids.ts, ADR-0015): usr_, ses_, acct_, key_…
+    advanced: { database: { generateId: ({ model }) => authId(model) } },
     emailAndPassword: { enabled: false },
     plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env)],
     socialProviders: {
@@ -255,7 +258,7 @@ export async function bootstrapWorkspace(
   const source = { db, workspace: { id: "" }, member: null };
   if (!workspaceId) {
     const name = env.workspaceName?.trim() || "deevy";
-    workspaceId = crypto.randomUUID();
+    workspaceId = newId("workspace");
     await db.insert(workspace).values({ id: workspaceId, name, slug: slugify(name) });
     source.workspace.id = workspaceId;
     await appendEvent(source, {
@@ -266,7 +269,7 @@ export async function bootstrapWorkspace(
     });
   }
   source.workspace.id = workspaceId;
-  const memberId = crypto.randomUUID();
+  const memberId = newId("member");
   await db.insert(member).values({
     id: memberId,
     workspaceId,
@@ -317,7 +320,7 @@ export async function joinWorkspace(
   if (!ws) return;
   if (!(await matchesAllowlist(db, ws.id, user, options))) return;
 
-  const memberId = crypto.randomUUID();
+  const memberId = newId("member");
   await db.insert(member).values({
     id: memberId,
     workspaceId: ws.id,

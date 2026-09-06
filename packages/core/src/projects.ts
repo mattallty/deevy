@@ -1,5 +1,6 @@
 import { project as projectTable, workflowState, type Db, type Project } from "@deevy/db";
 import { defaultWorkflow } from "./workflow.ts";
+import { newId } from "./ids.ts";
 
 /**
  * The prefix of every Issue key, as in `DEV-42`. Two to six uppercase letters
@@ -21,7 +22,7 @@ export interface CreateProjectInput {
  * States go in as one multi-row statement rather than six writes in a loop.
  */
 export async function createProject(db: Db, input: CreateProjectInput): Promise<Project> {
-  const id = crypto.randomUUID();
+  const id = newId("project");
   const [row] = await db
     .insert(projectTable)
     .values({
@@ -37,7 +38,7 @@ export async function createProject(db: Db, input: CreateProjectInput): Promise<
 
   await db.insert(workflowState).values(
     defaultWorkflow().map((state) => ({
-      id: crypto.randomUUID(),
+      id: newId("state"),
       projectId: id,
       ...state,
     })),

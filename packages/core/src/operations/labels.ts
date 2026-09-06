@@ -6,6 +6,7 @@ import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation } from "./registry.ts";
 import { requireLabel } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 export const labels = {
   list: defineOperation({
@@ -58,7 +59,7 @@ export const labels = {
       });
       if (taken) throw new ORPCError("CONFLICT", { message: "That Label already exists" });
 
-      const id = crypto.randomUUID();
+      const id = newId("label");
       const [row] = await context.db
         .insert(labelTable)
         .values({

@@ -2,6 +2,7 @@ import { createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -93,8 +94,10 @@ describe("allowlist.remove", () => {
     const admin = await memberContext(db, { role: "admin", name: "Ada" });
 
     const client = createRouterClient(router, { context: admin });
-    await expect(client.allowlist.remove({ ruleId: crypto.randomUUID() })).rejects.toMatchObject({
-      code: "NOT_FOUND",
-    });
+    await expect(client.allowlist.remove({ ruleId: newId("allowlistRule") })).rejects.toMatchObject(
+      {
+        code: "NOT_FOUND",
+      },
+    );
   });
 });

@@ -7,6 +7,7 @@ import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation } from "./registry.ts";
 import { AllowlistValue } from "./shared.ts";
+import { newId } from "../ids.ts";
 
 export const allowlist = {
   list: defineOperation({
@@ -43,7 +44,7 @@ export const allowlist = {
       const [row] = await context.db
         .insert(allowlistRuleTable)
         .values({
-          id: crypto.randomUUID(),
+          id: newId("allowlistRule"),
           workspaceId: context.workspace.id,
           kind: input.kind,
           value: input.value,

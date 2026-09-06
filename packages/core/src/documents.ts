@@ -6,6 +6,7 @@ import {
   type WorkflowState,
 } from "@deevy/db";
 import { and, eq } from "drizzle-orm";
+import { newId } from "./ids.ts";
 
 /**
  * Documents are append-only: a write is a new version, never an overwrite, so
@@ -19,7 +20,7 @@ export async function writeVersion(
 ): Promise<number> {
   const version = document.currentVersion + 1;
   await db.insert(documentVersionTable).values({
-    id: crypto.randomUUID(),
+    id: newId("documentVersion"),
     documentId: document.id,
     version,
     body,
@@ -53,14 +54,14 @@ export async function ensureStateDocument(
     .limit(1);
   if (existing.length > 0) return null;
 
-  const id = crypto.randomUUID();
+  const id = newId("document");
   const [created] = await db
     .insert(documentTable)
     .values({ id, issueId, name, currentVersion: 1 })
     .returning();
   if (!created) throw new Error("ensureStateDocument: the insert returned no row");
   await db.insert(documentVersionTable).values({
-    id: crypto.randomUUID(),
+    id: newId("documentVersion"),
     documentId: id,
     version: 1,
     body: state.documentTemplate ?? "",

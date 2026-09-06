@@ -24,6 +24,7 @@ import {
   sweepStaleRuns,
 } from "../src/work.ts";
 import { agentContext, memberContext, testDb } from "./helpers.ts";
+import { newId } from "../src/ids.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -60,7 +61,7 @@ async function seedRuns(
   silentMinutes: number,
   status: RunStatus = "active",
 ) {
-  const ids = Array.from({ length: count }, () => crypto.randomUUID());
+  const ids = Array.from({ length: count }, () => newId("run"));
   await db.insert(runTable).values(
     ids.map((id) => ({
       id,
@@ -236,7 +237,7 @@ describe("the job queue port", () => {
 
 /** A second Issue in the same Project and State, straight into the table. */
 async function seedIssue(db: Db, projectId: string, stateId: string, number: number) {
-  const id = crypto.randomUUID();
+  const id = newId("issue");
   await db.insert(issueTable).values({ id, projectId, number, title: `Issue ${number}`, stateId });
   return id;
 }
@@ -386,7 +387,7 @@ describe("the schedule sweep", () => {
 
 /** A subscription that wants every Event of this Workspace, straight into the table. */
 async function subscribeTo(db: Db, workspaceId: string, kinds: string[] | null = null) {
-  const id = crypto.randomUUID();
+  const id = newId("webhook");
   await db.insert(webhookSubscriptionTable).values({
     id,
     workspaceId,

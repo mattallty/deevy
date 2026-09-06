@@ -10,6 +10,7 @@ import {
 import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { issueUrl } from "./slack.ts";
+import { newId } from "./ids.ts";
 
 /** A State as the default template describes it, before it belongs to a Project. */
 export type WorkflowStateTemplate = Pick<
@@ -199,7 +200,7 @@ export interface RecordDecisionInput {
 
 export async function recordGateDecision(db: Db, input: RecordDecisionInput): Promise<void> {
   await db.insert(gateDecisionTable).values({
-    id: crypto.randomUUID(),
+    id: newId("decision"),
     issueId: input.issueId,
     stateId: input.stateId,
     decision: input.decision,
