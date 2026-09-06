@@ -46,11 +46,13 @@ export function ProjectLayout({ projectKey }: { projectKey: string }) {
   return (
     <section className="flex flex-1 flex-col gap-5">
       <header className="flex flex-col gap-3 border-b">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-mono text-muted-foreground">{key}</span>
-          {team ? <span className="text-muted-foreground">{team.name}</span> : null}
-          {archivedAt ? <Badge variant="outline">Archived</Badge> : null}
-        </div>
+        {/* The key is in every Issue key below and in the sidebar; the line above the name is the Team's. */}
+        {team || archivedAt ? (
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            {team ? <span className="text-muted-foreground">{team.name}</span> : null}
+            {archivedAt ? <Badge variant="outline">Archived</Badge> : null}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold tracking-tight">{name}</h1>
           {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}

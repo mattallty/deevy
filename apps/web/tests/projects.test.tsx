@@ -146,8 +146,6 @@ describe("the Project page", () => {
     await mountAt("/projects/DEV");
 
     expect(await screen.findByRole("heading", { name: "deevy" })).toBeTruthy();
-    // The sidebar lists the Projects too, so the page is asked, not the document.
-    expect(within(screen.getByRole("main")).getByText("DEV")).toBeTruthy();
     // The Issues tab groups by State and the Board's columns are the States: the
     // header does not repeat them (2026-09-06).
     expect(screen.queryByRole("list", { name: "Workflow" })).toBeNull();
