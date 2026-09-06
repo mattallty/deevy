@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { pickOption } from "./select.ts";
+import { pickOption, selectedLabel } from "./select.ts";
 
 const created = vi.fn(async () => ({
   id: "new-issue",
@@ -113,6 +113,17 @@ describe("creating an Issue from anywhere", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/issues/DEV-7"));
   });
 
+  it("already knows the Project when opened from its pages", async () => {
+    await mountAt("/projects/OPS");
+
+    fireEvent.click(screen.getByRole("button", { name: /new issue/i }));
+    // The select shows the Project of the page, with no pick needed.
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() =>
+      expect(selectedLabel(within(dialog).getByLabelText(/project/i))).toBe("ops (OPS)"),
+    );
+  });
+
   it("opens on `c`, the key every tool of this kind uses", async () => {
     await mountAt("/inbox");
 
@@ -122,9 +133,9 @@ describe("creating an Issue from anywhere", () => {
   });
 
   it("leaves `c` alone while the Human is typing into something else", async () => {
-    await mountAt("/projects/DEV");
+    await mountAt("/settings/labels");
 
-    const field = await screen.findByLabelText(/new issue/i);
+    const field = await screen.findByLabelText("Name");
     field.focus();
     fireEvent.keyDown(field, { key: "c" });
 

@@ -1,7 +1,7 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Shortcut } from "@/components/kbd-hint";
 import { Button } from "@/components/ui/button";
 import {
@@ -96,6 +96,15 @@ function NewIssueDialog({
   const queryClient = useQueryClient();
   const [projectKey, setProjectKey] = useState("");
   const [title, setTitle] = useState("");
+  // Opened from a Project's pages, or from one of its Issues, the Project is
+  // already known; the select shows it and the Human can still change it.
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const hinted = useMemo(() => {
+    const onProject = /^\/projects\/([^/]+)/.exec(pathname);
+    if (onProject) return decodeURIComponent(onProject[1] ?? "");
+    const onIssue = /^\/issues\/([^/]+)-\d+$/.exec(pathname);
+    return onIssue ? (onIssue[1] ?? "") : "";
+  }, [pathname]);
 
   // Only asked for while the dialog is open: every signed-in page mounts this
   // button, and a Projects query per page load would be a query nobody reads.
@@ -103,7 +112,10 @@ function NewIssueDialog({
   const options = projects.data?.projects ?? [];
   // The Workspace's only Project is not a question worth asking, so it answers
   // itself; with several, the Human chooses and nothing is preselected.
-  const chosen = projectKey || (options.length === 1 ? (options[0]?.key ?? "") : "");
+  const chosen =
+    projectKey ||
+    (options.some((project) => project.key === hinted) ? hinted : "") ||
+    (options.length === 1 ? (options[0]?.key ?? "") : "");
 
   const create = useMutation(
     orpc.issues.create.mutationOptions({

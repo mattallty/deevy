@@ -151,11 +151,12 @@ describe("the Project page", () => {
     expect(screen.queryByRole("list", { name: "Workflow" })).toBeNull();
   });
 
-  it("offers the new-Issue form and says so when the Project has none", async () => {
+  it("says so when the Project has no Issues, and leaves creating one to the top bar", async () => {
     await mountAt("/projects/DEV");
 
-    expect(await screen.findByLabelText("New Issue")).toBeTruthy();
     expect(await screen.findByText("No Issues yet")).toBeTruthy();
+    expect(screen.queryByLabelText("New Issue")).toBeNull();
+    expect(screen.getByRole("button", { name: /new issue/i })).toBeTruthy();
   });
 });
 

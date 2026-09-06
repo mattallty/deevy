@@ -302,8 +302,8 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 
 - **`/projects/$key` is a layout route** (`ProjectLayout`: header — key, Team, name, description; the
   `ul aria-label="Workflow"` strip of `StateBadge`s it carried went on 2026-09-06, since the Issues tab's
-  groups and the Board's columns are the Workflow already — `nav aria-label="Project"` tabs) with children `/` (Issues: quick-add "New Issue"/"Add
-  Issue" + the Issues home `embedded` and `fixedProject`), `board`, `workflow`, `settings`
+  groups and the Board's columns are the Workflow already — `nav aria-label="Project"` tabs) with children `/` (Issues: the Issues home `embedded` and `fixedProject`; the quick-add form went on
+  2026-09-06, since the top bar's New Issue and `c` open the dialog with this Project already chosen), `board`, `workflow`, `settings`
   (`projects.update`/`archive`), and `settings/workflow` redirecting to `workflow`. The Issue filters and
   `?peek=` validate on the layout, so the tabs share them.
 - **A tab writes its search with the router's `useNavigate()` and `to: "."`**, never the layout route's

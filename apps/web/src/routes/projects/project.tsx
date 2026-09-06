@@ -1,11 +1,7 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { IssuesSearch } from "@/components/issue-filters";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
 import { IssuesPage } from "@/routes/issues/list";
@@ -97,41 +93,6 @@ export function ProjectIssuesTab({
   search: IssuesSearch;
   onSearch: (patch: Partial<IssuesSearch>) => void;
 }) {
-  const queryClient = useQueryClient();
-  const [title, setTitle] = useState("");
-  const create = useMutation(
-    orpc.issues.create.mutationOptions({
-      onSuccess: async () => {
-        setTitle("");
-        await queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
-      },
-    }),
-  );
-
-  return (
-    <div className="flex flex-col gap-4">
-      <form
-        className="flex items-end gap-3"
-        onSubmit={(submitted) => {
-          submitted.preventDefault();
-          if (title.trim()) create.mutate({ projectKey, title: title.trim() });
-        }}
-      >
-        <div className="flex flex-1 flex-col gap-2">
-          <Label htmlFor="new-issue">New Issue</Label>
-          <Input
-            id="new-issue"
-            value={title}
-            placeholder="What needs doing?"
-            onChange={(changed) => setTitle(changed.target.value)}
-          />
-        </div>
-        <Button type="submit" disabled={create.isPending || !title.trim()}>
-          Add Issue
-        </Button>
-      </form>
-      {create.error ? <p className="text-sm text-destructive">{create.error.message}</p> : null}
-      <IssuesPage search={search} onSearch={onSearch} fixedProject={projectKey} embedded />
-    </div>
-  );
+  // No form of its own: the top bar's New Issue (and `c`) already knows this Project.
+  return <IssuesPage search={search} onSearch={onSearch} fixedProject={projectKey} embedded />;
 }
