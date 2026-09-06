@@ -49,5 +49,6 @@ for (const [model, def] of Object.entries(plugin.schema ?? {})) {
   out += `\nexport const ${model} = sqliteTable("${table}", {\n  id: text("id").primaryKey(),\n${fields}\n});\n`;
 }
 out += `\n/** The same tables as DDL, so the plugin's init query finds them. */\nexport const bootstrapSql = ${JSON.stringify(ddl, null, 2)};\n`;
-writeFileSync(new URL("./auth.bootstrap.ts", import.meta.url), out);
+// Beside auth.generate.config.ts, which imports it, not beside this script.
+writeFileSync(new URL("../auth.bootstrap.ts", import.meta.url), out);
 console.log(`stubbed ${Object.keys(plugin.schema ?? {}).length} models`);

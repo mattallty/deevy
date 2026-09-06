@@ -188,18 +188,26 @@ review, and an oRPC bump that reshapes a schema shows up as a diff.
 
 A Human's own client needs no header: deevy is the authorization server (ADR-0007, docs/OPERATIONS.md). It is
 all built from `BETTER_AUTH_URL`, and everything in the dance has to happen on one origin, so in development
-point that at the Vite dev server rather than at the Node server:
-
-```
-BETTER_AUTH_URL=http://localhost:5173
-```
+that has to name the Vite dev server rather than the Node server. The `dev:stub` launch configuration sets
+`BETTER_AUTH_URL=http://localhost:5173` itself, over whatever `.env` says. With a real GitHub OAuth App, set
+it in `.env` and move the App's callback URL to `http://localhost:5173/api/auth/callback/github` for as long
+as it stays there.
 
 The proxy sends `/api`, `/mcp` and `/.well-known` back to the Node server, and `/consent` — where the OAuth
-provider sends the browser mid-authorization — resolves to the SPA route that serves it. Then:
+provider sends the browser mid-authorization — resolves to the SPA route that serves it. Then, from a
+directory that is not this repository, since the server lands in that directory's local Claude Code
+configuration:
 
 ```bash
 claude mcp add --transport http deevy http://localhost:5173/mcp
+claude mcp login deevy
 ```
+
+`login` opens a browser on deevy's consent page — one that is signed in to deevy, or sign in there first —
+and Settings, MCP clients lists the client once you allow it. `claude mcp get deevy` then says `Connected`,
+and a `claude -p` session run from that directory acts as you. This was walked on 2026-09-06 with Claude
+Code 2.1.261; what it found, and why Better Auth 1.7.3 is the floor, is in OPERATIONS.md under "A Human's
+own MCP client".
 
 Left pointing at `http://localhost:3000`, the dance still runs but the consent page 404s: the Node server only
 serves the SPA when `DEEVY_WEB_DIST` names a built one, which is how the Docker image runs it and not how

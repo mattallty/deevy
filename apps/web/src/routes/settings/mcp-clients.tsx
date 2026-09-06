@@ -93,11 +93,14 @@ export function McpClientsPage() {
       >
         <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
         <p className="text-sm text-muted-foreground">
-          and Claude Code adds it with no header at all — it signs you in through a browser and asks
-          you to consent:
+          and Claude Code adds it with no header at all — the second command signs you in through a
+          browser and asks you to consent:
         </p>
         <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
           {`claude mcp add --transport http deevy ${mcpEndpoint()}`}
+        </code>
+        <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
+          claude mcp login deevy
         </code>
       </SettingsSection>
 

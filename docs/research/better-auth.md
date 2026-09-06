@@ -19,7 +19,8 @@
   PKCE S256 enforced, RFC 8414, RFC 9728 (/.well-known/oauth-protected-resource), RFC 8707, DCR opt-in,
   CIMD (Node transport only; Workers must supply own fetch transport), refresh rotation, scopes + step-up,
   custom consent page, requireMcpAuth(auth, handler, {...}). Churn: multiple CIMD/DCR interop bugs filed Aug-Sep 2026
-  (#11081 DCR rejects Claude w/ extra grant types; #11136 CIMD 429s; #10937 localhost redirect).
+  (#11081 DCR rejects Claude w/ extra grant types; #11136 CIMD 429s; #10937 localhost redirect — the one
+  Claude Code hits, fixed in 1.7.3 by #11090, which is why the pin moved there on 2026-09-06).
 - Admin plugin: roles, ban, adminUserIds env bootstrap, `auth create-admin`. "First user becomes admin" not
   built in; hook-based count check is racy without transactions.
 - Schema: `npx auth@1.7.2 generate --config <file>` where the config imports `@better-auth/drizzle-adapter/relations-v2`
