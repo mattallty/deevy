@@ -234,7 +234,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
               </ButtonGroup>
               <Button
                 type="button"
-                variant="ghost"
+                variant="destructive"
                 size="icon"
                 aria-label={`Delete ${current.name}`}
                 onClick={() => drop(at)}

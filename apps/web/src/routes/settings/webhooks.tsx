@@ -193,7 +193,7 @@ export function WebhooksPage() {
                     {subscription.disabledAt ? "Switch on" : "Switch off"}
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ subscriptionId: subscription.id })}

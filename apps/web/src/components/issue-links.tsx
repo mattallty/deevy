@@ -87,7 +87,7 @@ export function IssueLinks({ issueKey }: { issueKey: string }) {
                 {link.repository ? <Badge variant="outline">{link.repository.name}</Badge> : null}
                 <span className="flex-1" />
                 <Button
-                  variant="ghost"
+                  variant="destructive"
                   size="sm"
                   className="h-6 px-2"
                   disabled={remove.isPending}

@@ -187,7 +187,7 @@ export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => setConfirming(true)}>
+              <Button variant="destructive" onClick={() => setConfirming(true)}>
                 Archive Project
               </Button>
             )}

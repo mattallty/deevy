@@ -98,7 +98,7 @@ export function TeamsPage() {
                   {member.role === "admin" ? <Badge variant="outline">admin</Badge> : null}
                   <span className="flex-1" />
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={removeMember.isPending}
                     onClick={() => removeMember.mutate({ teamId: team.id, memberId: member.id })}

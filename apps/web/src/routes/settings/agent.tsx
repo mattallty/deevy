@@ -266,7 +266,7 @@ function Grants({ memberId, onChanged }: { memberId: string; onChanged: () => Pr
               <span className="text-sm">{project.name}</span>
               <Button
                 size="xs"
-                variant="ghost"
+                variant="destructive"
                 aria-label={`Revoke ${project.key}`}
                 disabled={remove.isPending}
                 onClick={() => remove.mutate({ memberId, projectId: project.id })}
@@ -369,7 +369,7 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
               </span>
               <Button
                 size="sm"
-                variant="outline"
+                variant="destructive"
                 disabled={revoke.isPending}
                 onClick={() => revoke.mutate({ memberId, keyId: key.id })}
               >

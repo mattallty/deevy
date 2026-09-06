@@ -134,7 +134,7 @@ export function LabelsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ labelId: label.id })}

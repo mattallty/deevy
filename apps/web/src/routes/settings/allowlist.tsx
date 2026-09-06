@@ -115,7 +115,7 @@ export function AllowlistPage() {
                 <TableCell className="font-medium">{rule.value}</TableCell>
                 <TableCell className="text-right">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ ruleId: rule.id })}

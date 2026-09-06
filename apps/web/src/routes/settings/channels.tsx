@@ -174,7 +174,7 @@ export function ChannelsPage() {
                     Test
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ channelId: channel.id })}
@@ -305,7 +305,7 @@ export function ChannelsPage() {
               </Select>
             </div>
             <Button
-              variant="ghost"
+              variant="destructive"
               size="sm"
               onClick={() => setDraft((current) => current.filter((_, index) => index !== at))}
             >

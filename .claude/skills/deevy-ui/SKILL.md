@@ -149,6 +149,10 @@ string` erases the literal and every typed `to` in the app stops compiling.
   `@import "shadcn/tailwind.css"` in `index.css` (the `shadcn` package is in the catalog for that one
   stylesheet), as the base-mira style prescribes. Without it those variants match nothing and the kit
   silently degrades (square toggle corners, Tabs in a row) — which is how it shipped until 2026-09-06.
+- **Destructive is for what does not undo.** Delete, Remove, Revoke, Archive are `variant="destructive"`
+  (base-mira's tinted one, quiet enough for a table row). Suspend and Reinstate are `outline`: a suspension
+  reverses, so it is not destructive (Matt, 2026-09-06). Reject is a Gate ruling, not a deletion, and keeps
+  the ruling's own styling; Reset on a draft stays `ghost`.
 - **Base UI menus.** A `DropdownMenuLabel` must sit inside a `DropdownMenuGroup` (or a radio group) or the
   menu throws the moment it opens. Make a menu's trigger the DOM button itself (`DropdownMenuTrigger
 className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}`: a `tooltip` there turns

@@ -424,7 +424,7 @@ function CommentItem({
           {entry.edited ? <span className="text-xs text-muted-foreground">edited</span> : null}
           <span className="flex-1" />
           {entry.deleted ? null : (
-            <Button variant="ghost" size="xs" disabled={deleting} onClick={onDelete}>
+            <Button variant="destructive" size="xs" disabled={deleting} onClick={onDelete}>
               Delete
             </Button>
           )}

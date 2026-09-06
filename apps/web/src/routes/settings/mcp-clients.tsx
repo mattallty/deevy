@@ -94,7 +94,7 @@ export function McpClientsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     disabled={revoke.isPending}
                     onClick={() => revoke.mutate({ clientId: client.clientId })}
