@@ -213,8 +213,8 @@ both publish jobs keep their bodies; what changes is what starts them.
 - The publish half becomes `on: workflow_call` with a `version` input, so it can be called rather than only
   triggered. The existing `on: push: tags:` stays as the manual escape hatch, widened to `v*` — today's
   `v0.1.*`–`v0.4.*` filter would not match the `v0.5.0` this work produces.
-- A new `.github/workflows/changesets.yml`, on `push` to `main`, runs `changesets/action@v1` with
-  `version: vp run version` and no `publish`. It opens and maintains the "Version Packages" pull request —
+- A new `.github/workflows/changesets.yml`, on `push` to `main`, runs `changesets/action@v2` with
+  `version-script: vp run version` and no `publish`. It opens and maintains the "Version Packages" pull request —
   whose own title and commit are conventional, because it is squash-merged like any other and slice 2 will
   read that title.
 - **Releasing takes two conditions**, and getting it wrong cost three attempts. "No changesets waiting" is

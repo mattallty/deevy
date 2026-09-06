@@ -56,6 +56,12 @@ an rc publishes images under its own tags, is a prerelease on GitHub, and does n
 `-` in the version decides all three. Leaving pre mode re-lists every change in the final version's notes, so
 the fold drops the `X.Y.Z-*` sections that release supersedes.
 
+`changesets/action` is pinned exactly, and its major must match the changesets CLI's: v1 bundles changesets 2,
+v2 bundles 3. Running the CLI at 3 under the action at v1 works for every ordinary release and fails only in
+pre-release mode, where the two disagree about the shape of `.changeset/pre.json` — the older code looks for a
+file the newer CLI never wrote. Move the pin and the catalog entry together, the way the other pre-release
+lines in this repository are moved.
+
 The one caveat is structural and worth writing down rather than discovering: `changesets.yml` runs on `main`,
 so while pre mode is on every merge to `main` joins the rc line and no stable patch can ship without exiting
 first. The changesets documentation recommends a dedicated branch for exactly this. deevy does not have one,

@@ -71,13 +71,29 @@ jobs:
       # The title and commit are conventional on purpose: this pull request is
       # squash-merged like any other and its title becomes a commit on main,
       # where the check in pull-request.yml will read it.
+      # Pinned exactly, and v2 rather than v1 on purpose: the action's majors
+      # track the changesets majors, and v1 bundles changesets 2 while the CLI
+      # in this workspace is 3. That mismatch is invisible until pre-release
+      # mode, where the two disagree about the shape of .changeset/pre.json —
+      # v1 goes looking for a file the CLI never wrote and the release dies on
+      # an ENOENT. Move this pin and the catalog's @changesets/cli together.
       - name: Open or update the Version PR
-        uses: changesets/action@v1
+        uses: changesets/action@v2.1.1
         with:
-          version: vp run version
-          title: "chore(release): version packages"
-          commit: "chore(release): version packages"
+          version-script: vp run version
+          pr-title: "chore(release): version packages"
+          commit-message: "chore(release): version packages"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # This workflow makes the tag and the Release itself, a few steps
+          # down, so that they describe the folded changelog rather than the
+          # per-package one. v2 would otherwise start creating git tags where
+          # v1 did not.
+          create-github-releases: false
+          push-git-tags: false
         env:
+          # Still needed, and not the same thing as `github-token` above: this
+          # is what @changesets/changelog-github reads inside `vp run version`
+          # to turn each changeset into a line naming its pull request.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Two conditions. Changesets waiting means the action has just opened or
