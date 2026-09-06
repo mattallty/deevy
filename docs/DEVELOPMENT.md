@@ -140,6 +140,47 @@ Some notes on the mechanics, because they surprise people:
   purpose — `changesets/action` reads them back — and stay out of the commit by being gitignored. Delete them
   by hand whenever you like; only the newest section of each is ever read.
 
+## Cutting a release candidate
+
+Changesets has a pre-release mode, and deevy's release path understands it: an rc publishes images under its
+own tags, is marked as a prerelease on GitHub, and never moves `latest`.
+
+```bash
+changeset pre enter rc     # commit .changeset/pre.json through a pull request
+```
+
+From then on the flow is the one above and nothing about it changes: pull requests carry changesets, `main`
+collects them into a Version PR, and merging that Version PR releases. The versions it produces are
+`0.5.0-rc.0`, `0.5.0-rc.1`, and so on. When it is ready:
+
+```bash
+changeset pre exit         # commit the change to .changeset/pre.json the same way
+```
+
+The next Version PR then carries the final `0.5.0`, whose notes re-list **every** change since the line
+opened, not only the ones since the last candidate. The root `CHANGELOG.md` drops the superseded
+`0.5.0-rc.*` sections when that lands, because the final section already says all of it.
+
+Three things worth knowing before you start, the first one quoted from
+[the changesets documentation](https://github.com/changesets/changesets/blob/main/docs/prereleases.md):
+
+- **"If you decide to do prereleases from the default branch without having a branch for your last stable
+  release, you will block other changes until you exit prerelease mode."** That is true here: `changesets.yml`
+  runs on `main`, so while pre mode is on, every merge to `main` goes into the rc line and there is no way to
+  ship a stable patch without exiting first. For deevy that is usually what you want — an rc is a stabilising
+  period — but if a hotfix has to go out mid-rc, exit, release the patch, and re-enter.
+- **Changesets are not consumed while pre mode is on.** `changeset version` moves them into `.changeset/pre/`
+  instead of deleting them, so that leaving pre mode can re-read every change into the final notes. The
+  workflow's `find -maxdepth 1` depends on this and the comment there says so.
+- **The npm-shaped caveats in those docs do not apply.** Dist tags, dependent packages falling outside a
+  semver range, a new package landing on `latest` — none of it reaches a repository that publishes no
+  packages and moves all seven versions together as a `fixed` group.
+
+**Snapshot releases are deliberately not wired up.** They are npm's answer to "let me install this branch":
+`changeset version --snapshot` writes a throwaway `0.0.0-tag-timestamp` and the documentation is explicit
+that the commit must never be merged — which is the opposite of a flow built on merging a Version PR. deevy's
+equivalent is an image tagged by commit, which needs no changesets at all.
+
 ## The two snapshots CI diffs
 
 `packages/core/openapi.json` and `packages/core/mcp-tools.json` are generated files, committed, and

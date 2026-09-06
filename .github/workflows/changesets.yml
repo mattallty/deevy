@@ -59,6 +59,11 @@ jobs:
       - name: Are changesets waiting on this commit?
         id: pending
         run: |
+          # -maxdepth 1 is load-bearing in pre-release mode and must stay.
+          # `changeset version` does not delete a changeset while pre mode is on;
+          # it moves it into .changeset/pre/ so that leaving pre mode can re-read
+          # every change into the final version's notes. Counting those would
+          # mean an rc never releases, because the queue would never look empty.
           count=$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
           echo "$count changeset(s) waiting."
           echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -113,7 +118,14 @@ jobs:
           VERSION: ${{ steps.guard.outputs.version }}
         run: |
           node tools/release/scripts/release-notes.ts "$VERSION" > /tmp/release-notes.md
-          gh release create "v$VERSION" --title "v$VERSION" --notes-file /tmp/release-notes.md
+          # A version with a `-` in it is a release candidate: GitHub marks it as
+          # a prerelease and keeps it off the repository's "latest release",
+          # which is the same rule that keeps it off the `latest` image tag.
+          case "$VERSION" in
+            *-*) prerelease=--prerelease ;;
+            *) prerelease= ;;
+          esac
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file /tmp/release-notes.md $prerelease
 
   # Called rather than left to the tag push above, which GITHUB_TOKEN cannot
   # trigger. This re-runs the whole of CI before either image is pushed.
