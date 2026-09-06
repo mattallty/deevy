@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+  "changelog": ["@changesets/changelog-github", { "repo": "mattallty/deevy" }],
+  "commit": false,
+  "format": false,
+  "baseBranch": "main",
+  "access": "restricted",
+  "updateInternalDependencies": "patch",
+  "privatePackages": { "version": true, "tag": false },
+  "fixed": [
+    [
+      "@deevy/core",
+      "@deevy/db",
+      "@deevy/adapters",
+      "@deevy/web",
+      "@deevy/server",
+      "@deevy/claude-agent",
+      "@deevy/release"
+    ]
+  ],
+  "ignore": [],
+  "changedFilePatterns": ["**", "!**/*.md", "!**/tests/**", "!**/*.test.ts"]
+}

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vp run -r --parallel dev",
     "ready": "vp check && vp run -r test && vp run -r build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "version": "changeset version && node tools/release/scripts/fold-changelog.ts"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
