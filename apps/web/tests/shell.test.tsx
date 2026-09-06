@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption, selectedLabel } from "./select.ts";
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
@@ -95,28 +96,33 @@ describe("the app shell", () => {
     expect(within(sidebar()).queryByRole("link", { name: "Members" })).toBeNull();
   });
 
-  it("offers the same Settings pages as a strip of tabs where the sidebar is hidden", async () => {
-    await mountAt("/settings/members");
+  it("offers the same Settings pages in one control where the nav beside is hidden", async () => {
+    const router = await mountAt("/settings/members");
     await screen.findByRole("heading", { name: "Members" });
 
     // Both are in the DOM; the stylesheet shows one per width (lg:hidden / hidden lg:flex).
-    const strip = screen.getByRole("navigation", { name: "Settings pages" });
-    expect(strip.className).toContain("lg:hidden");
-    expect(strip.className).toContain("overflow-x-auto");
+    const compact = screen.getByRole("navigation", { name: "Settings pages" });
+    expect(compact.className).toContain("lg:hidden");
     const desktop = screen.getByRole("navigation", { name: "Settings" });
     expect(desktop.className).toContain("lg:flex");
-    const links = within(strip).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(
+
+    // It says where you are without being opened — the strip it replaced could
+    // scroll the page you were on out of its own navigation.
+    const trigger = within(compact).getByRole("combobox", { name: "Settings page" });
+    expect(selectedLabel(trigger)).toBe("Members");
+
+    // …and opens to every page the wide nav lists, in the same four groups.
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(
       within(desktop)
         .getAllByRole("link")
         .map((link) => link.textContent),
     );
-    expect(within(strip).getByRole("link", { name: "Members" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
-    expect(within(strip).getByRole("link", { name: "Teams" }).getAttribute("href")).toBe(
-      "/settings/teams",
-    );
+    expect(screen.getAllByRole("group").length).toBeGreaterThanOrEqual(4);
+
+    await pickOption(trigger, "Teams");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/teams"));
   });
 
   it("sends the old /settings/allowlist to General, which now holds the Allowlist", async () => {

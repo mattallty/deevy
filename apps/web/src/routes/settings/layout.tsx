@@ -1,4 +1,13 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export interface SettingsNavPage {
@@ -54,6 +63,9 @@ export const settingsNav: Array<{ group: string; pages: SettingsNavPage[] }> = [
  */
 export function SettingsLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigate = useNavigate();
+  const pages = settingsNav.flatMap((group) => group.pages);
+  const here = pages.find((page) => pathname === page.to || pathname.startsWith(`${page.to}/`));
 
   return (
     <div className="flex min-h-full">
@@ -90,32 +102,43 @@ export function SettingsLayout() {
           </div>
         ))}
       </nav>
-      <div className="flex min-w-0 flex-1 flex-col p-6">
-        {/* Below lg the nav beside is gone; the same pages, as one strip of tabs that scrolls. */}
-        <nav
-          aria-label="Settings pages"
-          className="-mx-6 -mt-6 mb-6 flex overflow-x-auto border-b px-6 lg:hidden"
-        >
-          {settingsNav.flatMap(({ pages }) =>
-            pages.map((page) => {
-              const active = pathname === page.to || pathname.startsWith(`${page.to}/`);
-              return (
-                <Link
-                  key={page.to}
-                  to={page.to}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap hover:text-foreground",
-                    active
-                      ? "border-primary font-medium text-foreground"
-                      : "border-transparent text-muted-foreground",
-                  )}
-                >
-                  {page.label}
-                </Link>
-              );
-            }),
-          )}
+      {/* No padding of its own until there is a nav beside it to be padded from:
+          the shell already gives the page a 24px gutter, and a second one under
+          it spent 100px of a 390px screen on margins (Matt, 2026-09-07). */}
+      <div className="flex min-w-0 flex-1 flex-col lg:p-6">
+        {/* Below lg the nav beside is gone. Not the eleven as a strip that
+            scrolls sideways: MCP clients was four swipes from General, and the
+            page you were on could be scrolled off its own navigation. One
+            control instead — it names where you are without being opened, opens
+            to the whole list in the four groups the wide nav uses, and costs one
+            row (Matt, 2026-09-07). */}
+        <nav aria-label="Settings pages" className="mb-6 lg:hidden">
+          <Select
+            value={here?.to ?? null}
+            onValueChange={(next) => {
+              if (next) void navigate({ to: next });
+            }}
+          >
+            <SelectTrigger aria-label="Settings page" className="w-full">
+              <SelectValue>
+                {(chosen: string | null) =>
+                  pages.find((page) => page.to === chosen)?.label ?? "Settings"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {settingsNav.map(({ group, pages: inGroup }) => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
+                  {inGroup.map((page) => (
+                    <SelectItem key={page.to} value={page.to}>
+                      {page.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </nav>
         {/* A container, so a page lays itself out by the room it actually has:
             behind the sidebar and this nav, a viewport breakpoint says nothing
