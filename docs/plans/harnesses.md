@@ -150,6 +150,39 @@ the proxy's forwarder given a wrong key, the pre-session probe fails the Run bef
 
 ---
 
+### Found by building the slice
+
+**The proxy is its own listener, not a route on 8787.** The plan put `/mcp` beside `/healthz` on the
+receiver's listener and had it check who connected. Built, it is a second `node:http` server bound to
+`127.0.0.1` on port 0, opened by `workRun` for one Run and closed in its `finally`. That is loopback by
+address rather than by inspection, one session at a time by construction, and up only while a Run is in
+flight without a line of code saying so. The URL is per Run, and reaches the session as `SessionInput.mcpUrl`.
+
+**There is no `initialize` to probe with.** The 2026-07-28 revision has no handshake: every request carries
+its envelope in `_meta`, and deevy's edge rejects an `initialize` sent with a modern `MCP-Protocol-Version`
+header, then rejects a request whose body names a method the `Mcp-Method` header does not. Both are recorded
+in [mcp-spec-2026-07-28.md](../research/mcp-spec-2026-07-28.md) and both were learned again here, which is
+the point of a client that never saw the server's code. The probe is a `tools/list` with the envelope and
+the header, and it is the better probe: it proves the key is this Agent's and that deevy lists its tools.
+
+**`deevyIsReachable` is gone.** The supervisor no longer reads a harness's `ready` event to decide whether
+deevy is there; the probe decides, before a token is spent, in words the Run's feed can carry
+("deevy answered 401 to tools/list"). `ready` stays in `SessionEvent` for the log.
+
+**A refusal is recorded before the session is answered.** The first version queued the proxy's refusals and
+drained them at the harness's next event. The acceptance walk caught what that costs: the model's refused
+call came first, its `runs_request_approval` came last, and the queued refusal was written after the Run
+had stopped at the Gate — an Activity on a Run in `awaiting_input` puts it back in `active`, and the
+supervisor then failed a Run that had done everything right. So the proxy awaits `onDenied` before it
+answers the session, and the error Activity is in the feed before the model has seen the error.
+
+**The acceptance walk now goes through the proxy.** The scripted model calls `input.mcpUrl` with no
+credential, and the walk gained a check that `gates_approve` through it is refused with "not available to
+this session". The walk on both deployments is what shows the forwarder is transparent to a real socket,
+JSON and SSE alike.
+
+---
+
 ## Slice 2: The harness contract, and Claude Code on the CLI (L)
 
 **Goal.** The runtime chooses a harness by name, runs it as a subprocess through one runner, and the first

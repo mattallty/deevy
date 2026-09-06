@@ -25,6 +25,7 @@ async function stoppedAtTheGate() {
   const pass = await runOnce({
     ...options,
     deevy: it.deevy,
+    proxy: it.proxy,
     session: scripted([
       async () => {
         const [run] = await it.deevy.runs("pending");
@@ -49,6 +50,7 @@ describe("a Human rules on the Gate", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: (input) => {
         prompts.push(input.prompt);
         return scripted([
@@ -87,6 +89,7 @@ describe("a Human rules on the Gate", () => {
     await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: (input) => {
         prompts.push(input.prompt);
         return scripted([
@@ -100,6 +103,7 @@ describe("a Human rules on the Gate", () => {
     const after = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         () => {
           askedAgain = true;
@@ -127,6 +131,7 @@ describe("a Human rules on the Gate", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         async () => {
           await it.deevy.finishRun(runId, "completed", "Built it");
@@ -146,6 +151,7 @@ describe("a Run nobody has ruled on", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([finished]),
     });
 

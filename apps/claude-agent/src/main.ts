@@ -3,7 +3,9 @@ import { DeevyError, createDeevy } from "./deevy.ts";
 import { forgeFor } from "./forge.ts";
 import { createReceiver, startListener } from "./receiver.ts";
 import { startLoop } from "./loop.ts";
+import { openProxy } from "./proxy.ts";
 import { buildSession } from "./sdk.ts";
+import { deevyToolNames } from "./tools.ts";
 import { runOnce } from "./work.ts";
 import { openWorkspace } from "./workspace.ts";
 
@@ -32,6 +34,9 @@ const deevy = createDeevy({ config });
 const work = {
   deevy,
   session: buildSession(config),
+  // The key and the tool list stay here; the session gets a loopback URL.
+  proxy: (options: { onDenied: (name: string) => Promise<void> }) =>
+    openProxy({ url: config.url, key: config.key, tools: deevyToolNames, ...options }),
   runTimeoutMs: config.runTimeoutSeconds * 1000,
   forge: forgeFor(config),
   workspace: (options: { runId: string }) =>

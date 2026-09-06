@@ -8,7 +8,9 @@ import type { Db, Member, Workspace } from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
 import type { Config } from "../src/config.ts";
 import { createDeevy } from "../src/deevy.ts";
-import type { Session, SessionEvent } from "../src/session.ts";
+import { openProxy, type Proxy } from "../src/proxy.ts";
+import type { Session, SessionEvent, SessionInput } from "../src/session.ts";
+import { deevyToolNames } from "../src/tools.ts";
 import { newId } from "@deevy/core";
 
 const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname;
@@ -68,6 +70,9 @@ export async function instance() {
    * nothing going wrong, and this is how a test can say it did not.
    */
   const refused: Array<{ method: string; path: string; status: number }> = [];
+  /** The app's own handler as a fetch, so nothing binds a port. */
+  const inProcess: typeof globalThis.fetch = (input, init) =>
+    Promise.resolve(app.request(input as string, init as RequestInit));
 
   return {
     db,
@@ -77,7 +82,7 @@ export async function instance() {
     deevy: createDeevy({
       config,
       fetch: async (input, init) => {
-        const response = await app.request(input as string, init);
+        const response = await inProcess(input, init);
         if (!response.ok) {
           refused.push({
             method: init?.method ?? "GET",
@@ -88,6 +93,20 @@ export async function instance() {
         return response;
       },
     }),
+    /**
+     * The proxy the supervisor opens per Run, forwarding to this deevy with
+     * the Agent's key (src/proxy.ts). A test that wants a different key or a
+     * shorter tool list calls `openProxy` itself with `inProcess`.
+     */
+    proxy: (options: { onDenied?: (name: string) => void | Promise<void> } = {}): Promise<Proxy> =>
+      openProxy({
+        url: baseURL,
+        key: issued.key,
+        tools: deevyToolNames,
+        fetch: inProcess,
+        ...options,
+      }),
+    inProcess,
     /**
      * The Agent's key against a path the supervisor itself never calls. The
      * model reaches those over MCP, and a test playing the model needs a way to
@@ -169,19 +188,23 @@ function contextFor(db: Db, row: Member, ws: Workspace) {
   };
 }
 
-/** A session that yields what a test wrote and does what a test told it to. */
+/**
+ * A session that yields what a test wrote and does what a test told it to. A
+ * step that is a function gets the session's input, so a test playing the
+ * model can reach deevy the way the model does: through the proxy's URL.
+ */
 export function scripted(
-  steps: Array<SessionEvent | (() => Promise<void>)>,
+  steps: Array<SessionEvent | ((input: SessionInput) => Promise<void>)>,
   ready: SessionEvent = {
     type: "ready",
     tools: [],
     servers: [{ name: "deevy", status: "connected" }],
   },
 ): Session {
-  return async function* () {
+  return async function* (input) {
     yield ready;
     for (const step of steps) {
-      if (typeof step === "function") await step();
+      if (typeof step === "function") await step(input);
       else yield step;
     }
   };

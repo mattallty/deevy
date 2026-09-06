@@ -129,7 +129,12 @@ describe("a repository that tries to configure the session", () => {
     // against a repository that simply did not contain them.
     expect(await readdir(dirty.cwd)).toContain(".mcp.json");
 
-    const input = { prompt: "p", cwd: "/tmp/run", signal: AbortSignal.abort() };
+    const input = {
+      prompt: "p",
+      cwd: "/tmp/run",
+      mcpUrl: "http://127.0.0.1:1/mcp",
+      signal: AbortSignal.abort(),
+    };
     const options = sessionOptions(withRepo, input, "", {});
 
     expect(options).toEqual(sessionOptions(clean, input, "", {}));

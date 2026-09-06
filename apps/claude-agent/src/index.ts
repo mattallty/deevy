@@ -9,7 +9,16 @@ export {
   type Ruling,
   type Run,
 } from "./deevy.ts";
-export { deevyIsReachable, type Session, type SessionEvent, type SessionInput } from "./session.ts";
+export { type Session, type SessionEvent, type SessionInput } from "./session.ts";
+export { deevyToolNames } from "./tools.ts";
+export {
+  mcpEnvelope,
+  messagesIn,
+  mcpProtocolVersion,
+  openProxy,
+  type Proxy,
+  type ProxyOptions,
+} from "./proxy.ts";
 export {
   promptFor,
   runOnce,

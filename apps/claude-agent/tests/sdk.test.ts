@@ -14,6 +14,7 @@ import { testConfig } from "./helpers.ts";
 const input = {
   prompt: "Work Run r1 on Issue DEV-1.",
   cwd: "/tmp/run",
+  mcpUrl: "http://127.0.0.1:1/mcp",
   signal: AbortSignal.abort(),
 };
 
@@ -40,12 +41,10 @@ describe("the options a session runs under", () => {
     const options = sessionOptions(testConfig, input, "INSTRUCTIONS", env);
 
     expect(options).toEqual({
+      // The supervisor's loopback proxy and no header: the session never holds
+      // the key, whichever harness it is (src/proxy.ts).
       mcpServers: {
-        deevy: {
-          type: "http",
-          url: "http://localhost:3000/mcp",
-          headers: { Authorization: "Bearer unset" },
-        },
+        deevy: { type: "http", url: "http://127.0.0.1:1/mcp" },
       },
       allowedTools: [
         "mcp__deevy__inbox_list",
@@ -108,8 +107,11 @@ describe("the options a session runs under", () => {
     // `Bash` plus the Agent's key is every operation the Agent may call, over
     // curl, including the ones deliberately left out of the tool list.
     expect(options.env).toEqual({ PATH: "/usr/bin", ANTHROPIC_API_KEY: "sk-ant-x" });
-    expect(JSON.stringify(options.env)).not.toContain("deevy_sk_secret");
-    expect(JSON.stringify(options.env)).not.toContain("ghp_secret");
+    // And not in the options at all: a subprocess can read its parent's
+    // arguments, so a key in an MCP header is a key in the session.
+    expect(JSON.stringify(options)).not.toContain("unset");
+    expect(JSON.stringify(options)).not.toContain("deevy_sk_secret");
+    expect(JSON.stringify(options)).not.toContain("ghp_secret");
   });
 
   it("passes only what is named, so a credential nobody thought of is not inherited", () => {

@@ -52,6 +52,7 @@ describe("Claude, working a real Issue", () => {
       const config = { ...testConfig, url: server.url, key: deevy.config.key };
       const pass = await runOnce({
         deevy: deevy.deevy,
+        proxy: deevy.proxy,
         session: buildSession(config),
         runTimeoutMs: 10 * 60 * 1000,
       });

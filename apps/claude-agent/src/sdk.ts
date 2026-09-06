@@ -3,27 +3,10 @@ import { query, type Options, type SDKMessage } from "@anthropic-ai/claude-agent
 import type { Config } from "./config.ts";
 import type { Session, SessionEvent, SessionInput } from "./session.ts";
 
-/**
- * The deevy tools a session may call, namespaced the way an MCP client sees
- * them. Listed rather than wildcarded on purpose: deevy gaining a
- * twenty-first tool must not silently widen what this program may do, and the
- * list is short enough to read as a description of the job
- * (docs/agent-loop.md).
- */
-export const deevyTools = [
-  "inbox_list",
-  "runs_list",
-  "runs_get",
-  "runs_start",
-  "issues_get",
-  "documents_get",
-  "documents_write",
-  "runs_post_activity",
-  "runs_request_approval",
-  "links_add",
-  "comments_create",
-  "runs_finish",
-].map((tool) => `mcp__deevy__${tool}`);
+import { deevyToolNames } from "./tools.ts";
+
+/** The deevy tools, namespaced the way an MCP client sees them (src/tools.ts). */
+export const deevyTools = deevyToolNames.map((tool) => `mcp__deevy__${tool}`);
 
 /**
  * What the session gets on top of deevy when it has a repository to work in.
@@ -142,14 +125,12 @@ export function sessionOptions(
   env: Record<string, string | undefined> = process.env,
 ): Options {
   return {
-    // The same endpoint and the same credential a person puts in a `.mcp.json`,
-    // built here so the key never lands in a file (docs/agent-loop.md).
+    // The supervisor's loopback proxy, with no credential: the key stays in
+    // this process and the proxy adds it (src/proxy.ts). A person's `.mcp.json`
+    // names deevy's own endpoint and carries the header instead
+    // (docs/agent-loop.md); the difference is who holds the key.
     mcpServers: {
-      deevy: {
-        type: "http",
-        url: `${config.url}/mcp`,
-        headers: { Authorization: `Bearer ${config.key}` },
-      },
+      deevy: { type: "http", url: input.mcpUrl },
     },
     allowedTools: config.repo ? [...deevyTools, ...repositoryTools] : deevyTools,
     disallowedTools: config.repo ? deniedTools : [],

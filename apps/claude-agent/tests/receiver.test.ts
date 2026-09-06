@@ -154,6 +154,7 @@ describe("waking the loop", () => {
     const first = counted.next();
     const loop = startLoop({
       deevy: it.deevy,
+      proxy: it.proxy,
       runTimeoutMs: 5_000,
       // An hour, so a second pass arriving at all can only be the wake.
       pollSeconds: 3600,
@@ -180,6 +181,7 @@ describe("waking the loop", () => {
     let worked = 0;
     const loop = startLoop({
       deevy: it.deevy,
+      proxy: it.proxy,
       runTimeoutMs: 5_000,
       pollSeconds: 3600,
       session: scripted([finished]),

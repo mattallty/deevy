@@ -1,7 +1,8 @@
 import { DeevyError, isOpen, type Deevy, type Ruling, type Run } from "./deevy.ts";
 import { deliver, type Delivery, type DeliverOptions } from "./deliver.ts";
 import type { Forge } from "./forge.ts";
-import { deevyIsReachable, type Session } from "./session.ts";
+import type { Proxy } from "./proxy.ts";
+import type { Session, SessionEvent } from "./session.ts";
 import { openWorkspace, type Workspace, type WorkspaceOptions } from "./workspace.ts";
 
 export interface WorkResult {
@@ -29,6 +30,12 @@ export interface Pass {
 export interface WorkOptions {
   deevy: Deevy;
   session: Session;
+  /**
+   * deevy as the session reaches it: a loopback proxy holding the key and the
+   * tool list, opened for one Run and closed after it (src/proxy.ts). The
+   * supervisor hands it what to do with a refusal.
+   */
+  proxy: (options: { onDenied: (name: string) => Promise<void> }) => Promise<Proxy>;
   /** Aborted when the process is stopping, on top of each Run's own timeout. */
   signal?: AbortSignal;
   runTimeoutMs: number;
@@ -228,30 +235,46 @@ export async function workRun(
   let denialsLeft = 5;
   let delivered: Delivery | null = null;
 
+  // A refusal is the one thing in the feed the model cannot report accurately
+  // about itself, because all it sees is an error. Not a failure: the session
+  // is told and carries on. The proxy's refusals and the harness's are the same
+  // fact about the Run and go through the same function; the proxy awaits it
+  // before answering the session, so the feed reads in the order it happened.
+  async function refused(event: Extract<SessionEvent, { type: "denied" }>): Promise<void> {
+    if (denialsLeft <= 0) return;
+    denialsLeft -= 1;
+    await deevy
+      .postActivity(run.id, "error", `Refused ${event.name}: ${event.reason}`)
+      .catch(() => undefined);
+  }
+  const proxy = await options.proxy({
+    onDenied: (name) =>
+      refused({ type: "denied", name, reason: "not in this runtime's tool list" }),
+  });
+
   try {
-    const prompt = promptFor(run, ruling);
-    for await (const event of session({ prompt, cwd: workspace.cwd, signal })) {
-      if (event.type === "ready" && !deevyIsReachable(event)) {
-        // A session that cannot reach deevy has no way to read the Issue or
-        // record what it did, and will fill the gap by guessing. Stop here,
-        // before a token is spent on it.
-        failure = "The session could not reach deevy, so it was stopped before it started";
-        break;
+    // A session that cannot reach deevy has no way to read the Issue or record
+    // what it did, and will fill the gap by guessing. Ask first, the way the
+    // session will, and stop here before a token is spent on it.
+    const unreachable = await proxy.probe();
+    if (unreachable) {
+      failure = `The session could not reach deevy, so it was stopped before it started: ${unreachable}`;
+    } else {
+      const prompt = promptFor(run, ruling);
+      for await (const event of session({
+        prompt,
+        cwd: workspace.cwd,
+        mcpUrl: proxy.url,
+        signal,
+      })) {
+        if (event.type === "denied") await refused(event);
+        if (event.type === "done" && !event.ok) failure = event.detail;
       }
-      if (event.type === "denied" && denialsLeft > 0) {
-        denialsLeft -= 1;
-        // Not a failure: the session is told and carries on, and this is the
-        // one thing in the feed the model cannot report accurately about
-        // itself, because all it sees is an error.
-        await deevy
-          .postActivity(run.id, "error", `Refused ${event.name}: ${event.reason}`)
-          .catch(() => undefined);
-      }
-      if (event.type === "done" && !event.ok) failure = event.detail;
     }
   } catch (error) {
     failure = describe(error, stopped(timeout, options.signal));
   } finally {
+    await proxy.close();
     // Before the directory goes: whatever the session left behind is the only
     // evidence there will ever be that this attempt did anything.
     if (workspace.repo && !failure) {

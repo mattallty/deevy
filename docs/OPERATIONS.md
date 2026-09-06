@@ -654,8 +654,12 @@ each part does:
   allowlist rather than a list of secrets to remove, because a denylist can only exclude what somebody thought
   of: the first version removed `DEEVY_AGENT_KEY` and the git token and passed everything else, so a session
   with a shell inherited every other credential the operator happened to have. Name anything it genuinely
-  needs in `DEEVY_AGENT_PASS_ENV`. The Agent's own key is still the sharpest case — a shell plus that key is
-  every operation the Agent may call, over `curl`, including the ones deliberately left out of the tool list.
+  needs in `DEEVY_AGENT_PASS_ENV`. The Agent's own key is the sharpest case — a shell plus that key is every
+  operation the Agent may call, over `curl`, including the ones deliberately left out of the tool list — and
+  the session never holds it at all: it reaches deevy through a loopback proxy the runtime opens for each
+  Run, which adds the key on the way out, offers only the twelve tools the runtime grants, and refuses any
+  other tool before deevy hears of it. A refusal is written into the Run's feed as an error Activity. A shell
+  that finds the proxy's port gets those twelve tools and nothing else, which is the allowlist and not a hole.
 - **The credential is narrow, and the supervisor holds it.** Scope the git token to one repository, with
   permission to push a branch and open a pull request. The runtime clones and pushes; the session is refused
   `git push`, `git remote`, `git config` and `gh`, and the token is passed as a header git does not persist,

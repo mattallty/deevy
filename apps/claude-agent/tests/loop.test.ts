@@ -49,6 +49,7 @@ describe("the loop", () => {
 
     const loop = startLoop({
       deevy: it.deevy,
+      proxy: it.proxy,
       runTimeoutMs: 5_000,
       pollSeconds: 1,
       maxPollSeconds: 4,
@@ -90,6 +91,7 @@ describe("the loop", () => {
 
     const loop = startLoop({
       deevy: it.deevy,
+      proxy: it.proxy,
       runTimeoutMs: 5_000,
       pollSeconds: 1,
       sleep: async () => {
@@ -128,6 +130,7 @@ describe("the loop", () => {
 
     const loop = startLoop({
       deevy: it.deevy,
+      proxy: it.proxy,
       runTimeoutMs: 5_000,
       pollSeconds: 1,
       sleep: async () => {
@@ -160,6 +163,7 @@ describe("stopping with a Run in flight", () => {
 
     const loop = startLoop({
       deevy: it.deevy,
+      proxy: it.proxy,
       runTimeoutMs: 60_000,
       pollSeconds: 1,
       sleep: async () => {

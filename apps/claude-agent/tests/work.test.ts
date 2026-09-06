@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { openProxy } from "../src/proxy.ts";
+import { deevyToolNames } from "../src/tools.ts";
 import { runOnce, workRun } from "../src/work.ts";
 import type { Delivery } from "../src/deliver.ts";
 import type { Session, SessionEvent } from "../src/session.ts";
@@ -39,7 +41,7 @@ describe("a pass", () => {
       finished,
     ]);
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(pass.worked).toEqual([
       { runId: expect.any(String), issueKey: "DEV-1", status: "completed" },
@@ -67,8 +69,8 @@ describe("a pass", () => {
       finished,
     ]);
 
-    await runOnce({ ...options, deevy: it.deevy, session });
-    const again = await runOnce({ ...options, deevy: it.deevy, session });
+    await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
+    const again = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(again.worked).toEqual([]);
     expect(again.takenUp).toEqual([]);
@@ -87,7 +89,7 @@ describe("a pass", () => {
       finished,
     ]);
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(pass.worked[0]).toMatchObject({ status: "awaiting_input" });
     expect(pass.waiting.map((run) => run.issueKey)).toEqual(["DEV-1"]);
@@ -112,6 +114,7 @@ describe("taking work up from the inbox", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         async () => {
           const [run] = await it.deevy.runs("pending");
@@ -132,6 +135,7 @@ describe("taking work up from the inbox", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         async () => {
           const [run] = await it.deevy.runs("pending");
@@ -159,6 +163,7 @@ describe("taking work up from the inbox", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         async () => {
           const [run] = await it.deevy.runs("pending");
@@ -184,6 +189,7 @@ describe("taking work up from the inbox", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         async () => {
           const [run] = await it.deevy.runs("pending");
@@ -205,7 +211,7 @@ describe("the envelope", () => {
     const it = await deevyWithAnAssignedIssue();
     const session = scripted([() => Promise.reject(new Error("the model fell over")), finished]);
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(pass.worked[0]).toMatchObject({ status: "failed" });
     expect(pass.worked[0].failedBy).toContain("the model fell over");
@@ -224,7 +230,7 @@ describe("the envelope", () => {
       finished,
     ]);
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(pass.worked[0]).toMatchObject({
       status: "failed",
@@ -243,7 +249,7 @@ describe("the envelope", () => {
       { type: "done", ok: false, detail: "The session ended: error_during_execution" },
     ]);
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(pass.worked[0]).toMatchObject({
       status: "failed",
@@ -269,7 +275,7 @@ describe("the envelope", () => {
       { type: "done", ok: false, detail: "the tool call timed out" } satisfies SessionEvent,
     ]);
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy: it.proxy, session });
 
     expect(pass.worked[0]).toMatchObject({ status: "completed" });
     expect(pass.worked[0].failedBy).toBeUndefined();
@@ -279,18 +285,24 @@ describe("the envelope", () => {
   it("stops before spending anything when the session cannot reach deevy", async () => {
     const it = await deevyWithAnAssignedIssue();
     let called = false;
-    const session = scripted(
-      [
-        () => {
-          called = true;
-          return Promise.resolve();
-        },
-        finished,
-      ],
-      { type: "ready", tools: [], servers: [{ name: "deevy", status: "failed" }] },
-    );
+    const session = scripted([
+      () => {
+        called = true;
+        return Promise.resolve();
+      },
+      finished,
+    ]);
+    // The supervisor asks before the session does, with the key the session
+    // would have used: here one deevy refuses (src/proxy.ts).
+    const proxy = () =>
+      openProxy({
+        url: it.config.url,
+        key: "not-a-key",
+        tools: deevyToolNames,
+        fetch: it.inProcess,
+      });
 
-    const pass = await runOnce({ ...options, deevy: it.deevy, session });
+    const pass = await runOnce({ ...options, deevy: it.deevy, proxy, session });
 
     expect(called).toBe(false);
     expect(pass.worked[0].failedBy).toContain("could not reach deevy");
@@ -305,7 +317,7 @@ describe("the envelope", () => {
       throw new Error("should have been aborted");
     };
 
-    const pass = await runOnce({ deevy: it.deevy, session, runTimeoutMs: 1 });
+    const pass = await runOnce({ deevy: it.deevy, proxy: it.proxy, session, runTimeoutMs: 1 });
 
     expect(pass.worked[0]).toMatchObject({
       status: "failed",
@@ -322,6 +334,7 @@ describe("a repository the Run cannot have", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       workspace: () => Promise.reject(new Error("Could not clone https://example.test/repo.git")),
       session: scripted([
         () => {
@@ -354,6 +367,7 @@ describe("a tool the session may not call", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         { type: "denied", name: "Bash", reason: "no approval surface" },
         async () => {
@@ -382,6 +396,7 @@ describe("a tool the session may not call", () => {
     const pass = await runOnce({
       ...options,
       deevy: it.deevy,
+      proxy: it.proxy,
       session: scripted([
         ...denials,
         async () => {
@@ -425,6 +440,7 @@ describe("the evidence a Run leaves on the Issue", () => {
       ...options,
       ...delivering(shipped),
       deevy: it.deevy,
+      proxy: it.proxy,
       deliver: () => Promise.resolve(shipped),
       session: scripted([
         async () => {
@@ -458,6 +474,7 @@ describe("the evidence a Run leaves on the Issue", () => {
       ...options,
       ...delivering(null),
       deevy: it.deevy,
+      proxy: it.proxy,
       deliver: () => Promise.resolve(null),
       session: scripted([
         async () => {
@@ -479,6 +496,7 @@ describe("the evidence a Run leaves on the Issue", () => {
       ...options,
       ...delivering(null),
       deevy: it.deevy,
+      proxy: it.proxy,
       deliver: () => Promise.reject(new Error("the remote rejected the push")),
       session: scripted([
         async () => {
@@ -503,7 +521,7 @@ describe("a Run that is not ours to drive", () => {
     await it.deevy.postActivity(run.id, "thought", "Somebody else got here first");
 
     const result = await workRun(
-      { ...options, deevy: it.deevy, session: scripted([finished]) },
+      { ...options, deevy: it.deevy, proxy: it.proxy, session: scripted([finished]) },
       { ...run, status: "active" },
     );
 

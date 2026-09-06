@@ -35,7 +35,15 @@ describe("the boundary", () => {
   });
 
   it("imports nothing from deevy outside its tests", async () => {
-    const sources = ["config.ts", "deevy.ts", "session.ts", "work.ts", "index.ts"];
+    const sources = [
+      "config.ts",
+      "deevy.ts",
+      "proxy.ts",
+      "session.ts",
+      "tools.ts",
+      "work.ts",
+      "index.ts",
+    ];
 
     for (const name of sources) {
       const source = await readFile(new URL(`../src/${name}`, import.meta.url), "utf8");

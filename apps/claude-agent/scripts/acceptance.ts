@@ -27,7 +27,9 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { createDeevy } from "../src/deevy.ts";
 import { forgeFor } from "../src/forge.ts";
+import { openProxy } from "../src/proxy.ts";
 import type { SessionEvent } from "../src/session.ts";
+import { deevyToolNames } from "../src/tools.ts";
 import { runOnce } from "../src/work.ts";
 import { openWorkspace } from "../src/workspace.ts";
 import { adminEmail, startNode, startWorkers, type Deployment } from "./boot.ts";
@@ -101,14 +103,17 @@ async function human(
 
 // ---------------------------------------------------------------- the model
 
-/** One tool call over /mcp with the Agent's key, which is all the model ever has. */
+/**
+ * One tool call the way the model makes it: to the supervisor's loopback proxy,
+ * with no credential at all. The proxy adds the Agent's key and refuses a tool
+ * the runtime did not grant (src/proxy.ts).
+ */
 async function tool(
-  origin: string,
-  key: string,
+  mcpUrl: string,
   name: string,
   args: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(`${origin}/mcp`, {
+  const response = await fetch(mcpUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -116,7 +121,6 @@ async function tool(
       "mcp-protocol-version": mcpProtocolVersion,
       "mcp-method": "tools/call",
       "mcp-name": name,
-      authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -278,6 +282,8 @@ export async function walk(origin: string, label: string): Promise<string> {
     const deevy = createDeevy({ config });
     const work = {
       deevy,
+      proxy: (options: { onDenied: (name: string) => Promise<void> }) =>
+        openProxy({ url: origin, key, tools: deevyToolNames, ...options }),
       runTimeoutMs: 120_000,
       forge: forgeFor(config),
       workspace: (options: { runId: string }) => openWorkspace({ ...options, repo: config.repo }),
@@ -292,24 +298,36 @@ export async function walk(origin: string, label: string): Promise<string> {
     let runId = "";
     const planned = await runOnce({
       ...work,
-      session: async function* () {
+      session: async function* (input) {
         yield ready;
-        const mine = (await tool(origin, key, "runs_list", { status: "pending" })).runs as Array<{
+        const mine = (await tool(input.mcpUrl, "runs_list", { status: "pending" })).runs as Array<{
           id: string;
         }>;
         runId = mine[0]?.id ?? "";
-        await tool(origin, key, "runs_post_activity", {
+        // What the runtime did not grant is refused before deevy hears of it,
+        // and the refusal lands in the Run's feed as its first Activity — which
+        // is also what moves the Run to `active`, so it is asked for after the
+        // queue has been read (src/proxy.ts).
+        const refusal = await tool(input.mcpUrl, "gates_approve", { key: issueKey }).catch(
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+        check(
+          "the proxy refuses a tool the runtime did not grant",
+          typeof refusal === "string" && refusal.includes("not available to this session"),
+          JSON.stringify(refusal),
+        );
+        await tool(input.mcpUrl, "runs_post_activity", {
           runId,
           kind: "thought",
           body: "Reading the intent",
         });
-        await tool(origin, key, "documents_get", { issueKey, name: "intent" });
-        await tool(origin, key, "documents_write", {
+        await tool(input.mcpUrl, "documents_get", { issueKey, name: "intent" });
+        await tool(input.mcpUrl, "documents_write", {
           issueKey,
           name: "plan",
           body: "## Files that change\n\n- src/health.ts\n\n## Tests that prove it\n\n- a smoke\n",
         });
-        await tool(origin, key, "runs_request_approval", { runId });
+        await tool(input.mcpUrl, "runs_request_approval", { runId });
         yield { type: "done", ok: true, detail: "asked" };
       },
     });
@@ -358,12 +376,12 @@ export async function walk(origin: string, label: string): Promise<string> {
         resumePrompt = input.prompt;
         yield ready;
         await writeFile(join(input.cwd, "src-health.ts"), "export const ok = true;\n");
-        await tool(origin, key, "runs_post_activity", {
+        await tool(input.mcpUrl, "runs_post_activity", {
           runId,
           kind: "action",
           body: "Wrote the health endpoint",
         });
-        await tool(origin, key, "runs_finish", {
+        await tool(input.mcpUrl, "runs_finish", {
           runId,
           status: "completed",
           summary: "Added a health endpoint and a smoke for it",
@@ -434,8 +452,10 @@ export async function walk(origin: string, label: string): Promise<string> {
     const story = events.map((event) => event.kind).join(" ");
     check(
       "the Event log tells the story of the Run from the trigger to the finish",
+      // The second `run.activity` is the refusal the proxy wrote, in the
+      // Agent's name, before the model saw the error (src/proxy.ts).
       story ===
-        "run.started run.activity document.updated run.activity run.awaiting_input " +
+        "run.started run.activity run.activity document.updated run.activity run.awaiting_input " +
           "gate.approved run.answered run.activity run.activity run.completed " +
           "issue.link_added comment.created",
       story,
