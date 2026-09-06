@@ -9,6 +9,7 @@ import { createRouterClient } from "@orpc/server";
 import type { Config } from "../src/config.ts";
 import { createDeevy } from "../src/deevy.ts";
 import type { Session, SessionEvent } from "../src/session.ts";
+import { newId } from "@deevy/core";
 
 const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname;
 // Better Auth refuses a plain-http MCP resource that is not loopback, and this
@@ -125,18 +126,18 @@ async function insertMember(
   db: Db,
   options: { name: string; role: Member["role"]; kind: Member["kind"] },
 ): Promise<{ member: Member; workspace: Workspace }> {
-  const userId = crypto.randomUUID();
+  const userId = newId("user");
   await db
     .insert(user)
     .values({ id: userId, name: options.name, email: `${options.name.toLowerCase()}@deevy.test` });
   let found = await db.query.workspace.findFirst();
   if (!found) {
-    const id = crypto.randomUUID();
+    const id = newId("workspace");
     await db.insert(workspace).values({ id, name: "deevy", slug: "deevy" });
     found = await db.query.workspace.findFirst({ where: { id } });
   }
   const ws = found as Workspace;
-  const memberId = crypto.randomUUID();
+  const memberId = newId("member");
   await db.insert(member).values({
     id: memberId,
     workspaceId: ws.id,
@@ -162,7 +163,7 @@ function contextFor(db: Db, row: Member, ws: Workspace) {
     member: row,
     baseURL,
     session: {
-      session: { id: crypto.randomUUID(), userId: row.userId, token: "t", expiresAt: new Date() },
+      session: { id: newId("session"), userId: row.userId, token: "t", expiresAt: new Date() },
       user: { id: row.userId, name: row.id, email: "ada@deevy.test", image: null, kind: row.kind },
     } as unknown as AuthSession,
   };

@@ -38,6 +38,7 @@ export interface DraftState {
 
 export function newDraftState(): DraftState {
   return {
+    // A key for the sortable while the State is unsaved; never stored, so not one of ids.ts's.
     uid: crypto.randomUUID(),
     name: "New State",
     isGate: false,
