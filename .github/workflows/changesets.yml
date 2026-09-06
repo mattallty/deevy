@@ -45,6 +45,24 @@ jobs:
       - name: Install
         run: vp install --frozen-lockfile
 
+      # Whether changesets are waiting is read from the commit, before the
+      # action runs, and never from its outputs. Two reasons, and the second one
+      # cost a release:
+      #
+      #  - the action rewrites the working tree in place when there ARE
+      #    changesets, so anything read afterwards describes its output and not
+      #    this commit;
+      #  - in the branch it takes when there are none and no publish script is
+      #    configured — deevy's case, since nothing goes to npm — it returns
+      #    without setting any output at all, so `hasChangesets` is the empty
+      #    string rather than 'false'.
+      - name: Are changesets waiting on this commit?
+        id: pending
+        run: |
+          count=$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
+          echo "$count changeset(s) waiting."
+          echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       # The title and commit are conventional on purpose: this pull request is
       # squash-merged like any other and its title becomes a commit on main,
       # where the check in pull-request.yml will read it.
@@ -57,21 +75,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Two conditions, and the first one is not optional however redundant it
-      # looks. `changesets/action` runs the version command in place, so when
-      # changesets were waiting the working tree — and HEAD, which it commits to
-      # the release branch — is already bumped by the time this step runs.
-      # Reading a version here without that gate tags the Version PR's own
-      # commit, which is not on main, and releases it while its pull request is
-      # still open. That is what the first run of this actually did.
-      #
-      # `hasChangesets == false` on its own is not the signal either, because it
-      # is also true of every ordinary commit on main. The tag is the rest of
-      # it: a version whose tag does not exist yet is one the Version PR just
-      # brought in.
+      # Two conditions. Changesets waiting means the action has just opened or
+      # updated the Version PR and there is nothing to release yet — releasing
+      # here tags the Version PR's own commit, which is not on main, while its
+      # pull request is still open. And no changesets is not the signal on its
+      # own either, because it is true of every ordinary commit on main; the tag
+      # is the rest of it, so a version whose tag does not exist yet is one the
+      # Version PR just brought in.
       - name: Is there a version here that has not been released?
         id: guard
-        if: steps.changesets.outputs.hasChangesets == 'false'
+        if: steps.pending.outputs.any == 'false'
         run: |
           # From the commit rather than the working tree, so a future step order
           # cannot reintroduce the bug above.
