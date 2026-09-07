@@ -221,6 +221,32 @@ about `email_verified` is trusted exactly as far as the operator's own configura
 
 **Checkpoint.** Matt walks the seeded instance with two stubbed providers before any real one lands.
 
+What shipped differently:
+
+- **The policy is `accountLinkingOf(env)`, and `requireLocalEmailVerified` is written down nowhere.** The
+  option is deprecated in Better Auth 1.7.3 — the gate becomes unconditional in the next minor — so the
+  slice's "left at its default `true`" is left there literally, with the reason in the comment rather than a
+  value to delete later. `enabled`, `trustedProviders` and `allowDifferentEmails` are stated.
+- **A second provider that reports an unverified address still links.** The slice expected it not to, but the
+  two are the same decision: Better Auth refuses a link only when the provider is untrusted _and_ the profile
+  says the address is unverified, and every provider deevy registers is trusted by construction. The gate
+  that remains is the other end — `requireLocalEmailVerified`, on the row that already holds the address —
+  and that is what the test drives. `docs/OPERATIONS.md` says both halves.
+- **A refused link is not a second user.** 1.7.3 answers `account_not_linked` at the callback and stops; it
+  does not fall through to creating a second Human on the address, so there is no "second user with no
+  Member unless a rule matches it" to assert. The test asserts what happens instead: one user row, one
+  account, no Member, no session.
+- **The end-to-end lives in `apps/server/tests/stub-oauth.test.ts`, not `membership.test.ts`.** Only GitHub is
+  registered until slices 4 to 6, and the stub a real OAuth dance needs is `apps/web/scripts/stub-oauth.js` —
+  which `packages/core` may not reach for without inverting the dependency. So the provider that signed the
+  Human up first is a seeded `account` row (a row is the same row whichever provider wrote it) and the
+  _second_ provider arriving is a real GitHub callback. `membership.test.ts` keeps deevy's own half: the
+  trusted list is exactly the configured providers, it reaches the context the linking decision reads, and a
+  second account for a Member deevy already has appends no second `member.joined`.
+- **The trust list is asserted where it is decided, not through the dance.** The stub reports every address
+  as verified, so no sign-in it can drive turns on trust; what the end-to-end proves is that the policy holds
+  in a real callback, and what `membership.test.ts` proves is that the list is the configured one.
+
 ---
 
 ## Slice 4: Google (S)

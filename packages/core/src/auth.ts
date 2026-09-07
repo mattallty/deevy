@@ -87,6 +87,7 @@ export function createAuth({ db, env }: CreateAuthOptions) {
     emailAndPassword: { enabled: false },
     plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env)],
     socialProviders: socialProvidersOf(env.providers ?? {}),
+    account: { accountLinking: accountLinkingOf(env) },
     user: {
       additionalFields: {
         kind: {
@@ -140,6 +141,38 @@ export function signInProviders(env: Pick<AuthEnv, "providers">): SignInProvider
   if (configuredClient(providers.github))
     offered.push({ id: "github", label: "GitHub", kind: "social" });
   return offered;
+}
+
+/**
+ * One Human, one Member (docs/plans/sign-in.md). A teammate who signed in with
+ * one provider in March and another in April is one user row with two accounts
+ * — one handle, one inbox, one Member — rather than two strangers who share an
+ * address. Better Auth links that way by default; this says so, because what a
+ * Workspace's identity model is should not be inherited from a minor release.
+ *
+ * Every provider the deployment configured is trusted, and only those: the list
+ * is the one `signInProviders` reports, so offering an IdP is not also
+ * remembering to trust it. Trust here means the address a provider reports is
+ * taken as proof of ownership, so an IdP that lies about `email_verified` is
+ * believed exactly as far as the operator's own configuration trusts it
+ * (docs/OPERATIONS.md).
+ *
+ * The gate that stays is Better Auth's `requireLocalEmailVerified`, left at its
+ * default `true` — the row already holding the address must itself have proved
+ * it, so nobody collects somebody else's next sign-in by registering an
+ * unverified account at their address first. It is set nowhere here because the
+ * option is deprecated on its way to being unconditional, and a value written
+ * down now is a value to delete later.
+ *
+ * `allowDifferentEmails: false`: a link is one address at both ends. Two
+ * addresses are two Humans until deevy has a screen that says otherwise.
+ */
+export function accountLinkingOf(env: Pick<AuthEnv, "providers">) {
+  return {
+    enabled: true,
+    trustedProviders: signInProviders(env).map((provider) => provider.id),
+    allowDifferentEmails: false,
+  };
 }
 
 /**

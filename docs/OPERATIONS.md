@@ -338,6 +338,21 @@ client id and secret are both present, `health.ping` reports the same list publi
 draws one button per entry in that order. An instance with none configured says so on the page instead of
 offering a button that goes nowhere. GitHub is the one entry today (docs/plans/sign-in.md).
 
+**One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
+same user row: the second sign-in links onto the address the first one registered, so they keep one handle,
+one inbox and one Member rather than becoming two people who share an email. Every provider the environment
+configured is trusted for that, and only those — the list Better Auth links by is the list the sign-in page
+draws, so offering an IdP is never also remembering to trust it. Trusting one means taking the address it
+reports as proof of ownership: an IdP that lies about `email_verified` is believed exactly as far as the
+configuration that named it, which is why the client pair for a provider nobody signs in with is a variable
+worth removing rather than leaving set.
+
+What is not delegated is the other end of the link. The row that already holds the address must have proved
+it, so somebody who signs in first with an address they cannot receive mail at does not collect the real
+owner's next sign-in; that one fails at the callback with `account_not_linked` instead, and no second Human
+is created on the address. Linking is also same-address only — two addresses are two Humans, and deevy has no
+screen that says otherwise.
+
 `BETTER_AUTH_URL` has to be the origin the browser actually visits, character for character. Better Auth
 builds the OAuth callback from it and sets the session cookie for it, and `packages/core/src/auth.ts` pins
 the token issuer and the RFC 8707 resource identifier to it as well. A value naming a host nobody visits
