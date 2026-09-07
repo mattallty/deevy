@@ -52,9 +52,9 @@ export interface AppOptions {
    */
   onError?: (error: unknown) => void;
   /**
-   * Whether this instance signs Humans in through a GitHub stub, so the SPA may
-   * offer "sign in as <email>" (apps/server reads it from
-   * `DEEVY_DEV_STUB_GITHUB`). Reported on `health.ping`; the Worker never sets it.
+   * Whether this instance signs Humans in through the OAuth stub, so the SPA
+   * may offer "sign in as <email>" (apps/server reads it from
+   * `DEEVY_DEV_STUB_OAUTH`). Reported on `health.ping`; the Worker never sets it.
    */
   devSignIn?: boolean;
   /**

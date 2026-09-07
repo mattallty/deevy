@@ -21,7 +21,7 @@ export default function App() {
 export function SignedOut() {
   // Public, so it answers before anyone is signed in: which providers this
   // deployment configured, and whether sign-in goes through the development
-  // stub (DEEVY_DEV_STUB_GITHUB).
+  // stub (DEEVY_DEV_STUB_OAUTH).
   const health = useQuery(orpc.health.ping.queryOptions());
   const providers = health.data?.providers;
   // What a button that did not start says. Better Auth answers a provider it
@@ -80,8 +80,8 @@ export function SignedOut() {
 }
 
 /**
- * Sign in as any email, on an instance whose GitHub is the stub
- * (apps/web/scripts/stub-github.js). It is Better Auth's real OAuth dance with
+ * Sign in as any email, on an instance whose providers are the stub
+ * (apps/web/scripts/stub-oauth.js). It is Better Auth's real OAuth dance with
  * the consent screen skipped: start the social sign-in to get a `state`, then
  * land on the callback with the email as the `code`, exactly as the acceptance
  * walk does over HTTP (apps/claude-agent/scripts/acceptance.ts).

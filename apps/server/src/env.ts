@@ -22,14 +22,15 @@ export interface ServerEnv {
   sweepIntervalSeconds: number;
   gateReminderHours: number;
   /**
-   * Replace GitHub with the stub the acceptance walk signs in through
-   * (apps/web/scripts/stub-github.js), so a developer needs no OAuth App and
-   * the OAuth `code` is the email address. Development only, by construction:
+   * Replace every sign-in provider with the stub the acceptance walk signs
+   * in through (apps/web/scripts/stub-oauth.js), so a developer needs no
+   * account anywhere and the OAuth `code` is the email address. Development
+   * only, by construction:
    * `readEnv` refuses it under `NODE_ENV=production` rather than ignoring it,
    * because a flag that is silently dropped is a flag somebody will one day
    * believe is on.
    */
-  devStubGithub: boolean;
+  devStubOAuth: boolean;
 }
 
 /** A positive number from the environment, or the default when it is absent or nonsense. */
@@ -48,10 +49,10 @@ function positive(value: string | undefined, fallback: number): number {
 const stubbed = "dev-stub";
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
-  const devStubGithub = env.DEEVY_DEV_STUB_GITHUB === "1";
-  if (devStubGithub && env.NODE_ENV === "production") {
+  const devStubOAuth = env.DEEVY_DEV_STUB_OAUTH === "1";
+  if (devStubOAuth && env.NODE_ENV === "production") {
     throw new Error(
-      "DEEVY_DEV_STUB_GITHUB replaces GitHub sign-in and cannot be set in production",
+      "DEEVY_DEV_STUB_OAUTH replaces every sign-in provider and cannot be set in production",
     );
   }
   const half = (value: string | undefined) => value || (devStubGithub ? stubbed : "");
@@ -75,6 +76,6 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
     sweepIntervalSeconds: positive(env.DEEVY_SWEEP_INTERVAL_SECONDS, 60),
     gateReminderHours: positive(env.DEEVY_GATE_REMINDER_HOURS, 4),
-    devStubGithub,
+    devStubOAuth,
   };
 }

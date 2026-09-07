@@ -8,7 +8,7 @@
  * script is counting POSTs at. The port travels in the URL, so nothing has to
  * be passed in, and every other host — GitHub included — goes straight past.
  *
- * Prepended to the built bundle beside scripts/stub-github.js: the signature,
+ * Prepended to the built bundle beside scripts/stub-oauth.js: the signature,
  * the body, the retry and the delivery row are all the real ones, and only the
  * transport underneath them is the smoke's.
  */

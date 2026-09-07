@@ -46,12 +46,18 @@ an OAuth App created before this slice asks for the extra scope the next time so
 
 ### Running without an OAuth App
 
-Set `DEEVY_DEV_STUB_GITHUB=1` and the Node server imports `apps/web/scripts/stub-github.js` — the same stub the
-acceptance walk and the Workers smoke prepend to their bundles — so GitHub's three endpoints answer locally
-and the OAuth `code` is the email address. The signed-out page then offers "Sign in as this email" beneath the
-GitHub button (it learns the flag from `health.ping`); any address signs in, and the one in `DEEVY_ADMIN_EMAIL`
-becomes the admin exactly as it would with a real OAuth App. `readEnv` refuses the flag under
-`NODE_ENV=production`, and the Worker never has it.
+Set `DEEVY_DEV_STUB_OAUTH=1` and the Node server imports `apps/web/scripts/stub-oauth.js` — the same stub the
+acceptance walk and the Workers smoke prepend to their bundles — so every provider deevy offers answers
+locally and the OAuth `code` is the email address. The signed-out page then offers "Sign in as this email"
+beneath the provider buttons (it learns the flag from `health.ping`); any address signs in, and the one in
+`DEEVY_ADMIN_EMAIL` becomes the admin exactly as it would with a real OAuth App. `readEnv` refuses the flag
+under `NODE_ENV=production`, and the Worker never has it.
+
+The stub answers GitHub's and Google's endpoints by host, because Better Auth hardcodes them, and GitLab's
+and a generic OIDC provider's by path, because those live wherever the operator's issuer is — never on a
+loopback host, which is deevy itself. It generates an RS256 key pair on first use, serves the JWKS at
+whichever certificate URL was asked for, and signs the `id_token` it hands back, so a provider that verifies
+one against its issuer's keys is satisfied by keys the stub also published.
 
 `.claude/launch.json` carries a second configuration, `dev:stub`, which runs the same two dev tasks with the
 flag on and `DEEVY_DATABASE_PATH=./data/stub.sqlite`, so a stubbed instance never shares a database with one you
