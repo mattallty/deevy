@@ -13,7 +13,7 @@ import { ProjectKeyPattern } from "../projects.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import type { Run } from "@deevy/db";
-import type { ContextFor } from "./registry.ts";
+import type { AppContext, ContextFor } from "./registry.ts";
 
 /** The Member an admin operation names, or NOT_FOUND. Scoped to the Workspace. */
 export async function findMember(context: ContextFor<"admin">, memberId: string) {
@@ -461,3 +461,17 @@ export const SubscriptionUrl = z.url().max(2048).startsWith("https://");
  * Human who loses it sets another rather than being shown this one.
  */
 export const SubscriptionSecret = z.string().min(16).max(200);
+
+/**
+ * The origin a link a Human is meant to click is built on: the SPA's own when
+ * this deployment gives it one, else the origin the API answers on.
+ *
+ * They are the same in the image and on the Worker, which serve the SPA
+ * themselves — but `baseURL` is the API's origin, the one the OAuth issuer and
+ * the MCP resource are bound to, and in the `dev` loop or on a split-origin
+ * deployment that is a different port from the page a Human has open. A link
+ * built on it 404s (docs/plans/sign-in.md).
+ */
+export function linkOrigin(context: Pick<AppContext, "webURL" | "baseURL">): string {
+  return (context.webURL ?? context.baseURL ?? "").replace(/\/+$/, "");
+}

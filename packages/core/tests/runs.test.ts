@@ -341,6 +341,33 @@ describe("runs.requestApproval", () => {
     expect(elicitation?.payload).toMatchObject({ gateStateId: plan.id, url: asked.url });
   });
 
+  /**
+   * The link is for a Human's browser, which is not always where the API
+   * answers: in the `dev` loop and on a split-origin deployment the SPA is a
+   * second port, and a Gate link built on the API's own origin lands on a
+   * server that serves no page (docs/plans/sign-in.md).
+   */
+  it("builds that URL on the SPA's origin when this deployment gives it one", async () => {
+    const { db, asAdmin, agent, project } = await workspaceWithAgent();
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    await asAdmin.gates.approve({ key: "DEV-1" });
+    const split = createRouterClient(router, {
+      context: { ...agent, webURL: "https://app.deevy.test/" },
+    });
+    const run = await split.runs.start({ issueKey: "DEV-1" });
+    await split.runs.postActivity({ runId: run.id, kind: "action", body: "Wrote the plan" });
+    const plan = project.states.find((state) => state.name === "Plan")!;
+
+    const asked = await split.runs.requestApproval({ runId: run.id });
+
+    // The trailing slash is the operator's, not the link's.
+    expect(asked.url).toBe(`https://app.deevy.test/issues/DEV-1?gate=${plan.id}`);
+    const activities = await db.query.activity.findMany({ where: { runId: run.id } });
+    expect(activities.find((row) => row.kind === "elicitation")?.payload).toMatchObject({
+      url: asked.url,
+    });
+  });
+
   it("says a Gate that names nobody is any Human's to decide, not nobody's", async () => {
     const { db, asAdmin, asAgent } = await workspaceWithAgent();
     await asAdmin.gates.approve({ key: "DEV-1" });

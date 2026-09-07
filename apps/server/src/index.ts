@@ -31,7 +31,9 @@ const runner = startRunner({
   gateReminderHours: env.gateReminderHours,
   // The origin a Slack message links back to. Without one nothing is sent, so
   // the deliveries wait in their rows until the instance knows its own URL.
-  ...(env.baseURL ? { baseUrl: env.baseURL } : {}),
+  // The origin a Slack message's link is built on: the SPA's when it has one
+  // of its own, else this instance's (docs/plans/sign-in.md).
+  ...((env.webOrigin ?? env.baseURL) ? { baseUrl: env.webOrigin ?? env.baseURL } : {}),
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

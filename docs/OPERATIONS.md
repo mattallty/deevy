@@ -268,7 +268,7 @@ bindings arrive with the request.
 | `DEEVY_OIDC_NAME`              | env         | var                | `Single sign-on`     | The button says "Sign in with Single sign-on". Set it to what your teammates call the IdP.                                                                                                                                                                                |
 | `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                                                                                      |
 | `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                                                                                      |
-| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                                                                                |
+| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS, and every link deevy hands a Human — a Gate, an invitation, a Slack message — points at the API rather than at the page.                                                       |
 | `DEEVY_RUN_STALE_MINUTES`      | env         | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                                                                                                                                       |
 | `DEEVY_SWEEP_INTERVAL_SECONDS` | env         | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                                                                                                                                       |
 | `DEEVY_GATE_REMINDER_HOURS`    | env         | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                                                                                                                                     |
@@ -409,6 +409,11 @@ a second seat. An invitation is good for seven days, one address holds one live 
 (revoke it to send another), and an admin who loses a link revokes the invitation and issues a new one.
 Neither is a Gate: nothing waits on a Human's ruling, and neither reaches an inbox — the admin is holding
 the link.
+
+The link points where a browser finds deevy, which is `BETTER_AUTH_URL` in the image and on the Worker,
+since both serve the SPA themselves. Where the SPA has an origin of its own, that is `DEEVY_WEB_ORIGIN`, and
+setting it is what keeps an invitation link, a Gate link and a Slack message pointing at the page rather than
+at the API beside it.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,

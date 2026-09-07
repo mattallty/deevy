@@ -167,6 +167,26 @@ describe("an Agent whose client cannot be elicited", () => {
     expect(feed.status).toBe("awaiting_input");
     expect(feed.activities.filter((row) => row.kind === "elicitation")).toHaveLength(1);
   });
+
+  /**
+   * The tool surface builds that link the way the API does: on the origin a
+   * Human's browser finds deevy at, which is a different port from /mcp in the
+   * `dev` loop and on a split-origin deployment (docs/plans/sign-in.md).
+   */
+  it("builds it on the SPA's origin when this deployment gives it one", async () => {
+    const { db, auth, key, run, plan } = await agentAtAGate();
+    const split = createApp({ db, auth, baseURL, secret, webURL: "https://app.deevy.test" });
+
+    const answer = await mcpWithoutElicitation(split, key, {
+      name: "runs_request_approval",
+      arguments: { runId: run.id },
+    });
+
+    expect(answer.result?.structuredContent).toMatchObject({
+      status: "awaiting",
+      url: `https://app.deevy.test/issues/DEV-1?gate=${plan.id}`,
+    });
+  });
 });
 
 describe("an Agent that reaches a Gate over MCP", () => {

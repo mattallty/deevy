@@ -1157,8 +1157,11 @@ export interface RunDueWorkOptions {
   now?: Date;
   limits?: DueWorkLimits;
   /**
-   * The public origin of this instance, so a Slack message links back to the
-   * Issue it is about. Without one those deliveries wait in their rows.
+   * The origin a Slack message's link back to the Issue is built on: where a
+   * Human's browser finds this deevy, which is the SPA's own origin when this
+   * deployment gives it one and this instance's otherwise (`linkOrigin` in
+   * operations/shared.ts is the same decision inside a request). Without one
+   * those deliveries wait in their rows.
    */
   baseUrl?: string;
   /** Aborted when the caller is shutting down. Checked between passes. */

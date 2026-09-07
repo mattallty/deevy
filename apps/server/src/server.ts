@@ -49,6 +49,10 @@ export function buildServer(env: ServerEnv) {
     auth,
     origin,
     baseURL: env.baseURL,
+    // Where a Human's browser finds this instance, when the SPA is somewhere
+    // else: a Gate link and an invitation link are built on it, and the API's
+    // own origin serves no page in the dev loop (docs/plans/sign-in.md).
+    ...(env.webOrigin ? { webURL: env.webOrigin } : {}),
     secret: env.secret,
     devSignIn: env.devStubOAuth,
     // What the sign-in page draws its buttons from: the providers this

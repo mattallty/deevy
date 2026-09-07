@@ -46,6 +46,14 @@ export interface AppContext {
    */
   baseURL?: string;
   /**
+   * Where a Human's browser finds this deevy, when that is not the origin the
+   * API answers on: a split-origin deployment, or the dev loop, where the SPA
+   * is a second port (`DEEVY_WEB_ORIGIN`). Absent means the two are the same
+   * origin, which is what the image and the Worker do. `linkOrigin` in
+   * `operations/shared.ts` is what reads it (docs/plans/sign-in.md).
+   */
+  webURL?: string;
+  /**
    * How long an Event stream may run on this runtime, and how often it looks.
    * The entry decides: a Node process holds a connection for as long as the
    * browser does, a Worker cannot (docs/plans/m3.md).

@@ -133,6 +133,21 @@ describe("invitations.create", () => {
       code: "FORBIDDEN",
     });
   });
+  it("builds that link on the SPA's origin when this deployment gives it one", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin } = await workspaceWithAdmin(db);
+    // The `dev` loop and a split-origin deployment: the API answers on one
+    // port and the page a Human has open is on another
+    // (docs/plans/sign-in.md).
+    const split = createRouterClient(router, {
+      context: { ...admin, webURL: "https://app.deevy.test" },
+    });
+
+    const created = await split.invitations.create({ email: "grace@example.com" });
+
+    expect(created.url).toBe(`https://app.deevy.test${created.path}`);
+  });
 });
 
 describe("invitations.list", () => {

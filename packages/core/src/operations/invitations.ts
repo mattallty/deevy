@@ -8,6 +8,7 @@ import { appendEvent } from "../events.ts";
 import { InvitationSchema, MemberSchema } from "../schemas.ts";
 import { newId } from "../ids.ts";
 import { defineOperation, NoInput, type AppContext } from "./registry.ts";
+import { linkOrigin } from "./shared.ts";
 
 /**
  * An invitation admits one person where an allowlist rule admits a category
@@ -188,7 +189,7 @@ export const invitations = {
         payload: { email: row.email, role: row.role },
       });
       const path = `/invite/${token}`;
-      return { ...shown(row), url: `${context.baseURL ?? ""}${path}`, path };
+      return { ...shown(row), url: `${linkOrigin(context)}${path}`, path };
     },
   }),
 
