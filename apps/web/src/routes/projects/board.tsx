@@ -15,6 +15,7 @@ import {
   type IssuesSearch,
 } from "@/components/issue-filters";
 import { PageHeader } from "@/components/page-header";
+import { StateBadge } from "@/components/state-badge";
 import { SidePeek } from "@/components/side-peek";
 import { orpc } from "@/lib/orpc";
 import { useRowSelection } from "@/lib/row-selection";
@@ -69,14 +70,25 @@ export function BoardPage({
   );
 
   // One Project: a column is a State, and a drop lands in exactly that State.
+  // Its buckets come from the same grouping the Issues home uses, keyed by id
+  // rather than by name because there is only one Project to fold.
   const columns = useMemo<BoardColumn[]>(
     () =>
       states.map((state) => ({
         id: state.id,
         name: state.name,
+        header: (
+          <StateBadge
+            state={{
+              name: state.name,
+              isGate: state.isGate,
+              category: state.category as FilterState["category"],
+            }}
+          />
+        ),
         isGate: state.isGate,
-        category: state.category as FilterState["category"],
-        resolveTarget: () => state.id,
+        plan: (issue) =>
+          issue.state.isGate ? { kind: "gate" } : { kind: "move", stateId: state.id },
       })),
     [states],
   );

@@ -24,15 +24,20 @@ import { StateBadge } from "@/components/state-badge";
 import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
 import { useRowSelection } from "@/lib/row-selection";
-import { categoryOrder, foldStates } from "@/lib/states";
+import { foldStates } from "@/lib/states";
+import { stateGrouping } from "@/lib/groupings";
 import { ago } from "@/lib/time";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
 >["issues"][number];
 
-/** On the Workspace board a column is a State name, folded across Projects. */
-const byStateName = (issue: BoardIssue) => issue.state.name;
+/** Which bucket a card belongs to, asked of the buckets the grouping made. */
+function byBucket(buckets: Array<{ id: string; rows: Array<{ key: string }> }>) {
+  const home = new Map<string, string>();
+  for (const bucket of buckets) for (const row of bucket.rows) home.set(row.key, bucket.id);
+  return (issue: BoardIssue) => home.get(issue.key) ?? "";
+}
 
 /**
  * The home screen: every Issue you may see, filtered by the URL, grouped by
@@ -170,80 +175,55 @@ export function IssuesPage({
     [folded],
   );
 
-  // The board: a column per folded State name, plus one for any State a row is
-  // in that no Workflow names (a stale cache, a race), so no card goes unshown.
   const board = search.view === "board" && !fixedProject;
-  const boardColumns = useMemo<BoardColumn[]>(() => {
-    const columns: BoardColumn[] = folded.map((state) => ({
-      id: state.name,
-      name: state.name,
-      isGate: state.isGate,
-      category: state.category,
-      resolveTarget: (issue) => state.byProject.get(issue.projectId) ?? null,
-    }));
-    for (const row of rows) {
-      if (columns.some((column) => column.id === row.state.name)) continue;
-      columns.push({
-        id: row.state.name,
-        name: row.state.name,
-        isGate: row.state.isGate,
-        category: (row.state.category in categoryOrder
-          ? row.state.category
-          : "active") as FilterState["category"],
-        resolveTarget: (issue) => (issue.state.name === row.state.name ? issue.state.id : null),
-      });
-    }
-    return columns;
-  }, [folded, rows]);
+
+  // One grouping, drawn twice: the list renders its buckets as groups, the
+  // board renders the same buckets as columns (lib/groupings.tsx).
+  const grouping = useMemo(() => stateGrouping(folded), [folded]);
+  const buckets = useMemo(() => grouping.buckets(rows), [grouping, rows]);
+
+  const boardColumns = useMemo<BoardColumn[]>(
+    () =>
+      buckets.map((bucket) => ({
+        id: bucket.id,
+        name: bucket.name,
+        header: bucket.header,
+        ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+        ...(bucket.plan ? { plan: bucket.plan } : {}),
+      })),
+    [buckets],
+  );
   const boardValue = useMemo(
-    () => groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], byStateName),
-    [boardColumns, rows],
+    () => groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], byBucket(buckets)),
+    [boardColumns, buckets, rows],
   );
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  // Which buckets the Human has folded or unfolded away from their default.
+  const [toggled, setToggled] = useState<Set<string>>(() => new Set());
   const grouped = search.group !== "none";
   const groups = useMemo<DataGroup<IssueRow>[] | undefined>(() => {
     if (!grouped) return undefined;
-    const byState = new Map<string, IssueRow[]>();
-    for (const row of rows) {
-      byState.set(row.state.name, [...(byState.get(row.state.name) ?? []), row]);
-    }
-    const known = new Map(states.map((state) => [state.name, state]));
-    // Workflow order, as `states` already has it: Intent before Spec before
-    // Plan, not the alphabet's idea of it; a name no Workflow knows goes last.
-    const rank = (name: string) => {
-      const index = states.findIndex((state) => state.name === name);
-      return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-    };
-    return [...byState.entries()]
-      .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-      .map(([name, list]) => {
-        const state = known.get(name) ?? {
-          name,
-          isGate: list[0]?.state.isGate ?? false,
-          category: (list[0]?.state.category ?? "active") as FilterState["category"],
-        };
-        // Done is folded unless asked: it is the past.
-        const isCollapsed =
-          collapsed.has(name) || (state.category === "done" && !collapsed.has(`!${name}`));
-        return {
-          id: name,
-          header: <StateBadge state={state} />,
-          rows: list,
-          collapsed: isCollapsed,
+    return (
+      buckets
+        // A list drops an empty group; a board keeps the column.
+        .filter((bucket) => bucket.rows.length > 0)
+        .map((bucket) => ({
+          id: bucket.id,
+          header: bucket.header,
+          rows: bucket.rows,
+          collapsed: toggled.has(bucket.id)
+            ? !bucket.collapsedByDefault
+            : Boolean(bucket.collapsedByDefault),
           onToggle: () =>
-            setCollapsed((current) => {
+            setToggled((current) => {
               const next = new Set(current);
-              if (state.category === "done") {
-                if (next.has(`!${name}`)) next.delete(`!${name}`);
-                else next.add(`!${name}`);
-              } else if (next.has(name)) next.delete(name);
-              else next.add(name);
+              if (next.has(bucket.id)) next.delete(bucket.id);
+              else next.add(bucket.id);
               return next;
             }),
-        };
-      });
-  }, [grouped, rows, states, collapsed]);
+        }))
+    );
+  }, [grouped, buckets, toggled]);
 
   // The rows as they are on screen, for j and k.
   const visibleIds = useMemo(
@@ -381,7 +361,7 @@ export function IssuesPage({
         <IssueBoard
           columns={boardColumns}
           issues={rows as unknown as BoardIssue[]}
-          columnOf={byStateName}
+          columnOf={byBucket(buckets)}
           loading={issues.isPending}
           selectedKey={selected}
           onSelect={setSelected}

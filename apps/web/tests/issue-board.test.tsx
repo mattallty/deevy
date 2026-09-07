@@ -8,6 +8,7 @@ import {
   type BoardIssue,
 } from "../src/components/issue-board.tsx";
 import { foldStates } from "../src/lib/states.ts";
+import { stateGrouping } from "../src/lib/groupings.tsx";
 
 const projects = [
   {
@@ -62,14 +63,21 @@ describe("foldStates", () => {
   });
 });
 
+/** Columns exactly as a page builds them: from the State grouping's buckets. */
+function stateColumns(rows: BoardIssue[] = []): BoardColumn[] {
+  return stateGrouping(foldStates(projects))
+    .buckets(rows)
+    .map((bucket) => ({
+      id: bucket.id,
+      name: bucket.name,
+      header: bucket.header,
+      ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+      ...(bucket.plan ? { plan: bucket.plan } : {}),
+    }));
+}
+
 describe("planDrop", () => {
-  const columns: BoardColumn[] = foldStates(projects).map((state) => ({
-    id: state.name,
-    name: state.name,
-    isGate: state.isGate,
-    category: state.category,
-    resolveTarget: (card) => state.byProject.get(card.projectId) ?? null,
-  }));
+  const columns = stateColumns();
   const column = (name: string) => columns.find((candidate) => candidate.name === name)!;
   const opsTodo = issue("OPS-4", "p-ops", {
     id: "o-todo",
@@ -109,13 +117,7 @@ describe("planDrop", () => {
 
 describe("groupIntoColumns", () => {
   it("puts every card under its column, newest change first, and keeps empty columns", () => {
-    const columns = foldStates(projects).map((state) => ({
-      id: state.name,
-      name: state.name,
-      isGate: state.isGate,
-      category: state.category,
-      resolveTarget: () => null,
-    }));
+    const columns = stateColumns();
     const older = {
       ...issue("DEV-2", "p-dev", {
         id: "d-build",
@@ -142,13 +144,7 @@ describe("groupIntoColumns", () => {
 
 describe("IssueBoardView", () => {
   it("draws every column at full strength: nothing is disabled just because columns stay put", () => {
-    const columns: BoardColumn[] = foldStates(projects).map((state) => ({
-      id: state.name,
-      name: state.name,
-      isGate: state.isGate,
-      category: state.category,
-      resolveTarget: (card) => state.byProject.get(card.projectId) ?? null,
-    }));
+    const columns = stateColumns();
     const value = groupIntoColumns(
       columns,
       [
