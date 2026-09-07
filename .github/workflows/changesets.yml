@@ -83,7 +83,16 @@ jobs:
           version-script: vp run version
           pr-title: "chore(release): version packages"
           commit-message: "chore(release): version packages"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Not GITHUB_TOKEN. GitHub refuses to let that token start a workflow
+          # run — the loop it is protecting against — so every check on the
+          # Version PR queued as `action_required` and expired unapproved, and
+          # approving is per run rather than a standing permission. A token that
+          # belongs to somebody makes the PR theirs and its checks simply run
+          # (changesets.dev/guide/automating). A fine-grained PAT on this
+          # repository alone, Contents and Pull requests, read and write: it
+          # expires, and the release quietly stops updating the Version PR when
+          # it does, which is the price of not keeping a GitHub App.
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           # This workflow makes the tag and the Release itself, a few steps
           # down, so that they describe the folded changelog rather than the
           # per-package one. v2 would otherwise start creating git tags where
