@@ -505,6 +505,29 @@ mismatched address renders the error rather than an empty screen.
 **Docs.** `docs/OPERATIONS.md`, "who may join": a rule admits a category, an invitation admits a person, and
 neither is a Gate.
 
+What shipped differently:
+
+- **`/invite/$token` is answered by `App.tsx`, not by the router.** The router is mounted only for a Member
+  (`App.tsx` returns `SignedOut`, `NotAMember` or `Suspended` before it), and everybody who clicks an
+  invitation link is by definition not one yet — so the token is read off `window.location.pathname` on the
+  first render and held in `sessionStorage` (`lib/invitation.ts`), and the two screens that see it are the
+  ones that were already there. The route exists all the same, for the case the plan did not name: a Member
+  who lands on the link is already in, so it drops the held token and redirects home.
+- **The screen keeps the plain copy for a Human with no token.** "Its copy stops telling every such Human to
+  go and ask for an allowlist rule" is a condition, not a deletion: with a token held the screen accepts the
+  invitation and reports what the operation said; without one it still names the ways in, and now names an
+  invitation as the first of them.
+- **A refused invitation is not dropped.** A mismatched address is the case where the Human has the right
+  link and the wrong session, so the token stays held and the screen offers to sign out and try another
+  account — with Continue without it beside it, so a link that will never work is not a screen somebody is
+  stuck on.
+- **The Invited row shows expired invitations too.** Slice 7 left it to the screen: an expired invitation
+  still holds its address against the partial unique index, so hiding it would hide the row whose Revoke is
+  the way to invite that person again. It is listed with "Expired" where the others say when they run out.
+  Accepted and revoked invitations are not shown — one is a Member and the other is history.
+- **An `invitation` Event re-reads the Invited row and the Members list** (`lib/live.ts`), which is the
+  seam slice 7's Events were appended for; nothing else in the SPA reads invitations.
+
 ---
 
 ## Order, checkpoints, records

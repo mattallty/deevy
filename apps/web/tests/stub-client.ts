@@ -109,6 +109,12 @@ export function stubClient(overrides: StubOverrides = {}): never {
       add: async () => ({}),
       remove: async () => ({ removed: true }),
     },
+    invitations: {
+      list: async () => ({ invitations: [] }),
+      create: async () => ({ id: "inv-stub", url: "https://deevy.example.com/invite/stub" }),
+      revoke: async () => ({ id: "inv-stub" }),
+      accept: async () => ({ id: "mem-stub", role: "member" }),
+    },
     projects: {
       list: async () => ({ projects: [] }),
       get: async () => ({

@@ -2,7 +2,7 @@
 
 deevy is one container and one volume. A self-hosted instance serves one Workspace (CONTEXT.md), so there is
 no tenancy to configure: the first sign-in with `DEEVY_ADMIN_EMAIL` creates the Workspace and becomes its
-admin, and everyone else joins through the allowlist.
+admin, and everyone else joins through the allowlist or an invitation.
 
 ## The image
 
@@ -398,6 +398,17 @@ GitHub or Google sign-in too, for as long as the runtime's own connect timeout. 
 something reachable, or leave it unset. And an IdP that sends no `email_verified` claim — Microsoft Entra
 sends none — can sign a teammate in, but cannot become the _second_ provider for a Human who already has one
 here: that link is refused, for the reason under **One Human is one Member** below.
+
+**Who may join, and who is invited.** A rule admits a category — an email domain, a GitHub organization, a
+GitLab group — and it goes on admitting everybody who matches it, this month and next. An invitation admits
+one person: an admin creates it in Settings, Workspace with an address and a role, and gets a link back
+once, because deevy has no email Channel to send it with and keeps only a hash of the token. The invited
+Human clicks the link, signs in with whichever provider the instance offers, and accepting is what makes
+them a Member — the address that signs in has to be the address that was invited, so a forwarded link is not
+a second seat. An invitation is good for seven days, one address holds one live invitation at a time
+(revoke it to send another), and an admin who loses a link revokes the invitation and issues a new one.
+Neither is a Gate: nothing waits on a Human's ruling, and neither reaches an inbox — the admin is holding
+the link.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,

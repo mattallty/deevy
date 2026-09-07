@@ -43,6 +43,11 @@ export function keysFor(event: LiveEvent): QueryKey[] {
     case "allowlist_rule":
       keys.push(orpc.allowlist.key());
       break;
+    case "invitation":
+      // A Member joined by one, or an admin issued or revoked one: the Invited
+      // row and the Members list are both a screen behind until they re-read.
+      keys.push(orpc.invitations.key(), orpc.members.key());
+      break;
     case "label":
       keys.push(orpc.labels.key(), orpc.issues.key());
       break;
