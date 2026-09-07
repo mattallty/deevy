@@ -264,6 +264,27 @@ deevy's UI, and one place to look.
 **Acceptance test.** Sign-in through the stub with a matching `email_domain` rule creates the user and the
 Member; without a rule it creates the user and no Member. The sign-in page shows two buttons.
 
+What shipped differently:
+
+- **The dev form no longer names GitHub.** Slice 2 left the question — does the stubbed form need a chooser
+  once a second provider exists? — to the slice that added one. It does not: under the stub every provider
+  answers and the address is what decides who signs in, so any of them ends in the same session. But naming
+  GitHub in the code meant a stubbed instance configured with only Google could not sign in at all, so
+  `DevSignIn` takes the first provider `health.ping` reports and the copy above it stops saying "GitHub is a
+  stub". Today's environment offers GitHub first, so today's form behaves exactly as it did.
+- **`docker-compose.yml` stopped requiring GitHub.** `GITHUB_CLIENT_ID` was a `:?` variable, so a compose
+  file that now also passes Google's pair would still refuse to start an instance that offers Google alone.
+  Every provider pair is passed through as optional, which is what "an operator chooses which of four
+  providers their instance offers" has to mean; an instance with no pair at all still starts and says so on
+  its sign-in page, which is the behaviour slice 1 built.
+- **The two-button assertion is made twice.** `apps/web/tests/app.test.tsx` already rendered two buttons from
+  a stubbed `health.ping` as of slice 1, so what this slice added is the other end: `packages/core/tests/app.test.ts`
+  asserts that two configured pairs are two entries, in that order, and that either alone is one.
+- **The end-to-end sign-in needed no new test.** `apps/server/tests/stub-oauth.test.ts` loops
+  `signInProviders(env)`, so adding Google's pair to that environment is what drives Better Auth's real
+  Google dance — token endpoint, signed `id_token` and all — to a session. The rule cases the slice asks for
+  are new tests beside it, driven through a Workspace the admin's own Google sign-in created.
+
 ---
 
 ## Slice 5: GitLab, and a `gitlab_group` rule (M)

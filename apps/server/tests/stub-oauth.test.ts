@@ -9,8 +9,8 @@
  * providers of slices 4 to 6 will be pointed at.
  */
 import { afterAll, describe, expect, it } from "vite-plus/test";
-import { account, user } from "@deevy/db";
-import { signInProviders } from "@deevy/core";
+import { account, allowlistRule, user } from "@deevy/db";
+import { newId, signInProviders } from "@deevy/core";
 import { readEnv } from "../src/env.ts";
 import { buildServer } from "../src/server.ts";
 
@@ -28,6 +28,8 @@ const stubbedEnv = {
   DEEVY_DEV_STUB_OAUTH: "1",
   GITHUB_CLIENT_ID: "stub-client",
   GITHUB_CLIENT_SECRET: "stub-secret",
+  GOOGLE_CLIENT_ID: "stub-client",
+  GOOGLE_CLIENT_SECRET: "stub-secret",
 };
 
 function stubbedServer(overrides: { adminEmail?: string } = {}) {
@@ -164,6 +166,63 @@ describe("a second provider on an address deevy already knows", () => {
     expect(await db.query.user.findMany()).toHaveLength(1);
     expect(await db.query.account.findMany()).toHaveLength(1);
     expect(await db.query.member.findMany()).toHaveLength(0);
+    close();
+  });
+});
+
+/**
+ * Google (docs/plans/sign-in.md slice 4). What decides whether a teammate on
+ * the Workspace's domain becomes a Member is the allowlist, not the provider:
+ * `hd` is deliberately unset, so a Google Workspace is admitted as the email
+ * domain it is, by a rule an admin can see in deevy's own UI.
+ */
+describe("a Google sign-in", () => {
+  const admin = "ada@example.com";
+
+  /** The Workspace, as the configured admin's own sign-in creates it. */
+  async function seeded() {
+    const server = stubbedServer({ adminEmail: admin });
+    await signIn(server.app, "google", admin);
+    const workspace = await server.db.query.workspace.findFirst();
+    if (!workspace) throw new Error("the admin sign-in created no Workspace");
+    return { ...server, workspaceId: workspace.id };
+  }
+
+  async function rule(
+    db: ReturnType<typeof stubbedServer>["db"],
+    workspaceId: string,
+    value: string,
+  ) {
+    await db
+      .insert(allowlistRule)
+      .values({ id: newId("allowlistRule"), workspaceId, kind: "email_domain", value });
+  }
+
+  it("makes a Member of a teammate an email_domain rule matches", async () => {
+    const { app, db, workspaceId, close } = await seeded();
+    await rule(db, workspaceId, "example.com");
+
+    const cookie = await signIn(app, "google", "grace@example.com");
+    expect(cookie).toContain("session_token");
+
+    const joined = await db.query.user.findFirst({ where: { email: "grace@example.com" } });
+    expect(joined).toBeTruthy();
+    expect(await db.query.member.findMany({ where: { userId: joined?.id } })).toMatchObject([
+      { role: "member", kind: "human" },
+    ]);
+    close();
+  });
+
+  it("leaves a teammate no rule matches signed in and not a Member", async () => {
+    const { app, db, workspaceId, close } = await seeded();
+    await rule(db, workspaceId, "elsewhere.example");
+
+    const cookie = await signIn(app, "google", "grace@example.com");
+    expect(cookie).toContain("session_token");
+
+    const joined = await db.query.user.findFirst({ where: { email: "grace@example.com" } });
+    expect(joined).toBeTruthy();
+    expect(await db.query.member.findMany({ where: { userId: joined?.id } })).toEqual([]);
     close();
   });
 });

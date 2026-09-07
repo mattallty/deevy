@@ -2,7 +2,13 @@ import { member, user, workspace } from "@deevy/db";
 import { ORPCError, call, createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createApp, isDefinedRefusal } from "../src/app.ts";
-import { bootstrapWorkspace, createAuth, signInProviders, slugify } from "../src/auth.ts";
+import {
+  bootstrapWorkspace,
+  createAuth,
+  signInProviders,
+  slugify,
+  type AuthProviders,
+} from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import type { AppContext } from "../src/operations/registry.ts";
 import { testDb } from "./helpers.ts";
@@ -55,23 +61,34 @@ describe("createApp", () => {
 
   it("tells a signed-out SPA which providers it offers", async () => {
     const context = anonymous();
-    const providers = async (github: { clientId: string; clientSecret: string }) => {
+    const pair = { clientId: "id", clientSecret: "secret" };
+    const providers = async (configured: AuthProviders) => {
       const app = createApp({
         db: context.db,
-        signInProviders: signInProviders({ providers: { github } }),
+        signInProviders: signInProviders({ providers: configured }),
       });
       const body = (await (await app.request("/api/health/ping")).json()) as {
         providers: Array<{ id: string; label: string; kind: string }>;
       };
       return body.providers;
     };
-    expect(await providers({ clientId: "id", clientSecret: "secret" })).toEqual([
+    expect(await providers({ github: pair })).toEqual([
       { id: "github", label: "GitHub", kind: "social" },
+    ]);
+    // Two configured pairs are two buttons, in the order they are offered
+    // (docs/plans/sign-in.md slice 4).
+    expect(await providers({ github: pair, google: pair })).toEqual([
+      { id: "github", label: "GitHub", kind: "social" },
+      { id: "google", label: "Google", kind: "social" },
+    ]);
+    expect(await providers({ google: pair })).toEqual([
+      { id: "google", label: "Google", kind: "social" },
     ]);
     // Half a pair is not a provider: a button that only leads to the
     // provider's own error page is worse than no button (docs/plans/sign-in.md).
-    expect(await providers({ clientId: "", clientSecret: "secret" })).toEqual([]);
-    expect(await providers({ clientId: "id", clientSecret: "" })).toEqual([]);
+    expect(await providers({ github: { clientId: "", clientSecret: "secret" } })).toEqual([]);
+    expect(await providers({ github: { clientId: "id", clientSecret: "" } })).toEqual([]);
+    expect(await providers({ google: { clientId: "", clientSecret: "secret" } })).toEqual([]);
   });
 
   /**

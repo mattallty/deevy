@@ -74,7 +74,7 @@ export function SignedOut() {
         </p>
       ) : null}
       {failed ? <p className="text-sm text-destructive">{failed}</p> : null}
-      {health.data?.devSignIn ? <DevSignIn /> : null}
+      {health.data?.devSignIn ? <DevSignIn provider={providers?.[0]?.id ?? "github"} /> : null}
     </SignInFrame>
   );
 }
@@ -85,10 +85,18 @@ export function SignedOut() {
  * the consent screen skipped: start the social sign-in to get a `state`, then
  * land on the callback with the email as the `code`, exactly as the acceptance
  * walk does over HTTP (apps/claude-agent/scripts/acceptance.ts).
+ *
+ * It needs no chooser now that a deployment can offer more than one provider:
+ * the stub answers for all of them and the address is what decides who signs
+ * in, so any offered provider ends in the same session. It takes the first one
+ * rather than GitHub by name so a stubbed instance that offers only Google
+ * still signs in (docs/plans/sign-in.md).
  */
 export function DevSignIn({
+  provider = "github",
   navigate = (url: string) => window.location.assign(url),
 }: {
+  provider?: string;
   navigate?: (url: string) => void;
 }) {
   const [email, setEmail] = useState("");
@@ -108,12 +116,12 @@ export function DevSignIn({
             method: "POST",
             headers: { "content-type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ provider: "github", callbackURL: home() }),
+            body: JSON.stringify({ provider, callbackURL: home() }),
           });
           const { url } = (await started.json()) as { url?: string };
           const state = url ? new URL(url).searchParams.get("state") : null;
           if (!state) throw new Error("the server did not start a sign-in");
-          const callback = new URL("/api/auth/callback/github", window.location.origin);
+          const callback = new URL(`/api/auth/callback/${provider}`, window.location.origin);
           callback.searchParams.set("state", state);
           callback.searchParams.set("code", email.trim());
           navigate(callback.toString());

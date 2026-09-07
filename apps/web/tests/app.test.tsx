@@ -144,6 +144,30 @@ describe("DevSignIn", () => {
     expect(JSON.parse(init.body as string)).toMatchObject({ provider: "github" });
   });
 
+  /**
+   * A deployment can offer more than one provider, and under the stub they all
+   * end in the same session, so the form takes the first one it is given
+   * rather than naming GitHub (docs/plans/sign-in.md slice 4).
+   */
+  it("signs in through the provider it was handed", async () => {
+    const fetchSpy = vi.fn(async () =>
+      Response.json({ url: "https://stub/authorize?state=s3cret" }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const navigate = vi.fn();
+    mount(<DevSignIn provider="google" navigate={navigate} />);
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ada@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in as this email" }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
+    expect(new URL(navigate.mock.calls[0]?.[0] as string).pathname).toBe(
+      "/api/auth/callback/google",
+    );
+    const [, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ provider: "google" });
+  });
+
   it("says so when the server does not start a sign-in", async () => {
     vi.stubGlobal(
       "fetch",

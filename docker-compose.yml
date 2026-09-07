@@ -11,8 +11,13 @@ services:
     environment:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set a secret of at least 32 characters}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?set the GitHub OAuth App client id}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?set the GitHub OAuth App client secret}
+      # Sign-in providers: set the pairs this instance offers, and leave the
+      # rest empty. A pair with only one half is not registered and not offered,
+      # and an instance with no pair at all says so on its sign-in page.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       DEEVY_ADMIN_EMAIL: ${DEEVY_ADMIN_EMAIL:?set the email that becomes the Workspace admin}
       DEEVY_WORKSPACE_NAME: ${DEEVY_WORKSPACE_NAME:-deevy}
     healthcheck:
