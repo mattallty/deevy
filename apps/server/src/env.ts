@@ -40,29 +40,57 @@ function positive(value: string | undefined, fallback: number): number {
 }
 
 /**
- * What the stub stands in for: a provider is registered only when both halves
- * of its client pair are set, and a developer running without an OAuth App has
- * neither. So the flag supplies the halves it does not have, and a real value
- * always wins — an instance configured with a pair keeps it
- * (docs/DEVELOPMENT.md, "Running without an OAuth App"). The stub answers
- * whatever pair it is handed, because the OAuth `code` is the email address.
+ * The client pair the stub signs in with. It answers whatever pair it is
+ * handed — the OAuth `code` is the email address — so a stubbed instance needs
+ * no credential anywhere, which is the whole point of the flag.
  */
 const STUB_CLIENT = { clientId: "stub-client", clientSecret: "stub-secret" };
 
 /**
- * Every entry with both halves filled in, so a provider added later is stubbed
- * by being added rather than by remembering this function.
+ * Where a stubbed OpenID Connect provider publishes its discovery document.
+ * Any host but loopback, which is deevy itself: the stub matches an issuer by
+ * path, because it cannot know where an operator's IdP lives
+ * (apps/web/scripts/stub-oauth.js).
  */
-function stubbedProviders(providers: AuthProviders): AuthProviders {
-  const filled: AuthProviders = {};
-  for (const [id, client] of Object.entries(providers)) {
-    filled[id as keyof AuthProviders] = {
-      ...client,
-      clientId: client.clientId || STUB_CLIENT.clientId,
-      clientSecret: client.clientSecret || STUB_CLIENT.clientSecret,
-    };
-  }
-  return filled;
+const STUB_OIDC_ISSUER = "https://idp.stub.test/realms/deevy";
+
+/** Whether an entry has both halves of its pair, the way `signInProviders` asks. */
+function hasPair(client: { clientId: string; clientSecret: string } | undefined): boolean {
+  return Boolean(client?.clientId.trim() && client?.clientSecret.trim());
+}
+
+/**
+ * Every provider deevy offers, standing in for the ones this environment left
+ * unconfigured (docs/DEVELOPMENT.md, "Running without an OAuth App"). Half a
+ * pair is not a provider, so without this a checkout of `.env.example` — whose
+ * pairs are all empty — offers no button at all under `DEEVY_DEV_STUB_OAUTH=1`
+ * and the stub has nothing to stand in for: the sign-in page says the
+ * deployment has no provider configured, and the development form's sign-in
+ * answers `PROVIDER_NOT_FOUND`.
+ *
+ * A pair the environment did set is kept, because a developer who is stubbing
+ * a real client id wants their own client id in the authorization URL; only
+ * the gaps are filled.
+ */
+export function stubbedProviders(providers: AuthProviders): AuthProviders {
+  const oidc = providers.oidc;
+  return {
+    github: hasPair(providers.github) ? providers.github : { ...STUB_CLIENT },
+    google: hasPair(providers.google) ? providers.google : { ...STUB_CLIENT },
+    gitlab: hasPair(providers.gitlab)
+      ? providers.gitlab
+      : { ...STUB_CLIENT, issuer: providers.gitlab?.issuer },
+    // An issuer is as load-bearing as the pair here: without one there is no
+    // discovery document, so a stubbed OIDC entry gets a stubbed issuer too.
+    oidc:
+      hasPair(oidc) && oidc?.issuer.trim()
+        ? oidc
+        : {
+            ...STUB_CLIENT,
+            issuer: oidc?.issuer.trim() || STUB_OIDC_ISSUER,
+            name: oidc?.name,
+          },
+  };
 }
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
@@ -106,6 +134,9 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     webOrigin: env.DEEVY_WEB_ORIGIN,
+    // Under the flag every provider is the stub, including the ones this
+    // environment configured no pair for: a developer with no OAuth App has
+    // none of them, and that is who the flag is for.
     providers: devStubOAuth ? stubbedProviders(providers) : providers,
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,

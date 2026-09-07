@@ -270,15 +270,7 @@ function socialProvidersOf(providers: AuthProviders) {
             ...gitlab,
             issuer: gitlabIssuer(providers.gitlab),
             scope: ["read_api"],
-            // GitLab's profile has no `email_verified`, and Better Auth's
-            // provider reads `profile.email_verified ?? false` — so without
-            // this every GitLab sign-in creates an unverified row, and
-            // Better Auth then refuses that Human every second provider
-            // forever. A confirmed address is a `confirmed_at` stamp
-            // (docs/plans/sign-in.md).
-            mapProfileToUser: (profile: { confirmed_at?: string | null }) => ({
-              emailVerified: Boolean(profile.confirmed_at),
-            }),
+            mapProfileToUser: gitlabUser,
           },
         }
       : {}),
@@ -325,6 +317,24 @@ function oidcPlugins(providers: AuthProviders) {
       ],
     }),
   ];
+}
+
+/**
+ * Whether GitLab has proved the address it just handed over. Better Auth reads
+ * `email_verified`, which is an OpenID Connect claim GitLab's `/api/v4/user`
+ * does not carry: it says `confirmed_at`, the moment the address answered
+ * GitLab's own confirmation mail. Without this mapping every GitLab sign-in
+ * lands as an unverified `user` row, and `requireLocalEmailVerified` — the gate
+ * one Human, one Member rests on (docs/plans/sign-in.md slice 3) — then refuses
+ * that Human every later link, so a teammate whose first provider was GitLab
+ * could never add a second one.
+ *
+ * A GitLab that does report the claim is believed first: a self-hosted instance
+ * or a later release may say so directly, and what the provider states about an
+ * address beats what deevy infers from a timestamp.
+ */
+function gitlabUser(profile: { email_verified?: boolean; confirmed_at?: string | null }) {
+  return { emailVerified: profile.email_verified ?? Boolean(profile.confirmed_at) };
 }
 
 /** The GitLab instance this deployment signs in against. */

@@ -195,6 +195,13 @@ What shipped differently:
   which is correct while GitHub is the only entry; the slice that adds a second provider is the one that can
   see whether it needs a chooser. `docs/DEVELOPMENT.md` gained the stub's shape, `.env.example`, the
   `dev:stub` launch configuration and the `deevy-ui` skill the new flag name.
+- **The stub stands in for the client pairs too** — found in review, fixed after slice 8. Slice 1 made half a
+  pair no provider, and `.env.example` ships every pair empty, so the loop this slice exists for offered no
+  button at all: the page said the deployment had none configured and the dev form's sign-in answered
+  `PROVIDER_NOT_FOUND`. `readEnv` now fills the gaps under the flag (and `seed.ts` unconditionally, since it
+  always signs in through the stub), so a stubbed instance offers all four and a pair the environment did set
+  is left alone. `apps/web/scripts/screens.ts` stopped naming GitHub with it, and takes the nonce the way the
+  dev form does.
 
 ---
 
@@ -346,6 +353,11 @@ What shipped differently:
   `signInProviders(env)`, so adding GitLab's pair and a self-hosted `GITLAB_ISSUER` to that environment is
   what drives Better Auth's real GitLab dance — the token endpoint and `/api/v4/user` on the operator's own
   host — to a session.
+- **GitLab says `confirmed_at`, not `email_verified`** — found in review, fixed after slice 8. Better Auth
+  maps the OpenID Connect claim, which GitLab's `/api/v4/user` does not have, so every real GitLab sign-in
+  landed unverified and slice 3's linking gate then refused that Human every second provider. The entry gains
+  a `mapProfileToUser` reading `confirmed_at`, and the stub's GitLab profile stopped reporting a claim the
+  real one never sends — which is why the tests were green over a broken provider.
 
 ---
 

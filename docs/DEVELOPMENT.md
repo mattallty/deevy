@@ -87,10 +87,14 @@ that added one asks for the extra scope the next time someone signs in. A group 
 
 Set `DEEVY_DEV_STUB_OAUTH=1` and the Node server imports `apps/web/scripts/stub-oauth.js` — the same stub the
 acceptance walk and the Workers smoke prepend to their bundles — so every provider deevy offers answers
-locally and the OAuth `code` is the email address. The signed-out page then offers "Sign in as this email"
-beneath the provider buttons (it learns the flag from `health.ping`); any address signs in, and the one in
-`DEEVY_ADMIN_EMAIL` becomes the admin exactly as it would with a real OAuth App. `readEnv` refuses the flag
-under `NODE_ENV=production`, and the Worker never has it.
+locally and the OAuth `code` is the email address. It stands in for the client pairs as well as the
+endpoints: half a pair is no provider, so an environment that sets none — a fresh copy of `.env.example` —
+would otherwise offer no button at all. A stubbed instance therefore offers all four, GitHub, Google, GitLab
+and one generic OpenID Connect entry, and a pair the environment did set is left as it is. The signed-out
+page then offers "Sign in as this email" beneath the provider buttons (it learns the flag from
+`health.ping`); any address signs in, and the one in `DEEVY_ADMIN_EMAIL` becomes the admin exactly as it
+would with a real OAuth App. `readEnv` refuses the flag under `NODE_ENV=production`, and the Worker never
+has it.
 
 The stub answers GitHub's and Google's endpoints by host, because Better Auth hardcodes them, and GitLab's
 and a generic OIDC provider's by path, because those live wherever the operator's issuer is — never on a

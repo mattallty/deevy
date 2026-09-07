@@ -207,22 +207,37 @@ try {
   await goto(page, signedOut.path, 1500);
   await snap(page, signedOut.name);
 
-  // The stub sign-in, as the dev form does it (apps/web/src/App.tsx DevSignIn).
-  const state = await evaluate<string | null>(
+  // The stub sign-in, as the dev form does it (apps/web/src/App.tsx DevSignIn):
+  // whichever provider this instance offers first, because under the stub they
+  // all answer and the address in the code is what decides who signs in.
+  const provider = await evaluate<string | null>(
+    page,
+    `fetch("/api/health/ping").then((r) => r.json()).then((j) => j.providers?.[0]?.id ?? null)`,
+  );
+  if (!provider) {
+    throw new Error("this instance offers no sign-in provider; is DEEVY_DEV_STUB_OAUTH=1 set?");
+  }
+  const started = await evaluate<string | null>(
     page,
     `fetch("/api/auth/sign-in/social", { method: "POST", credentials: "include",
        headers: { "content-type": "application/json" },
-       body: JSON.stringify({ provider: "github", callbackURL: location.origin + "/" }) })
-     .then((r) => r.json()).then((j) => new URL(j.url).searchParams.get("state"))`,
+       body: JSON.stringify({ provider: ${JSON.stringify(provider)}, callbackURL: location.origin + "/" }) })
+     .then((r) => r.json()).then((j) => j.url ?? null)`,
   );
-  if (!state) throw new Error("the server did not start a sign-in; is DEEVY_DEV_STUB_OAUTH=1 set?");
+  const authorization = started ? new URL(started) : null;
+  const state = authorization?.searchParams.get("state");
+  if (!state) throw new Error(`the server did not start a sign-in with ${provider}`);
+  // An OpenID Connect sign-in binds its id_token to a nonce from the
+  // authorization request this skips past, so the code carries it back.
+  const nonce = authorization?.searchParams.get("nonce");
+  const code = nonce ? `${email}|${nonce}` : email;
   await goto(
     page,
-    `/api/auth/callback/github?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`,
+    `/api/auth/callback/${provider}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`,
     1500,
   );
   const who = await evaluate<string>(page, "document.body.innerText.slice(0, 200)");
-  if (/Sign in with GitHub/.test(who)) throw new Error(`sign-in as ${email} did not take`);
+  if (/Sign in with /.test(who)) throw new Error(`sign-in as ${email} did not take`);
 
   // DEEVY_SCREENS_ONLY=issue,inbox-phone takes those shots alone (the sign-in one always).
   const only = process.env.DEEVY_SCREENS_ONLY?.split(",").map((name) => name.trim());

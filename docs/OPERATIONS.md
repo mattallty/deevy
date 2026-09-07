@@ -431,6 +431,16 @@ whatever the provider that created the row reported. A Human whose first sign-in
 stays on that provider until an operator changes the row. Linking is also same-address only — two addresses are two Humans, and deevy has no
 screen that says otherwise.
 
+Whether a provider proved the address is the provider's own answer, and they word it differently. GitHub and
+Google say so directly. GitLab does not: its `/api/v4/user` has no `email_verified` at all, only
+`confirmed_at`, the moment the address answered GitLab's confirmation mail — so deevy reads that as the proof
+it is, and a GitLab account whose address was never confirmed lands unverified. A generic OIDC provider is
+taken at the `email_verified` claim of its `id_token`, and an IdP that publishes no such claim — Entra is one
+— therefore leaves every Human it signs in unverified: they sign in and become Members as usual, but a second
+provider on the same address is refused with `account_not_linked` until that IdP asserts the claim. An
+operator behind such an IdP should offer it alone rather than beside a second provider, or configure the IdP
+to release `email_verified`.
+
 `BETTER_AUTH_URL` has to be the origin the browser actually visits, character for character. Better Auth
 builds the OAuth callback from it and sets the session cookie for it, and `packages/core/src/auth.ts` pins
 the token issuer and the RFC 8707 resource identifier to it as well. A value naming a host nobody visits

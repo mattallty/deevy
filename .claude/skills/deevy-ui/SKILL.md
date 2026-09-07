@@ -49,8 +49,10 @@ rules) and `frontend-design` (design process) beside it.
 
 `DEEVY_DEV_STUB_OAUTH=1` makes the Node server import `apps/web/scripts/stub-oauth.js` — the same stub the
 acceptance walk and the Workers smoke prepend to their bundles — so the OAuth `code` is the email address and
-the signed-out page offers "Sign in as this email". Refused under `NODE_ENV=production`. The Worker never has
-it. `health.ping` reports `devSignIn`, which is how the SPA knows to show the form.
+the signed-out page offers "Sign in as this email". It stands in for the client pairs too, so an environment
+that configures no provider still offers all four buttons: GitHub, Google, GitLab and one generic OpenID
+Connect entry, which is what the signed-out screenshots show. Refused under `NODE_ENV=production`. The Worker
+never has it. `health.ping` reports `devSignIn`, which is how the SPA knows to show the form.
 
 ```bash
 # in .claude/launch.json as "dev:stub": the stubbed instance on its own database file
