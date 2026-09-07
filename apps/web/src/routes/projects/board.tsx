@@ -70,7 +70,10 @@ export function BoardPage({
 
   // The same groupings the Issues home offers, with this Project fixed: its
   // States, unfolded, and no Project grouping where every Issue is this one's.
-  const groupings = useMemo(() => groupingsFor({ workflowStates: states }), [states]);
+  const groupings = useMemo(
+    () => groupingsFor({ workflowStates: states, members: memberList }),
+    [states, memberList],
+  );
   const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
   const buckets = useMemo(() => grouping.buckets(cards), [grouping, cards]);
   const columns = useMemo<BoardColumn[]>(

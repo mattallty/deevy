@@ -225,9 +225,9 @@ export function IssueBoardView({
 }
 
 /**
- * The board, connected: a drop is planned, then written as a move, opened as a
- * ruling, or refused with a word — through `issues.move` and the Gate dialog,
- * the same on a Project's Board and on the Workspace's.
+ * The board, connected: a drop is planned by the bucket it lands in, then
+ * written — a move, a reassignment, a change of Labels — or opened as a ruling,
+ * or refused with a word. The same on a Project's Board and on the Workspace's.
  */
 export function IssueBoard({
   columns,
@@ -251,6 +251,9 @@ export function IssueBoard({
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
   const move = useMutation(orpc.issues.move.mutationOptions({ onSuccess: refresh }));
+  const update = useMutation(orpc.issues.update.mutationOptions({ onSuccess: refresh }));
+  const setLabels = useMutation(orpc.issues.setLabels.mutationOptions({ onSuccess: refresh }));
+  const failed = move.error ?? update.error ?? setLabels.error;
   const [deciding, setDeciding] = useState<BoardIssue | null>(null);
   const value = useMemo(
     () => groupIntoColumns(columns, issues, columnOf),
@@ -262,11 +265,14 @@ export function IssueBoard({
     if (plan.kind === "gate") setDeciding(issue);
     else if (plan.kind === "refused") toast.warning(plan.message);
     else if (plan.kind === "move") move.mutate({ key: issue.key, stateId: plan.stateId });
+    else if (plan.kind === "assign")
+      update.mutate({ key: issue.key, assigneeMemberId: plan.memberId });
+    else if (plan.kind === "labels") setLabels.mutate({ key: issue.key, labelIds: plan.labelIds });
   };
 
   return (
     <>
-      {move.error ? <p className="text-sm text-destructive">{move.error.message}</p> : null}
+      {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
       {loading ? (
         <Skeleton className="h-96 w-full" />
       ) : (

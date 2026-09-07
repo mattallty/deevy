@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MemberChip, type ChipMember } from "@/components/member-chip";
 import { StateBadge } from "@/components/state-badge";
 import type { DropPlan } from "@/components/issue-board";
 import { categoryOrder, foldStates, type FoldedState, type StateCategory } from "@/lib/states";
@@ -48,6 +49,9 @@ export interface Grouping {
   label: string;
   buckets<T extends GroupableIssue>(rows: T[]): GroupBucket<T>[];
 }
+
+/** The bucket for an Issue nobody holds. Not "", which is a legitimate id. */
+export const UNASSIGNED = "__unassigned";
 
 /** Rows in the order they arrived, bucketed by a key each one answers to. */
 function bucketBy<T extends GroupableIssue>(rows: T[], keyOf: (row: T) => string) {
@@ -166,6 +170,97 @@ export function projectStateGrouping(
   };
 }
 
+/**
+ * By Assignee: the Humans first, then the Agents, then whatever nobody holds.
+ * Every Member gets a bucket even holding nothing, so a board has a column to
+ * drop onto — the list throws the empty ones away.
+ */
+export function assigneeGrouping(members: ChipMember[]): Grouping {
+  const rank = (member: ChipMember) => (member.kind === "agent" ? 1 : 0);
+  const ordered = [...members].sort(
+    (a, b) => rank(a) - rank(b) || a.user.name.localeCompare(b.user.name),
+  );
+
+  return {
+    id: "assignee",
+    label: "Assignee",
+    buckets<T extends GroupableIssue>(rows: T[]) {
+      const held = bucketBy(rows, (row) => row.assignee?.id ?? UNASSIGNED);
+      // A Member nobody lists but who holds an Issue still gets a bucket: a
+      // suspended one keeps their work until somebody takes it off them.
+      const listed = new Set(ordered.map((member) => member.id));
+      const strays = rows
+        .map((row) => row.assignee)
+        .filter((assignee): assignee is NonNullable<typeof assignee> =>
+          Boolean(assignee && !listed.has(assignee.id)),
+        );
+      const byId = new Map<string, ChipMember>();
+      for (const member of [...ordered, ...(strays as ChipMember[])]) {
+        if (!byId.has(member.id)) byId.set(member.id, member);
+      }
+
+      const buckets: GroupBucket<T>[] = [...byId.values()].map((member) => ({
+        id: member.id,
+        name: member.user.name,
+        header: <MemberChip member={member} size="xs" />,
+        rows: held.get(member.id) ?? [],
+        keepWhenEmpty: true,
+        plan: (): DropPlan => ({ kind: "assign", memberId: member.id }),
+      }));
+
+      buckets.push({
+        id: UNASSIGNED,
+        name: "Unassigned",
+        header: <span className="text-sm text-muted-foreground">Unassigned</span>,
+        rows: held.get(UNASSIGNED) ?? [],
+        keepWhenEmpty: true,
+        plan: (): DropPlan => ({ kind: "assign", memberId: null }),
+      });
+      return buckets;
+    },
+  };
+}
+
+/**
+ * By Project. Read-only on a board: there is no operation that moves an Issue
+ * between Projects, and its key names the one it belongs to, so a column takes
+ * no cards and says so rather than pretending to be disabled.
+ */
+export function projectGrouping(
+  projects: Array<{ id: string; key: string; name: string }>,
+): Grouping {
+  const ordered = [...projects].sort((a, b) => a.key.localeCompare(b.key));
+
+  return {
+    id: "project",
+    label: "Project",
+    buckets<T extends GroupableIssue>(rows: T[]) {
+      const held = bucketBy(rows, (row) => row.projectId);
+      const known = new Map(ordered.map((project) => [project.id, project]));
+      const ids = [...new Set([...ordered.map((project) => project.id), ...held.keys()])];
+
+      return ids.map((id) => {
+        const project = known.get(id);
+        const name = project?.name ?? id;
+        return {
+          id,
+          name,
+          header: (
+            <span className="flex items-center gap-2 text-sm">
+              {project ? (
+                <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
+              ) : null}
+              <span className="font-medium">{name}</span>
+            </span>
+          ),
+          rows: held.get(id) ?? [],
+          keepWhenEmpty: true,
+        };
+      });
+    },
+  };
+}
+
 export interface GroupingContext {
   /**
    * One Project's Workflow. Given, the State grouping is that Workflow's, with
@@ -178,6 +273,8 @@ export interface GroupingContext {
   projects?: Array<{ id: string; key: string; name: string; states?: unknown }>;
   /** Named, only that Project's States are folded in. */
   projectKey?: string;
+  /** For grouping by Assignee: every Member the screen may show. */
+  members?: ChipMember[];
 }
 
 /**
@@ -193,7 +290,13 @@ export function groupingsFor(context: GroupingContext): Grouping[] {
           context.projectKey,
         ),
       );
-  return [state];
+  const groupings: Grouping[] = [state, assigneeGrouping(context.members ?? [])];
+  // Not on a screen that is one Project's: every Issue on it is that Project's.
+  const oneProject = Boolean(context.workflowStates || context.projectKey);
+  if (!oneProject && (context.projects?.length ?? 0) > 1) {
+    groupings.push(projectGrouping(context.projects ?? []));
+  }
+  return groupings;
 }
 
 /** The grouping `?group=` names, or the first one, which is always State. */

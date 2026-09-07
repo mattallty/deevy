@@ -183,9 +183,10 @@ export function IssuesPage({
     () =>
       groupingsFor({
         projects: projects.data?.projects ?? [],
+        members: memberList,
         ...(projectKey ? { projectKey } : {}),
       }),
-    [projects.data, projectKey],
+    [projects.data, memberList, projectKey],
   );
   const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
   const buckets = useMemo(() => grouping.buckets(rows), [grouping, rows]);
@@ -277,7 +278,9 @@ export function IssuesPage({
         sortValue: (row) => row.title,
         className: "max-w-0 w-full",
       },
-      ...(grouped
+      // A column that only repeats the group header earns nothing: grouped by
+      // State the State column goes, grouped by Assignee the Assignee one does.
+      ...(grouped && grouping.id === "state"
         ? []
         : [
             {
@@ -296,18 +299,22 @@ export function IssuesPage({
               className: "w-36",
             },
           ]),
-      {
-        id: "assignee",
-        header: "Assignee",
-        cell: (row) =>
-          row.assignee ? (
-            <MemberChip member={row.assignee} size="xs" />
-          ) : (
-            <span className="text-xs text-muted-foreground">Unassigned</span>
-          ),
-        sortValue: (row) => row.assignee?.user.name ?? "",
-        className: "w-44",
-      },
+      ...(grouped && grouping.id === "assignee"
+        ? []
+        : [
+            {
+              id: "assignee",
+              header: "Assignee",
+              cell: (row: IssueRow) =>
+                row.assignee ? (
+                  <MemberChip member={row.assignee} size="xs" />
+                ) : (
+                  <span className="text-xs text-muted-foreground">Unassigned</span>
+                ),
+              sortValue: (row: IssueRow) => row.assignee?.user.name ?? "",
+              className: "w-44",
+            },
+          ]),
       {
         id: "updated",
         header: "Updated",
@@ -321,7 +328,7 @@ export function IssuesPage({
         headerClassName: "text-right",
       },
     ],
-    [grouped],
+    [grouped, grouping.id],
   );
 
   const title =
