@@ -5559,6 +5559,9 @@
                     },
                     "url": {
                       "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -5572,7 +5575,8 @@
                     "acceptedAt",
                     "acceptedMemberId",
                     "revokedAt",
-                    "url"
+                    "url",
+                    "path"
                   ],
                   "additionalProperties": false
                 }

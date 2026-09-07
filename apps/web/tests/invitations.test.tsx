@@ -55,6 +55,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
           acceptedAt: null,
           revokedAt: null,
           url: "https://deevy.example.com/invite/s3cret-token",
+          path: "/invite/s3cret-token",
         };
       },
       revoke: async (input: { invitationId: string }) => {
@@ -128,7 +129,10 @@ describe("the Invited row of Workspace › General", () => {
 
   it("shows the link once, in the dialog that made it, and never on a row", async () => {
     mount(<InvitationsRow />);
-    const url = "https://deevy.example.com/invite/s3cret-token";
+    // The link the admin copies is built on the origin the browser is on, not
+    // the one the API answered with: they are the same in the image and on
+    // Workers, and two ports in the dev loop (docs/plans/sign-in.md).
+    const url = `${window.location.origin}/invite/s3cret-token`;
 
     fireEvent.click(await screen.findByRole("button", { name: "Invite someone" }));
     fireEvent.change(await screen.findByLabelText("Email"), {

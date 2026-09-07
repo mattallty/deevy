@@ -1,8 +1,14 @@
 import { account, allowlistRule, allowlistRuleKinds, member, user } from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vite-plus/test";
-import { accountLinkingOf, bootstrapWorkspace, createAuth, joinWorkspace } from "../src/auth.ts";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import {
+  accountLinkingOf,
+  bootstrapWorkspace,
+  createAuth,
+  joinPorts,
+  joinWorkspace,
+} from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb, type MemberContext } from "./helpers.ts";
 import { authId, newId } from "../src/ids.ts";
@@ -27,6 +33,7 @@ async function allow(
 const closers: Array<() => void> = [];
 afterEach(() => {
   for (const close of closers.splice(0)) close();
+  vi.unstubAllGlobals();
 });
 
 describe("joinWorkspace", () => {
@@ -81,7 +88,7 @@ describe("the handle a Member joins with", () => {
     await joinWorkspace(
       db,
       { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" },
-      { login: "bvance" },
+      { login: async () => "bvance" },
     );
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
@@ -359,7 +366,7 @@ describe("one Human, one Member", () => {
     const admin = await allow(db, "example.com");
     await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
     const bob = { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" };
-    await joinWorkspace(db, bob, { login: "bvance" });
+    await joinWorkspace(db, bob, { login: async () => "bvance" });
 
     // What a linked account looks like on the way back in: the same user, a
     // second provider, and the join running again from Better Auth's hooks.
@@ -378,5 +385,95 @@ describe("one Human, one Member", () => {
     const client = createRouterClient(router, { context: admin });
     const page = await client.events.list({ subjectType: "member", subjectId: members[0]?.id });
     expect(page.events).toMatchObject([{ kind: "member.joined" }]);
+  });
+});
+
+describe("joinPorts", () => {
+  /** A signed-in Human with one provider account, and the token the ports read. */
+  const signedInWith = async (db: Awaited<ReturnType<typeof testDb>>["db"], providerId: string) => {
+    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
+    await db.insert(account).values({
+      id: authId("account"),
+      userId: "u-bob",
+      accountId: "bob",
+      providerId,
+      accessToken: "token",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  /**
+   * Both forges page — thirty organizations, twenty groups — so the rule that
+   * names the one on the second page matched nothing, which looks exactly like
+   * a rule that did not match (docs/plans/sign-in.md).
+   */
+  it("reads past the first page of the groups a rule may name", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await signedInWith(db, "gitlab");
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      asked.push(url);
+      const page = Number(new URL(url).searchParams.get("page"));
+      const full = Array.from({ length: 100 }, (_, i) => ({ full_path: `acme/team-${i}` }));
+      return Response.json(page === 1 ? full : [{ full_path: "acme/platform" }]);
+    });
+
+    const groups = await joinPorts(db, { providers: {} }, "u-bob").listGroups?.();
+
+    expect(groups).toHaveLength(101);
+    expect(groups).toContain("acme/platform");
+    expect(asked).toHaveLength(2);
+    expect(asked[0]).toContain("per_page=100&page=1");
+    expect(asked[1]).toContain("page=2");
+  });
+
+  it("stops asking when a page is the last one", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await signedInWith(db, "github");
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      asked.push(url);
+      return Response.json([{ login: "Acme" }]);
+    });
+
+    expect(await joinPorts(db, { providers: {} }, "u-bob").listOrgs?.()).toEqual(["Acme"]);
+    expect(asked).toHaveLength(1);
+  });
+
+  /**
+   * The handle a join allocates: slice 5 promised a GitLab username is a
+   * handle the way a GitHub login is, and nothing was supplying either
+   * (docs/plans/sign-in.md).
+   */
+  it("hands the join whatever the provider calls this sign-in", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await signedInWith(db, "gitlab");
+    vi.stubGlobal("fetch", async (url: string) =>
+      new URL(url).pathname === "/api/v4/user"
+        ? Response.json({ username: "bvance" })
+        : Response.json(null, { status: 404 }),
+    );
+
+    expect(await joinPorts(db, { providers: {} }, "u-bob").login?.()).toBe("bvance");
+  });
+
+  it("spends no request on a provider this Human never signed in with", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await signedInWith(db, "github");
+    let asked = 0;
+    vi.stubGlobal("fetch", async () => {
+      asked++;
+      return Response.json({ login: "bvance" });
+    });
+
+    expect(await joinPorts(db, { providers: {} }, "u-bob").login?.()).toBe("bvance");
+    // GitHub answered, so GitLab is never asked; a Human with neither account
+    // costs no request at all.
+    expect(asked).toBe(1);
   });
 });

@@ -135,8 +135,11 @@ function InviteDialog({
 
   const create = useMutation(
     orpc.invitations.create.mutationOptions({
-      onSuccess: async (created: { url: string }) => {
-        setLink(created.url);
+      onSuccess: async (created: { path: string }) => {
+        // The link is built on the origin this browser is on, not the API's:
+        // they are the same in the image and on Workers, and two ports in the
+        // dev loop or a split-origin deployment (docs/plans/sign-in.md).
+        setLink(new URL(created.path, window.location.origin).toString());
         await onCreated();
       },
     }),

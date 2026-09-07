@@ -478,7 +478,7 @@ async function admit(db: Db, env: AuthEnv, user: JoiningUser): Promise<void> {
 /** How long a forge has to answer a question about a sign-in's memberships. */
 const FORGE_TIMEOUT_MS = 5_000;
 
-function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
+export function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
   const token = async (providerId: string) => {
     const account = await db.query.account.findFirst({ where: { userId, providerId } });
     return account?.accessToken ?? null;
@@ -502,28 +502,72 @@ function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
     });
     return res.ok ? ((await res.json()) as T) : null;
   };
+  /**
+   * Every page of a list, not the first one. Both forges page by default — 30
+   * organizations, 20 groups — and a rule that names the one on page two
+   * matched nothing, which looks exactly like a rule that did not match
+   * (docs/plans/sign-in.md). `PAGE_CAP` bounds a sign-in's cost at five round
+   * trips; a Human in more than five hundred groups is not the case to spend a
+   * sixth on.
+   */
+  const getAll = async <T>(providerId: string, url: string, accept: string): Promise<T[]> => {
+    const items: T[] = [];
+    const separator = url.includes("?") ? "&" : "?";
+    for (let page = 1; page <= PAGE_CAP; page++) {
+      const batch = await get<T[]>(
+        providerId,
+        `${url}${separator}per_page=${PAGE_SIZE}&page=${page}`,
+        accept,
+      );
+      if (!batch || batch.length === 0) break;
+      items.push(...batch);
+      if (batch.length < PAGE_SIZE) break;
+    }
+    return items;
+  };
   return {
     listOrgs: async () => {
-      const orgs = await get<Array<{ login: string }>>(
+      const orgs = await getAll<{ login: string }>(
         "github",
         "https://api.github.com/user/orgs",
         "application/vnd.github+json",
       );
-      return orgs?.map((org) => org.login) ?? [];
+      return orgs.map((org) => org.login);
     },
     listGroups: async () => {
       // Every group the sign-in is in at all: 10 is Guest, GitLab's lowest
       // membership. A rule says who may join deevy, not what they may do in
       // GitLab, so a Guest of the group the rule names is in the group.
-      const groups = await get<Array<{ full_path: string }>>(
+      const groups = await getAll<{ full_path: string }>(
         "gitlab",
         `${gitlabIssuer(env.providers?.gitlab)}/api/v4/groups?min_access_level=10`,
         "application/json",
       );
-      return groups?.map((group) => group.full_path) ?? [];
+      return groups.map((group) => group.full_path);
+    },
+    // Whichever account this sign-in has: `get` spends no round trip on a
+    // provider the Human never signed in with, so asking GitHub first costs a
+    // query rather than a request.
+    login: async () => {
+      const github = await get<{ login?: string }>(
+        "github",
+        "https://api.github.com/user",
+        "application/vnd.github+json",
+      );
+      if (github?.login) return github.login;
+      const gitlab = await get<{ username?: string }>(
+        "gitlab",
+        `${gitlabIssuer(env.providers?.gitlab)}/api/v4/user`,
+        "application/json",
+      );
+      return gitlab?.username ?? null;
     },
   };
 }
+
+/** What one page of a forge's list asks for, and how many pages a join will read. */
+const PAGE_SIZE = 100;
+const PAGE_CAP = 5;
 
 export { allocateHandle, slugify } from "./handles.ts";
 
@@ -589,8 +633,12 @@ export interface JoinOptions {
    * What the provider calls this sign-in — a GitHub login, a GitLab username —
    * preferred over a slug of the name as the handle. Provider-neutral, because
    * a handle is deevy's and every provider hands out the same kind of thing.
+   *
+   * A port rather than a string, and asked only when a Member is actually
+   * being created: the sign-in's own profile is a round trip, and `admit` runs
+   * on every session as well as every user (docs/plans/sign-in.md).
    */
-  login?: string;
+  login?: () => Promise<string | null>;
   /**
    * The GitHub organizations this sign-in belongs to, for `github_org` rules.
    * A port rather than a fetch so the rule can be decided without a network
@@ -628,7 +676,7 @@ export async function joinWorkspace(
     userId: user.userId,
     role: "member",
     kind: "human",
-    handle: await allocateHandle(db, options.login ?? user.name ?? user.email),
+    handle: await allocateHandle(db, (await options.login?.()) ?? user.name ?? user.email),
   });
   await appendEvent(
     { db, workspace: ws, member: null },

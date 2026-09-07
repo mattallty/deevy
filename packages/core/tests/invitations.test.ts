@@ -58,6 +58,11 @@ describe("invitations.create", () => {
     });
     expect(created.id).toMatch(/^inv_/);
     const token = created.url.replace("https://deevy.test/invite/", "");
+    // The absolute URL is this instance's own origin, which serves the SPA in
+    // the image and on Workers; the site-relative one is for everywhere else,
+    // where the browser knows the origin and the server does not
+    // (docs/plans/sign-in.md).
+    expect(created.path).toBe(`/invite/${token}`);
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     // Seven days, give or take the second this test took.
     const week = 7 * 24 * 60 * 60 * 1000;
