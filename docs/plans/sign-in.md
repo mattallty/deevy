@@ -1,8 +1,13 @@
 # Sign-in: the rest of the providers, and invitations — vertical slices
 
 Status: **done** — all eight slices landed, plus two fixes found reviewing them (the stub fills in the client
-pairs a dev loop needs, and GitLab's `confirmed_at` is what verifies an address), and each slice's "what
-shipped differently" is appended below. An instance now offers GitHub, Google, GitLab and a generic OIDC
+pairs a dev loop needs, and GitLab's `confirmed_at` is what verifies an address) and five smaller ones after
+that: a join reads every page of the organizations and groups a rule is decided from, `JoinOptions.login` is
+finally supplied so a GitHub login or a GitLab username becomes the handle, `health.ping` offers only the
+providers Better Auth registered (a generic OIDC entry is skipped when the IdP is unreachable at startup),
+`invitations.create` returns the link site-relative so the SPA builds it on the origin the browser is on, and
+the Event log reads the three `invitation.*` kinds as sentences. Each slice's "what shipped differently" is
+appended below. An instance now offers GitHub, Google, GitLab and a generic OIDC
 provider from environment variables alone, a Human who uses two of them is one Member, and an admin admits one
 person with a link. The deferrals this closed are gone from [m1.md](./m1.md) and [m2.md](./m2.md), and
 [PLAN.md](../PLAN.md) describes it rather than promising it. The approved plan of 2026-09-07 is kept here as
