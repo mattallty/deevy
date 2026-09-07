@@ -1,5 +1,13 @@
 # Sign-in: the rest of the providers, and invitations — vertical slices
 
+Status: **done** — all eight slices landed, plus two fixes found reviewing them (the stub fills in the client
+pairs a dev loop needs, and GitLab's `confirmed_at` is what verifies an address), and each slice's "what
+shipped differently" is appended below. An instance now offers GitHub, Google, GitLab and a generic OIDC
+provider from environment variables alone, a Human who uses two of them is one Member, and an admin admits one
+person with a link. The deferrals this closed are gone from [m1.md](./m1.md) and [m2.md](./m2.md), and
+[PLAN.md](../PLAN.md) describes it rather than promising it. The approved plan of 2026-09-07 is kept here as
+the record.
+
 Breakdown of the two things [PLAN.md](../PLAN.md) promises under "Authentication and access" that no
 milestone built, 2026-09-07. Vocabulary is [CONTEXT.md](../../CONTEXT.md); the slice that built what exists
 today is slice 2 of [m1.md](./m1.md), which took GitHub-only sign-in and rule-based joining and wrote both
