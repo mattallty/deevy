@@ -18,6 +18,21 @@ import { orpc } from "@/lib/orpc.ts";
 const kindLabels = {
   email_domain: "Email domain",
   github_org: "GitHub organization",
+  gitlab_group: "GitLab group",
+} as const;
+
+/** What the value field asks for, and what it shows as an example, per kind. */
+const valueFields = {
+  email_domain: { label: "Domain", placeholder: "example.com" },
+  github_org: { label: "Organization login", placeholder: "acme" },
+  gitlab_group: { label: "Group path", placeholder: "acme/platform" },
+} as const;
+
+/** The word a chip wears so a bare value says which namespace it is in. */
+const kindPrefixes = {
+  email_domain: null,
+  github_org: "org",
+  gitlab_group: "group",
 } as const;
 
 type RuleKind = keyof typeof kindLabels;
@@ -81,19 +96,18 @@ export function AllowlistRow() {
                   <SelectGroup>
                     <SelectItem value="email_domain">{kindLabels.email_domain}</SelectItem>
                     <SelectItem value="github_org">{kindLabels.github_org}</SelectItem>
+                    <SelectItem value="gitlab_group">{kindLabels.gitlab_group}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-2 @md:min-w-48 @md:flex-1">
-              <Label htmlFor="rule-value">
-                {kind === "email_domain" ? "Domain" : "Organization login"}
-              </Label>
+              <Label htmlFor="rule-value">{valueFields[kind].label}</Label>
               <Input
                 id="rule-value"
                 value={value}
                 autoFocus
-                placeholder={kind === "email_domain" ? "example.com" : "acme"}
+                placeholder={valueFields[kind].placeholder}
                 onChange={(changed) => setValue(changed.target.value)}
               />
             </div>
@@ -122,8 +136,8 @@ export function AllowlistRow() {
             key={rule.id}
             className="inline-flex h-7 items-center gap-1.5 rounded-md border pr-1 pl-2.5 font-mono text-xs"
           >
-            {rule.kind === "github_org" ? (
-              <span className="font-sans text-muted-foreground">org</span>
+            {kindPrefixes[rule.kind] ? (
+              <span className="font-sans text-muted-foreground">{kindPrefixes[rule.kind]}</span>
             ) : null}
             {rule.value}
             <Button

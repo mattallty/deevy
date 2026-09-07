@@ -81,6 +81,13 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
       clientId: env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
     },
+    gitlab: {
+      clientId: env.GITLAB_CLIENT_ID ?? "",
+      clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
+      // gitlab.com unless the deployment names its own instance; every
+      // GitLab endpoint deevy calls is built from it (docs/OPERATIONS.md).
+      issuer: env.GITLAB_ISSUER,
+    },
   };
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.

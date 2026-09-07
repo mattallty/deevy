@@ -23,6 +23,16 @@ export interface OAuthClient {
 }
 
 /**
+ * A GitLab client, and the instance it belongs to. `issuer` is what makes one
+ * entry serve both gitlab.com and a self-hosted GitLab: every endpoint —
+ * authorization, token, `/api/v4` — is built from it, so an operator points
+ * deevy at their own instance without a second provider (docs/plans/sign-in.md).
+ */
+export interface GitLabClient extends OAuthClient {
+  issuer?: string;
+}
+
+/**
  * What a deployment configures: one optional entry per provider deevy offers.
  * A provider is configuration, not a constant, so offering another one is an
  * entry here and in `signInProviders` rather than an edit to the sign-in page
@@ -31,7 +41,11 @@ export interface OAuthClient {
 export interface AuthProviders {
   github?: OAuthClient;
   google?: OAuthClient;
+  gitlab?: GitLabClient;
 }
+
+/** Where a GitLab client lives when the deployment names no instance of its own. */
+const DEFAULT_GITLAB_ISSUER = "https://gitlab.com";
 
 /**
  * How the SPA starts a sign-in with a provider. `social` is Better Auth's own
@@ -143,6 +157,8 @@ export function signInProviders(env: Pick<AuthEnv, "providers">): SignInProvider
     offered.push({ id: "github", label: "GitHub", kind: "social" });
   if (configuredClient(providers.google))
     offered.push({ id: "google", label: "Google", kind: "social" });
+  if (configuredClient(providers.gitlab))
+    offered.push({ id: "gitlab", label: "GitLab", kind: "social" });
   return offered;
 }
 
@@ -195,6 +211,7 @@ export function accountLinkingOf(_env: Pick<AuthEnv, "providers">) {
 function socialProvidersOf(providers: AuthProviders) {
   const github = configuredClient(providers.github);
   const google = configuredClient(providers.google);
+  const gitlab = configuredClient(providers.gitlab);
   return {
     ...(github
       ? {
@@ -212,7 +229,27 @@ function socialProvidersOf(providers: AuthProviders) {
     // `email_domain` rule in deevy's own UI, so there is one place to look
     // rather than two that can disagree (docs/plans/sign-in.md).
     ...(google ? { google } : {}),
+    // GitLab hands `read_user` out by default, which is the profile; the
+    // groups a gitlab_group allowlist rule matches are only listable with
+    // `read_api`, the same bargain `read:org` strikes above. GitLab has no
+    // narrower scope for a user's groups, so the sign-in's token can read the
+    // API it can reach — it is stored by Better Auth, read on the join and
+    // never again (docs/OPERATIONS.md).
+    ...(gitlab
+      ? {
+          gitlab: {
+            ...gitlab,
+            issuer: gitlabIssuer(providers.gitlab),
+            scope: ["read_api"],
+          },
+        }
+      : {}),
   };
+}
+
+/** The GitLab instance this deployment signs in against. */
+function gitlabIssuer(client: GitLabClient | undefined): string {
+  return client?.issuer?.trim().replace(/\/+$/, "") || DEFAULT_GITLAB_ISSUER;
 }
 
 /** An entry with both halves of its pair, or nothing. */
@@ -320,28 +357,31 @@ export function bearerApiKey(headers: Headers | undefined): string | null {
  */
 async function admit(db: Db, env: AuthEnv, user: JoiningUser): Promise<void> {
   await bootstrapWorkspace(db, user, env);
-  await joinWorkspace(db, user, githubPorts(db, user.userId));
+  await joinWorkspace(db, user, joinPorts(db, env, user.userId));
 }
 
 /**
- * The GitHub half of a join, read through the account's stored access token.
- * Both ports are lazy: `github_org` rules are the only reason to spend a round
- * trip, and `joinWorkspace` skips them when an email domain already matched.
+ * What a join can ask a provider about this sign-in, one port per provider
+ * that has something to answer. Each dispatches on the account's `providerId`,
+ * so a Human with both accounts linked is asked of whichever provider the rule
+ * is about, and one with neither is simply not in the group.
+ *
+ * Every port is lazy: a `github_org` or `gitlab_group` rule is the only reason
+ * to spend a round trip, and `joinWorkspace` skips them all when an email
+ * domain already matched.
  */
-function githubPorts(db: Db, userId: string): JoinOptions {
-  const token = async () => {
-    const account = await db.query.account.findFirst({
-      where: { userId, providerId: "github" },
-    });
+function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
+  const token = async (providerId: string) => {
+    const account = await db.query.account.findFirst({ where: { userId, providerId } });
     return account?.accessToken ?? null;
   };
-  const get = async <T>(path: string): Promise<T | null> => {
-    const accessToken = await token();
+  const get = async <T>(providerId: string, url: string, accept: string): Promise<T | null> => {
+    const accessToken = await token(providerId);
     if (!accessToken) return null;
-    const res = await fetch(`https://api.github.com${path}`, {
+    const res = await fetch(url, {
       headers: {
         authorization: `Bearer ${accessToken}`,
-        accept: "application/vnd.github+json",
+        accept,
         "user-agent": "deevy",
       },
     });
@@ -349,8 +389,23 @@ function githubPorts(db: Db, userId: string): JoinOptions {
   };
   return {
     listOrgs: async () => {
-      const orgs = await get<Array<{ login: string }>>("/user/orgs");
+      const orgs = await get<Array<{ login: string }>>(
+        "github",
+        "https://api.github.com/user/orgs",
+        "application/vnd.github+json",
+      );
       return orgs?.map((org) => org.login) ?? [];
+    },
+    listGroups: async () => {
+      // Every group the sign-in is in at all: 10 is Guest, GitLab's lowest
+      // membership. A rule says who may join deevy, not what they may do in
+      // GitLab, so a Guest of the group the rule names is in the group.
+      const groups = await get<Array<{ full_path: string }>>(
+        "gitlab",
+        `${gitlabIssuer(env.providers?.gitlab)}/api/v4/groups?min_access_level=10`,
+        "application/json",
+      );
+      return groups?.map((group) => group.full_path) ?? [];
     },
   };
 }
@@ -415,14 +470,24 @@ export interface JoiningUser {
 }
 
 export interface JoinOptions {
-  /** The GitHub login of the sign-in, preferred over a slug of the name as the handle. */
-  githubLogin?: string;
+  /**
+   * What the provider calls this sign-in — a GitHub login, a GitLab username —
+   * preferred over a slug of the name as the handle. Provider-neutral, because
+   * a handle is deevy's and every provider hands out the same kind of thing.
+   */
+  login?: string;
   /**
    * The GitHub organizations this sign-in belongs to, for `github_org` rules.
    * A port rather than a fetch so the rule can be decided without a network
    * call; production supplies the sign-in's access token (needs `read:org`).
    */
   listOrgs?: () => Promise<string[]>;
+  /**
+   * The GitLab groups this sign-in belongs to, as full paths
+   * (`acme/platform`), for `gitlab_group` rules. A port for the same reason;
+   * production reads them from the sign-in's own token (needs `read_api`).
+   */
+  listGroups?: () => Promise<string[]>;
 }
 
 /**
@@ -448,7 +513,7 @@ export async function joinWorkspace(
     userId: user.userId,
     role: "member",
     kind: "human",
-    handle: await allocateHandle(db, options.githubLogin ?? user.name ?? user.email),
+    handle: await allocateHandle(db, options.login ?? user.name ?? user.email),
   });
   await appendEvent(
     { db, workspace: ws, member: null },
@@ -474,10 +539,30 @@ async function matchesAllowlist(
     .where(eq(allowlistRule.workspaceId, workspaceId));
   if (rules.some((rule) => rule.kind === "email_domain" && rule.value === domain)) return true;
 
-  // The organizations cost a round trip to GitHub, so they are only asked for
-  // when a github_org rule exists and no email domain matched.
-  const orgRules = rules.filter((rule) => rule.kind === "github_org");
-  if (orgRules.length === 0 || !options.listOrgs) return false;
-  const orgs = new Set((await options.listOrgs()).map((org) => org.toLowerCase()));
-  return orgRules.some((rule) => orgs.has(rule.value));
+  // Each of these costs a round trip to a provider, so each is asked only when
+  // a rule of its kind exists and no email domain matched.
+  if (await matchesMemberships(rules, "github_org", options.listOrgs)) return true;
+  return matchesMemberships(rules, "gitlab_group", options.listGroups);
+}
+
+/**
+ * One rule kind decided against what a provider says this sign-in belongs to.
+ * A port that is absent, that answers with nothing, or that fails is not a
+ * match: a join deevy could not verify is a join that does not happen.
+ *
+ * A provider that is down therefore costs a Member their join and not their
+ * sign-in — this runs inside a Better Auth database hook, where a thrown error
+ * is a sign-in that fails — and the next sign-in asks again, because `admit`
+ * runs from the session hook every time.
+ */
+async function matchesMemberships(
+  rules: Array<{ kind: string; value: string }>,
+  kind: string,
+  list: (() => Promise<string[]>) | undefined,
+): Promise<boolean> {
+  const matching = rules.filter((rule) => rule.kind === kind);
+  if (matching.length === 0 || !list) return false;
+  const memberships = await list().catch(() => []);
+  const held = new Set(memberships.map((value) => value.toLowerCase()));
+  return matching.some((rule) => held.has(rule.value));
 }

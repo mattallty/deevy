@@ -30,6 +30,12 @@ const stubbedEnv = {
   GITHUB_CLIENT_SECRET: "stub-secret",
   GOOGLE_CLIENT_ID: "stub-client",
   GOOGLE_CLIENT_SECRET: "stub-secret",
+  GITLAB_CLIENT_ID: "stub-client",
+  GITLAB_CLIENT_SECRET: "stub-secret",
+  // A self-hosted GitLab, because that is the half an issuer changes: every
+  // endpoint the sign-in touches is built from it, and the stub answers
+  // GitLab's paths on whatever host it is (docs/plans/sign-in.md slice 5).
+  GITLAB_ISSUER: "https://gitlab.example.test",
 };
 
 function stubbedServer(overrides: { adminEmail?: string } = {}) {

@@ -5,7 +5,7 @@
  */
 import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
-import { member as memberTable } from "@deevy/db";
+import { allowlistRuleKinds, member as memberTable } from "@deevy/db";
 import { loadAgent } from "../agents.ts";
 import { issueKey, parseIssueKey } from "../issues.ts";
 import { ensureStateDocument } from "../documents.ts";
@@ -88,16 +88,57 @@ export const HandleInput = z
   .regex(/^[a-z0-9][a-z0-9-]*$/, "A handle is lowercase letters, digits and hyphens");
 
 /**
- * An email domain (`example.com`) or a GitHub organization login. Both are
- * stored lowercased so a rule matches whatever case the sign-in arrives in.
+ * What an allowlist rule holds, whatever its kind: trimmed, lowercased so a
+ * rule matches whatever case the sign-in arrives in, short enough to be a name
+ * rather than a document, and made of the characters all three kinds are made
+ * of. The exact shape is the kind's, checked below — this is the widest of the
+ * three, and the one an OpenAPI reader sees, since a `pattern` cannot depend on
+ * a sibling field.
  */
-export const AllowlistValue = z
+const AllowlistValue = z
   .string()
   .trim()
   .toLowerCase()
   .min(1)
   .max(255)
-  .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)*$/, "A domain such as example.com, or an organization login");
+  .regex(
+    /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/,
+    "A domain such as example.com, an organization login, or a group path",
+  );
+
+/**
+ * The shape a value may take is its kind's, because the three are not one
+ * shape. An email domain and a GitHub organization login are dotted labels; a
+ * GitLab group is a path — `acme/platform`, subgroups nested, `_` and `.`
+ * legal — which the label pattern refuses and which is not a domain
+ * (docs/plans/sign-in.md).
+ */
+const allowlistValueShapes = {
+  email_domain: {
+    pattern: /^[a-z0-9-]+(\.[a-z0-9-]+)*$/,
+    message: "A domain such as example.com",
+  },
+  github_org: {
+    pattern: /^[a-z0-9-]+(\.[a-z0-9-]+)*$/,
+    message: "An organization login such as acme",
+  },
+  gitlab_group: {
+    pattern: /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/,
+    message: "A group path such as acme/platform",
+  },
+} satisfies Record<(typeof allowlistRuleKinds)[number], { pattern: RegExp; message: string }>;
+
+/**
+ * A rule as an admin states one. The kind is checked with the value rather
+ * than beside it, so the message names the shape the admin was actually asked
+ * for instead of the union of all three.
+ */
+export const AllowlistRuleInput = z
+  .object({ kind: z.enum(allowlistRuleKinds), value: AllowlistValue })
+  .superRefine(({ kind, value }, ctx) => {
+    const { pattern, message } = allowlistValueShapes[kind];
+    if (!pattern.test(value)) ctx.addIssue({ code: "custom", message, path: ["value"] });
+  });
 
 /** Strict on the way in: `dev` is a mistake worth reporting, not something to correct silently. */
 export const ProjectKey = z

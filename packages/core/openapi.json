@@ -5175,7 +5175,8 @@
                             "type": "string",
                             "enum": [
                               "email_domain",
-                              "github_org"
+                              "github_org",
+                              "gitlab_group"
                             ]
                           },
                           "value": {
@@ -5217,7 +5218,7 @@
       },
       "post": {
         "operationId": "allowlist.add",
-        "summary": "Admit every sign-in matching an email domain or a GitHub organization",
+        "summary": "Admit every sign-in matching an email domain, a GitHub organization or a GitLab group",
         "requestBody": {
           "required": true,
           "content": {
@@ -5229,14 +5230,15 @@
                     "type": "string",
                     "enum": [
                       "email_domain",
-                      "github_org"
+                      "github_org",
+                      "gitlab_group"
                     ]
                   },
                   "value": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255,
-                    "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$"
+                    "pattern": "^[a-z0-9][a-z0-9._-]*(\\/[a-z0-9][a-z0-9._-]*)*$"
                   }
                 },
                 "required": [
@@ -5265,7 +5267,8 @@
                       "type": "string",
                       "enum": [
                         "email_domain",
-                        "github_org"
+                        "github_org",
+                        "gitlab_group"
                       ]
                     },
                     "value": {

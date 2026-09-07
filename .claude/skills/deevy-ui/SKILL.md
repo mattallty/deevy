@@ -504,7 +504,8 @@ name, a State); `Group by <label>` as each option's text.
 
 The Settings rework added: `combobox "Settings page"` (the compact nav below `lg`, whose classes the shell
 test asserts as `lg:hidden` / `lg:flex`); `Who may join`, `Add rule`, `Stop allowing <value>` and the
-`Match on` / `Domain` fields behind it (Workspace › General); `nav "Teams"`, `article "<Team>"`,
+`Match on` field behind it, whose value field is named by the kind chosen — `Domain`, `Organization login`,
+`Group path` (Workspace › General); `nav "Teams"`, `article "<Team>"`,
 `list "Members of <Team>"`, `Actions for <name>`, `Disband <Team>`; `Kind` / `Subject` / `Project` on the
 Event log, now named by a `<label>` rather than an `aria-label`.
 

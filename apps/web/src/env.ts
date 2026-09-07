@@ -42,6 +42,9 @@ export interface WorkerBindings {
   GITHUB_CLIENT_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  GITLAB_CLIENT_ID?: string;
+  GITLAB_CLIENT_SECRET?: string;
+  GITLAB_ISSUER?: string;
   DEEVY_ADMIN_EMAIL?: string;
   DEEVY_WORKSPACE_NAME?: string;
   DEEVY_RUN_STALE_MINUTES?: string;
@@ -104,6 +107,11 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
       google: {
         clientId: env.GOOGLE_CLIENT_ID ?? "",
         clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+      },
+      gitlab: {
+        clientId: env.GITLAB_CLIENT_ID ?? "",
+        clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
+        issuer: env.GITLAB_ISSUER,
       },
     },
     adminEmail: env.DEEVY_ADMIN_EMAIL,

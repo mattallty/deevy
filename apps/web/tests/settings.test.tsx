@@ -23,6 +23,7 @@ const stub = vi.hoisted(() => ({
   rules: [
     { id: "r-1", kind: "email_domain", value: "example.com", createdAt: new Date() },
     { id: "r-2", kind: "github_org", value: "acme", createdAt: new Date() },
+    { id: "r-3", kind: "gitlab_group", value: "acme/platform", createdAt: new Date() },
   ],
 }));
 
@@ -67,6 +68,11 @@ describe("the Allowlist row of Workspace › General", () => {
     expect(screen.getByText("acme")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Stop allowing example.com" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Stop allowing acme" })).toBeTruthy();
+    // A bare path says nothing about which namespace it is in, so a chip that
+    // is not an email domain wears the word (docs/plans/sign-in.md slice 5).
+    expect(screen.getByText("acme/platform")).toBeTruthy();
+    expect(screen.getByText("group")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stop allowing acme/platform" })).toBeTruthy();
   });
 
   it("keeps the form for a new rule behind Add rule", async () => {

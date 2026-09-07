@@ -49,13 +49,25 @@ Put the client id and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_
 default scopes and sets no `hd`, so Google decides nothing about who may join: a Google Workspace is an email
 domain, and an `email_domain` allowlist rule is what admits it.
 
+**GitLab.** Create an application under User settings › Applications on gitlab.com or on your own instance,
+confidential, with:
+
+- Redirect URI: `http://localhost:3000/api/auth/callback/gitlab`
+- Scopes: `read_user` and `read_api`
+
+Put the id and secret in `.env` as `GITLAB_CLIENT_ID` and `GITLAB_CLIENT_SECRET`. A self-hosted instance is
+`GITLAB_ISSUER=https://gitlab.example.com`; unset, it is `https://gitlab.com`. Every GitLab endpoint deevy
+calls is built from the issuer, so one entry serves either.
+
 Either way, set `DEEVY_ADMIN_EMAIL` to the address that should become the Workspace admin: the first sign-in
 with it creates the Workspace.
 
 Anyone else who signs in joins as a Member when an allowlist rule matches them, and otherwise gets an account
 and no Membership. The admin manages the rules under Settings, Allowlist. A `github_org` rule is matched by
-listing the organizations the sign-in's token can see, which needs the `read:org` scope: deevy requests it, so
-an OAuth App created before this slice asks for the extra scope the next time someone signs in.
+listing the organizations the sign-in's token can see, which needs the `read:org` scope, and a `gitlab_group`
+rule by listing its groups, which needs `read_api`: deevy requests both, so a client created before the slice
+that added one asks for the extra scope the next time someone signs in. A group rule holds the full path —
+`acme/platform`, and a subgroup is not its parent.
 
 ### Running without an OAuth App
 

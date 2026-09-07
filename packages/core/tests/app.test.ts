@@ -84,11 +84,22 @@ describe("createApp", () => {
     expect(await providers({ google: pair })).toEqual([
       { id: "google", label: "Google", kind: "social" },
     ]);
+    // GitLab is one entry whichever instance it points at, so a self-hosted
+    // issuer changes where a sign-in goes and not what the page offers
+    // (docs/plans/sign-in.md slice 5).
+    expect(await providers({ gitlab: { ...pair, issuer: "https://gitlab.example.com" } })).toEqual([
+      { id: "gitlab", label: "GitLab", kind: "social" },
+    ]);
     // Half a pair is not a provider: a button that only leads to the
     // provider's own error page is worse than no button (docs/plans/sign-in.md).
     expect(await providers({ github: { clientId: "", clientSecret: "secret" } })).toEqual([]);
     expect(await providers({ github: { clientId: "id", clientSecret: "" } })).toEqual([]);
     expect(await providers({ google: { clientId: "", clientSecret: "secret" } })).toEqual([]);
+    expect(
+      await providers({
+        gitlab: { clientId: "", clientSecret: "", issuer: "https://git.example" },
+      }),
+    ).toEqual([]);
   });
 
   /**

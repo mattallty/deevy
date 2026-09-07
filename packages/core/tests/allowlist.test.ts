@@ -68,6 +68,24 @@ describe("allowlist.add", () => {
       client.allowlist.add({ kind: "email_domain", value: "not a domain" }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  /**
+   * The shape a value may take is its kind's (docs/plans/sign-in.md slice 5):
+   * a GitLab group is a path, which is not a domain and never was one.
+   */
+  it("takes a group path for a GitLab group and refuses it for an email domain", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await memberContext(db, { role: "admin", name: "Ada" });
+    const client = createRouterClient(router, { context: admin });
+
+    const rule = await client.allowlist.add({ kind: "gitlab_group", value: "Acme/Platform" });
+    expect(rule).toMatchObject({ kind: "gitlab_group", value: "acme/platform" });
+
+    await expect(
+      client.allowlist.add({ kind: "email_domain", value: "acme/platform" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });
 
 describe("allowlist.remove", () => {
