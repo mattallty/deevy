@@ -7,6 +7,14 @@ A release is two Docker images and one `vX.Y.Z` tag — see [docs/OPERATIONS.md]
 
 <!-- Entries are inserted below this line by `vp run version`. -->
 
+## 0.5.2
+
+### Patch Changes
+
+- **release** — [#36](https://github.com/mattallty/deevy/pull/36) [`8d9fb55`](https://github.com/mattallty/deevy/commit/8d9fb558fb9bff1f9259b0b9723a51d732159228) Thanks [@mattallty](https://github.com/mattallty)! - Nothing in deevy changed. This release exists to walk the release itself end to end after a fix to it: the
+  Version PR behind it is the first whose own checks run, rather than queueing for an approval that could never
+  be granted. If you are on 0.5.1 you can skip it.
+
 ## 0.5.1
 
 ### Patch Changes
