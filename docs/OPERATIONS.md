@@ -245,7 +245,7 @@ bindings arrive with the request.
 | ------------------------------ | ----------- | ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BETTER_AUTH_URL`              | env         | secret             | the request's origin | Sign-in callbacks are wrong, the OAuth server is off, and Slack deliveries wait.                                                                                                                           |
 | `BETTER_AUTH_SECRET`           | env         | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out.                                            |
-| `GITHUB_CLIENT_ID`             | env         | secret             | —                    | Nobody can sign in. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                                                                                                                                |
+| `GITHUB_CLIENT_ID`             | env         | secret             | —                    | GitHub is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                         |
 | `GITHUB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
 | `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                       |
 | `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                       |
@@ -332,6 +332,11 @@ and nobody sees the seam. Raising the value raises the query count with it — o
 value much over 90 spends the whole cap on polling and leaves none for signing the request in.
 
 ### Signing in, and the origin `BETTER_AUTH_URL` names
+
+Which providers an instance offers is what its environment sets: `createAuth` registers the entries whose
+client id and secret are both present, `health.ping` reports the same list publicly, and the sign-in page
+draws one button per entry in that order. An instance with none configured says so on the page instead of
+offering a button that goes nowhere. GitHub is the one entry today (docs/plans/sign-in.md).
 
 `BETTER_AUTH_URL` has to be the origin the browser actually visits, character for character. Better Auth
 builds the OAuth callback from it and sets the session cookie for it, and `packages/core/src/auth.ts` pins

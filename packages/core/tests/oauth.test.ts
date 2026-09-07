@@ -27,7 +27,7 @@ function testApp(options: { metadataDocument?: Record<string, unknown> } = {}) {
     env: {
       baseURL,
       secret,
-      github: { clientId: "github-client", clientSecret: "github-secret" },
+      providers: { github: { clientId: "github-client", clientSecret: "github-secret" } },
       // A Client ID Metadata Document is dereferenced over the network; the
       // port that does it is the one thing a test stands in for, so the rest
       // of the CIMD path is the real plugin (auth.ts).

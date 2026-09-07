@@ -407,8 +407,10 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   else announces; a new one needs a reason.
 - **Everything outside the shell** (`SignedOut`, `NotAMember`, `Suspended`) renders in `SignInFrame`
   (`App.tsx`): the legend on the left is built from `MemberChip` and `StateBadge` with placeholder Members,
-  so a token change shows up there too. The dev form stays under the GitHub button, only when `health.ping`
-  reports `devSignIn`.
+  so a token change shows up there too. **The sign-in buttons are `health.ping`'s `providers`**, one per
+  entry in the order the server sent (`Sign in with <label>`); a deployment that configured none gets a line
+  saying so and no button, and a provider is added by configuring one, never by editing `App.tsx`
+  (docs/plans/sign-in.md). The dev form stays under them, only when `health.ping` reports `devSignIn`.
 - **`ui/*` hygiene:** a `ui/*` file may sit unimported (it is the kit), but a dependency only an unimported
   file needs goes with the file. Removed in slice 11: `chart`, `carousel`, `calendar`, `input-otp`,
   `aspect-ratio`, `menubar`, `navigation-menu`, `slider`, `progress`, `radio-group`, `drawer`,

@@ -18,7 +18,7 @@ function testAuth() {
     env: {
       baseURL: "http://localhost:3000",
       secret: "test-secret-that-is-at-least-32-characters",
-      github: { clientId: "github-client", clientSecret: "github-secret" },
+      providers: { github: { clientId: "github-client", clientSecret: "github-secret" } },
     },
   });
   return { db, auth };

@@ -1,14 +1,29 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-const stub = vi.hoisted(() => ({ devSignIn: false }));
+interface StubProvider {
+  id: string;
+  label: string;
+  kind: "social";
+}
+
+const github: StubProvider = { id: "github", label: "GitHub", kind: "social" };
+const stub = vi.hoisted(() => ({
+  devSignIn: false,
+  providers: [{ id: "github", label: "GitHub", kind: "social" }] as StubProvider[],
+}));
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
   const client = stubClient({
     health: {
-      ping: async () => ({ ok: true, time: new Date(0).toISOString(), devSignIn: stub.devSignIn }),
+      ping: async () => ({
+        ok: true,
+        time: new Date(0).toISOString(),
+        devSignIn: stub.devSignIn,
+        providers: stub.providers,
+      }),
     },
   });
   return { client, orpc: createTanstackQueryUtils(client) };
@@ -20,19 +35,37 @@ const { orpc } = await import("../src/lib/orpc.ts");
 
 afterEach(() => {
   stub.devSignIn = false;
+  stub.providers = [github];
   vi.unstubAllGlobals();
 });
 
 describe("SignedOut", () => {
-  it("offers GitHub sign-in, and nothing else on a real instance", async () => {
+  it("offers the providers this deployment configured, and nothing else", async () => {
     const { queryClient } = mount(<SignedOut />);
-    expect(screen.getByRole("button", { name: "Sign in with GitHub" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Sign in with GitHub" })).toBeTruthy();
     // The form's absence means something only once health.ping has answered.
     await waitFor(() =>
       expect(queryClient.getQueryState(orpc.health.ping.queryKey())?.status).toBe("success"),
     );
     expect(screen.queryByRole("form")).toBeNull();
     expect(screen.queryByLabelText("Email")).toBeNull();
+  });
+
+  it("renders one button per provider, in the order the server sent", async () => {
+    stub.providers = [github, { id: "google", label: "Google", kind: "social" }];
+    mount(<SignedOut />);
+    await screen.findByRole("button", { name: "Sign in with Google" });
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Sign in with GitHub",
+      "Sign in with Google",
+    ]);
+  });
+
+  it("says so when the deployment configured no provider at all", async () => {
+    stub.providers = [];
+    mount(<SignedOut />);
+    expect(await screen.findByText(/no sign-in provider configured/)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("offers the development form only when health.ping says GitHub is a stub", async () => {

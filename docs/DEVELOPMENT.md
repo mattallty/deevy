@@ -34,6 +34,11 @@ Create one at https://github.com/settings/developers with:
 Put the client id and secret in `.env`. Set `DEEVY_ADMIN_EMAIL` to the primary email of the GitHub account
 that should become the Workspace admin: the first sign-in with that address creates the Workspace.
 
+A provider is configuration, not a constant (docs/plans/sign-in.md): what a deployment sets is what
+`createAuth` registers, what `health.ping` reports, and what the sign-in page draws a button for. Half a pair
+is no provider — with only `GITHUB_CLIENT_ID` set, GitHub is neither registered nor offered, and the page says
+this deployment has none configured rather than offering a button that ends on GitHub's own error page.
+
 Anyone else who signs in joins as a Member when an allowlist rule matches them, and otherwise gets an account
 and no Membership. The admin manages the rules under Settings, Allowlist. A `github_org` rule is matched by
 listing the organizations the sign-in's token can see, which needs the `read:org` scope: deevy requests it, so

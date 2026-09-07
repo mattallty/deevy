@@ -11,6 +11,41 @@ import { fetchClientMetadataResource, type MetadataResourceFetch } from "./cimd.
 import { appendEvent } from "./events.ts";
 import { authId, newId } from "./ids.ts";
 
+/**
+ * Both halves of an OAuth client. Half a pair is not a provider: a `clientId`
+ * of `""` still registers one with Better Auth, and the failure then arrives
+ * as a redirect to the provider's own error page rather than as a sign-in page
+ * that can say this instance offers nothing (docs/plans/sign-in.md).
+ */
+export interface OAuthClient {
+  clientId: string;
+  clientSecret: string;
+}
+
+/**
+ * What a deployment configures: one optional entry per provider deevy offers.
+ * A provider is configuration, not a constant, so offering another one is an
+ * entry here and in `signInProviders` rather than an edit to the sign-in page
+ * (docs/plans/sign-in.md).
+ */
+export interface AuthProviders {
+  github?: OAuthClient;
+}
+
+/**
+ * How the SPA starts a sign-in with a provider. `social` is Better Auth's own
+ * `signIn.social`; a generic OIDC provider is posted differently and brings
+ * the second value with it (docs/plans/sign-in.md).
+ */
+export type SignInProviderKind = "social";
+
+/** One provider, as the sign-in page needs it: what to call, and what to say. */
+export interface SignInProvider {
+  id: string;
+  label: string;
+  kind: SignInProviderKind;
+}
+
 export interface AuthEnv {
   /** Public URL of the server; callbacks derive from it. */
   baseURL?: string;
@@ -18,7 +53,8 @@ export interface AuthEnv {
   secret?: string;
   /** Browser origins allowed to use the session cookie (the Vite dev server). */
   trustedOrigins?: string[];
-  github: { clientId: string; clientSecret: string };
+  /** Which sign-in providers this deployment offers. Absent offers none. */
+  providers?: AuthProviders;
   /** The first sign-in with this email creates the Workspace and becomes admin. */
   adminEmail?: string;
   workspaceName?: string;
@@ -50,15 +86,7 @@ export function createAuth({ db, env }: CreateAuthOptions) {
     advanced: { database: { generateId: ({ model }) => authId(model) } },
     emailAndPassword: { enabled: false },
     plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env)],
-    socialProviders: {
-      github: {
-        clientId: env.github.clientId,
-        clientSecret: env.github.clientSecret,
-        // The organizations a github_org allowlist rule matches are only
-        // listable with this scope (docs/plans/m1.md).
-        scope: ["read:org"],
-      },
-    },
+    socialProviders: socialProvidersOf(env.providers ?? {}),
     user: {
       additionalFields: {
         kind: {
@@ -99,6 +127,46 @@ export function createAuth({ db, env }: CreateAuthOptions) {
   // does not turn one into an unhandled rejection.
   void auth.$context.catch(() => {});
   return auth;
+}
+
+/**
+ * The providers this deployment offers, in the order the sign-in page renders
+ * them. Public through `health.ping`: an instance that cannot say what it
+ * offers cannot render its own sign-in page (docs/plans/sign-in.md).
+ */
+export function signInProviders(env: Pick<AuthEnv, "providers">): SignInProvider[] {
+  const providers = env.providers ?? {};
+  const offered: SignInProvider[] = [];
+  if (configuredClient(providers.github))
+    offered.push({ id: "github", label: "GitHub", kind: "social" });
+  return offered;
+}
+
+/**
+ * The social providers Better Auth registers: the configured entries, and only
+ * those. What `signInProviders` reports and what `createAuth` registers are
+ * decided by the same predicate, so a button on the page is a provider the
+ * server will actually start a sign-in with.
+ */
+function socialProvidersOf(providers: AuthProviders) {
+  const github = configuredClient(providers.github);
+  return github
+    ? {
+        github: {
+          ...github,
+          // The organizations a github_org allowlist rule matches are only
+          // listable with this scope (docs/plans/m1.md).
+          scope: ["read:org"],
+        },
+      }
+    : {};
+}
+
+/** An entry with both halves of its pair, or nothing. */
+function configuredClient(client: OAuthClient | undefined): OAuthClient | null {
+  const clientId = client?.clientId.trim();
+  const clientSecret = client?.clientSecret.trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
 
 /** The prefix every deevy API key carries, and the discriminator resolvePrincipal reads. */

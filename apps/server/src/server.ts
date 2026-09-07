@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { mountSpa, openDatabase } from "@deevy/adapters/node";
-import { createApp, createAuth, type AuthEnv } from "@deevy/core";
+import { createApp, createAuth, signInProviders, type AuthEnv } from "@deevy/core";
 import { fetchClientMetadataResource } from "./cimd.ts";
 import type { ServerEnv } from "./env.ts";
 
@@ -21,7 +21,7 @@ function authEnv(env: ServerEnv): AuthEnv {
     baseURL: env.baseURL,
     secret: env.secret,
     trustedOrigins: [env.webOrigin, env.baseURL].filter((o): o is string => Boolean(o)),
-    github: env.github,
+    providers: env.providers,
     adminEmail: env.adminEmail,
     workspaceName: env.workspaceName,
     fetchClientMetadataResource,
@@ -51,6 +51,10 @@ export function buildServer(env: ServerEnv) {
     baseURL: env.baseURL,
     secret: env.secret,
     devSignIn: env.devStubGithub,
+    // What the sign-in page draws its buttons from: the providers this
+    // environment configured, decided where they are registered rather than in
+    // the SPA (docs/plans/sign-in.md).
+    signInProviders: signInProviders(identity),
   });
   if (env.webDist) mountSpa(app, resolve(env.webDist));
   return { app, db, auth, close, authEnv: identity };

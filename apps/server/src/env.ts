@@ -1,3 +1,5 @@
+import type { AuthProviders } from "@deevy/core";
+
 export interface ServerEnv {
   port: number;
   databasePath: string;
@@ -5,7 +7,12 @@ export interface ServerEnv {
   baseURL?: string;
   secret?: string;
   webOrigin?: string;
-  github: { clientId: string; clientSecret: string };
+  /**
+   * The sign-in providers this instance offers, one optional entry each. A
+   * provider is configuration: what is set here is what `createAuth` registers
+   * and what the sign-in page draws a button for (docs/plans/sign-in.md).
+   */
+  providers: AuthProviders;
   adminEmail?: string;
   workspaceName?: string;
   webDist?: string;
@@ -46,9 +53,11 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     webOrigin: env.DEEVY_WEB_ORIGIN,
-    github: {
-      clientId: env.GITHUB_CLIENT_ID ?? "",
-      clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+    providers: {
+      github: {
+        clientId: env.GITHUB_CLIENT_ID ?? "",
+        clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+      },
     },
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,

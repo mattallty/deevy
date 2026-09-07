@@ -15,11 +15,27 @@ export const health = {
       time: z.string(),
       /** True when this instance signs in through the development GitHub stub. */
       devSignIn: z.boolean(),
+      /**
+       * The sign-in providers this deployment configured, in the order the
+       * sign-in page renders them. Public on purpose: an instance that cannot
+       * say what it offers cannot render its own sign-in page, and "this
+       * deployment has GitHub configured" is not a secret worth a session
+       * (docs/plans/sign-in.md).
+       */
+      providers: z.array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          /** How the SPA starts the sign-in. */
+          kind: z.enum(["social"]),
+        }),
+      ),
     }),
     handler: async ({ context }) => ({
       ok: true as const,
       time: new Date().toISOString(),
       devSignIn: context.devSignIn === true,
+      providers: context.signInProviders ?? [],
     }),
   }),
 };

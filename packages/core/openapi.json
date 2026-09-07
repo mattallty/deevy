@@ -1380,12 +1380,39 @@
                     },
                     "devSignIn": {
                       "type": "boolean"
+                    },
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "social"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
                     "ok",
                     "time",
-                    "devSignIn"
+                    "devSignIn",
+                    "providers"
                   ],
                   "additionalProperties": false
                 }

@@ -1,4 +1,4 @@
-import type { AuthEnv, LiveOptions } from "@deevy/core";
+import type { AuthEnv, AuthProviders, LiveOptions } from "@deevy/core";
 import { fetchClientMetadataResource } from "@deevy/core/cimd";
 import type { createDb, QueueProducer } from "@deevy/adapters/workers";
 
@@ -59,7 +59,11 @@ export interface WorkerEnv {
   baseURL?: string;
   secret?: string;
   webOrigin?: string;
-  github: { clientId: string; clientSecret: string };
+  /**
+   * The sign-in providers this instance offers, one optional entry each, read
+   * from the same names `apps/server/src/env.ts` reads (docs/plans/sign-in.md).
+   */
+  providers: AuthProviders;
   adminEmail?: string;
   workspaceName?: string;
   /** Silence after which a Run is presumed stale (docs/plans/m2.md). */
@@ -90,9 +94,11 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     webOrigin: env.DEEVY_WEB_ORIGIN,
-    github: {
-      clientId: env.GITHUB_CLIENT_ID ?? "",
-      clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+    providers: {
+      github: {
+        clientId: env.GITHUB_CLIENT_ID ?? "",
+        clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+      },
     },
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,
@@ -119,7 +125,7 @@ export function workerAuthEnv(env: WorkerEnv): AuthEnv {
     baseURL: env.baseURL,
     secret: env.secret,
     trustedOrigins: [env.webOrigin, env.baseURL].filter((o): o is string => Boolean(o)),
-    github: env.github,
+    providers: env.providers,
     adminEmail: env.adminEmail,
     workspaceName: env.workspaceName,
     fetchClientMetadataResource,

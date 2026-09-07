@@ -7,7 +7,7 @@ import { CORSHandlerPlugin } from "@orpc/server/plugins";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Auth } from "./auth.ts";
+import type { Auth, SignInProvider } from "./auth.ts";
 import { discardingJobQueue, type JobQueue } from "./jobs.ts";
 import type { LiveOptions } from "./live.ts";
 import { createDeevyMcp } from "./mcp/server.ts";
@@ -57,6 +57,13 @@ export interface AppOptions {
    * `DEEVY_DEV_STUB_GITHUB`). Reported on `health.ping`; the Worker never sets it.
    */
   devSignIn?: boolean;
+  /**
+   * Which providers this deployment offers a Human to sign in with, from
+   * `signInProviders(env)` in the entry that built the identity configuration.
+   * Reported on `health.ping`, so the sign-in page renders what the server
+   * registered rather than a constant of its own (docs/plans/sign-in.md).
+   */
+  signInProviders?: SignInProvider[];
 }
 
 /**
@@ -95,6 +102,7 @@ export function createApp({
   jobs = discardingJobQueue(),
   onError: report = console.error,
   devSignIn = false,
+  signInProviders = [],
 }: AppOptions) {
   // A client asking for a Run that does not exist is a 404, not something for
   // an operator to read. Reporting every refusal buried the ones that matter in
@@ -142,6 +150,7 @@ export function createApp({
     ...(live ? { live } : {}),
     jobs,
     devSignIn,
+    signInProviders,
   });
   app.use("/rpc/*", async (c, next) => {
     c.set("ctx", await contextFor(c.req.raw));

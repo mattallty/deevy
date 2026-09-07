@@ -2,7 +2,7 @@ import { member, user, workspace } from "@deevy/db";
 import { ORPCError, call, createRouterClient } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createApp, isDefinedRefusal } from "../src/app.ts";
-import { bootstrapWorkspace, slugify } from "../src/auth.ts";
+import { bootstrapWorkspace, createAuth, signInProviders, slugify } from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import type { AppContext } from "../src/operations/registry.ts";
 import { testDb } from "./helpers.ts";
@@ -51,6 +51,58 @@ describe("createApp", () => {
       (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
     expect((await ping(createApp({ db: context.db }))).devSignIn).toBe(false);
     expect((await ping(createApp({ db: context.db, devSignIn: true }))).devSignIn).toBe(true);
+  });
+
+  it("tells a signed-out SPA which providers it offers", async () => {
+    const context = anonymous();
+    const providers = async (github: { clientId: string; clientSecret: string }) => {
+      const app = createApp({
+        db: context.db,
+        signInProviders: signInProviders({ providers: { github } }),
+      });
+      const body = (await (await app.request("/api/health/ping")).json()) as {
+        providers: Array<{ id: string; label: string; kind: string }>;
+      };
+      return body.providers;
+    };
+    expect(await providers({ clientId: "id", clientSecret: "secret" })).toEqual([
+      { id: "github", label: "GitHub", kind: "social" },
+    ]);
+    // Half a pair is not a provider: a button that only leads to the
+    // provider's own error page is worse than no button (docs/plans/sign-in.md).
+    expect(await providers({ clientId: "", clientSecret: "secret" })).toEqual([]);
+    expect(await providers({ clientId: "id", clientSecret: "" })).toEqual([]);
+  });
+
+  /**
+   * The half-a-pair case the sign-in page is meant to be able to report: with
+   * `clientId: ""` Better Auth would register GitHub anyway and the failure
+   * would arrive as a redirect to GitHub's own error page, so the entry is
+   * absent instead and the page offers no button (docs/plans/sign-in.md).
+   */
+  it("starts a sign-in only with a provider it registered", async () => {
+    const baseURL = "https://deevy.example.com";
+    const startSignIn = async (github: { clientId: string; clientSecret: string }) => {
+      const context = anonymous();
+      const auth = createAuth({
+        db: context.db,
+        env: {
+          baseURL,
+          secret: "test-secret-that-is-at-least-32-characters",
+          providers: { github },
+        },
+      });
+      const app = createApp({ db: context.db, auth, baseURL });
+      return app.request(`${baseURL}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+      });
+    };
+    expect((await startSignIn({ clientId: "id", clientSecret: "secret" })).status).toBe(200);
+    expect(
+      (await startSignIn({ clientId: "", clientSecret: "secret" })).status,
+    ).toBeGreaterThanOrEqual(400);
   });
 
   it("rejects session and member operations for anonymous callers", async () => {

@@ -6,6 +6,7 @@ import {
   createAuth,
   deliverWebhook,
   runDueWork,
+  signInProviders,
   type AuthEnv,
   type DueWorkLimits,
 } from "@deevy/core";
@@ -79,6 +80,9 @@ export function isolateFor(bindings: WorkerBindings): Isolate {
       // stream that ends itself signs off with the cursor the next one resumes
       // from (docs/plans/m3.md slice 7).
       live: env.live,
+      // The buttons the sign-in page draws, from the same entries Better Auth
+      // was just registered with (docs/plans/sign-in.md).
+      signInProviders: signInProviders(authEnv),
       // Only when the account has Queues. Absent, `createApp` discards jobs
       // and every delivery waits for the next Cron pass, which is the whole
       // difference an optional binding makes (docs/plans/m3.md slice 9).
