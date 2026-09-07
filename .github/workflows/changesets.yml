@@ -100,10 +100,14 @@ jobs:
           create-github-releases: false
           push-git-tags: false
         env:
-          # Still needed, and not the same thing as `github-token` above: this
-          # is what @changesets/changelog-github reads inside `vp run version`
-          # to turn each changeset into a line naming its pull request.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Still needed — this is what @changesets/changelog-github reads
+          # inside `vp run version` to turn each changeset into a line naming
+          # its pull request — and it must be the *same* token as the input
+          # above. v2.1.1 refuses the pair when they differ rather than leaving
+          # you to guess which one it used, so leaving this as GITHUB_TOKEN
+          # fails the run outright: "The GITHUB_TOKEN environment variable is
+          # set and does not match the github-token input."
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       # Two conditions. Changesets waiting means the action has just opened or
       # updated the Version PR and there is nothing to release yet — releasing
