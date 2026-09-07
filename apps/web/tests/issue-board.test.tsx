@@ -113,6 +113,29 @@ describe("planDrop", () => {
   it("does nothing for a drop back into the same column", () => {
     expect(planDrop(opsTodo, "Todo", column("Todo"))).toEqual({ kind: "none" });
   });
+
+  it("refuses a column that takes no cards in its own words", () => {
+    const readOnly: BoardColumn = {
+      id: "p-dev",
+      name: "deevy",
+      header: "deevy",
+      refusal: "An Issue belongs to the Project its key names",
+    };
+
+    expect(planDrop(opsTodo, "Todo", readOnly)).toEqual({
+      kind: "refused",
+      message: "An Issue belongs to the Project its key names",
+    });
+  });
+
+  it("falls back to naming the column when it gives no reason", () => {
+    const readOnly: BoardColumn = { id: "x", name: "Whatever", header: "Whatever" };
+
+    expect(planDrop(opsTodo, "Todo", readOnly)).toEqual({
+      kind: "refused",
+      message: "Whatever takes no cards",
+    });
+  });
 });
 
 describe("groupIntoColumns", () => {

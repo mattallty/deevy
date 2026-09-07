@@ -4,12 +4,7 @@ import { useMemo, useState } from "react";
 import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  IssueBoard,
-  groupIntoColumns,
-  type BoardColumn,
-  type BoardIssue,
-} from "@/components/issue-board";
+import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
 import {
   ISSUE_PAGE,
   IssueFilters,
@@ -195,19 +190,23 @@ export function IssuesPage({
 
   const boardColumns = useMemo<BoardColumn[]>(
     () =>
-      buckets.map((bucket) => ({
-        id: bucket.id,
-        name: bucket.name,
-        header: bucket.header,
-        ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
-        ...(bucket.plan ? { plan: bucket.plan } : {}),
-      })),
+      buckets
+        // A column nothing is in is still somewhere to drop, but only where the
+        // grouping says so — the list drops the same bucket for having no rows.
+        .filter((bucket) => bucket.rows.length > 0 || bucket.keepWhenEmpty)
+        .map((bucket) => ({
+          id: bucket.id,
+          name: bucket.name,
+          header: bucket.header,
+          ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+          ...(bucket.plan ? { plan: bucket.plan } : {}),
+          ...(bucket.refusal ? { refusal: bucket.refusal } : {}),
+        })),
     [buckets],
   );
-  const boardValue = useMemo(
-    () => groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], byBucket(buckets)),
-    [boardColumns, buckets, rows],
-  );
+  // Memoised, or `IssueBoard`'s own `useMemo` over it never hits and the whole
+  // board is re-bucketed on every render of this page.
+  const columnOf = useMemo(() => byBucket(buckets), [buckets]);
 
   // Which buckets the Human has folded or unfolded away from their default.
   const [toggled, setToggled] = useState<Set<string>>(() => new Set());
@@ -241,9 +240,9 @@ export function IssuesPage({
   const visibleIds = useMemo(
     () =>
       board
-        ? boardColumns.flatMap((column) => (boardValue[column.id] ?? []).map((card) => card.key))
+        ? buckets.flatMap((bucket) => bucket.rows.map((card) => card.key))
         : (groups ? groups.flatMap((g) => (g.collapsed ? [] : g.rows)) : rows).map((r) => r.key),
-    [board, boardColumns, boardValue, groups, rows],
+    [board, buckets, groups, rows],
   );
   const peek = (key: string) => onSearch({ peek: key });
   const openFull = (key: string) =>
@@ -380,7 +379,7 @@ export function IssuesPage({
         <IssueBoard
           columns={boardColumns}
           issues={rows as unknown as BoardIssue[]}
-          columnOf={byBucket(buckets)}
+          columnOf={columnOf}
           loading={issues.isPending}
           selectedKey={selected}
           onSelect={setSelected}

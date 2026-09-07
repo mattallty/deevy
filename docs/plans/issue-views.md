@@ -67,7 +67,7 @@ interface Bucket {
 | Grouping        | Buckets                                        | Order                                | Drop                                       |
 | --------------- | ---------------------------------------------- | ------------------------------------ | ------------------------------------------ |
 | `state`         | folded State names + any State a row is in     | Workflow order, backlog→active→done  | `issues.move`, or the Gate ruling dialog   |
-| `assignee`      | one per Member with Issues, plus Unassigned    | Humans, then Agents, then Unassigned | `issues.update({ assigneeMemberId })`      |
+| `assignee`      | one per Member, plus Unassigned                | Humans, then Agents, then Unassigned | `issues.update({ assigneeMemberId })`      |
 | `project`       | one per Project the rows touch                 | Project key                          | refused: "An Issue belongs to its Project" |
 | `label:<scope>` | one per Label in that scope, plus `No <scope>` | the scope's Labels, then No          | `issues.setLabels`, swapping that scope    |
 
@@ -79,7 +79,7 @@ Project and Label ids are already Workspace-wide.
 
 Move what exists behind the interface, changing nothing on screen.
 
-- New `apps/web/src/lib/groupings.ts`: the types above, `stateGrouping`, and `groupingsFor(context)` returning
+- New `apps/web/src/lib/groupings.tsx`: the types above, `stateGrouping`, and `groupingsFor(context)` returning
   the list a screen may offer.
 - `routes/issues/list.tsx` builds its `DataGroup[]` and its `BoardColumn[]` from `bucketsOf` instead of its
   own two loops. The State-specific ordering, the unknown-State column, and the Done-is-collapsed rule move

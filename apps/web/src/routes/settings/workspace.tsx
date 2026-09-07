@@ -101,7 +101,7 @@ function Identity({ canRename }: { canRename: boolean }) {
   ];
 
   return (
-    <section aria-label="Name" className="flex flex-col gap-4">
+    <section aria-label="This Workspace" className="flex flex-col gap-4">
       <div className="flex items-start gap-4">
         <span
           aria-hidden
@@ -159,7 +159,9 @@ function Identity({ canRename }: { canRename: boolean }) {
             </Button>
           </>
         ) : null}
-        {autosave.status === "idle" && canRename ? "The name saves as you change it." : null}
+        {autosave.status === "idle" && canRename
+          ? "The name saves when you leave the field."
+          : null}
       </p>
 
       {/* Ruled apart, not just spaced: four numbers in a row with nothing between
@@ -195,33 +197,28 @@ function SetUp() {
   const checks = [
     {
       done: (rules.data?.rules.length ?? 0) > 0,
+      // Fixed by the Allowlist row further down this same page, so no link.
       todo: "Nobody but the admin can sign in",
-      to: "/settings/workspace",
-      act: null,
     },
     {
       done: (projects.data?.projects.length ?? 0) > 0,
       todo: "No Project yet, so an Issue has nowhere to live",
-      to: "/projects",
-      act: "New Project",
+      action: { label: "New Project", to: "/projects" },
     },
     {
       done: (agents.data?.agents.length ?? 0) > 0,
       todo: "No Agent yet — a Workspace of Humans is half of deevy",
-      to: "/settings/agents",
-      act: "Add one",
+      action: { label: "Add one", to: "/settings/agents" },
     },
     {
       done: (repositories.data?.repositories.length ?? 0) > 0,
       todo: "No Repository connected, so an Agent has nowhere to push",
-      to: "/settings/repositories",
-      act: "Connect",
+      action: { label: "Connect", to: "/settings/repositories" },
     },
     {
       done: (channels.data?.channels.length ?? 0) > 0,
       todo: "No Channel connected, so nothing reaches Slack",
-      to: "/settings/channels",
-      act: "Connect",
+      action: { label: "Connect", to: "/settings/channels" },
     },
   ];
 
@@ -251,14 +248,14 @@ function SetUp() {
             className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-primary/20 py-2 first:border-t-0 first:pt-0"
           >
             <span className="min-w-0 flex-1 text-sm">{check.todo}</span>
-            {check.act ? (
+            {check.action ? (
               <Button
                 variant="outline"
                 size="sm"
                 nativeButton={false}
-                render={<Link to={check.to} />}
+                render={<Link to={check.action.to} />}
               >
-                {check.act}
+                {check.action.label}
               </Button>
             ) : null}
           </li>

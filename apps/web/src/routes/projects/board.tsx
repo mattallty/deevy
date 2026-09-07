@@ -84,13 +84,18 @@ export function BoardPage({
   const buckets = useMemo(() => grouping.buckets(cards), [grouping, cards]);
   const columns = useMemo<BoardColumn[]>(
     () =>
-      buckets.map((bucket) => ({
-        id: bucket.id,
-        name: bucket.name,
-        header: bucket.header,
-        ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
-        ...(bucket.plan ? { plan: bucket.plan } : {}),
-      })),
+      buckets
+        // A column nothing is in is still somewhere to drop, but only where the
+        // grouping says so — the list drops the same bucket for having no rows.
+        .filter((bucket) => bucket.rows.length > 0 || bucket.keepWhenEmpty)
+        .map((bucket) => ({
+          id: bucket.id,
+          name: bucket.name,
+          header: bucket.header,
+          ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+          ...(bucket.plan ? { plan: bucket.plan } : {}),
+          ...(bucket.refusal ? { refusal: bucket.refusal } : {}),
+        })),
     [buckets],
   );
   const filterStates: FilterState[] = states.map((state) => ({
@@ -101,6 +106,8 @@ export function BoardPage({
 
   // The cards as they are on screen, column by column, for j and k; Enter
   // peeks and o opens, as on the Issues home (lib/row-selection.ts).
+  // Memoised: a fresh closure would defeat IssueBoard's memo over the cards.
+  const columnOf = useMemo(() => byBucket(buckets), [buckets]);
   const visibleKeys = useMemo(
     () => buckets.flatMap((bucket) => bucket.rows.map((card) => card.key)),
     [buckets],
@@ -141,7 +148,7 @@ export function BoardPage({
       <IssueBoard
         columns={columns}
         issues={cards}
-        columnOf={byBucket(buckets)}
+        columnOf={columnOf}
         loading={workflow.isPending || issues.isPending}
         selectedKey={selected}
         onSelect={select}

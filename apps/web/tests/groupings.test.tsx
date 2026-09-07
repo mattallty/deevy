@@ -210,10 +210,13 @@ describe("the Project grouping", () => {
     expect(buckets.map((bucket) => bucket.name)).toEqual(["deevy", "Operations"]);
   });
 
-  it("takes no cards, because an Issue belongs to the Project its key names", () => {
+  it("takes no cards, and says why rather than naming the Project at you", () => {
     const buckets = projectGrouping(projectRows).buckets([issue("DEV-1", "p-dev", build)]);
 
     expect(buckets.every((bucket) => bucket.plan === undefined)).toBe(true);
+    expect(
+      buckets.every((bucket) => bucket.refusal === "An Issue belongs to the Project its key names"),
+    ).toBe(true);
   });
 });
 
@@ -225,8 +228,9 @@ describe("a Label scope as a grouping", () => {
     { id: "l-backend", name: "backend", scope: null, color: "#a78bfa" },
   ];
   const epic = () => labelScopeGrouping("epic", labels);
+  let next = 0;
   const carrying = (...held: string[]) => ({
-    ...issue("DEV-1", "p-dev", build),
+    ...issue(`DEV-${String(++next)}`, "p-dev", build),
     labels: labels.filter((label) => held.includes(label.id)),
   });
 

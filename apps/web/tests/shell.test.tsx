@@ -119,7 +119,11 @@ describe("the app shell", () => {
         .getAllByRole("link")
         .map((link) => link.textContent),
     );
-    expect(screen.getAllByRole("group").length).toBeGreaterThanOrEqual(4);
+    // …in the four groups the wide nav uses, named, not merely four of something.
+    const listbox = screen.getByRole("listbox");
+    for (const group of ["Workspace", "Work", "Agents and delivery", "You"]) {
+      expect(within(listbox).getByText(group)).toBeTruthy();
+    }
 
     await pickOption(trigger, "Teams");
     await waitFor(() => expect(router.state.location.pathname).toBe("/settings/teams"));

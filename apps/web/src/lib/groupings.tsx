@@ -38,10 +38,12 @@ export interface GroupBucket<T extends GroupableIssue = GroupableIssue> {
   isGate?: boolean;
   /**
    * What a drop into this bucket means, decided before anything is written.
-   * Absent, the board refuses every drop into it and says why — grouping by
+   * Absent, the board takes no cards here and says `refusal` — grouping by
    * Project is the case: an Issue belongs to the Project its key names.
    */
   plan?: (issue: GroupableIssue) => DropPlan;
+  /** Why this bucket takes no cards, in a sentence. Only read without a `plan`. */
+  refusal?: string;
 }
 
 /** One way to divide a list of Issues. `id` is what rides in `?group=`. */
@@ -250,6 +252,7 @@ export function projectGrouping(
         return {
           id,
           name,
+          refusal: "An Issue belongs to the Project its key names",
           header: (
             <span className="flex items-center gap-2 text-sm">
               {project ? (

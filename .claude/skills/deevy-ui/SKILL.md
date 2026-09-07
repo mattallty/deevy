@@ -338,6 +338,40 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `Change Sponsor` select in the header (`agents.setSponsor`). The Agents table keeps its own
   `Schedule for <name>` select, which its test drives.
 
+## What the Settings rework settled (2026-09-07)
+
+- **`SettingsRow` is one setting**: the label, one line of why, then the control, ruled off from the next.
+  A page of cards each holding a single field spends more frame than it frames, so a tenth setting is a
+  tenth row. Its `below` slot is for a form the row opens — across the row's whole width, never inside the
+  control column, where it takes the width out of the label and turns a one-line hint into a sliver.
+  `SettingsSection` is still the card, for a concern with several controls in it.
+- **A Settings page lays itself out by its container, never by the window.** The content column is
+  `@container`, so a page uses `@sm:`…`@3xl:` and not `sm:`…`xl:`: behind the sidebar and the Settings nav
+  a 900px window leaves a form about 350px, and a viewport breakpoint says nothing about that.
+  `SidebarInset` carries `min-w-0` for the same reason (a deevy edit in `ui/sidebar.tsx`) — without it a
+  wide page pushes the whole app sideways rather than shrinking.
+- **The Settings nav appears at `lg`, not `md`.** It is 224px beside a 256px sidebar, so at 768 the page
+  was left 161px and most of the pages overflowed. Below `lg` the whole navigation is one Select
+  (`combobox "Settings page"`) that names where you are without being opened and opens to all eleven pages
+  in the four groups — not a strip of tabs scrolling sideways, which put MCP clients four swipes from
+  General. The content column adds no padding of its own below `lg`: the shell already gives every page a
+  gutter, and a second one spent a quarter of a 390px screen on margins.
+- **Settings leaves the primary sidebar alone.** It used to fold it on the way in and unfold it on the way
+  out; its own nav already reads as the second level.
+- **Workspace › General opens with the Workspace**, not with a form about it: the mark, the name edited
+  where it is read, `@slug`, the date, and counts taken from queries the shell has already run. The
+  Allowlist is a row of chips on it (`/settings/allowlist` redirects), and one strip names what the
+  instance has not set up while anything is unset, from lists the app already fetches, and renders nothing
+  once nothing is.
+- **Teams is master–detail** (`nav "Teams"` beside `article "<Team>"`), the shape the Workflow editor
+  taught, with `?team=` naming the open one. It shows the Projects a Team owns, joined off `projects.list`
+  which already carries each Project's Team.
+- **A label element beats an `aria-label`** where a control can have a visible one: the Event log's filters
+  name themselves Kind, Subject and Project on screen, and the `aria-label`s that would have shadowed them
+  are gone. `getByLabelText` finds the same thing either way.
+- **A log reads at 12px** and names its actors rather than drawing them — 300 rows of avatars is a column
+  of noise. Which kind acted still shows, in the `--human` and `--agent` colours.
+
 ## What slice 10 settled (the Event log)
 
 - **`events.list` takes `before` and `order`** (`asc` default, the stream's; `desc` for a log). The cursor
@@ -463,6 +497,12 @@ purpose and update the tests with them.
 The grouping rework added: `combobox "Group by"` in `group "Filters"`, on the list **and** the board;
 `region "<bucket>"` for a board column named by whatever it groups (`Unassigned`, `No epic`, a Project's
 name, a State); `Group by <label>` as each option's text.
+
+The Settings rework added: `combobox "Settings page"` (the compact nav below `lg`, whose classes the shell
+test asserts as `lg:hidden` / `lg:flex`); `Who may join`, `Add rule`, `Stop allowing <value>` and the
+`Match on` / `Domain` fields behind it (Workspace › General); `nav "Teams"`, `article "<Team>"`,
+`list "Members of <Team>"`, `Actions for <name>`, `Disband <Team>`; `Kind` / `Subject` / `Project` on the
+Event log, now named by a `<label>` rather than an `aria-label`.
 
 Round 2 added these names: `list "Notifications"` with `checkbox "Select <verb>"` and `toolbar "Selection"`
 (Inbox); `button "List"` / `button "Board"` in `group "Filters"` and `region "<State>"` columns on the

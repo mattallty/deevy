@@ -57,6 +57,8 @@ export interface BoardColumn {
   /** The Gate tint, which only a State column asks for. */
   isGate?: boolean;
   plan?: (issue: BoardIssue) => DropPlan;
+  /** Why it takes no cards, said as a fact about Issues rather than an error. */
+  refusal?: string;
 }
 
 export type DropPlan =
@@ -75,7 +77,9 @@ export type DropPlan =
  */
 export function planDrop(issue: BoardIssue, fromColumnId: string, column: BoardColumn): DropPlan {
   if (fromColumnId === column.id) return { kind: "none" };
-  if (!column.plan) return { kind: "refused", message: `${column.name} takes no cards` };
+  if (!column.plan) {
+    return { kind: "refused", message: column.refusal ?? `${column.name} takes no cards` };
+  }
   return column.plan(issue);
 }
 
