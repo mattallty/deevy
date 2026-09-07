@@ -54,8 +54,18 @@ export function stubClient(overrides: StubOverrides = {}): never {
       revoke: async () => ({ revoked: true }),
     },
     workspace: {
-      get: async () => ({ id: "w1", name: "deevy", slug: "deevy" }),
-      update: async () => ({ id: "w1", name: "deevy", slug: "deevy" }),
+      get: async () => ({
+        id: "w1",
+        name: "deevy",
+        slug: "deevy",
+        createdAt: new Date("2026-09-06"),
+      }),
+      update: async () => ({
+        id: "w1",
+        name: "deevy",
+        slug: "deevy",
+        createdAt: new Date("2026-09-06"),
+      }),
     },
     members: {
       list: async () => ({ members: [] }),

@@ -4,12 +4,7 @@ import { useMemo, useState } from "react";
 import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  IssueBoard,
-  groupIntoColumns,
-  type BoardColumn,
-  type BoardIssue,
-} from "@/components/issue-board";
+import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
 import {
   ISSUE_PAGE,
   IssueFilters,
@@ -24,15 +19,20 @@ import { StateBadge } from "@/components/state-badge";
 import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
 import { useRowSelection } from "@/lib/row-selection";
-import { categoryOrder, foldStates } from "@/lib/states";
+import { foldStates } from "@/lib/states";
+import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { ago } from "@/lib/time";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
 >["issues"][number];
 
-/** On the Workspace board a column is a State name, folded across Projects. */
-const byStateName = (issue: BoardIssue) => issue.state.name;
+/** Which bucket a card belongs to, asked of the buckets the grouping made. */
+function byBucket(buckets: Array<{ id: string; rows: Array<{ key: string }> }>) {
+  const home = new Map<string, string>();
+  for (const bucket of buckets) for (const row of bucket.rows) home.set(row.key, bucket.id);
+  return (issue: BoardIssue) => home.get(issue.key) ?? "";
+}
 
 /**
  * The home screen: every Issue you may see, filtered by the URL, grouped by
@@ -58,6 +58,7 @@ export function IssuesPage({
   const me = useQuery(orpc.me.get.queryOptions());
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
 
   const myId = me.data?.member?.id ?? null;
   const memberList = members.data?.members ?? [];
@@ -170,88 +171,78 @@ export function IssuesPage({
     [folded],
   );
 
-  // The board: a column per folded State name, plus one for any State a row is
-  // in that no Workflow names (a stale cache, a race), so no card goes unshown.
   const board = search.view === "board" && !fixedProject;
-  const boardColumns = useMemo<BoardColumn[]>(() => {
-    const columns: BoardColumn[] = folded.map((state) => ({
-      id: state.name,
-      name: state.name,
-      isGate: state.isGate,
-      category: state.category,
-      resolveTarget: (issue) => state.byProject.get(issue.projectId) ?? null,
-    }));
-    for (const row of rows) {
-      if (columns.some((column) => column.id === row.state.name)) continue;
-      columns.push({
-        id: row.state.name,
-        name: row.state.name,
-        isGate: row.state.isGate,
-        category: (row.state.category in categoryOrder
-          ? row.state.category
-          : "active") as FilterState["category"],
-        resolveTarget: (issue) => (issue.state.name === row.state.name ? issue.state.id : null),
-      });
-    }
-    return columns;
-  }, [folded, rows]);
-  const boardValue = useMemo(
-    () => groupIntoColumns(boardColumns, rows as unknown as BoardIssue[], byStateName),
-    [boardColumns, rows],
-  );
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const grouped = search.group !== "none";
+  // One grouping, drawn twice: the list renders its buckets as groups, the
+  // board renders the same buckets as columns (lib/groupings.tsx).
+  const groupings = useMemo(
+    () =>
+      groupingsFor({
+        projects: projects.data?.projects ?? [],
+        members: memberList,
+        labels: labels.data?.labels ?? [],
+        ...(projectKey ? { projectKey } : {}),
+      }),
+    [projects.data, memberList, labels.data, projectKey],
+  );
+  const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
+  const buckets = useMemo(() => grouping.buckets(rows), [grouping, rows]);
+
+  const boardColumns = useMemo<BoardColumn[]>(
+    () =>
+      buckets
+        // A column nothing is in is still somewhere to drop, but only where the
+        // grouping says so — the list drops the same bucket for having no rows.
+        .filter((bucket) => bucket.rows.length > 0 || bucket.keepWhenEmpty)
+        .map((bucket) => ({
+          id: bucket.id,
+          name: bucket.name,
+          header: bucket.header,
+          ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+          ...(bucket.plan ? { plan: bucket.plan } : {}),
+          ...(bucket.refusal ? { refusal: bucket.refusal } : {}),
+        })),
+    [buckets],
+  );
+  // Memoised, or `IssueBoard`'s own `useMemo` over it never hits and the whole
+  // board is re-bucketed on every render of this page.
+  const columnOf = useMemo(() => byBucket(buckets), [buckets]);
+
+  // Which buckets the Human has folded or unfolded away from their default.
+  const [toggled, setToggled] = useState<Set<string>>(() => new Set());
+  // A board is columns of something; only a list may say "no grouping".
+  const grouped = board || search.group !== "none";
   const groups = useMemo<DataGroup<IssueRow>[] | undefined>(() => {
     if (!grouped) return undefined;
-    const byState = new Map<string, IssueRow[]>();
-    for (const row of rows) {
-      byState.set(row.state.name, [...(byState.get(row.state.name) ?? []), row]);
-    }
-    const known = new Map(states.map((state) => [state.name, state]));
-    // Workflow order, as `states` already has it: Intent before Spec before
-    // Plan, not the alphabet's idea of it; a name no Workflow knows goes last.
-    const rank = (name: string) => {
-      const index = states.findIndex((state) => state.name === name);
-      return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-    };
-    return [...byState.entries()]
-      .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-      .map(([name, list]) => {
-        const state = known.get(name) ?? {
-          name,
-          isGate: list[0]?.state.isGate ?? false,
-          category: (list[0]?.state.category ?? "active") as FilterState["category"],
-        };
-        // Done is folded unless asked: it is the past.
-        const isCollapsed =
-          collapsed.has(name) || (state.category === "done" && !collapsed.has(`!${name}`));
-        return {
-          id: name,
-          header: <StateBadge state={state} />,
-          rows: list,
-          collapsed: isCollapsed,
+    return (
+      buckets
+        // A list drops an empty group; a board keeps the column.
+        .filter((bucket) => bucket.rows.length > 0)
+        .map((bucket) => ({
+          id: bucket.id,
+          header: bucket.header,
+          rows: bucket.rows,
+          collapsed: toggled.has(bucket.id)
+            ? !bucket.collapsedByDefault
+            : Boolean(bucket.collapsedByDefault),
           onToggle: () =>
-            setCollapsed((current) => {
+            setToggled((current) => {
               const next = new Set(current);
-              if (state.category === "done") {
-                if (next.has(`!${name}`)) next.delete(`!${name}`);
-                else next.add(`!${name}`);
-              } else if (next.has(name)) next.delete(name);
-              else next.add(name);
+              if (next.has(bucket.id)) next.delete(bucket.id);
+              else next.add(bucket.id);
               return next;
             }),
-        };
-      });
-  }, [grouped, rows, states, collapsed]);
+        }))
+    );
+  }, [grouped, buckets, toggled]);
 
   // The rows as they are on screen, for j and k.
   const visibleIds = useMemo(
     () =>
       board
-        ? boardColumns.flatMap((column) => (boardValue[column.id] ?? []).map((card) => card.key))
+        ? buckets.flatMap((bucket) => bucket.rows.map((card) => card.key))
         : (groups ? groups.flatMap((g) => (g.collapsed ? [] : g.rows)) : rows).map((r) => r.key),
-    [board, boardColumns, boardValue, groups, rows],
+    [board, buckets, groups, rows],
   );
   const peek = (key: string) => onSearch({ peek: key });
   const openFull = (key: string) =>
@@ -288,7 +279,9 @@ export function IssuesPage({
         sortValue: (row) => row.title,
         className: "max-w-0 w-full",
       },
-      ...(grouped
+      // A column that only repeats the group header earns nothing: grouped by
+      // State the State column goes, grouped by Assignee the Assignee one does.
+      ...(grouped && grouping.id === "state"
         ? []
         : [
             {
@@ -307,18 +300,22 @@ export function IssuesPage({
               className: "w-36",
             },
           ]),
-      {
-        id: "assignee",
-        header: "Assignee",
-        cell: (row) =>
-          row.assignee ? (
-            <MemberChip member={row.assignee} size="xs" />
-          ) : (
-            <span className="text-xs text-muted-foreground">Unassigned</span>
-          ),
-        sortValue: (row) => row.assignee?.user.name ?? "",
-        className: "w-44",
-      },
+      ...(grouped && grouping.id === "assignee"
+        ? []
+        : [
+            {
+              id: "assignee",
+              header: "Assignee",
+              cell: (row: IssueRow) =>
+                row.assignee ? (
+                  <MemberChip member={row.assignee} size="xs" />
+                ) : (
+                  <span className="text-xs text-muted-foreground">Unassigned</span>
+                ),
+              sortValue: (row: IssueRow) => row.assignee?.user.name ?? "",
+              className: "w-44",
+            },
+          ]),
       {
         id: "updated",
         header: "Updated",
@@ -332,7 +329,7 @@ export function IssuesPage({
         headerClassName: "text-right",
       },
     ],
-    [grouped],
+    [grouped, grouping.id],
   );
 
   const title =
@@ -357,7 +354,8 @@ export function IssuesPage({
       members={memberList}
       sponsorsAgents={myAgentIds.size > 0}
       hideProject={Boolean(fixedProject)}
-      hideGroup={board}
+      groupings={groupings}
+      allowNoGrouping={!board}
       showView={!fixedProject}
     />
   );
@@ -381,7 +379,7 @@ export function IssuesPage({
         <IssueBoard
           columns={boardColumns}
           issues={rows as unknown as BoardIssue[]}
-          columnOf={byStateName}
+          columnOf={columnOf}
           loading={issues.isPending}
           selectedKey={selected}
           onSelect={setSelected}

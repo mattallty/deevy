@@ -34,7 +34,6 @@ import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
 import { WebhooksPage } from "./routes/settings/webhooks.tsx";
 import { WorkspacePage } from "./routes/settings/workspace.tsx";
-import { AllowlistPage } from "./routes/settings/allowlist.tsx";
 import { McpClientsPage } from "./routes/settings/mcp-clients.tsx";
 import { MembersPage } from "./routes/settings/members.tsx";
 import { AgentsPage } from "./routes/settings/agents.tsx";
@@ -199,7 +198,19 @@ const workspaceRoute = createRoute({
 const teamsRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "teams",
-  component: TeamsPage,
+  // `?team=` names the open Team, so one is a link and Back undoes a selection.
+  validateSearch: (search: Record<string, unknown>) =>
+    typeof search.team === "string" && search.team ? { team: search.team } : {},
+  component: function Teams() {
+    const { team } = teamsRoute.useSearch();
+    const navigate = teamsRoute.useNavigate();
+    return (
+      <TeamsPage
+        selected={team ?? null}
+        onSelect={(next) => void navigate({ search: () => (next ? { team: next } : {}) })}
+      />
+    );
+  },
 });
 const labelsRoute = createRoute({
   getParentRoute: () => settingsRoute,
@@ -236,10 +247,14 @@ const notificationsRoute = createRoute({
   path: "notifications",
   component: NotificationsPage,
 });
+// The Allowlist is a section of Workspace › General since 2026-09-07; the path
+// it had for a year stays, as a redirect, so a bookmark still lands on it.
 const allowlistRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "allowlist",
-  component: AllowlistPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/workspace" });
+  },
 });
 const mcpClientsRoute = createRoute({
   getParentRoute: () => settingsRoute,

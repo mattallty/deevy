@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { MemberChip } from "@/components/member-chip";
 import {
@@ -12,7 +12,6 @@ import {
   KanbanOverlay,
   type KanbanMoveEvent,
 } from "@/components/reui/kanban";
-import { StateBadge } from "@/components/state-badge";
 import { LabelBadge } from "@/components/label-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/lib/orpc";
-import type { StateCategory } from "@/lib/states";
 import { cn } from "@/lib/utils";
 
 export interface BoardIssue {
@@ -47,36 +45,42 @@ export interface BoardIssue {
 }
 
 /**
- * A column of the board. On a Project's Board a column is one State; on the
- * Workspace board it is a State name folded across Projects, and
- * `resolveTarget` says which State a given Issue would land in — or null,
- * when its Project has none of that name and the drop must be refused.
+ * A column of the board — one bucket of whatever the screen groups by
+ * (`lib/groupings.tsx`), not a State in particular. `header` is what it draws,
+ * `name` is what it is called, and `plan` says what a drop into it means; a
+ * column with no `plan` takes no cards, which is how grouping by Project works.
  */
 export interface BoardColumn {
   id: string;
   name: string;
-  isGate: boolean;
-  category: StateCategory;
-  resolveTarget: (issue: BoardIssue) => string | null;
+  header: ReactNode;
+  /** The Gate tint, which only a State column asks for. */
+  isGate?: boolean;
+  plan?: (issue: BoardIssue) => DropPlan;
+  /** Why it takes no cards, said as a fact about Issues rather than an error. */
+  refusal?: string;
 }
 
 export type DropPlan =
   | { kind: "none" }
   | { kind: "gate" }
   | { kind: "refused"; message: string }
-  | { kind: "move"; stateId: string };
+  | { kind: "move"; stateId: string }
+  | { kind: "assign"; memberId: string | null }
+  | { kind: "labels"; labelIds: string[] };
 
-/** What a drop means, before anything is written: nothing, a ruling, a refusal, or a move. */
+/**
+ * What a drop means, before anything is written. The board decides only the two
+ * things true of every grouping — a card dropped where it already is does
+ * nothing, and a column that takes no cards refuses — and the grouping's own
+ * bucket decides the rest.
+ */
 export function planDrop(issue: BoardIssue, fromColumnId: string, column: BoardColumn): DropPlan {
   if (fromColumnId === column.id) return { kind: "none" };
-  // A Gate is left by a decision, never by a drop.
-  if (issue.state.isGate) return { kind: "gate" };
-  const stateId = column.resolveTarget(issue);
-  if (!stateId) {
-    const projectKey = issue.key.split("-")[0] ?? issue.key;
-    return { kind: "refused", message: `${projectKey} has no "${column.name}" State` };
+  if (!column.plan) {
+    return { kind: "refused", message: column.refusal ?? `${column.name} takes no cards` };
   }
-  return { kind: "move", stateId };
+  return column.plan(issue);
 }
 
 /** The kanban's value: every column, its cards newest change first. */
@@ -107,9 +111,10 @@ export interface IssueBoardViewProps {
 }
 
 /**
- * The board, drawn: columns as `section[aria-label=State]`, a StateBadge and
- * a count in each header, Gate columns tinted, and — while a card is dragged —
- * every column it could not land in dimmed, so a refusal shows before the drop.
+ * The board, drawn: columns as `section[aria-label=<bucket>]`, the grouping's
+ * own header and a count in each, Gate columns tinted, and — while a card is
+ * dragged — every column it could not land in dimmed, so a refusal shows
+ * before the drop.
  */
 export function IssueBoardView({
   columns,
@@ -159,12 +164,16 @@ export function IssueBoardView({
       <KanbanBoard className="flex auto-rows-auto items-start gap-3 overflow-x-auto pb-4 sm:grid-cols-none">
         {columns.map((column) => {
           const inColumn = value[column.id] ?? [];
+          // Dimmed while a card is dragged that this column would not take, so
+          // a refusal shows before the drop rather than as a warning after it.
+          const from =
+            dragging === null
+              ? null
+              : (Object.entries(value).find(([, cards]) => cards.includes(dragging))?.[0] ?? null);
           const refuses =
             dragging !== null &&
-            !dragging.state.isGate &&
-            column.resolveTarget(dragging) === null &&
-            column.id !==
-              (Object.entries(value).find(([, cards]) => cards.includes(dragging))?.[0] ?? "");
+            from !== null &&
+            planDrop(dragging, from, column).kind === "refused";
           return (
             <KanbanColumn
               key={column.id}
@@ -183,9 +192,7 @@ export function IssueBoardView({
               )}
             >
               <header className="flex items-center gap-2 px-1 py-0.5">
-                <StateBadge
-                  state={{ name: column.name, isGate: column.isGate, category: column.category }}
-                />
+                {column.header}
                 <span className="ml-auto font-mono text-xs text-muted-foreground">
                   {inColumn.length}
                 </span>
@@ -222,9 +229,9 @@ export function IssueBoardView({
 }
 
 /**
- * The board, connected: a drop is planned, then written as a move, opened as a
- * ruling, or refused with a word — through `issues.move` and the Gate dialog,
- * the same on a Project's Board and on the Workspace's.
+ * The board, connected: a drop is planned by the bucket it lands in, then
+ * written — a move, a reassignment, a change of Labels — or opened as a ruling,
+ * or refused with a word. The same on a Project's Board and on the Workspace's.
  */
 export function IssueBoard({
   columns,
@@ -248,6 +255,9 @@ export function IssueBoard({
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: orpc.issues.key() });
   const move = useMutation(orpc.issues.move.mutationOptions({ onSuccess: refresh }));
+  const update = useMutation(orpc.issues.update.mutationOptions({ onSuccess: refresh }));
+  const setLabels = useMutation(orpc.issues.setLabels.mutationOptions({ onSuccess: refresh }));
+  const failed = move.error ?? update.error ?? setLabels.error;
   const [deciding, setDeciding] = useState<BoardIssue | null>(null);
   const value = useMemo(
     () => groupIntoColumns(columns, issues, columnOf),
@@ -259,11 +269,14 @@ export function IssueBoard({
     if (plan.kind === "gate") setDeciding(issue);
     else if (plan.kind === "refused") toast.warning(plan.message);
     else if (plan.kind === "move") move.mutate({ key: issue.key, stateId: plan.stateId });
+    else if (plan.kind === "assign")
+      update.mutate({ key: issue.key, assigneeMemberId: plan.memberId });
+    else if (plan.kind === "labels") setLabels.mutate({ key: issue.key, labelIds: plan.labelIds });
   };
 
   return (
     <>
-      {move.error ? <p className="text-sm text-destructive">{move.error.message}</p> : null}
+      {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
       {loading ? (
         <Skeleton className="h-96 w-full" />
       ) : (

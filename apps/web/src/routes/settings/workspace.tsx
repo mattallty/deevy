@@ -1,23 +1,54 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SettingsPage } from "@/components/settings-page";
+import { AllowlistRow } from "@/routes/settings/allowlist";
+import { useAutosave } from "@/lib/autosave";
 import { orpc } from "@/lib/orpc";
+import { cn } from "@/lib/utils";
 
-/** A self-hosted instance serves one Workspace; this is its name. */
+/**
+ * The front door of Settings. It used to be two forms and nothing else — the
+ * page was called Workspace and never showed you one. Now it opens with the
+ * Workspace itself (its mark, its name edited in place, its address, its age and
+ * its size), then every setting as a row that saves itself, with one strip on
+ * top naming what this instance has not set up yet (Matt, 2026-09-07).
+ */
 export function WorkspacePage() {
+  const me = useQuery(orpc.me.get.queryOptions());
+  const admin = me.data?.member?.role === "admin";
+
+  return (
+    <SettingsPage title="Workspace" description="This instance serves one Workspace.">
+      {/* Only an admin can act on any of it, and `allowlist.list` and
+          `channels.list` are admin-only operations besides. */}
+      {admin ? <SetUp /> : null}
+      <Identity canRename={admin} />
+      {admin ? (
+        <div className="flex flex-col">
+          <AllowlistRow />
+        </div>
+      ) : null}
+    </SettingsPage>
+  );
+}
+
+/** The Workspace as an object: what it is called, where it lives, how big it got. */
+function Identity({ canRename }: { canRename: boolean }) {
   const queryClient = useQueryClient();
   const workspace = useQuery(orpc.workspace.get.queryOptions());
-  const [name, setName] = useState<string | null>(null);
+  // Both are already in cache: the shell reads them for the sidebar.
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const teams = useQuery(orpc.teams.list.queryOptions({ input: {} }));
 
-  useEffect(() => {
-    if (workspace.data && name === null) setName(workspace.data.name);
-  }, [workspace.data, name]);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [refused, setRefused] = useState<string | null>(null);
 
-  const save = useMutation(
+  const update = useMutation(
     orpc.workspace.update.mutationOptions({
       // The sidebar's name comes from me.get, so both re-read.
       onSuccess: () =>
@@ -27,47 +58,209 @@ export function WorkspacePage() {
         ]),
     }),
   );
+  const autosave = useAutosave<string>((name) => update.mutateAsync({ name }));
 
-  if (workspace.isPending || name === null) return <Skeleton className="h-32 w-full" />;
+  if (workspace.isPending) return <Skeleton className="h-28 w-full" />;
   if (workspace.isError) {
     return (
       <p className="text-destructive">Could not load the Workspace: {workspace.error.message}</p>
     );
   }
 
+  const shown = draft ?? workspace.data.name;
+  const save = () => {
+    const next = shown.trim();
+    if (!next) {
+      setRefused("A Workspace needs a name");
+      setDraft(null);
+      return;
+    }
+    setRefused(null);
+    if (next !== workspace.data.name) void autosave.saveNow(next);
+    else setDraft(null);
+  };
+
+  const madeOn = new Date(workspace.data.createdAt);
+  const made = Number.isNaN(madeOn.getTime())
+    ? null
+    : madeOn.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+
+  const humans = (members.data?.members ?? []).filter((member) => member.kind !== "agent").length;
+  const agents = (members.data?.members ?? []).filter((member) => member.kind === "agent").length;
+  const counts = [
+    { n: humans, of: humans === 1 ? "Human" : "Humans" },
+    { n: agents, of: agents === 1 ? "Agent" : "Agents" },
+    {
+      n: teams.data?.teams.length ?? 0,
+      of: (teams.data?.teams.length ?? 0) === 1 ? "Team" : "Teams",
+    },
+    {
+      n: projects.data?.projects.length ?? 0,
+      of: (projects.data?.projects.length ?? 0) === 1 ? "Project" : "Projects",
+    },
+  ];
+
   return (
-    <SettingsPage
-      title="Workspace"
-      description={
-        <>
-          This instance serves one Workspace. Renaming it changes what everyone sees in the sidebar.
-        </>
-      }
-    >
-      <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
-        onSubmit={(submitted) => {
-          submitted.preventDefault();
-          if (name.trim()) save.mutate({ name: name.trim() });
-        }}
-      >
-        <div className="flex flex-1 flex-col gap-2">
-          <Label htmlFor="workspace-name">Name</Label>
+    <section aria-label="This Workspace" className="flex flex-col gap-4">
+      <div className="flex items-start gap-4">
+        <span
+          aria-hidden
+          className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary font-mono text-lg font-semibold text-primary-foreground"
+        >
+          {workspace.data.name.slice(0, 1).toUpperCase()}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {/* Edited where it is read. A field that looks like the heading it sets,
+              with its edges showing on hover and focus so it is still findable. */}
           <Input
             id="workspace-name"
-            value={name}
-            onChange={(changed) => setName(changed.target.value)}
+            aria-label="Name"
+            value={shown}
+            readOnly={!canRename}
+            aria-invalid={refused ? true : undefined}
+            className={cn(
+              "h-auto max-w-sm border-transparent bg-transparent px-1.5 py-0.5 text-xl font-semibold tracking-tight -ml-1.5",
+              canRename && "hover:border-input hover:bg-card",
+              !canRename && "cursor-default",
+            )}
+            onChange={(changed) => {
+              setRefused(null);
+              setDraft(changed.target.value);
+            }}
+            onBlur={save}
+            onKeyDown={(pressed) => {
+              if (pressed.key === "Enter") {
+                pressed.preventDefault();
+                pressed.currentTarget.blur();
+              }
+            }}
           />
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <span className="font-mono">@{workspace.data.slug}</span>
+            {made ? (
+              <>
+                <span aria-hidden>·</span>
+                <span>made {made}</span>
+              </>
+            ) : null}
+          </p>
         </div>
-        <Button type="submit" disabled={save.isPending || !name.trim()}>
-          Save
-        </Button>
-      </form>
+      </div>
 
-      {save.error ? <p className="text-sm text-destructive">{save.error.message}</p> : null}
-      {save.isSuccess && !save.isPending ? (
-        <p className="text-sm text-muted-foreground">Saved.</p>
-      ) : null}
-    </SettingsPage>
+      {refused ? <p className="text-sm text-destructive">{refused}</p> : null}
+      <p role="status" className="flex min-h-5 items-center gap-2 text-xs text-muted-foreground">
+        {autosave.status === "saving" ? "Saving…" : null}
+        {autosave.status === "saved" ? "Saved" : null}
+        {autosave.status === "error" ? (
+          <>
+            <span className="text-destructive">{autosave.error}</span>
+            <Button type="button" variant="outline" size="xs" onClick={autosave.retry}>
+              Retry
+            </Button>
+          </>
+        ) : null}
+        {autosave.status === "idle" && canRename
+          ? "The name saves when you leave the field."
+          : null}
+      </p>
+
+      {/* Ruled apart, not just spaced: four numbers in a row with nothing between
+          them read as one number with four parts. */}
+      <ul className="flex flex-wrap items-center gap-y-3">
+        {counts.map((count) => (
+          <li
+            key={count.of}
+            className="flex flex-col border-l px-5 first:border-l-0 first:pl-0 last:pr-0"
+          >
+            <span className="text-lg font-semibold tabular-nums">{count.n}</span>
+            <span className="text-xs text-muted-foreground">{count.of}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * What this instance has not set up yet, and where to fix it. Every check is a
+ * list the app already has, so the strip costs no operation of its own — and it
+ * is gone the moment there is nothing left on it, which is the whole point: a
+ * checklist of ticks is furniture.
+ */
+function SetUp() {
+  const rules = useQuery(orpc.allowlist.list.queryOptions({ input: {} }));
+  const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
+  const repositories = useQuery(orpc.repositories.list.queryOptions({ input: {} }));
+  const channels = useQuery(orpc.channels.list.queryOptions({ input: {} }));
+
+  const checks = [
+    {
+      done: (rules.data?.rules.length ?? 0) > 0,
+      // Fixed by the Allowlist row further down this same page, so no link.
+      todo: "Nobody but the admin can sign in",
+    },
+    {
+      done: (projects.data?.projects.length ?? 0) > 0,
+      todo: "No Project yet, so an Issue has nowhere to live",
+      action: { label: "New Project", to: "/projects" },
+    },
+    {
+      done: (agents.data?.agents.length ?? 0) > 0,
+      todo: "No Agent yet — a Workspace of Humans is half of deevy",
+      action: { label: "Add one", to: "/settings/agents" },
+    },
+    {
+      done: (repositories.data?.repositories.length ?? 0) > 0,
+      todo: "No Repository connected, so an Agent has nowhere to push",
+      action: { label: "Connect", to: "/settings/repositories" },
+    },
+    {
+      done: (channels.data?.channels.length ?? 0) > 0,
+      todo: "No Channel connected, so nothing reaches Slack",
+      action: { label: "Connect", to: "/settings/channels" },
+    },
+  ];
+
+  const loading = [rules, projects, agents, repositories, channels].some(
+    (query) => query.isPending,
+  );
+  const left = checks.filter((check) => !check.done);
+  // Nothing left to say, or not enough read yet to say it.
+  if (loading || left.length === 0) return null;
+  const done = checks.length - left.length;
+
+  return (
+    <section
+      aria-label="Set up"
+      className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4"
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 className="text-sm font-medium">Finish setting this Workspace up</h2>
+        <span className="font-mono text-xs text-muted-foreground tabular-nums">
+          {done} of {checks.length}
+        </span>
+      </div>
+      <ul className="flex flex-col">
+        {left.map((check) => (
+          <li
+            key={check.todo}
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-primary/20 py-2 first:border-t-0 first:pt-0"
+          >
+            <span className="min-w-0 flex-1 text-sm">{check.todo}</span>
+            {check.action ? (
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={<Link to={check.action.to} />}
+              >
+                {check.action.label}
+              </Button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

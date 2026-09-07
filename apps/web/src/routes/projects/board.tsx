@@ -1,12 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import {
-  IssueBoard,
-  groupIntoColumns,
-  type BoardColumn,
-  type BoardIssue,
-} from "@/components/issue-board";
+import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
 import {
   ISSUE_PAGE,
   IssueFilters,
@@ -16,11 +11,16 @@ import {
 } from "@/components/issue-filters";
 import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
+import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { orpc } from "@/lib/orpc";
 import { useRowSelection } from "@/lib/row-selection";
 
-/** On a Project's Board a column is one State. */
-const byStateId = (issue: BoardIssue) => issue.state.id;
+/** Which bucket a card belongs to, asked of the buckets the grouping made. */
+function byBucket(buckets: Array<{ id: string; rows: Array<{ key: string }> }>) {
+  const home = new Map<string, string>();
+  for (const bucket of buckets) for (const row of bucket.rows) home.set(row.key, bucket.id);
+  return (issue: BoardIssue) => home.get(issue.key) ?? "";
+}
 
 /**
  * The Project's Issues as one column per State (docs/plans/ui-redesign.md slice
@@ -40,6 +40,7 @@ export function BoardPage({
   const navigate = useNavigate();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
   const me = useQuery(orpc.me.get.queryOptions());
   const myId = me.data?.member?.id ?? null;
   const memberList = members.data?.members ?? [];
@@ -68,17 +69,34 @@ export function BoardPage({
     [issues.data],
   );
 
-  // One Project: a column is a State, and a drop lands in exactly that State.
+  // The same groupings the Issues home offers, with this Project fixed: its
+  // States, unfolded, and no Project grouping where every Issue is this one's.
+  const groupings = useMemo(
+    () =>
+      groupingsFor({
+        workflowStates: states,
+        members: memberList,
+        labels: labels.data?.labels ?? [],
+      }),
+    [states, memberList, labels.data],
+  );
+  const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
+  const buckets = useMemo(() => grouping.buckets(cards), [grouping, cards]);
   const columns = useMemo<BoardColumn[]>(
     () =>
-      states.map((state) => ({
-        id: state.id,
-        name: state.name,
-        isGate: state.isGate,
-        category: state.category as FilterState["category"],
-        resolveTarget: () => state.id,
-      })),
-    [states],
+      buckets
+        // A column nothing is in is still somewhere to drop, but only where the
+        // grouping says so — the list drops the same bucket for having no rows.
+        .filter((bucket) => bucket.rows.length > 0 || bucket.keepWhenEmpty)
+        .map((bucket) => ({
+          id: bucket.id,
+          name: bucket.name,
+          header: bucket.header,
+          ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+          ...(bucket.plan ? { plan: bucket.plan } : {}),
+          ...(bucket.refusal ? { refusal: bucket.refusal } : {}),
+        })),
+    [buckets],
   );
   const filterStates: FilterState[] = states.map((state) => ({
     name: state.name,
@@ -88,10 +106,12 @@ export function BoardPage({
 
   // The cards as they are on screen, column by column, for j and k; Enter
   // peeks and o opens, as on the Issues home (lib/row-selection.ts).
-  const visibleKeys = useMemo(() => {
-    const value = groupIntoColumns(columns, cards, byStateId);
-    return columns.flatMap((column) => (value[column.id] ?? []).map((card) => card.key));
-  }, [columns, cards]);
+  // Memoised: a fresh closure would defeat IssueBoard's memo over the cards.
+  const columnOf = useMemo(() => byBucket(buckets), [buckets]);
+  const visibleKeys = useMemo(
+    () => buckets.flatMap((bucket) => bucket.rows.map((card) => card.key)),
+    [buckets],
+  );
   const peek = (key: string) => onSearch({ peek: key });
   const openFull = (key: string) =>
     void navigate({ to: "/issues/$issueKey", params: { issueKey: key } });
@@ -120,14 +140,15 @@ export function BoardPage({
           members={memberList}
           sponsorsAgents={myAgentIds.size > 0}
           hideProject
-          hideGroup
+          groupings={groupings}
+          allowNoGrouping={false}
         />
       </PageHeader>
 
       <IssueBoard
         columns={columns}
         issues={cards}
-        columnOf={byStateId}
+        columnOf={columnOf}
         loading={workflow.isPending || issues.isPending}
         selectedKey={selected}
         onSelect={select}

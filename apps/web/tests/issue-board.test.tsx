@@ -8,6 +8,7 @@ import {
   type BoardIssue,
 } from "../src/components/issue-board.tsx";
 import { foldStates } from "../src/lib/states.ts";
+import { stateGrouping } from "../src/lib/groupings.tsx";
 
 const projects = [
   {
@@ -62,14 +63,21 @@ describe("foldStates", () => {
   });
 });
 
+/** Columns exactly as a page builds them: from the State grouping's buckets. */
+function stateColumns(rows: BoardIssue[] = []): BoardColumn[] {
+  return stateGrouping(foldStates(projects))
+    .buckets(rows)
+    .map((bucket) => ({
+      id: bucket.id,
+      name: bucket.name,
+      header: bucket.header,
+      ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+      ...(bucket.plan ? { plan: bucket.plan } : {}),
+    }));
+}
+
 describe("planDrop", () => {
-  const columns: BoardColumn[] = foldStates(projects).map((state) => ({
-    id: state.name,
-    name: state.name,
-    isGate: state.isGate,
-    category: state.category,
-    resolveTarget: (card) => state.byProject.get(card.projectId) ?? null,
-  }));
+  const columns = stateColumns();
   const column = (name: string) => columns.find((candidate) => candidate.name === name)!;
   const opsTodo = issue("OPS-4", "p-ops", {
     id: "o-todo",
@@ -105,17 +113,34 @@ describe("planDrop", () => {
   it("does nothing for a drop back into the same column", () => {
     expect(planDrop(opsTodo, "Todo", column("Todo"))).toEqual({ kind: "none" });
   });
+
+  it("refuses a column that takes no cards in its own words", () => {
+    const readOnly: BoardColumn = {
+      id: "p-dev",
+      name: "deevy",
+      header: "deevy",
+      refusal: "An Issue belongs to the Project its key names",
+    };
+
+    expect(planDrop(opsTodo, "Todo", readOnly)).toEqual({
+      kind: "refused",
+      message: "An Issue belongs to the Project its key names",
+    });
+  });
+
+  it("falls back to naming the column when it gives no reason", () => {
+    const readOnly: BoardColumn = { id: "x", name: "Whatever", header: "Whatever" };
+
+    expect(planDrop(opsTodo, "Todo", readOnly)).toEqual({
+      kind: "refused",
+      message: "Whatever takes no cards",
+    });
+  });
 });
 
 describe("groupIntoColumns", () => {
   it("puts every card under its column, newest change first, and keeps empty columns", () => {
-    const columns = foldStates(projects).map((state) => ({
-      id: state.name,
-      name: state.name,
-      isGate: state.isGate,
-      category: state.category,
-      resolveTarget: () => null,
-    }));
+    const columns = stateColumns();
     const older = {
       ...issue("DEV-2", "p-dev", {
         id: "d-build",
@@ -142,13 +167,7 @@ describe("groupIntoColumns", () => {
 
 describe("IssueBoardView", () => {
   it("draws every column at full strength: nothing is disabled just because columns stay put", () => {
-    const columns: BoardColumn[] = foldStates(projects).map((state) => ({
-      id: state.name,
-      name: state.name,
-      isGate: state.isGate,
-      category: state.category,
-      resolveTarget: (card) => state.byProject.get(card.projectId) ?? null,
-    }));
+    const columns = stateColumns();
     const value = groupIntoColumns(
       columns,
       [

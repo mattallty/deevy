@@ -1,6 +1,6 @@
 import { RouterProvider } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MemberChip } from "@/components/member-chip";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
@@ -137,6 +137,13 @@ function SignedIn() {
   // The router is built once; its context is refreshed as `me` resolves.
   const router = useMemo(() => createAppRouter(context), []);
   router.update({ context });
+  // `update` alone does not re-render what is already mounted, so a Workspace
+  // renamed on Settings › General never reached the sidebar (Matt, 2026-09-07).
+  // Invalidating on the values the shell actually shows does, and only then.
+  const shown = `${context.workspaceName}\u0000${context.memberName}\u0000${context.member?.id ?? ""}\u0000${context.member?.image ?? ""}`;
+  useEffect(() => {
+    void router.invalidate();
+  }, [router, shown]);
 
   if (me.isPending) return <Centered>Loading…</Centered>;
   if (me.isError) return <Centered>Could not load your profile: {me.error.message}</Centered>;

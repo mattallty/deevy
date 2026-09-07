@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { pickOption, selectedLabel } from "./select.ts";
 
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
@@ -87,46 +88,56 @@ describe("the app shell", () => {
     expect(within(nav).getByRole("link", { name: "Agents" }).getAttribute("href")).toBe(
       "/settings/agents",
     );
-    expect(within(nav).getByRole("link", { name: "Allowlist" }).getAttribute("href")).toBe(
-      "/settings/allowlist",
+    expect(within(nav).getByRole("link", { name: "General" }).getAttribute("href")).toBe(
+      "/settings/workspace",
     );
     expect(within(nav).getByText("Agents and delivery")).toBeTruthy();
     // The primary sidebar no longer carries the eleven; they live here.
     expect(within(sidebar()).queryByRole("link", { name: "Members" })).toBeNull();
   });
 
-  it("offers the same Settings pages as a strip of tabs where the sidebar is hidden", async () => {
-    await mountAt("/settings/allowlist");
-    await screen.findByRole("heading", { name: "Allowlist" });
+  it("offers the same Settings pages in one control where the nav beside is hidden", async () => {
+    const router = await mountAt("/settings/members");
+    await screen.findByRole("heading", { name: "Members" });
 
-    // Both are in the DOM; the stylesheet shows one per width (md:hidden / hidden md:flex).
-    const strip = screen.getByRole("navigation", { name: "Settings pages" });
-    expect(strip.className).toContain("md:hidden");
-    expect(strip.className).toContain("overflow-x-auto");
+    // Both are in the DOM; the stylesheet shows one per width (lg:hidden / hidden lg:flex).
+    const compact = screen.getByRole("navigation", { name: "Settings pages" });
+    expect(compact.className).toContain("lg:hidden");
     const desktop = screen.getByRole("navigation", { name: "Settings" });
-    expect(desktop.className).toContain("md:flex");
-    const links = within(strip).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(
+    expect(desktop.className).toContain("lg:flex");
+
+    // It says where you are without being opened — the strip it replaced could
+    // scroll the page you were on out of its own navigation.
+    const trigger = within(compact).getByRole("combobox", { name: "Settings page" });
+    expect(selectedLabel(trigger)).toBe("Members");
+
+    // …and opens to every page the wide nav lists, in the same four groups.
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual(
       within(desktop)
         .getAllByRole("link")
         .map((link) => link.textContent),
     );
-    expect(
-      within(strip).getByRole("link", { name: "Allowlist" }).getAttribute("aria-current"),
-    ).toBe("page");
-    expect(within(strip).getByRole("link", { name: "Members" }).getAttribute("href")).toBe(
-      "/settings/members",
-    );
+    // …in the four groups the wide nav uses, named, not merely four of something.
+    const listbox = screen.getByRole("listbox");
+    for (const group of ["Workspace", "Work", "Agents and delivery", "You"]) {
+      expect(within(listbox).getByText(group)).toBeTruthy();
+    }
+
+    await pickOption(trigger, "Teams");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/teams"));
   });
 
-  it("renders the Allowlist page at /settings/allowlist", async () => {
+  it("sends the old /settings/allowlist to General, which now holds the Allowlist", async () => {
     await mountAt("/settings/allowlist");
 
-    expect(await screen.findByRole("heading", { name: "Allowlist" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "Workspace" })).toBeTruthy();
+    expect(screen.getByText("Who may join")).toBeTruthy();
     expect(
       screen.getByRole("navigation", { name: "Settings" }).querySelector('[aria-current="page"]')
         ?.textContent,
-    ).toBe("Allowlist");
+    ).toBe("General");
   });
 
   it("opens the command palette on ⌘K and jumps where it is told", async () => {
@@ -221,9 +232,9 @@ describe("the breadcrumb in the top bar", () => {
   });
 
   it("leads back from a Settings page to Settings", async () => {
-    await mountAt("/settings/allowlist");
+    await mountAt("/settings/labels");
     const nav = trail();
     expect(within(nav).getByRole("link", { name: "Settings" })).toBeTruthy();
-    expect(within(nav).getByText("Allowlist")).toBeTruthy();
+    expect(within(nav).getByText("Labels")).toBeTruthy();
   });
 });

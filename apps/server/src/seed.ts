@@ -92,11 +92,15 @@ const asAgent = (key: string) => caller({ authorization: `Bearer ${key}` });
 
 // -------------------------------------------------------------------- people
 
-const domain = env.adminEmail.split("@")[1] ?? "example.com";
+// The fabricated people live at example.com, never at the admin's own domain:
+// the seed's Workspace is what screenshots and demos show, and a real domain
+// read off an Allowlist rule there is the admin's, not the fiction's (RFC 2606).
+const domain = "example.com";
 const admin = await asHuman(env.adminEmail);
 console.log(`admin       ${env.adminEmail} (@${admin.member.handle ?? "?"})`);
 
-// Anyone at the admin's domain may join, which is how the second Human gets in.
+// Anyone at that domain may join, which is how the second Human gets in. The
+// admin needs no rule: DEEVY_ADMIN_EMAIL bootstraps the Workspace on its own.
 await admin.api.allowlist.add({ kind: "email_domain", value: domain });
 const graceEmail = `grace@${domain}`;
 const grace = await asHuman(graceEmail);

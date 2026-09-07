@@ -26,8 +26,12 @@ export default defineConfig({
     format: "esm",
     dts: false,
     // One self-contained file: no native modules (ADR-0008), so every
-    // dependency is inlined and the Docker image ships dist/ alone.
-    deps: { alwaysBundle: [/.*/], onlyBundle: false },
+    // dependency is inlined and the Docker image ships dist/ alone. The one
+    // exception is Better Auth's optional tracer peer, which it reaches through
+    // a dynamic import with a no-op fallback and which we do not install:
+    // bundling it is impossible, so name it here rather than let every rebuild
+    // print twenty lines of UNRESOLVED_IMPORT for a dependency working as meant.
+    deps: { alwaysBundle: [/.*/], onlyBundle: false, neverBundle: ["@opentelemetry/api"] },
     copy: [{ from: "../../packages/db/drizzle", to: "dist" }],
   },
   test: {

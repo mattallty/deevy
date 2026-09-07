@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => ({
@@ -38,7 +38,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
 
 const { MembersPage } = await import("../src/routes/settings/members.tsx");
 const { mount } = await import("./mount.tsx");
-const { AllowlistPage } = await import("../src/routes/settings/allowlist.tsx");
+const { AllowlistRow } = await import("../src/routes/settings/allowlist.tsx");
 
 describe("the Members settings page", () => {
   it("lists every Member with their role and handle", async () => {
@@ -58,14 +58,26 @@ describe("the Members settings page", () => {
   });
 });
 
-describe("the allowlist settings page", () => {
-  it("lists the rules that admit a sign-in", async () => {
-    mount(<AllowlistPage />);
+describe("the Allowlist row of Workspace › General", () => {
+  it("shows every rule that admits a sign-in, each one droppable", async () => {
+    mount(<AllowlistRow />);
 
-    const rules = await screen.findByRole("table");
-    expect(within(rules).getByText("example.com")).toBeTruthy();
-    expect(within(rules).getByText("acme")).toBeTruthy();
-    expect(within(rules).getByText("Email domain")).toBeTruthy();
-    expect(within(rules).getByText("GitHub organization")).toBeTruthy();
+    // Chips, not a table: nearly every rule is one domain, and a rule is two words.
+    expect(await screen.findByText("example.com")).toBeTruthy();
+    expect(screen.getByText("acme")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stop allowing example.com" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stop allowing acme" })).toBeTruthy();
+  });
+
+  it("keeps the form for a new rule behind Add rule", async () => {
+    mount(<AllowlistRow />);
+
+    await screen.findByText("example.com");
+    expect(screen.queryByLabelText("Match on")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add rule" }));
+
+    expect(await screen.findByLabelText("Match on")).toBeTruthy();
+    expect(screen.getByLabelText("Domain")).toBeTruthy();
   });
 });

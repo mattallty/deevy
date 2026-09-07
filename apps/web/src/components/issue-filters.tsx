@@ -23,7 +23,12 @@ export interface IssuesSearch {
   kind?: "human" | "agent";
   /** `0` shows closed Issues too; the default is open ones. */
   open?: "0" | "1";
-  group?: "state" | "none";
+  /**
+   * What the rows are divided by: a grouping's id (`state`, `assignee`,
+   * `project`, `label:epic`) or `none`, which only a list may be. A grouping
+   * the screen does not offer falls back to State rather than showing nothing.
+   */
+  group?: string;
   /** The list, or the board: the same Issues as columns by State (slice F). */
   view?: "list" | "board";
   q?: string;
@@ -48,7 +53,9 @@ export function parseIssuesSearch(search: Record<string, unknown>): IssuesSearch
     ...(text("assignee") ? { assignee: text("assignee") } : {}),
     ...(kind === "human" || kind === "agent" ? { kind } : {}),
     ...(open === "0" || open === "1" ? { open } : {}),
-    ...(group === "state" || group === "none" ? { group } : {}),
+    // Any grouping id: which ones exist depends on the Workspace's Labels, so
+    // the screen validates it against what it offers rather than this doing it.
+    ...(group ? { group } : {}),
     ...(view === "board" ? { view } : {}),
     ...(text("q") ? { q: text("q") } : {}),
     ...(text("peek") ? { peek: text("peek") } : {}),
@@ -88,6 +95,21 @@ export function issueFilterInput(search: IssuesSearch, myId: string | null, proj
 
 const ANY = "__any";
 
+/**
+ * What the Group by control shows: the URL's grouping when the screen has it,
+ * `none` only where a list may say so, and otherwise the first grouping, which
+ * is always State.
+ */
+function groupValue(
+  value: IssuesSearch,
+  groupings: Array<{ id: string }>,
+  allowNoGrouping: boolean,
+): string {
+  if (value.group === "none") return allowNoGrouping ? "none" : (groupings[0]?.id ?? "state");
+  if (value.group && groupings.some((one) => one.id === value.group)) return value.group;
+  return groupings[0]?.id ?? "state";
+}
+
 export interface FilterState {
   name: string;
   isGate: boolean;
@@ -108,7 +130,8 @@ export function IssueFilters({
   members,
   sponsorsAgents,
   hideProject = false,
-  hideGroup = false,
+  groupings,
+  allowNoGrouping = true,
   showView = false,
 }: {
   value: IssuesSearch;
@@ -119,8 +142,10 @@ export function IssueFilters({
   /** Whether the signed-in Human sponsors any Agent, which is when "My Agents" is offered. */
   sponsorsAgents: boolean;
   hideProject?: boolean;
-  /** On a board the rows are already grouped; the Group control would lie. */
-  hideGroup?: boolean;
+  /** Every way this screen may divide its Issues (`lib/groupings.tsx`). */
+  groupings: Array<{ id: string; label: string }>;
+  /** A board is columns of something: "No grouping" is a list's choice alone. */
+  allowNoGrouping?: boolean;
   /** Offer List / Board (the Workspace lists; a Project has its Board tab). */
   showView?: boolean;
 }) {
@@ -308,24 +333,42 @@ export function IssueFilters({
         </ToggleGroup>
       ) : null}
 
-      {hideGroup ? null : (
-        <Select
-          value={value.group ?? "state"}
-          onValueChange={(next) => onChange({ group: next === "none" ? "none" : undefined })}
-        >
-          <SelectTrigger aria-label="Group by" className="w-36">
-            <SelectValue>
-              {(selected: string) => (selected === "none" ? "No grouping" : "Group by State")}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="state">Group by State</SelectItem>
-              <SelectItem value="none">No grouping</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      )}
+      {/* On both shapes, not the list alone: on a board this is what the columns
+          are, which is the place a Human most wants to change it. */}
+      <Select
+        value={groupValue(value, groupings, allowNoGrouping)}
+        onValueChange={(next) => {
+          if (!next) return;
+          onChange({ group: next === groupings[0]?.id ? undefined : next });
+        }}
+      >
+        <SelectTrigger aria-label="Group by" className="w-44">
+          <SelectValue>
+            {(selected: string) =>
+              selected === "none"
+                ? "No grouping"
+                : `Group by ${groupings.find((one) => one.id === selected)?.label ?? "State"}`
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {groupings.map((grouping) => (
+              <SelectItem key={grouping.id} value={grouping.id}>
+                Group by {grouping.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+          {allowNoGrouping ? (
+            <>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectItem value="none">No grouping</SelectItem>
+              </SelectGroup>
+            </>
+          ) : null}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
