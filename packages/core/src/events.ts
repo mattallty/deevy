@@ -22,6 +22,16 @@ export type EventKind =
   | "member.reinstated"
   | "allowlist.rule_added"
   | "allowlist.rule_removed"
+  /**
+   * A person admitted one at a time, where a rule admits a category
+   * (docs/plans/sign-in.md). The payload carries the address and the role and
+   * never the token; accepting appends `member.joined` beside it, so the
+   * Workspace's history reads the same whether somebody joined by rule or by
+   * invitation.
+   */
+  | "invitation.created"
+  | "invitation.revoked"
+  | "invitation.accepted"
   | "project.created"
   | "project.updated"
   | "project.archived"

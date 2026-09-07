@@ -5,6 +5,7 @@ import {
   documentVersion,
   event,
   gateDecision,
+  invitation,
   issue,
   issueLink,
   label,
@@ -35,6 +36,13 @@ export const EventSchema = createSelectSchema(event);
 export const MemberWithUserSchema = MemberSchema.extend({ user: UserSchema });
 
 export const AllowlistRuleSchema = createSelectSchema(allowlistRule);
+
+/**
+ * An invitation as any surface may show one: everything but the token hash.
+ * The token exists in one HTTP response, `invitations.create`'s, and nothing
+ * reads it back (docs/plans/sign-in.md).
+ */
+export const InvitationSchema = createSelectSchema(invitation).omit({ tokenHash: true });
 
 export const TeamSchema = createSelectSchema(team);
 export const ProjectSchema = createSelectSchema(project);

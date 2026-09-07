@@ -448,6 +448,35 @@ added: the invited person is not a Member yet, and the admin is holding the link
 refused for a Member; accept as the invited address; refused for another; expired; revoked; accepted twice
 (the second is a no-op); the token absent from `events.list` and from `invitations.list`.
 
+What shipped differently:
+
+- **drizzle-kit emitted the partial index itself.** The plan expected the index's `WHERE` clause to be
+  hand-written into the migration; a `uniqueIndex` with a `where` on it in the schema produced the clause, so
+  the only hand-patch this migration needed is the `NOT NULL` on its text primary key that every migration
+  needs. The index is asserted at the database in `packages/db/tests/schema.test.ts`, since a constraint the
+  generator could stop emitting is one a test should hold on to.
+- **A second live invitation for an address is a `CONFLICT`, expired or not.** A partial index cannot ask what
+  the time is, so an expired invitation still holds the address; the message says to revoke it to send
+  another, rather than the operation quietly revoking one on the admin's behalf and appending an Event they
+  did not ask for.
+- **`invitations.list` lists spent and revoked invitations too.** The rows are kept, so the operation returns
+  them and each carries its `acceptedAt`, `revokedAt` and `expiresAt`; which of them slice 8's "Invited" row
+  shows is the screen's decision, not the API's.
+- **A caller who is already a Member is answered before the token is looked at.** "Accepted twice is a no-op"
+  and "already a Member gets their Member row back" are the same branch, and it is first — so a Human who
+  clicks a stale link they already used, or somebody else's link, lands in the Workspace rather than on an
+  error. What an invitation's state is comes before who is holding it: a spent link in a stranger's hands is
+  `BAD_REQUEST`, not `FORBIDDEN`.
+- **One address is one Human, so "accepted twice by a second person on the same address" cannot be tested.**
+  Better Auth's `user.email` is unique, which is what slice 3's linking policy rests on; the spent-link case
+  is driven with a different address instead.
+- **`invitations.accept` reads the Workspace back itself.** A Human who is signed in and nobody yet has no
+  Workspace on their context (`app.ts` finds no Member row), and a self-hosted instance serves one — so the
+  handler looks it up, and an instance with no Workspace at all answers `NOT_FOUND` like any unknown token.
+- **The token appears once in an HTTP response and nowhere else**, so the two Events an accept appends carry
+  the new Member as their actor and the address and role as their payload. The `invitation` row also carries
+  a unique index on the hash, because the accept path has nothing else to find the row by.
+
 ---
 
 ## Slice 8: Accepting one (M)

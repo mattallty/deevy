@@ -29,6 +29,7 @@ export const idPrefixes = {
   repository: "repo",
   routingRule: "rte",
   allowlistRule: "alw",
+  invitation: "inv",
   // Better Auth's own models, through its generateId hook (auth.ts).
   user: "usr",
   session: "ses",
