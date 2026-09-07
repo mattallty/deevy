@@ -22,6 +22,14 @@ services:
       GITLAB_CLIENT_SECRET: ${GITLAB_CLIENT_SECRET:-}
       # A self-hosted GitLab, if it is not gitlab.com.
       GITLAB_ISSUER: ${GITLAB_ISSUER:-}
+      # One generic OpenID Connect provider, discovered from its issuer. The
+      # issuer counts as a half of the pair here: without it there is nothing
+      # to discover, so the provider is not registered and not offered.
+      DEEVY_OIDC_ISSUER: ${DEEVY_OIDC_ISSUER:-}
+      DEEVY_OIDC_CLIENT_ID: ${DEEVY_OIDC_CLIENT_ID:-}
+      DEEVY_OIDC_CLIENT_SECRET: ${DEEVY_OIDC_CLIENT_SECRET:-}
+      # What the button says. "Single sign-on" unset.
+      DEEVY_OIDC_NAME: ${DEEVY_OIDC_NAME:-}
       DEEVY_ADMIN_EMAIL: ${DEEVY_ADMIN_EMAIL:?set the email that becomes the Workspace admin}
       DEEVY_WORKSPACE_NAME: ${DEEVY_WORKSPACE_NAME:-deevy}
     healthcheck:

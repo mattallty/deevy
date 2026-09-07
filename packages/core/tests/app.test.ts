@@ -90,6 +90,24 @@ describe("createApp", () => {
     expect(await providers({ gitlab: { ...pair, issuer: "https://gitlab.example.com" } })).toEqual([
       { id: "gitlab", label: "GitLab", kind: "social" },
     ]);
+    // The generic OIDC entry is labelled by the deployment, so an operator
+    // names their own IdP without touching the SPA, and falls back to what a
+    // teammate who has never heard of it would read (docs/plans/sign-in.md
+    // slice 6).
+    expect(
+      await providers({ oidc: { ...pair, issuer: "https://idp.example", name: "Acme SSO" } }),
+    ).toEqual([{ id: "oidc", label: "Acme SSO", kind: "social" }]);
+    expect(await providers({ oidc: { ...pair, issuer: "https://idp.example" } })).toEqual([
+      { id: "oidc", label: "Single sign-on", kind: "social" },
+    ]);
+    // An issuer is as load-bearing as the pair: without a discovery document
+    // there is nothing to register and nothing a button could start.
+    expect(await providers({ oidc: { ...pair, issuer: "" } })).toEqual([]);
+    expect(
+      await providers({
+        oidc: { clientId: "id", clientSecret: "", issuer: "https://idp.example" },
+      }),
+    ).toEqual([]);
     // Half a pair is not a provider: a button that only leads to the
     // provider's own error page is worse than no button (docs/plans/sign-in.md).
     expect(await providers({ github: { clientId: "", clientSecret: "secret" } })).toEqual([]);

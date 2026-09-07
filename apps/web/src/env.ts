@@ -45,6 +45,10 @@ export interface WorkerBindings {
   GITLAB_CLIENT_ID?: string;
   GITLAB_CLIENT_SECRET?: string;
   GITLAB_ISSUER?: string;
+  DEEVY_OIDC_ISSUER?: string;
+  DEEVY_OIDC_CLIENT_ID?: string;
+  DEEVY_OIDC_CLIENT_SECRET?: string;
+  DEEVY_OIDC_NAME?: string;
   DEEVY_ADMIN_EMAIL?: string;
   DEEVY_WORKSPACE_NAME?: string;
   DEEVY_RUN_STALE_MINUTES?: string;
@@ -112,6 +116,14 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
         clientId: env.GITLAB_CLIENT_ID ?? "",
         clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
         issuer: env.GITLAB_ISSUER,
+      },
+      // The generic OpenID Connect entry: the pair, the issuer everything else
+      // is discovered from, and what the button says (docs/plans/sign-in.md).
+      oidc: {
+        clientId: env.DEEVY_OIDC_CLIENT_ID ?? "",
+        clientSecret: env.DEEVY_OIDC_CLIENT_SECRET ?? "",
+        issuer: env.DEEVY_OIDC_ISSUER ?? "",
+        name: env.DEEVY_OIDC_NAME,
       },
     },
     adminEmail: env.DEEVY_ADMIN_EMAIL,

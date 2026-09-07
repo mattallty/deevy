@@ -191,6 +191,28 @@ describe("DevSignIn", () => {
     expect(JSON.parse(init.body as string)).toMatchObject({ provider: "google" });
   });
 
+  /**
+   * An OpenID Connect provider binds its `id_token` to a nonce, which lives in
+   * the authorization URL this form skips past — so the form hands it back in
+   * the code for the stub to sign into the token (docs/plans/sign-in.md slice 6).
+   */
+  it("carries an authorization nonce back in the code", async () => {
+    const fetchSpy = vi.fn(async () =>
+      Response.json({ url: "https://idp.example/authorize?state=s3cret&nonce=n0nce" }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const navigate = vi.fn();
+    mount(<DevSignIn provider="oidc" navigate={navigate} />);
+
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ada@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in as this email" }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
+    const landed = new URL(navigate.mock.calls[0]?.[0] as string);
+    expect(landed.pathname).toBe("/api/auth/callback/oidc");
+    expect(landed.searchParams.get("code")).toBe("ada@example.com|n0nce");
+  });
+
   it("says so when the server does not start a sign-in", async () => {
     vi.stubGlobal(
       "fetch",

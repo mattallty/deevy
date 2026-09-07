@@ -412,7 +412,8 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   saying so and no button, and a provider is added by configuring one, never by editing `App.tsx`
   (docs/plans/sign-in.md). The dev form stays under them, only when `health.ping` reports `devSignIn`, and it
   signs in through the first provider that list carries rather than naming one, so a stubbed instance offering
-  only Google still signs in.
+  only Google still signs in; when the authorization URL carries an `id_token` nonce (an OpenID Connect
+  provider does), the code it lands with is `email|nonce`.
 - **`ui/*` hygiene:** a `ui/*` file may sit unimported (it is the kit), but a dependency only an unimported
   file needs goes with the file. Removed in slice 11: `chart`, `carousel`, `calendar`, `input-otp`,
   `aspect-ratio`, `menubar`, `navigation-menu`, `slider`, `progress`, `radio-group`, `drawer`,

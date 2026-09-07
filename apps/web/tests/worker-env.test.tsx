@@ -59,6 +59,17 @@ describe("the Worker's sign-in providers", () => {
       }),
     ).toEqual(["github", "gitlab"]);
     expect(offered({ GITLAB_ISSUER: "https://gitlab.example.com" })).toEqual([]);
+    // The generic OIDC entry needs its issuer as much as its pair: without a
+    // discovery document there is nothing to register (docs/plans/sign-in.md
+    // slice 6).
+    expect(
+      offered({
+        DEEVY_OIDC_CLIENT_ID: "id",
+        DEEVY_OIDC_CLIENT_SECRET: "secret",
+        DEEVY_OIDC_ISSUER: "https://idp.example.com/realms/deevy",
+      }),
+    ).toEqual(["oidc"]);
+    expect(offered({ DEEVY_OIDC_CLIENT_ID: "id", DEEVY_OIDC_CLIENT_SECRET: "secret" })).toEqual([]);
     expect(offered({ GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" })).toEqual(["google"]);
     expect(offered({ GOOGLE_CLIENT_ID: "id" })).toEqual([]);
     expect(offered({})).toEqual([]);

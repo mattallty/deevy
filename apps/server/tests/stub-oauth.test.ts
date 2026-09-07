@@ -36,6 +36,13 @@ const stubbedEnv = {
   // endpoint the sign-in touches is built from it, and the stub answers
   // GitLab's paths on whatever host it is (docs/plans/sign-in.md slice 5).
   GITLAB_ISSUER: "https://gitlab.example.test",
+  DEEVY_OIDC_CLIENT_ID: "stub-client",
+  DEEVY_OIDC_CLIENT_SECRET: "stub-secret",
+  // An issuer with a path, the way Keycloak and Authentik publish realms:
+  // everything else is discovered from the well-known document under it
+  // (docs/plans/sign-in.md slice 6).
+  DEEVY_OIDC_ISSUER: "https://idp.example.test/realms/deevy",
+  DEEVY_OIDC_NAME: "Acme SSO",
 };
 
 function stubbedServer(overrides: { adminEmail?: string } = {}) {
@@ -81,9 +88,15 @@ async function callbackFor(
   });
   const { url } = (await started.json()) as { url?: string };
   if (!url) throw new Error(`sign-in did not start for ${provider}: ${String(started.status)}`);
-  const state = new URL(url).searchParams.get("state") ?? "";
+  const authorization = new URL(url);
+  const state = authorization.searchParams.get("state") ?? "";
+  // An OpenID Connect provider binds its `id_token` to a nonce, and the nonce
+  // is in the authorization URL this skips past, so the code carries it back
+  // to the stub for it to sign in (apps/web/scripts/stub-oauth.js).
+  const nonce = authorization.searchParams.get("nonce");
+  const code = nonce ? `${email}|${nonce}` : email;
   return app.request(
-    `/api/auth/callback/${provider}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`,
+    `/api/auth/callback/${provider}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(code)}`,
     { headers: { cookie: cookiesOf(started) }, redirect: "manual" },
   );
 }
@@ -198,6 +211,22 @@ describe("a second provider on an address deevy already knows", () => {
   });
 });
 
+/** The admin whose own sign-in creates the Workspace every case below joins. */
+const seedAdmin = "ada@example.com";
+
+/**
+ * A Workspace, as the configured admin's own Google sign-in creates it —
+ * which is also the shortest way to a Workspace another provider can then
+ * arrive at.
+ */
+async function seededByGoogle() {
+  const server = stubbedServer({ adminEmail: seedAdmin });
+  await signIn(server.app, "google", seedAdmin);
+  const workspace = await server.db.query.workspace.findFirst();
+  if (!workspace) throw new Error("the admin sign-in created no Workspace");
+  return { ...server, workspaceId: workspace.id };
+}
+
 /**
  * Google (docs/plans/sign-in.md slice 4). What decides whether a teammate on
  * the Workspace's domain becomes a Member is the allowlist, not the provider:
@@ -205,16 +234,7 @@ describe("a second provider on an address deevy already knows", () => {
  * domain it is, by a rule an admin can see in deevy's own UI.
  */
 describe("a Google sign-in", () => {
-  const admin = "ada@example.com";
-
-  /** The Workspace, as the configured admin's own sign-in creates it. */
-  async function seeded() {
-    const server = stubbedServer({ adminEmail: admin });
-    await signIn(server.app, "google", admin);
-    const workspace = await server.db.query.workspace.findFirst();
-    if (!workspace) throw new Error("the admin sign-in created no Workspace");
-    return { ...server, workspaceId: workspace.id };
-  }
+  const seeded = seededByGoogle;
 
   async function rule(
     db: ReturnType<typeof stubbedServer>["db"],
@@ -251,6 +271,76 @@ describe("a Google sign-in", () => {
     const joined = await db.query.user.findFirst({ where: { email: "grace@example.com" } });
     expect(joined).toBeTruthy();
     expect(await db.query.member.findMany({ where: { userId: joined?.id } })).toEqual([]);
+    close();
+  });
+});
+
+/**
+ * The generic OpenID Connect provider (docs/plans/sign-in.md slice 6). Four
+ * variables and nothing else: the pair, the issuer everything is discovered
+ * from, and the name the button carries.
+ *
+ * Better Auth 1.7.3 registers a `genericOAuth` entry as a first-class social
+ * provider, so this is the same dance every other provider runs — started at
+ * `/sign-in/social`, landing on `/callback/oidc` — over an issuer whose
+ * endpoints came out of its own well-known document.
+ */
+describe("a generic OIDC sign-in", () => {
+  it("is offered under the name the deployment gave it", () => {
+    const offered = signInProviders({ providers: readEnv(stubbedEnv).providers });
+    expect(offered).toContainEqual({ id: "oidc", label: "Acme SSO", kind: "social" });
+    // Unnamed, the button says what the operator's teammates would call it if
+    // they had never heard of their IdP.
+    expect(
+      signInProviders({
+        providers: readEnv({ ...stubbedEnv, DEEVY_OIDC_NAME: undefined }).providers,
+      }),
+    ).toContainEqual({ id: "oidc", label: "Single sign-on", kind: "social" });
+    // An issuer is as load-bearing as the pair: without one there is no
+    // discovery document, so there is nothing to offer.
+    expect(
+      signInProviders({
+        providers: readEnv({ ...stubbedEnv, DEEVY_OIDC_ISSUER: undefined }).providers,
+      }).map((provider) => provider.id),
+    ).not.toContain("oidc");
+  });
+
+  it("signs a Human in through discovery and a signed id_token", async () => {
+    const { app, db, close } = stubbedServer({ adminEmail: "ada@example.com" });
+
+    const cookie = await signIn(app, "oidc", "ada@example.com");
+    expect(cookie).toContain("session_token");
+
+    // The subject is the `sub` of the verified id_token, and the account is
+    // the provider's own id — which is what the callback URL an IdP is given
+    // ends in.
+    expect(await db.query.account.findMany()).toMatchObject([
+      { providerId: "oidc", accountId: "ada@example.com" },
+    ]);
+    expect(await db.query.member.findMany()).toMatchObject([{ role: "admin" }]);
+    close();
+  });
+
+  it("links onto the Human another provider signed up first", async () => {
+    const email = "grace@example.com";
+    const { app, db, workspaceId, close } = await seededByGoogle();
+    await db.insert(allowlistRule).values({
+      id: newId("allowlistRule"),
+      workspaceId,
+      kind: "email_domain",
+      value: "example.com",
+    });
+
+    await signIn(app, "google", email);
+    await signIn(app, "oidc", email);
+
+    const human = await db.query.user.findFirst({ where: { email } });
+    expect(
+      (await db.query.account.findMany({ where: { userId: human?.id } }))
+        .map((row) => row.providerId)
+        .sort(),
+    ).toEqual(["google", "oidc"]);
+    expect(await db.query.member.findMany({ where: { userId: human?.id } })).toHaveLength(1);
     close();
   });
 });

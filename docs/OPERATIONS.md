@@ -178,8 +178,10 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
 
    Offering Google or GitLab as well, or instead, is `wrangler secret put GOOGLE_CLIENT_ID` and
    `GOOGLE_CLIENT_SECRET`, or `GITLAB_CLIENT_ID` and `GITLAB_CLIENT_SECRET`, beside them; the sign-in page
-   draws whichever pairs are complete. A self-hosted GitLab also wants `GITLAB_ISSUER`, which is not a
-   credential and can go in the `vars` block below.
+   draws whichever pairs are complete. Offering an OpenID Connect IdP is `DEEVY_OIDC_CLIENT_ID` and
+   `DEEVY_OIDC_CLIENT_SECRET` the same way. A self-hosted GitLab also wants `GITLAB_ISSUER`, and an OIDC
+   provider `DEEVY_OIDC_ISSUER` and `DEEVY_OIDC_NAME`; none of those three is a credential, so they can go
+   in the `vars` block below.
 
    `wrangler secret list` shows the names you put in and no values. The rest are not credentials, so they can go in
    a `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
@@ -249,28 +251,32 @@ beside `wrangler.jsonc`, so run `wrangler dev` from `apps/web` and let it find i
 `.gitignore` keeps the file itself out of the repository. Nothing on the Worker reads `process.env`; the
 bindings arrive with the request.
 
-| Variable                       | Node        | Workers            | Default              | Without it                                                                                                                                                                                                 |
-| ------------------------------ | ----------- | ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BETTER_AUTH_URL`              | env         | secret             | the request's origin | Sign-in callbacks are wrong, the OAuth server is off, and Slack deliveries wait.                                                                                                                           |
-| `BETTER_AUTH_SECRET`           | env         | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out.                                            |
-| `GITHUB_CLIENT_ID`             | env         | secret             | —                    | GitHub is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                         |
-| `GITHUB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
-| `GOOGLE_CLIENT_ID`             | env         | secret             | —                    | Google is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`.                     |
-| `GOOGLE_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
-| `GITLAB_CLIENT_ID`             | env         | secret             | —                    | GitLab is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/gitlab`.                     |
-| `GITLAB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
-| `GITLAB_ISSUER`                | env         | var                | `https://gitlab.com` | GitLab sign-in goes to gitlab.com. Set it to a self-hosted instance's origin; every GitLab endpoint deevy calls is built from it.                                                                          |
-| `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                       |
-| `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                       |
-| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                 |
-| `DEEVY_RUN_STALE_MINUTES`      | env         | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                                                                        |
-| `DEEVY_SWEEP_INTERVAL_SECONDS` | env         | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                                                                        |
-| `DEEVY_GATE_REMINDER_HOURS`    | env         | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                                                                      |
-| `DEEVY_STREAM_SECONDS`         | — unbounded | var                | 60                   | Nothing: a live stream on Workers ends after a minute and the browser resumes from the cursor it signed off with. Workers-only, because a Node process holds a connection for as long as the browser does. |
-| `JOBS`                         | — the sweep | optional binding   | — no queue           | Nothing: a webhook delivery goes out at the next Cron pass instead of the moment it is owed. Workers-only, and absent from the committed `apps/web/wrangler.jsonc` because Queues are a paid feature.      |
-| `DEEVY_DATABASE_PATH`          | env         | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                                                             |
-| `DEEVY_PORT`                   | env         | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                                                              |
-| `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                        |
+| Variable                       | Node        | Workers            | Default              | Without it                                                                                                                                                                                                                                                                |
+| ------------------------------ | ----------- | ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_URL`              | env         | secret             | the request's origin | Sign-in callbacks are wrong, the OAuth server is off, and Slack deliveries wait.                                                                                                                                                                                          |
+| `BETTER_AUTH_SECRET`           | env         | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out.                                                                                                           |
+| `GITHUB_CLIENT_ID`             | env         | secret             | —                    | GitHub is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                                                                                        |
+| `GITHUB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                                                                                 |
+| `GOOGLE_CLIENT_ID`             | env         | secret             | —                    | Google is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`.                                                                                    |
+| `GOOGLE_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                                                                                 |
+| `GITLAB_CLIENT_ID`             | env         | secret             | —                    | GitLab is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/gitlab`.                                                                                    |
+| `GITLAB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                                                                                 |
+| `GITLAB_ISSUER`                | env         | var                | `https://gitlab.com` | GitLab sign-in goes to gitlab.com. Set it to a self-hosted instance's origin; every GitLab endpoint deevy calls is built from it.                                                                                                                                         |
+| `DEEVY_OIDC_ISSUER`            | env         | var                | —                    | The generic OpenID Connect provider is neither registered nor offered. It is where the IdP's `/.well-known/openid-configuration` hangs off, and everything else is discovered from it, so it counts as a third half of the pair: without it there is nothing to register. |
+| `DEEVY_OIDC_CLIENT_ID`         | env         | secret             | —                    | As above. All three or none. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/oidc`.                                                                                                                                                                                    |
+| `DEEVY_OIDC_CLIENT_SECRET`     | env         | secret             | —                    | As above.                                                                                                                                                                                                                                                                 |
+| `DEEVY_OIDC_NAME`              | env         | var                | `Single sign-on`     | The button says "Sign in with Single sign-on". Set it to what your teammates call the IdP.                                                                                                                                                                                |
+| `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                                                                                      |
+| `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                                                                                      |
+| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                                                                                |
+| `DEEVY_RUN_STALE_MINUTES`      | env         | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                                                                                                                                       |
+| `DEEVY_SWEEP_INTERVAL_SECONDS` | env         | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                                                                                                                                       |
+| `DEEVY_GATE_REMINDER_HOURS`    | env         | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                                                                                                                                     |
+| `DEEVY_STREAM_SECONDS`         | — unbounded | var                | 60                   | Nothing: a live stream on Workers ends after a minute and the browser resumes from the cursor it signed off with. Workers-only, because a Node process holds a connection for as long as the browser does.                                                                |
+| `JOBS`                         | — the sweep | optional binding   | — no queue           | Nothing: a webhook delivery goes out at the next Cron pass instead of the moment it is owed. Workers-only, and absent from the committed `apps/web/wrangler.jsonc` because Queues are a paid feature.                                                                     |
+| `DEEVY_DATABASE_PATH`          | env         | — the `DB` binding | `/data/deevy.sqlite` | Node writes to `./data/deevy.sqlite`. On Workers the rows are D1's and the path means nothing.                                                                                                                                                                            |
+| `DEEVY_PORT`                   | env         | —                  | 3000                 | Node listens on 3000. Workers has no port: the platform routes to the Worker.                                                                                                                                                                                             |
+| `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                                                                                       |
 
 The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
 signing in: `BETTER_AUTH_*`, `GITHUB_*`, `GOOGLE_*`, `GITLAB_*`, `DEEVY_ADMIN_EMAIL` and
@@ -350,9 +356,10 @@ value much over 90 spends the whole cap on polling and leaves none for signing t
 Which providers an instance offers is what its environment sets: `createAuth` registers the entries whose
 client id and secret are both present, `health.ping` reports the same list publicly, and the sign-in page
 draws one button per entry in that order. An instance with none configured says so on the page instead of
-offering a button that goes nowhere. GitHub, Google and GitLab are the entries today, `GITHUB_CLIENT_ID` with
-`GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET` and `GITLAB_CLIENT_ID` with
-`GITLAB_CLIENT_SECRET`; any of them, all of them or none (docs/plans/sign-in.md).
+offering a button that goes nowhere. GitHub, Google, GitLab and one generic OpenID Connect provider are the
+entries, `GITHUB_CLIENT_ID` with `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`,
+`GITLAB_CLIENT_ID` with `GITLAB_CLIENT_SECRET` and `DEEVY_OIDC_CLIENT_ID` with `DEEVY_OIDC_CLIENT_SECRET` and
+`DEEVY_OIDC_ISSUER`; any of them, all of them or none (docs/plans/sign-in.md).
 
 Google is registered with its default scopes and no `hd`, so it does not decide who may join. Who may join is
 the allowlist: a Google Workspace is an email domain, and an `email_domain` rule under Settings, Allowlist
@@ -370,6 +377,18 @@ not grant it: the scope is on the registration, so every GitLab sign-in consents
 that could read the API, whether or not a group rule exists. Leaving group rules alone means the token is
 never used; it does not mean it is never issued. An operator who wants it never issued has to leave GitLab
 unconfigured.
+
+Anything that speaks OpenID Connect is the fourth entry, and one is all there is: a self-hosted instance has
+one IdP, and a list of them would put JSON in a secret to serve a case nobody has. `DEEVY_OIDC_ISSUER` is
+where the IdP publishes `/.well-known/openid-configuration` — `https://acme.okta.com`,
+`https://login.microsoftonline.com/<tenant>/v2.0`, a Keycloak or Authentik realm URL with its path — and the
+authorization, token, userinfo and JWKS endpoints are all read out of that document, so the issuer is as
+load-bearing as the client pair and an entry missing any of the three is not offered. deevy asks for `openid`,
+`profile` and `email` and nothing else, uses PKCE, and requires the discovery document to name an issuer and a
+`jwks_uri`: an OIDC sign-in's identity is its `id_token`'s claims, and a token nobody can verify is not an
+identity. `DEEVY_OIDC_NAME` is what the button says — "Acme SSO" rather than "Single sign-on" — so an operator
+names their own IdP without a deployment of the SPA. Who may join is still the allowlist: an `email_domain`
+rule admits the addresses the IdP hands out.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,
@@ -409,9 +428,10 @@ Every provider's callback follows from it, and each ends in the provider's own i
 
 `<provider>` is `github` for the GitHub OAuth App's Authorization callback URL, `google` for the Authorized
 redirect URI of the Google OAuth client (an OAuth 2.0 Client ID of type "Web application" in a Google Cloud
-project's Credentials, with the consent screen's scopes left at email and profile), and `gitlab` for the
+project's Credentials, with the consent screen's scopes left at email and profile), `gitlab` for the
 Redirect URI of the GitLab application (User settings › Applications, confidential, scopes `read_user` and
-`read_api`).
+`read_api`), and `oidc` for the Redirect URI of the OpenID Connect client — deevy's own name for the provider,
+whatever the IdP is, so `DEEVY_OIDC_NAME` changes the button and never the URL.
 
 A GitHub OAuth App holds one callback URL, so a Worker reachable both on its `workers.dev` subdomain and on a
 custom domain needs an App for each, or a decision that sign-in happens on one of them; a Google client and a

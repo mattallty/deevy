@@ -88,6 +88,15 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
       // GitLab endpoint deevy calls is built from it (docs/OPERATIONS.md).
       issuer: env.GITLAB_ISSUER,
     },
+    // One generic OpenID Connect provider, discovered from its issuer. The
+    // name is what the button says, so an operator calls their own IdP what
+    // their teammates call it (docs/plans/sign-in.md).
+    oidc: {
+      clientId: env.DEEVY_OIDC_CLIENT_ID ?? "",
+      clientSecret: env.DEEVY_OIDC_CLIENT_SECRET ?? "",
+      issuer: env.DEEVY_OIDC_ISSUER ?? "",
+      name: env.DEEVY_OIDC_NAME,
+    },
   };
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.
