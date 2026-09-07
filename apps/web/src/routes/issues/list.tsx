@@ -25,7 +25,7 @@ import { LabelBadge } from "@/components/label-badge";
 import { orpc } from "@/lib/orpc";
 import { useRowSelection } from "@/lib/row-selection";
 import { foldStates } from "@/lib/states";
-import { stateGrouping } from "@/lib/groupings";
+import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { ago } from "@/lib/time";
 
 type IssueRow = Awaited<
@@ -179,7 +179,15 @@ export function IssuesPage({
 
   // One grouping, drawn twice: the list renders its buckets as groups, the
   // board renders the same buckets as columns (lib/groupings.tsx).
-  const grouping = useMemo(() => stateGrouping(folded), [folded]);
+  const groupings = useMemo(
+    () =>
+      groupingsFor({
+        projects: projects.data?.projects ?? [],
+        ...(projectKey ? { projectKey } : {}),
+      }),
+    [projects.data, projectKey],
+  );
+  const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
   const buckets = useMemo(() => grouping.buckets(rows), [grouping, rows]);
 
   const boardColumns = useMemo<BoardColumn[]>(
@@ -200,7 +208,8 @@ export function IssuesPage({
 
   // Which buckets the Human has folded or unfolded away from their default.
   const [toggled, setToggled] = useState<Set<string>>(() => new Set());
-  const grouped = search.group !== "none";
+  // A board is columns of something; only a list may say "no grouping".
+  const grouped = board || search.group !== "none";
   const groups = useMemo<DataGroup<IssueRow>[] | undefined>(() => {
     if (!grouped) return undefined;
     return (
@@ -337,7 +346,8 @@ export function IssuesPage({
       members={memberList}
       sponsorsAgents={myAgentIds.size > 0}
       hideProject={Boolean(fixedProject)}
-      hideGroup={board}
+      groupings={groupings}
+      allowNoGrouping={!board}
       showView={!fixedProject}
     />
   );

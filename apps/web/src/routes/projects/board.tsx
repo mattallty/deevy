@@ -1,12 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import {
-  IssueBoard,
-  groupIntoColumns,
-  type BoardColumn,
-  type BoardIssue,
-} from "@/components/issue-board";
+import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
 import {
   ISSUE_PAGE,
   IssueFilters,
@@ -15,13 +10,17 @@ import {
   type IssuesSearch,
 } from "@/components/issue-filters";
 import { PageHeader } from "@/components/page-header";
-import { StateBadge } from "@/components/state-badge";
 import { SidePeek } from "@/components/side-peek";
+import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { orpc } from "@/lib/orpc";
 import { useRowSelection } from "@/lib/row-selection";
 
-/** On a Project's Board a column is one State. */
-const byStateId = (issue: BoardIssue) => issue.state.id;
+/** Which bucket a card belongs to, asked of the buckets the grouping made. */
+function byBucket(buckets: Array<{ id: string; rows: Array<{ key: string }> }>) {
+  const home = new Map<string, string>();
+  for (const bucket of buckets) for (const row of bucket.rows) home.set(row.key, bucket.id);
+  return (issue: BoardIssue) => home.get(issue.key) ?? "";
+}
 
 /**
  * The Project's Issues as one column per State (docs/plans/ui-redesign.md slice
@@ -69,28 +68,21 @@ export function BoardPage({
     [issues.data],
   );
 
-  // One Project: a column is a State, and a drop lands in exactly that State.
-  // Its buckets come from the same grouping the Issues home uses, keyed by id
-  // rather than by name because there is only one Project to fold.
+  // The same groupings the Issues home offers, with this Project fixed: its
+  // States, unfolded, and no Project grouping where every Issue is this one's.
+  const groupings = useMemo(() => groupingsFor({ workflowStates: states }), [states]);
+  const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
+  const buckets = useMemo(() => grouping.buckets(cards), [grouping, cards]);
   const columns = useMemo<BoardColumn[]>(
     () =>
-      states.map((state) => ({
-        id: state.id,
-        name: state.name,
-        header: (
-          <StateBadge
-            state={{
-              name: state.name,
-              isGate: state.isGate,
-              category: state.category as FilterState["category"],
-            }}
-          />
-        ),
-        isGate: state.isGate,
-        plan: (issue) =>
-          issue.state.isGate ? { kind: "gate" } : { kind: "move", stateId: state.id },
+      buckets.map((bucket) => ({
+        id: bucket.id,
+        name: bucket.name,
+        header: bucket.header,
+        ...(bucket.isGate === undefined ? {} : { isGate: bucket.isGate }),
+        ...(bucket.plan ? { plan: bucket.plan } : {}),
       })),
-    [states],
+    [buckets],
   );
   const filterStates: FilterState[] = states.map((state) => ({
     name: state.name,
@@ -100,10 +92,10 @@ export function BoardPage({
 
   // The cards as they are on screen, column by column, for j and k; Enter
   // peeks and o opens, as on the Issues home (lib/row-selection.ts).
-  const visibleKeys = useMemo(() => {
-    const value = groupIntoColumns(columns, cards, byStateId);
-    return columns.flatMap((column) => (value[column.id] ?? []).map((card) => card.key));
-  }, [columns, cards]);
+  const visibleKeys = useMemo(
+    () => buckets.flatMap((bucket) => bucket.rows.map((card) => card.key)),
+    [buckets],
+  );
   const peek = (key: string) => onSearch({ peek: key });
   const openFull = (key: string) =>
     void navigate({ to: "/issues/$issueKey", params: { issueKey: key } });
@@ -132,14 +124,15 @@ export function BoardPage({
           members={memberList}
           sponsorsAgents={myAgentIds.size > 0}
           hideProject
-          hideGroup
+          groupings={groupings}
+          allowNoGrouping={false}
         />
       </PageHeader>
 
       <IssueBoard
         columns={columns}
         issues={cards}
-        columnOf={byStateId}
+        columnOf={byBucket(buckets)}
         loading={workflow.isPending || issues.isPending}
         selectedKey={selected}
         onSelect={select}

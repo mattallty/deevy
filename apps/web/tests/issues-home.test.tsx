@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { selectedLabel } from "./select.ts";
 
 const ada = {
   id: "m-ada",
@@ -259,14 +260,26 @@ describe("the Issues home with nothing to show", () => {
 });
 
 describe("the board view of the Issues home", () => {
-  it("toggles to the Board, writing view to the URL and hiding Group by", async () => {
+  it("toggles to the Board, writing view to the URL and keeping Group by", async () => {
     const router = await mountAt("/", { member: { ...ada, image: null } });
     await screen.findByRole("table", { name: "Issues" });
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ view: "board" }));
     expect(await screen.findByRole("region", { name: "Intent" })).toBeTruthy();
     expect(screen.queryByRole("table", { name: "Issues" })).toBeNull();
-    expect(screen.queryByRole("combobox", { name: "Group by" })).toBeNull();
+    // The columns are what it groups by, so this is where you most want to say.
+    expect(screen.getByRole("combobox", { name: "Group by" })).toBeTruthy();
+  });
+
+  it("offers no ungrouped board: a board is columns of something", async () => {
+    await mountAt("/?view=board", { member: { ...ada, image: null } });
+    await screen.findByRole("region", { name: "Intent" });
+
+    const groupBy = screen.getByRole("combobox", { name: "Group by" });
+    expect(selectedLabel(groupBy)).toBe("Group by State");
+    fireEvent.keyDown(groupBy, { key: "ArrowDown" });
+    const options = await screen.findAllByRole("option");
+    expect(options.map((option) => option.textContent)).not.toContain("No grouping");
   });
 
   it("keeps the Board when its toggle is pressed again", async () => {

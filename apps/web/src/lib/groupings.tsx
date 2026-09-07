@@ -121,9 +121,62 @@ export function stateGrouping(folded: FoldedState[]): Grouping {
   };
 }
 
+/**
+ * By State on a screen that is one Project's, where there is nothing to fold:
+ * a bucket is a State, and a drop lands in exactly it. The Project's own
+ * Workflow says which States exist, including the ones holding nothing.
+ */
+export function projectStateGrouping(
+  states: Array<{ id: string; name: string; isGate: boolean; category: string }>,
+): Grouping {
+  const order = new Map(states.map((state, index) => [state.id, index]));
+
+  return {
+    id: "state",
+    label: "State",
+    buckets<T extends GroupableIssue>(rows: T[]) {
+      const held = bucketBy(rows, (row) => row.state.id);
+      const known = new Map(states.map((state) => [state.id, state]));
+      const ids = [...new Set([...states.map((state) => state.id), ...held.keys()])];
+
+      return ids
+        .sort(
+          (a, b) =>
+            (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER),
+        )
+        .map((id) => {
+          const rowsHere = held.get(id) ?? [];
+          const state = known.get(id) ?? rowsHere[0]!.state;
+          const category = (
+            state.category in categoryOrder ? state.category : "active"
+          ) as StateCategory;
+          return {
+            id,
+            name: state.name,
+            header: <StateBadge state={{ name: state.name, isGate: state.isGate, category }} />,
+            rows: rowsHere,
+            keepWhenEmpty: true,
+            collapsedByDefault: category === "done",
+            isGate: state.isGate,
+            plan: (issue: GroupableIssue): DropPlan =>
+              issue.state.isGate ? { kind: "gate" } : { kind: "move", stateId: id },
+          };
+        });
+    },
+  };
+}
+
 export interface GroupingContext {
-  projects: Array<{ id: string; key: string; name: string; states?: unknown }>;
-  /** Named, the screen is one Project's: its States, unfolded. */
+  /**
+   * One Project's Workflow. Given, the State grouping is that Workflow's, with
+   * nothing folded — a Project's Board knows exactly which States it has, and
+   * asking the Workspace's Projects for them would be a second query to learn
+   * something it already loaded.
+   */
+  workflowStates?: Array<{ id: string; name: string; isGate: boolean; category: string }>;
+  /** Every Project the screen may show, for a State grouping folded by name. */
+  projects?: Array<{ id: string; key: string; name: string; states?: unknown }>;
+  /** Named, only that Project's States are folded in. */
   projectKey?: string;
 }
 
@@ -132,11 +185,15 @@ export interface GroupingContext {
  * first is what a screen falls back to when the URL names one it does not have.
  */
 export function groupingsFor(context: GroupingContext): Grouping[] {
-  const folded = foldStates(
-    context.projects as Parameters<typeof foldStates>[0],
-    context.projectKey,
-  );
-  return [stateGrouping(folded)];
+  const state = context.workflowStates
+    ? projectStateGrouping(context.workflowStates)
+    : stateGrouping(
+        foldStates(
+          (context.projects ?? []) as Parameters<typeof foldStates>[0],
+          context.projectKey,
+        ),
+      );
+  return [state];
 }
 
 /** The grouping `?group=` names, or the first one, which is always State. */
