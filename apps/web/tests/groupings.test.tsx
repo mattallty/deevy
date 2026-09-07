@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { BoardIssue } from "../src/components/issue-board.tsx";
-import { assigneeGrouping, projectGrouping, stateGrouping } from "../src/lib/groupings.tsx";
+import {
+  assigneeGrouping,
+  labelScopeGrouping,
+  projectGrouping,
+  stateGrouping,
+} from "../src/lib/groupings.tsx";
 import { foldStates } from "../src/lib/states.ts";
 
 const projects = [
@@ -209,5 +214,67 @@ describe("the Project grouping", () => {
     const buckets = projectGrouping(projectRows).buckets([issue("DEV-1", "p-dev", build)]);
 
     expect(buckets.every((bucket) => bucket.plan === undefined)).toBe(true);
+  });
+});
+
+describe("a Label scope as a grouping", () => {
+  const labels = [
+    { id: "l-loop", name: "Agent loop", scope: "epic", color: "#38bdf8" },
+    { id: "l-checkout", name: "Checkout rewrite", scope: "epic", color: "#fb7185" },
+    { id: "l-high", name: "high", scope: "priority", color: "#f59e0b" },
+    { id: "l-backend", name: "backend", scope: null, color: "#a78bfa" },
+  ];
+  const epic = () => labelScopeGrouping("epic", labels);
+  const carrying = (...held: string[]) => ({
+    ...issue("DEV-1", "p-dev", build),
+    labels: labels.filter((label) => held.includes(label.id)),
+  });
+
+  it("is one bucket per Label in the scope, and one for the Issues without", () => {
+    const buckets = epic().buckets([]);
+
+    expect(buckets.map((bucket) => bucket.name)).toEqual([
+      "epic: Agent loop",
+      "epic: Checkout rewrite",
+      "No epic",
+    ]);
+  });
+
+  it("puts every Issue in exactly one bucket, whatever else it carries", () => {
+    const rows = [carrying("l-loop", "l-high"), carrying("l-backend"), carrying("l-checkout")];
+
+    const buckets = epic().buckets(rows);
+
+    expect(buckets.map((bucket) => bucket.rows.length)).toEqual([1, 1, 1]);
+    expect(buckets.reduce((total, bucket) => total + bucket.rows.length, 0)).toBe(rows.length);
+  });
+
+  it("ignores Labels of another scope, and unscoped ones, when bucketing", () => {
+    const buckets = epic().buckets([carrying("l-high", "l-backend")]);
+
+    expect(buckets.find((bucket) => bucket.name === "No epic")?.rows.length).toBe(1);
+  });
+
+  it("swaps the scope's Label on a drop and keeps every other one", () => {
+    const held = carrying("l-loop", "l-high", "l-backend");
+
+    const toCheckout = epic()
+      .buckets([])
+      .find((bucket) => bucket.name === "epic: Checkout rewrite")!;
+
+    expect(toCheckout.plan!(held)).toEqual({
+      kind: "labels",
+      labelIds: ["l-high", "l-backend", "l-checkout"],
+    });
+  });
+
+  it("takes the scope's Label off entirely for the bucket that has none", () => {
+    const held = carrying("l-loop", "l-high");
+
+    const toNone = epic()
+      .buckets([])
+      .find((bucket) => bucket.name === "No epic")!;
+
+    expect(toNone.plan!(held)).toEqual({ kind: "labels", labelIds: ["l-high"] });
   });
 });

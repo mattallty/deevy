@@ -63,6 +63,7 @@ export function IssuesPage({
   const me = useQuery(orpc.me.get.queryOptions());
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
+  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
 
   const myId = me.data?.member?.id ?? null;
   const memberList = members.data?.members ?? [];
@@ -184,9 +185,10 @@ export function IssuesPage({
       groupingsFor({
         projects: projects.data?.projects ?? [],
         members: memberList,
+        labels: labels.data?.labels ?? [],
         ...(projectKey ? { projectKey } : {}),
       }),
-    [projects.data, memberList, projectKey],
+    [projects.data, memberList, labels.data, projectKey],
   );
   const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
   const buckets = useMemo(() => grouping.buckets(rows), [grouping, rows]);

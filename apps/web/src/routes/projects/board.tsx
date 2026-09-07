@@ -40,6 +40,7 @@ export function BoardPage({
   const navigate = useNavigate();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const labels = useQuery(orpc.labels.list.queryOptions({ input: {} }));
   const me = useQuery(orpc.me.get.queryOptions());
   const myId = me.data?.member?.id ?? null;
   const memberList = members.data?.members ?? [];
@@ -71,8 +72,13 @@ export function BoardPage({
   // The same groupings the Issues home offers, with this Project fixed: its
   // States, unfolded, and no Project grouping where every Issue is this one's.
   const groupings = useMemo(
-    () => groupingsFor({ workflowStates: states, members: memberList }),
-    [states, memberList],
+    () =>
+      groupingsFor({
+        workflowStates: states,
+        members: memberList,
+        labels: labels.data?.labels ?? [],
+      }),
+    [states, memberList, labels.data],
   );
   const grouping = useMemo(() => groupingFrom(groupings, search.group), [groupings, search.group]);
   const buckets = useMemo(() => grouping.buckets(cards), [grouping, cards]);

@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { LabelBadge } from "@/components/label-badge";
 import { MemberChip, type ChipMember } from "@/components/member-chip";
 import { StateBadge } from "@/components/state-badge";
 import type { DropPlan } from "@/components/issue-board";
+import { labelText } from "@/lib/labels";
 import { categoryOrder, foldStates, type FoldedState, type StateCategory } from "@/lib/states";
 
 /**
@@ -52,6 +54,9 @@ export interface Grouping {
 
 /** The bucket for an Issue nobody holds. Not "", which is a legitimate id. */
 export const UNASSIGNED = "__unassigned";
+
+/** The bucket for an Issue carrying no Label of the scope being grouped by. */
+const NO_LABEL = "__no-label:";
 
 /** Rows in the order they arrived, bucketed by a key each one answers to. */
 function bucketBy<T extends GroupableIssue>(rows: T[], keyOf: (row: T) => string) {
@@ -261,6 +266,61 @@ export function projectGrouping(
   };
 }
 
+interface ScopedLabel {
+  id: string;
+  name: string;
+  scope: string | null;
+  color: string;
+}
+
+/**
+ * By one scope of Label — `epic`, `area` — and never by Labels at large. An
+ * Issue carries at most one Label per scope, so a scope divides the Issues
+ * exactly once each: every Issue lands in one bucket, `No epic` included, a
+ * count is a count, and a board can take a drop. Grouping by individual Labels
+ * would put one Issue in several columns at once (Matt, 2026-09-07).
+ */
+export function labelScopeGrouping(scope: string, labels: ScopedLabel[]): Grouping {
+  const inScope = labels.filter((label) => label.scope === scope);
+  const none = `${NO_LABEL}${scope}`;
+
+  return {
+    id: `label:${scope}`,
+    label: scope,
+    buckets<T extends GroupableIssue>(rows: T[]) {
+      const held = bucketBy(
+        rows,
+        (row) => row.labels.find((label) => label.scope === scope)?.id ?? none,
+      );
+      /** The Labels this Issue keeps: all of them but this scope's. */
+      const others = (issue: GroupableIssue) =>
+        issue.labels.filter((label) => label.scope !== scope).map((label) => label.id);
+
+      const buckets: GroupBucket<T>[] = inScope.map((label) => ({
+        id: label.id,
+        name: labelText(label),
+        header: <LabelBadge label={label} />,
+        rows: held.get(label.id) ?? [],
+        keepWhenEmpty: true,
+        plan: (issue: GroupableIssue): DropPlan => ({
+          kind: "labels",
+          labelIds: [...others(issue), label.id],
+        }),
+      }));
+
+      buckets.push({
+        id: none,
+        name: `No ${scope}`,
+        header: <span className="text-sm text-muted-foreground">No {scope}</span>,
+        rows: held.get(none) ?? [],
+        keepWhenEmpty: true,
+        plan: (issue: GroupableIssue): DropPlan => ({ kind: "labels", labelIds: others(issue) }),
+      });
+      return buckets;
+    },
+  };
+}
+
 export interface GroupingContext {
   /**
    * One Project's Workflow. Given, the State grouping is that Workflow's, with
@@ -275,6 +335,8 @@ export interface GroupingContext {
   projectKey?: string;
   /** For grouping by Assignee: every Member the screen may show. */
   members?: ChipMember[];
+  /** For grouping by a Label scope: every Label this Workspace defines. */
+  labels?: ScopedLabel[];
 }
 
 /**
@@ -295,6 +357,14 @@ export function groupingsFor(context: GroupingContext): Grouping[] {
   const oneProject = Boolean(context.workflowStates || context.projectKey);
   if (!oneProject && (context.projects?.length ?? 0) > 1) {
     groupings.push(projectGrouping(context.projects ?? []));
+  }
+  // One grouping per scope in use, in the order the Labels come back.
+  const scopes: string[] = [];
+  for (const label of context.labels ?? []) {
+    if (label.scope && !scopes.includes(label.scope)) scopes.push(label.scope);
+  }
+  for (const scope of scopes) {
+    groupings.push(labelScopeGrouping(scope, context.labels ?? []));
   }
   return groupings;
 }
