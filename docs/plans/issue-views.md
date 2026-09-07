@@ -9,6 +9,7 @@ choice, both offering that choice from the same control, and both taking a new g
 rather than by editing either view.
 
 Four slices, in dependency order. Each is one PR on `main`, carries its own tests, and leaves the app working.
+**All four are built** (2026-09-07); what each turned up is under it.
 
 ## What is wrong today
 
@@ -92,6 +93,16 @@ Done when: the Issues home, the Workspace board and a Project's Board tab are pi
 existing test passes untouched. A unit test on `stateGrouping` asserts Workflow order, the unknown-State
 bucket, and that Done starts collapsed.
 
+### Found by building the slice
+
+- **The Gate rule is not the board's.** `planDrop` refused to move a card out of a Gate for every column,
+  which is right while every column is a State and wrong the moment one is a Member: reassigning an Issue
+  that happens to sit at a Gate is a reassignment, not a move. The rule moved into the State grouping's own
+  plan, and slice 3 has a test that grouping by Assignee does not inherit it.
+- **The collapsed-group bookkeeping got smaller.** It was a set of names plus `!name` entries to invert
+  Done's default. One set of buckets toggled away from whatever their default is says the same thing and
+  works for a grouping whose defaults have nothing to do with categories.
+
 ## Slice 2: The control, in both shapes (S)
 
 - `IssuesSearch.group` widens to `string`, parsed against the groupings the screen offers and falling back to
@@ -104,6 +115,13 @@ bucket, and that Done starts collapsed.
 Done when: switching Group by on the board re-columns it, switching on the list re-groups it, both survive a
 reload and Back, and the tab strip's `group "Filters"` still names everything it did.
 
+### Found by building the slice
+
+- **A Project's Board should not fold.** Putting it on `stateGrouping` made it ask the Workspace's Projects
+  for States it had already loaded from its own `workflow.get`, and a thin test stub caught it immediately.
+  `projectStateGrouping` takes a Workflow directly: buckets are States by id, nothing folded, and a drop
+  lands in exactly the State the column is. `groupingsFor` picks between the two on `workflowStates`.
+
 ## Slice 3: Assignee and Project (M)
 
 - `assigneeGrouping`: buckets headed by `MemberChip`, Humans before Agents before Unassigned, `dropInto`
@@ -115,6 +133,15 @@ reload and Back, and the tab strip's `group "Filters"` still names everything it
 Done when: a card dragged between Assignee columns is reassigned and the Event log says so, a card dragged
 into a Project column is refused with a reason, and `?group=assignee` is a link somebody can send.
 
+### Found by building the slice
+
+- **The table was repeating the group header.** It dropped the State column whenever _anything_ was grouped,
+  which was indistinguishable from "grouped by State" until there was a second grouping. It now drops
+  whichever column the grouping already states: by Assignee the State column comes back and the Assignee
+  column goes.
+- **A Member nobody lists may still hold Issues.** A suspended Member keeps their work until somebody takes
+  it off them, so the grouping gives them a bucket from the rows rather than from the Member list.
+
 ## Slice 4: Label scopes (M)
 
 - `labels.list` is already fetched by `LabelPicker`; scopes come from `label.scope`, deduplicated.
@@ -125,6 +152,12 @@ into a Project column is refused with a reason, and `?group=assignee` is a link 
 
 Done when: dropping a card into `epic: Agent loop` gives it that Label and takes the other epic off, and
 `No epic` takes the scope off entirely.
+
+### Found by building the slice
+
+- **Nothing needed to know which scopes exist.** They are read off `labels.list`, which both screens already
+  had reason to fetch, so a Workspace that invents an `area` scope gets "Group by area" without a line of
+  code or a migration.
 
 ## Deferred
 

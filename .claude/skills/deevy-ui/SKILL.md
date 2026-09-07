@@ -405,10 +405,30 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 - **The Inbox** is one flat two-line list (`ul aria-label="Notifications"`): actor's name (no chip: the kind glyph on the left is enough) · verb · on KEY,
   the Issue title, the quote. `lib/notification-text.ts` phrases it from the joined Event, actor and
   comment; a checkbox per row and `x` select, a `toolbar "Selection"` marks several read.
-- **Any Issue list is also a board.** `view=board` in the URL, `lib/states.ts` `foldStates` for the
-  columns, `components/issue-board.tsx` for the board itself (`planDrop` decides move / ruling / refusal;
-  `IssueBoard` is the connected one both the Project Board and the Workspace board render). Never build a
-  second kanban.
+- **Any Issue list is also a board.** `view=board` in the URL,
+  `components/issue-board.tsx` for the board itself (`IssueBoard` is the connected one both the Project
+  Board and the Workspace board render). Never build a second kanban.
+- **A grouping is an object, and both shapes draw it** (`lib/groupings.tsx`, docs/plans/issue-views.md,
+  2026-09-07). One `Grouping` buckets the rows, orders and names the buckets, and says what a drop into one
+  means; the list renders the buckets as `DataGroup`s and the board renders the same buckets as columns.
+  What ships is State, Assignee, Project and one per Label scope in use — a fifth is a new object in that
+  file, never an edit to either view. Rules the model carries:
+  - **`?group=` is any grouping's id** (`state`, `assignee`, `project`, `label:epic`) or `none`. The screen
+    validates it against what it offers and falls back to State, so an old link still opens.
+  - **Group by shows on a board too**, where the columns _are_ the grouping. "No grouping" is a list's
+    choice alone: a board with no columns is not a board.
+  - **A bucket's `plan` says what a drop means** — `move`, `assign`, `labels`, `gate`, `refused`. A bucket
+    with no plan takes no cards and the board says why (grouping by Project). The board itself decides only
+    what is true of every grouping; the Gate rule belongs to the State grouping, so reassigning a card that
+    sits at a Gate is a reassignment, not a ruling.
+  - **`keepWhenEmpty`** is how a board keeps a column nothing is in while the list drops the empty group.
+  - **Group by a Label scope, never by a Label**: an Issue carries at most one Label per scope, so a scope
+    divides the Issues exactly once each and a drop has one meaning.
+  - **The table drops whatever column the groups already state** — by Assignee the Assignee column goes and
+    State comes back.
+  - A screen that is one Project's uses `projectStateGrouping` (its Workflow, unfolded, buckets by State
+    id); a Workspace-wide one uses `stateGrouping` over `foldStates` (`lib/states.ts`), which folds States
+    by name across Projects and resolves a drop to the card's own Project.
 - **Forms save themselves** where a change is one field: `lib/autosave.ts` (`saveNow` on blur/Enter, a
   `role="status"` line: Saving · Saved · error + Retry). The Workflow editor is the exception — a rewrite with
   deletions keeps its explicit Save Workflow and counts unsaved changes in a sticky footer.
@@ -439,6 +459,10 @@ slice says otherwise: `Sign in with GitHub`; `New Issue` / `Create Issue` / `Add
 `Schedule for <name>`, `Grant a Project`, `Key name`, `Issue`, `Revoke DEV`, `Sponsored by`, `only time`;
 `Approvers for <State>`, `Save Workflow`, list `States`. Slices 1, 2, 4 and 8 of the plan change names on
 purpose and update the tests with them.
+
+The grouping rework added: `combobox "Group by"` in `group "Filters"`, on the list **and** the board;
+`region "<bucket>"` for a board column named by whatever it groups (`Unassigned`, `No epic`, a Project's
+name, a State); `Group by <label>` as each option's text.
 
 Round 2 added these names: `list "Notifications"` with `checkbox "Select <verb>"` and `toolbar "Selection"`
 (Inbox); `button "List"` / `button "Board"` in `group "Filters"` and `region "<State>"` columns on the
