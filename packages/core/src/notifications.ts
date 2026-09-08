@@ -3,15 +3,14 @@ import {
   delivery as deliveryTable,
   issue as issueTable,
   notification as notificationTable,
-  member as memberTable,
   workflowState,
   type Db,
   type Event,
   type HumanNotificationKind,
   type Notification,
 } from "@deevy/db";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
-import { gateApprovers } from "./workflow.ts";
+import { eq } from "drizzle-orm";
+import { approvalsThisVisit, eligibleApprovers, gateApprovers } from "./workflow.ts";
 import { newId } from "./ids.ts";
 
 /**
@@ -216,6 +215,7 @@ const AGENT_ANSWERED: Event["kind"] = "run.answered";
 const gateEventKinds = new Set<Event["kind"]>([
   "issue.created",
   "issue.moved",
+  "gate.approval",
   "gate.approved",
   "gate.rejected",
 ]);
@@ -278,6 +278,7 @@ async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
   if (
     event.kind === "issue.created" ||
     event.kind === "issue.moved" ||
+    event.kind === "gate.approval" ||
     event.kind === "gate.approved" ||
     event.kind === "gate.rejected"
   ) {
@@ -357,19 +358,30 @@ async function gateStateOf(db: Db, issueId: string): Promise<string | null> {
  */
 async function gateRecipients(db: Db, event: Event, stateId: string): Promise<Recipient[]> {
   const named = await gateApprovers(db, stateId);
-  const humans = await db
-    .select({ id: memberTable.id })
-    .from(memberTable)
-    .where(
-      and(
-        eq(memberTable.workspaceId, event.workspaceId),
-        eq(memberTable.kind, "human"),
-        isNull(memberTable.suspendedAt),
-        event.actorMemberId ? ne(memberTable.id, event.actorMemberId) : undefined,
-        named.length > 0 ? inArray(memberTable.id, named) : undefined,
-      ),
-    );
-  return humans.map((human) => ({ memberId: human.id, kind: "gate_awaiting" as const }));
+  const humans = await eligibleApprovers(db, {
+    workspaceId: event.workspaceId,
+    named,
+    exclude: event.actorMemberId,
+  });
+  // A Gate that wants more than one Human keeps asking the ones who have not
+  // answered yet, and stops asking the ones who have: an approval already given
+  // is not a question (docs/plans/four-eyes-gates.md).
+  const already =
+    event.kind === "gate.approval" && event.subjectType === "issue"
+      ? await approvedAlready(db, event.subjectId, stateId)
+      : [];
+  return humans
+    .filter((memberId) => !already.includes(memberId))
+    .map((memberId) => ({ memberId, kind: "gate_awaiting" as const }));
+}
+
+/** Who has already approved the Gate an Issue is in, for the visit it is on. */
+async function approvedAlready(db: Db, issueId: string, stateId: string): Promise<string[]> {
+  const found = await db.query.issue.findFirst({
+    where: { id: issueId },
+    columns: { id: true, stateEnteredAt: true },
+  });
+  return found ? approvalsThisVisit(db, found, stateId) : [];
 }
 
 /** Of the given Members, those still able to act. Suspension silences an inbox. */

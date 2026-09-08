@@ -68,6 +68,20 @@ export function describeNotification(row: DescribableNotification): Notification
             excerpt: text(payload.note),
             tone: "gate",
           };
+        case "gate.approval": {
+          // Short of the threshold, so the row is still a question: say how
+          // many more Humans it wants (docs/plans/four-eyes-gates.md).
+          const remaining = typeof payload.remaining === "number" ? payload.remaining : null;
+          const more =
+            remaining === null
+              ? ""
+              : `; it wants ${remaining} more ${remaining === 1 ? "Human" : "Humans"}`;
+          return {
+            verb: `approved the ${gate} Gate${more}`,
+            excerpt: text(payload.note),
+            tone: "gate",
+          };
+        }
         case "issue.moved":
           return {
             verb: `moved it into the ${text(payload.to) ?? stateName} Gate`,

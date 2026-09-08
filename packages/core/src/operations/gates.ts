@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  approvalsThisVisit,
   assertHuman,
   assertNamedApprover,
   enterState,
@@ -41,6 +42,22 @@ export const gates = {
       }
       assertNamedApprover(await gateApprovers(context.db, from.id), context.member.id);
 
+      // A Gate may want more than one Human, and wants them distinct: approving
+      // twice is one Human's opinion twice (docs/plans/four-eyes-gates.md).
+      const already = await approvalsThisVisit(context.db, issue, from.id);
+      const required = from.approvalsRequired;
+      if (already.includes(context.member.id)) {
+        const wanted = required - already.length;
+        throw new ORPCError("CONFLICT", {
+          message:
+            wanted > 0
+              ? `You have already approved the ${from.name} Gate; it wants ${wanted} more ${
+                  wanted === 1 ? "Human" : "Humans"
+                }`
+              : `You have already approved the ${from.name} Gate`,
+        });
+      }
+
       await recordGateDecision(context.db, {
         issueId: issue.id,
         stateId: from.id,
@@ -48,6 +65,27 @@ export const gates = {
         note: input.note,
         memberId: context.member.id,
       });
+
+      // Short of the threshold the Issue stays where it is: no State is entered,
+      // no Document is opened, and the Run that asked stays `awaiting_input`.
+      const approvals = already.length + 1;
+      if (approvals < required) {
+        await appendEvent(context, {
+          kind: "gate.approval",
+          subjectType: "issue",
+          subjectId: issue.id,
+          projectId: project.id,
+          payload: {
+            state: from.name,
+            note: input.note ?? null,
+            approvals,
+            required,
+            remaining: required - approvals,
+          },
+        });
+        return loadIssue(context, issue.id);
+      }
+
       await enterState(context.db, issue, to);
       await appendEvent(context, {
         kind: "gate.approved",

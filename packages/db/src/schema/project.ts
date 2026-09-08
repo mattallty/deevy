@@ -92,6 +92,12 @@ export const workflowState = sqliteTable(
     name: text("name").notNull(),
     position: integer("position").notNull(),
     isGate: integer("is_gate", { mode: "boolean" }).default(false).notNull(),
+    /**
+     * How many distinct Humans must approve before an Issue leaves this Gate.
+     * One is what every Workflow did before this column existed, so the default
+     * keeps them behaving exactly as they did (docs/plans/four-eyes-gates.md).
+     */
+    approvalsRequired: integer("approvals_required").default(1).notNull(),
     category: text("category", { enum: workflowStateCategories }).notNull(),
     /** The Document this State asks for, created from its template on entry. */
     documentName: text("document_name"),

@@ -3,7 +3,7 @@ import { createRouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
-import { memberContext, testDb, type MemberContext } from "./helpers.ts";
+import { agentContext, memberContext, testDb, type MemberContext } from "./helpers.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {
@@ -218,5 +218,162 @@ describe("the approvers a Gate names", () => {
     await named([]);
     expect((await client.gates.approve({ key: "DEV-1" })).state.name).toBe("Spec");
     expect(asBob).toBeTruthy();
+  });
+});
+
+/**
+ * A Gate that wants more than one Human (docs/plans/four-eyes-gates.md). Every
+ * test here stands up a second Human against a real deevy: one Member cannot
+ * prove a rule about two, and a faked second proves the fake.
+ */
+async function withTwoHumans(db: MemberContext["db"]) {
+  const base = await withIssue(db);
+  const grace = await memberContext(db, { name: "Grace" });
+  const asGrace = createRouterClient(router, { context: grace });
+  return { ...base, grace, asGrace };
+}
+
+/** Rewrite the Workflow whole, changing one Gate's threshold and nothing else. */
+type Client = Awaited<ReturnType<typeof withIssue>>["client"];
+
+async function wants(
+  client: Client,
+  states: Array<{
+    id: string;
+    name: string;
+    isGate: boolean;
+    category: "backlog" | "active" | "done";
+  }>,
+  gate: string,
+  approvalsRequired: number,
+) {
+  await client.workflow.update({
+    projectKey: "DEV",
+    states: states.map((state) => ({
+      id: state.id,
+      name: state.name,
+      isGate: state.isGate,
+      category: state.category,
+      approvalsRequired: state.name === gate ? approvalsRequired : undefined,
+    })),
+  });
+}
+
+describe("a Gate that wants two Humans", () => {
+  it("holds the Issue on the first approval and opens on the second", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client, project, asGrace, grace } = await withTwoHumans(db);
+    await wants(client, project.states, "Intent", 2);
+
+    const first = await client.gates.approve({ key: "DEV-1", note: "Worth doing" });
+
+    expect(first.state.name).toBe("Intent");
+    const after = await client.events.list({ subjectType: "issue", subjectId: first.id });
+    expect(after.events.find((e) => e.kind === "gate.approval")).toMatchObject({
+      actorMemberId: admin.member.id,
+      payload: { state: "Intent", approvals: 1, required: 2, remaining: 1 },
+    });
+    expect(after.events.find((e) => e.kind === "gate.approved")).toBeUndefined();
+
+    const second = await asGrace.gates.approve({ key: "DEV-1" });
+
+    expect(second.state.name).toBe("Spec");
+    const done = await client.events.list({ subjectType: "issue", subjectId: second.id });
+    expect(done.events.find((e) => e.kind === "gate.approved")).toMatchObject({
+      actorMemberId: grace.member.id,
+      payload: { state: "Intent", to: "Spec" },
+    });
+  });
+
+  it("refuses the same Human twice, and says how many more it wants", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project } = await withTwoHumans(db);
+    await wants(client, project.states, "Intent", 2);
+    await client.gates.approve({ key: "DEV-1" });
+
+    await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "You have already approved the Intent Gate; it wants 1 more Human",
+    });
+    expect((await client.issues.get({ key: "DEV-1" })).state.name).toBe("Intent");
+  });
+
+  it("spends the approvals already given when the Gate is rejected in place", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace } = await withTwoHumans(db);
+    await wants(client, project.states, "Intent", 2);
+    await client.gates.approve({ key: "DEV-1" });
+
+    // Intent is the first State, so a rejection has nowhere to send the Issue
+    // and does not stamp `stateEnteredAt`. The approval before it is spent all
+    // the same, or a Gate just rejected would open on the next click.
+    const rejected = await asGrace.gates.reject({ key: "DEV-1", note: "Not yet" });
+    expect(rejected.state.name).toBe("Intent");
+
+    const again = await client.gates.approve({ key: "DEV-1" });
+    expect(again.state.name).toBe("Intent");
+
+    const opened = await asGrace.gates.approve({ key: "DEV-1" });
+    expect(opened.state.name).toBe("Spec");
+  });
+
+  it("starts again when a rejection sends the Issue back a State", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace } = await withTwoHumans(db);
+    await wants(client, project.states, "Spec", 2);
+    await client.gates.approve({ key: "DEV-1" }); // Intent, which wants one
+    await client.gates.approve({ key: "DEV-1" }); // Spec, one of two
+    await asGrace.gates.approve({ key: "DEV-1" }); // Spec, and through
+    expect((await client.issues.get({ key: "DEV-1" })).state.name).toBe("Plan");
+
+    // Back to Spec, where two approvals already stand from the trip before.
+    const back = await asGrace.gates.reject({ key: "DEV-1" });
+    expect(back.state.name).toBe("Spec");
+
+    const one = await client.gates.approve({ key: "DEV-1" });
+    expect(one.state.name).toBe("Spec");
+    const two = await asGrace.gates.approve({ key: "DEV-1" });
+    expect(two.state.name).toBe("Plan");
+  });
+
+  it("keeps a waiting Run waiting until the last Human approves", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace } = await withTwoHumans(db);
+    const admin = await db.query.member.findFirst({ where: { role: "admin" } });
+    await wants(client, project.states, "Intent", 2);
+    const agent = await agentContext(db, {
+      sponsor: admin!,
+      name: "Planner",
+      grants: [project.id],
+    });
+    const asAgent = createRouterClient(router, { context: agent });
+    const run = await asAgent.runs.start({ issueKey: "DEV-1" });
+
+    const asked = await asAgent.runs.requestApproval({ runId: run.id });
+    expect(asked.status).toBe("awaiting");
+
+    await client.gates.approve({ key: "DEV-1" });
+    const still = await asAgent.runs.requestApproval({ runId: run.id });
+    expect(still.status).toBe("awaiting");
+    expect(still.run.status).toBe("awaiting_input");
+
+    await asGrace.gates.approve({ key: "DEV-1" });
+    const now = await asAgent.runs.requestApproval({ runId: run.id });
+    expect(now.status).toBe("approved");
+  });
+
+  it("leaves a Gate at the default of one deciding on one approval", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withTwoHumans(db);
+
+    const approved = await client.gates.approve({ key: "DEV-1" });
+
+    expect(approved.state.name).toBe("Spec");
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE `workflow_state` ADD `approvals_required` integer DEFAULT 1 NOT NULL;

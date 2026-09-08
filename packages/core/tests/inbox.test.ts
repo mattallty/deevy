@@ -131,6 +131,42 @@ describe("an Issue arriving in a Gate", () => {
       (await asAlice.inbox.list({})).notifications.filter((n) => n.kind === "gate_awaiting"),
     ).toEqual([]);
   });
+
+  it("keeps asking the Humans who have not approved, and stops asking the one who has", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { asAlice, asBob, asCarol } = await workspace(db);
+    const project = await asAlice.workflow.get({ projectKey: "DEV" });
+    const intent = project.states.find((state) => state.name === "Intent")!;
+    await asAlice.workflow.update({
+      projectKey: "DEV",
+      states: project.states.map((state) => ({
+        id: state.id,
+        name: state.name,
+        isGate: state.isGate,
+        category: state.category,
+        approvalsRequired: state.id === intent.id ? 2 : undefined,
+      })),
+    });
+    await asAlice.issues.create({ projectKey: "DEV", title: "Ship it" });
+    const before = (await asBob.inbox.list({})).notifications.filter(
+      (n) => n.kind === "gate_awaiting",
+    ).length;
+
+    await asBob.gates.approve({ key: "DEV-1" });
+
+    // Alice and Carol are asked for the approval still missing; Bob has given
+    // his, and an approval already given is not a question.
+    for (const client of [asAlice, asCarol]) {
+      const rows = (await client.inbox.list({})).notifications.filter(
+        (n) => n.kind === "gate_awaiting" && n.event.kind === "gate.approval",
+      );
+      expect(rows).toHaveLength(1);
+    }
+    expect(
+      (await asBob.inbox.list({})).notifications.filter((n) => n.kind === "gate_awaiting"),
+    ).toHaveLength(before);
+  });
 });
 
 describe("the inbox", () => {
