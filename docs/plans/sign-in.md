@@ -2,7 +2,7 @@
 
 Status: **done** — all eight slices landed, plus two fixes found reviewing them (the stub fills in the client
 pairs a dev loop needs, and GitLab's `confirmed_at` is what verifies an address) and five smaller ones after
-that: a join reads every page of the organizations and groups a rule is decided from, `JoinOptions.login` is
+that: a join reads up to five pages of the organizations and groups a rule is decided from, and fails the question rather than truncating it, `JoinOptions.login` is
 finally supplied so a GitHub login or a GitLab username becomes the handle, `health.ping` offers only the
 providers Better Auth registered (a generic OIDC entry is skipped when the IdP is unreachable at startup),
 `invitations.create` returns the link site-relative so the SPA builds it on the origin the browser is on, and

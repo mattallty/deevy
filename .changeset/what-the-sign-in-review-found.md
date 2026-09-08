@@ -8,7 +8,8 @@ Five things the sign-in work left behind, found reading it back.
 An allowlist rule that names a GitHub organization or a GitLab group now matches a teammate who is in many
 of them: both forges page their lists — thirty organizations, twenty groups — and deevy read only the first
 page, so a rule naming the one on page two matched nothing, which looked exactly like a rule that did not
-match. A join now reads up to five pages of a hundred.
+match. A join now reads up to five pages of a hundred, and a page the forge refuses fails the question
+rather than passing back a short list that looks complete.
 
 A Member joining through a rule takes their handle from what the provider calls them — a GitHub login, a
 GitLab username — rather than always from their display name. The profile is read once, when the Member is

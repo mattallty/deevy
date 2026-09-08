@@ -39,6 +39,13 @@ function useInvitation(): [string | null, (token: null) => void] {
     if (inPath) holdInvitation(inPath);
     return inPath ?? heldInvitation();
   });
+  // The token is a bearer, and a path is the one place a URL is copied,
+  // bookmarked, kept in history and sent as a `Referer`. Once it is held there
+  // is nothing left for the address bar to carry (docs/plans/sign-in.md).
+  useEffect(() => {
+    if (!invitationInPath(window.location.pathname)) return;
+    window.history.replaceState(null, "", "/");
+  }, []);
   return [token, setToken];
 }
 

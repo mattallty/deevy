@@ -519,7 +519,13 @@ export function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
         `${url}${separator}per_page=${PAGE_SIZE}&page=${page}`,
         accept,
       );
-      if (!batch || batch.length === 0) break;
+      // A page that failed is not the end of the list. Treating it as one
+      // handed back a short list that looked complete, so a rule naming
+      // something on the page the forge refused matched nothing and read
+      // exactly like a rule that did not match. The throw lands where a failing
+      // port already lands: no memberships, so no join.
+      if (!batch) throw new Error(`${providerId} answered no page ${String(page)}`);
+      if (batch.length === 0) break;
       items.push(...batch);
       if (batch.length < PAGE_SIZE) break;
     }

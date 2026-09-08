@@ -12,11 +12,15 @@
  */
 const HELD = "deevy.invitation";
 
-/** The token in `/invite/<token>`, or null for any other path. */
+/**
+ * The token in `/invite/<token>`, or null for any other path — and for a path
+ * that is not one. The token is base64url, so it is matched as that rather than
+ * decoded: `/invite/%` made `decodeURIComponent` throw inside a render with no
+ * error boundary above it, and the Human got a blank page with no way to sign
+ * in (docs/plans/sign-in.md).
+ */
 export function invitationInPath(pathname: string): string | null {
-  const match = /^\/invite\/([^/?#]+)\/?$/.exec(pathname);
-  if (!match?.[1]) return null;
-  return decodeURIComponent(match[1]);
+  return /^\/invite\/([A-Za-z0-9_-]{1,128})\/?$/.exec(pathname)?.[1] ?? null;
 }
 
 /** Keep it for the sign-in to come back to. */

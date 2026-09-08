@@ -429,6 +429,26 @@ describe("joinPorts", () => {
     expect(asked[1]).toContain("page=2");
   });
 
+  /**
+   * A page the forge refused is not the end of the list: a short list that
+   * looks complete makes a rule naming something on the missing page read
+   * exactly like a rule that did not match (docs/plans/sign-in.md).
+   */
+  it("treats a page it could not read as a question with no answer", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await signedInWith(db, "gitlab");
+    vi.stubGlobal("fetch", async (url: string) => {
+      const page = Number(new URL(url).searchParams.get("page"));
+      if (page > 1) return new Response("rate limited", { status: 403 });
+      return Response.json(
+        Array.from({ length: 100 }, (_, i) => ({ full_path: `acme/team-${i}` })),
+      );
+    });
+
+    await expect(joinPorts(db, { providers: {} }, "u-bob").listGroups?.()).rejects.toThrow();
+  });
+
   it("stops asking when a page is the last one", async () => {
     const { db, close } = testDb();
     closers.push(close);

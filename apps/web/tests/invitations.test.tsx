@@ -82,6 +82,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
 const App = (await import("../src/App.tsx")).default;
 const { InvitationsRow } = await import("../src/routes/settings/invitations.tsx");
 const { mount } = await import("./mount.tsx");
+const { invitationInPath } = await import("../src/lib/invitation.ts");
 
 afterEach(() => {
   stub.invitations = [];
@@ -218,5 +219,23 @@ describe("an invitation link", () => {
     // The link is still held, so signing in as the invited address still works.
     expect(window.sessionStorage.getItem("deevy.invitation")).toBe("tok-1");
     expect(screen.getByRole("button", { name: "Sign out and try another account" })).toBeTruthy();
+  });
+});
+
+describe("the token in the path", () => {
+  /**
+   * `/invite/%` made `decodeURIComponent` throw inside a render with no error
+   * boundary above it, so the Human got a blank page and no way to sign in.
+   * The token is base64url, so the path is matched as that rather than decoded
+   * (docs/plans/sign-in.md).
+   */
+  it("reads a token, and refuses a path that is not one", () => {
+    expect(invitationInPath("/invite/s3cret-token_AAAAAAAAAAAAAAAAAAAAAAAA")).toBe(
+      "s3cret-token_AAAAAAAAAAAAAAAAAAAAAAAA",
+    );
+    expect(invitationInPath("/invite/%")).toBeNull();
+    expect(invitationInPath("/invite/ab%zz")).toBeNull();
+    expect(invitationInPath("/invite/")).toBeNull();
+    expect(invitationInPath("/issues/DEV-1")).toBeNull();
   });
 });
