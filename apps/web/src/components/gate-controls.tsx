@@ -21,6 +21,34 @@ interface State {
   isGate: boolean;
 }
 
+/** What the Gate an Issue is in has got to (docs/plans/four-eyes-gates.md). */
+export interface GateStanding {
+  required: number;
+  eligible: number;
+  excludeRequester: boolean;
+  approvals: Array<{ memberId: string; name: string | null; note: string | null }>;
+  mayApprove: boolean;
+  refusedBecause: "not_an_approver" | "requester" | "approved" | "too_few_humans" | null;
+}
+
+/** Why the buttons are not yours to press, said where they would be. */
+function whyNot(standing: GateStanding, issueKey: string, wanted: number): string | null {
+  switch (standing.refusedBecause) {
+    case "not_an_approver":
+      return "This Gate names who may decide it, and you are not one of them.";
+    case "requester":
+      return `You brought ${issueKey} here, so this Gate asks somebody else to agree.`;
+    case "approved":
+      return `You have approved. It is waiting for ${String(wanted)} more ${
+        wanted === 1 ? "Human" : "Humans"
+      }.`;
+    case "too_few_humans":
+      return null; // The arithmetic below says it better than a reason would.
+    default:
+      return null;
+  }
+}
+
 interface GateControlsProps {
   /** The shortcut scope the Issue is shown in, so `s`, `⇧A` and `⇧R` reach this card. */
   shortcutScope?: string;
@@ -33,6 +61,8 @@ interface GateControlsProps {
     note: string | null;
     createdAt: string | Date;
   }>;
+  /** How far along the Gate is; absent for a State that is not one. */
+  standing?: GateStanding | null;
 }
 
 /**
@@ -45,6 +75,7 @@ export function GateControls({
   projectKey,
   state,
   decisions,
+  standing,
   shortcutScope = PAGE_SCOPE,
 }: GateControlsProps) {
   const queryClient = useQueryClient();
@@ -62,6 +93,11 @@ export function GateControls({
   const move = useMutation(orpc.issues.move.mutationOptions({ onSuccess: refresh }));
   const [note, setNote] = useState("");
   const busy = approve.isPending || reject.isPending || move.isPending;
+  const given = standing?.approvals.length ?? 0;
+  const wanted = Math.max((standing?.required ?? 1) - given, 0);
+  const stuck = standing ? standing.eligible < standing.required : false;
+  const refusal = standing ? whyNot(standing, issueKey, wanted) : null;
+  const mayRule = standing ? standing.mayApprove : true;
   const failed = approve.error ?? reject.error ?? move.error;
 
   // The keyboard (docs/plans/ui-redesign.md): `s` opens the State picker, or on
@@ -95,9 +131,36 @@ export function GateControls({
       {state.isGate ? (
         <div className="flex flex-col gap-3 rounded-lg border p-4">
           <p className="text-sm">
-            <strong>{state.name}</strong> is a Gate: {issueKey} cannot leave it without a
-            Human&apos;s decision.
+            <strong>{state.name}</strong> is a Gate:{" "}
+            {standing && standing.required > 1
+              ? `${issueKey} needs ${String(standing.required)} Humans to agree, and ${
+                  given === 0 ? "none have" : `${String(given)} ${given === 1 ? "has" : "have"}`
+                }.`
+              : `${issueKey} cannot leave it without a Human's decision.`}
           </p>
+
+          {given > 0 ? (
+            <ul aria-label="Approvals" className="flex flex-col gap-1 text-sm">
+              {standing?.approvals.map((approval) => (
+                <li key={approval.memberId} className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-medium">{approval.name ?? "Somebody"}</span>
+                  <span className="text-muted-foreground">approved</span>
+                  {approval.note ? (
+                    <span className="text-muted-foreground">{approval.note}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {stuck && standing ? (
+            <p className="text-sm font-medium">
+              This Gate wants {standing.required} approvals and only {standing.eligible}{" "}
+              {standing.eligible === 1 ? "Human" : "Humans"} could give one
+              {standing.excludeRequester ? ", once you are left out" : ""}. Ask an admin to lower
+              it, or to reinstate whoever is suspended.
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2">
             <Label htmlFor="gate-note">Note</Label>
             <Textarea
@@ -115,10 +178,12 @@ export function GateControls({
               }}
             />
           </div>
+          {refusal ? <p className="text-sm text-muted-foreground">{refusal}</p> : null}
+
           <div className="flex gap-2" data-ruling={ruling}>
             <Button
               variant={ruling === "approve" ? "default" : "outline"}
-              disabled={busy}
+              disabled={busy || !mayRule}
               onClick={() => rule("approve")}
             >
               Approve

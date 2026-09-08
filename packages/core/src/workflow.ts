@@ -273,26 +273,142 @@ export async function approvalsThisVisit(
   issue: Pick<Issue, "id" | "stateEnteredAt">,
   stateId: string,
 ): Promise<string[]> {
+  const rows = await approvalsWithNotes(db, issue, stateId);
+  return rows.map((row) => row.memberId);
+}
+
+/** The same approvals, with what each Human said and when: the Issue page reads these. */
+export async function approvalsWithNotes(
+  db: Db,
+  issue: Pick<Issue, "id" | "stateEnteredAt">,
+  stateId: string,
+): Promise<Array<{ memberId: string; note: string | null; at: Date }>> {
   const rows = await db
     .select({
       memberId: gateDecisionTable.memberId,
       decision: gateDecisionTable.decision,
+      note: gateDecisionTable.note,
       createdAt: gateDecisionTable.createdAt,
     })
     .from(gateDecisionTable)
     .where(and(eq(gateDecisionTable.issueId, issue.id), eq(gateDecisionTable.stateId, stateId)))
     .orderBy(asc(gateDecisionTable.createdAt));
 
-  const approvals: string[] = [];
+  return approvalsFrom(rows, issue.stateEnteredAt);
+}
+
+/**
+ * The rule itself, over one Gate's rulings in the order they were made. Kept
+ * pure so a caller holding the rulings already — the Issue page loads them for
+ * its own history — spends no second query on them.
+ */
+export function approvalsFrom(
+  rows: Array<{ memberId: string | null; decision: string; note: string | null; createdAt: Date }>,
+  stateEnteredAt: Date,
+): Array<{ memberId: string; note: string | null; at: Date }> {
+  let approvals: Array<{ memberId: string; note: string | null; at: Date }> = [];
   for (const row of rows) {
-    if (row.createdAt < issue.stateEnteredAt) continue;
+    if (row.createdAt < stateEnteredAt) continue;
     if (row.decision === "rejected") {
-      approvals.length = 0;
+      approvals = [];
       continue;
     }
-    if (row.memberId && !approvals.includes(row.memberId)) approvals.push(row.memberId);
+    if (!row.memberId) continue;
+    if (approvals.some((given) => given.memberId === row.memberId)) continue;
+    approvals.push({ memberId: row.memberId, note: row.note, at: row.createdAt });
   }
   return approvals;
+}
+
+/** Why a Human may not approve the Gate an Issue is in. */
+export type GateRefusal = "not_an_approver" | "requester" | "approved" | "too_few_humans";
+
+export interface GateStanding {
+  /** Distinct Humans who must approve before the Issue leaves. */
+  required: number;
+  /** How many Humans could give one: the named approvers, or everybody, less the suspended. */
+  eligible: number;
+  /** Whether this Gate refuses the Human who brought the Issue to it. */
+  excludeRequester: boolean;
+  /** Who has approved during this visit, oldest first. */
+  approvals: Array<{ memberId: string; name: string | null; note: string | null; at: Date }>;
+  mayApprove: boolean;
+  /** Set when `mayApprove` is false, so a screen says why rather than only refusing. */
+  refusedBecause: GateRefusal | null;
+}
+
+/**
+ * Everything a Human needs to know about the Gate an Issue is in: how far along
+ * it is, whether they may move it, and when they may not, why
+ * (docs/plans/four-eyes-gates.md slice 3).
+ *
+ * The four eligibility inputs — the named approvers, the active Humans, the
+ * requester and who has already approved — are asked here once, so no screen
+ * arrives at a different answer than `gates.approve` will. Nothing is asked at
+ * all for a State that is not a Gate.
+ */
+export async function gateStanding(
+  db: Db,
+  input: {
+    workspaceId: string;
+    issue: Pick<Issue, "id" | "stateEnteredAt">;
+    state: Pick<WorkflowState, "id" | "approvalsRequired" | "excludeRequester">;
+    memberId: string;
+    /** This Issue's rulings, oldest first, when the caller has them already. */
+    decisions?: Array<{
+      stateId: string;
+      memberId: string | null;
+      decision: string;
+      note: string | null;
+      createdAt: Date;
+    }>;
+  },
+): Promise<GateStanding> {
+  const named = await gateApprovers(db, input.state.id);
+  const eligible = await eligibleApprovers(db, { workspaceId: input.workspaceId, named });
+  const approved = input.decisions
+    ? approvalsFrom(
+        input.decisions.filter((row) => row.stateId === input.state.id),
+        input.issue.stateEnteredAt,
+      )
+    : await approvalsWithNotes(db, input.issue, input.state.id);
+  const requester = input.state.excludeRequester ? await requesterFor(db, input.issue) : null;
+  const rows = approved.length
+    ? await db.query.member.findMany({
+        where: { id: { in: approved.map((given) => given.memberId) } },
+        columns: { id: true },
+        with: { user: { columns: { name: true } } },
+      })
+    : [];
+
+  const required = input.state.approvalsRequired;
+  const available = eligible.filter((id) => id !== requester).length;
+  // Ordered so the reason a Human reads is the one that is about them: being
+  // shut out of the Gate, then having brought the Issue, then having already
+  // answered, and last the arithmetic, which is nobody's fault and everybody's
+  // problem (docs/plans/four-eyes-gates.md, convention 32).
+  const refusedBecause: GateRefusal | null =
+    named.length > 0 && !named.includes(input.memberId)
+      ? "not_an_approver"
+      : requester === input.memberId
+        ? "requester"
+        : approved.some((given) => given.memberId === input.memberId)
+          ? "approved"
+          : available < required
+            ? "too_few_humans"
+            : null;
+
+  return {
+    required,
+    eligible: available,
+    excludeRequester: input.state.excludeRequester,
+    approvals: approved.map((given) => ({
+      ...given,
+      name: rows.find((member) => member.id === given.memberId)?.user.name ?? null,
+    })),
+    mayApprove: refusedBecause === null,
+    refusedBecause,
+  };
 }
 
 /**

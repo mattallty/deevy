@@ -195,6 +195,33 @@ describe("the approvers a Gate names", () => {
   });
 });
 
+describe("a Gate that wants more than one Human", () => {
+  it("saves the count and the exclusion, and offers neither on a State that is not a Gate", async () => {
+    stub.saved.length = 0;
+    mount(<WorkflowPage projectKey="DEV" />);
+    const build = await open("Build");
+    expect(within(build).queryByLabelText("Humans who must agree")).toBeNull();
+
+    const intent = await open("Intent");
+    fireEvent.change(within(intent).getByLabelText("Humans who must agree"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(
+      within(intent).getByRole("checkbox", {
+        name: "Whoever brings an Issue here cannot approve it",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
+
+    await waitFor(() => expect(stub.saved).toHaveLength(1));
+    expect(stub.saved[0]?.states).toMatchObject([
+      { name: "Intent", approvalsRequired: 2, excludeRequester: true },
+      { name: "Plan", approvalsRequired: 1, excludeRequester: false },
+      { name: "Build", approvalsRequired: 1, excludeRequester: false },
+    ]);
+  });
+});
+
 describe("the order and the template", () => {
   it("moves a State with the arrows and counts the change", async () => {
     stub.saved.length = 0;

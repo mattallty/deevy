@@ -40,6 +40,51 @@ const stub = vi.hoisted(() => {
       ],
     },
     inBuild: { ...base, key: "DEV-2", id: "i2", state: states[2] },
+    // A Gate wanting two Humans, one of them already given
+    partly: {
+      ...base,
+      key: "DEV-3",
+      id: "i3",
+      state: states[0],
+      gate: {
+        required: 2,
+        eligible: 3,
+        excludeRequester: false,
+        approvals: [{ memberId: "m2", name: "Grace Hopper", note: "Looks right" }],
+        mayApprove: true,
+        refusedBecause: null,
+      },
+    },
+    // The same Gate, to the Human who brought the Issue to it
+    asRequester: {
+      ...base,
+      key: "DEV-4",
+      id: "i4",
+      state: states[0],
+      gate: {
+        required: 1,
+        eligible: 2,
+        excludeRequester: true,
+        approvals: [],
+        mayApprove: false,
+        refusedBecause: "requester",
+      },
+    },
+    // And a Gate nobody left can open
+    stuck: {
+      ...base,
+      key: "DEV-5",
+      id: "i5",
+      state: states[0],
+      gate: {
+        required: 3,
+        eligible: 1,
+        excludeRequester: false,
+        approvals: [],
+        mayApprove: false,
+        refusedBecause: "too_few_humans",
+      },
+    },
     approved: [] as unknown[],
     rejected: [] as unknown[],
     moved: [] as unknown[],
@@ -49,7 +94,13 @@ const stub = vi.hoisted(() => {
 vi.mock("../src/lib/orpc.ts", async () => {
   const { createTanstackQueryUtils } = await import("@orpc/tanstack-query");
   const { stubClient } = await import("./stub-client.ts");
-  const byKey: Record<string, unknown> = { "DEV-1": stub.inGate, "DEV-2": stub.inBuild };
+  const byKey: Record<string, unknown> = {
+    "DEV-1": stub.inGate,
+    "DEV-2": stub.inBuild,
+    "DEV-3": stub.partly,
+    "DEV-4": stub.asRequester,
+    "DEV-5": stub.stuck,
+  };
   const client = stubClient({
     projects: {
       get: async () => ({
@@ -168,5 +219,37 @@ describe("the Workflow editor", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(4);
     // Master–detail: the first State's form sits beside the list, not inside it.
     expect(screen.getAllByDisplayValue("Intent")).toHaveLength(1);
+  });
+});
+
+describe("a Gate that wants more than one Human", () => {
+  it("says how many it wants, and who has already agreed", async () => {
+    await mountAt("/issues/DEV-3", { memberName: "Ada" });
+
+    const panel = await screen.findByRole("group", { name: /Intent Gate/i });
+    expect(panel.textContent).toMatch(/needs 2 Humans to agree, and 1 has/);
+    const approvals = within(panel).getByRole("list", { name: "Approvals" });
+    expect(approvals.textContent).toMatch(/Grace Hopper/);
+    expect(approvals.textContent).toMatch(/Looks right/);
+    expect(screen.getByRole("button", { name: "Approve" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("will not take the approval of the Human who asked, and says why", async () => {
+    await mountAt("/issues/DEV-4", { memberName: "Ada" });
+
+    const panel = await screen.findByRole("group", { name: /Intent Gate/i });
+    expect(panel.textContent).toMatch(/You brought DEV-4 here, so this Gate asks somebody else/);
+    expect(screen.getByRole("button", { name: "Approve" }).hasAttribute("disabled")).toBe(true);
+    // A rejection is still theirs to make: one is enough to end it.
+    expect(screen.getByRole("button", { name: "Reject" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("states the arithmetic when nobody left could open it", async () => {
+    await mountAt("/issues/DEV-5", { memberName: "Ada" });
+
+    const panel = await screen.findByRole("group", { name: /Intent Gate/i });
+    expect(panel.textContent).toMatch(/wants 3 approvals and only 1 Human could give one/);
+    expect(panel.textContent).toMatch(/Ask an admin/);
+    expect(screen.getByRole("button", { name: "Approve" }).hasAttribute("disabled")).toBe(true);
   });
 });

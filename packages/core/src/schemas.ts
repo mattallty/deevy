@@ -71,12 +71,37 @@ export const IssueSummarySchema = IssueSchema.extend({
 
 export const GateDecisionSchema = createSelectSchema(gateDecision);
 
+/**
+ * Where the Gate an Issue is in has got to, and what the Human reading it may
+ * do about it (docs/plans/four-eyes-gates.md). Null when the Issue is not in a
+ * Gate, which is also when nothing is asked to work it out.
+ */
+export const GateStandingSchema = z.object({
+  /** Distinct Humans who must approve before the Issue leaves. */
+  required: z.number().int(),
+  /** How many could give one: the approvers this Gate names, or every Human, less the suspended. */
+  eligible: z.number().int(),
+  excludeRequester: z.boolean(),
+  approvals: z.array(
+    z.object({
+      memberId: z.string(),
+      name: z.string().nullable(),
+      note: z.string().nullable(),
+      at: z.date(),
+    }),
+  ),
+  mayApprove: z.boolean(),
+  /** Why not, when `mayApprove` is false. */
+  refusedBecause: z.enum(["not_an_approver", "requester", "approved", "too_few_humans"]).nullable(),
+});
+
 /** An Issue as its own page shows one: the summary plus its family and its Gate history. */
 export const IssueDetailSchema = IssueSummarySchema.extend({
   project: ProjectSchema,
   parent: IssueSummarySchema.nullable(),
   children: z.array(IssueSummarySchema),
   gateDecisions: z.array(GateDecisionSchema),
+  gate: GateStandingSchema.nullable(),
 });
 
 export const DocumentSchema = createSelectSchema(document);

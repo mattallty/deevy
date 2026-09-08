@@ -10,6 +10,7 @@ import { loadAgent } from "../agents.ts";
 import { issueKey, parseIssueKey } from "../issues.ts";
 import { ensureStateDocument } from "../documents.ts";
 import { ProjectKeyPattern } from "../projects.ts";
+import { gateStanding } from "../workflow.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import type { Run } from "@deevy/db";
@@ -287,10 +288,22 @@ export async function loadIssue(context: ContextFor<"member">, id: string) {
   });
   if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Issue" });
   const key = found.project.key;
+  // Only a Gate has a standing, and only a Gate pays for one: an Issue in Build
+  // asks nothing (docs/plans/four-eyes-gates.md).
+  const gate = found.state.isGate
+    ? await gateStanding(context.db, {
+        workspaceId: context.workspace.id,
+        issue: found,
+        state: found.state,
+        memberId: context.member.id,
+        decisions: found.gateDecisions,
+      })
+    : null;
   return {
     ...withKey(found, key),
     parent: found.parent ? withKey(found.parent, key) : null,
     children: found.children.map((child) => withKey(child, key)),
+    gate,
   };
 }
 
