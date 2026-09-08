@@ -22,7 +22,6 @@ const stub = vi.hoisted(() => ({
       url: "https://github.com/mattallty/deevy/pull/12",
       title: null,
       ref: "12",
-      repository: { id: "r1", name: "mattallty/deevy" },
     },
     {
       id: "k2",
@@ -30,7 +29,6 @@ const stub = vi.hoisted(() => ({
       url: "https://example.com/design",
       title: "The design",
       ref: null,
-      repository: null,
     },
   ],
   added: [] as unknown[],
@@ -56,12 +54,11 @@ vi.mock("../src/lib/orpc.ts", async () => {
 const { mountAt } = await import("./mount.tsx");
 
 describe("the Links section", () => {
-  it("groups Links by kind and names the Repository when one matched", async () => {
+  it("groups Links by kind", async () => {
     await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     const pulls = await screen.findByRole("list", { name: "Pull requests" });
     expect(within(pulls).getByRole("link", { name: "12" })).toBeTruthy();
-    expect(within(pulls).getByText("mattallty/deevy")).toBeTruthy();
 
     const other = screen.getByRole("list", { name: "Links" });
     expect(within(other).getByRole("link", { name: "The design" })).toBeTruthy();

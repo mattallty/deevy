@@ -26,7 +26,6 @@ export const idPrefixes = {
   webhook: "whk",
   delivery: "dlv",
   channel: "chan",
-  repository: "repo",
   routingRule: "rte",
   allowlistRule: "alw",
   invitation: "inv",

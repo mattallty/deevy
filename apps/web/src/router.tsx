@@ -31,7 +31,6 @@ import { EventLogPage } from "./routes/settings/events.tsx";
 import { LabelsPage } from "./routes/settings/labels.tsx";
 import { SettingsLayout } from "./routes/settings/layout.tsx";
 import { NotificationsPage } from "./routes/settings/notifications.tsx";
-import { RepositoriesPage } from "./routes/settings/repositories.tsx";
 import { TeamsPage } from "./routes/settings/teams.tsx";
 import { WebhooksPage } from "./routes/settings/webhooks.tsx";
 import { WorkspacePage } from "./routes/settings/workspace.tsx";
@@ -218,11 +217,6 @@ const labelsRoute = createRoute({
   path: "labels",
   component: LabelsPage,
 });
-const repositoriesRoute = createRoute({
-  getParentRoute: () => settingsRoute,
-  path: "repositories",
-  component: RepositoriesPage,
-});
 const membersRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "members",
@@ -318,7 +312,6 @@ const routeTree = rootRoute.addChildren([
     workspaceRoute,
     teamsRoute,
     labelsRoute,
-    repositoriesRoute,
     membersRoute,
     agentsRoute,
     agentRoute,

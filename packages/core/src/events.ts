@@ -57,8 +57,6 @@ export type EventKind =
   | "comment.created"
   | "comment.edited"
   | "comment.deleted"
-  | "repository.created"
-  | "repository.deleted"
   | "issue.link_added"
   | "issue.link_removed"
   | "workspace.updated"

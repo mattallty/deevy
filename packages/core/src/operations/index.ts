@@ -22,7 +22,6 @@ import { members } from "./members.ts";
 import { oauthClients } from "./oauth-clients.ts";
 import { preferences } from "./preferences.ts";
 import { projects } from "./projects.ts";
-import { repositories } from "./repositories.ts";
 import { routing } from "./routing.ts";
 import { runs } from "./runs.ts";
 import { health, me } from "./system.ts";
@@ -49,7 +48,6 @@ export const router = {
   documents,
   labels,
   comments,
-  repositories,
   links,
   inbox,
   channels,
@@ -79,7 +77,6 @@ export {
   oauthClients,
   preferences,
   projects,
-  repositories,
   routing,
   runs,
   teams,
