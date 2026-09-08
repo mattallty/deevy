@@ -42,6 +42,7 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_URL=https://deevy.example.com \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
+  -e GITLAB_CLIENT_ID=... -e GITLAB_CLIENT_SECRET=... \
   -e GOOGLE_CLIENT_ID=... -e GOOGLE_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
   deevy:local   # or ghcr.io/mattallty/deevy:latest
@@ -175,8 +176,10 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler secret put GITHUB_CLIENT_SECRET
    ```
 
-   Offering Google as well, or instead, is `wrangler secret put GOOGLE_CLIENT_ID` and
-   `GOOGLE_CLIENT_SECRET` beside them; the sign-in page draws whichever pairs are complete.
+   Offering Google or GitLab as well, or instead, is `wrangler secret put GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET`, or `GITLAB_CLIENT_ID` and `GITLAB_CLIENT_SECRET`, beside them; the sign-in page
+   draws whichever pairs are complete. A self-hosted GitLab also wants `GITLAB_ISSUER`, which is not a
+   credential and can go in the `vars` block below.
 
    `wrangler secret list` shows the names you put in and no values. The rest are not credentials, so they can go in
    a `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
@@ -254,6 +257,9 @@ bindings arrive with the request.
 | `GITHUB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
 | `GOOGLE_CLIENT_ID`             | env         | secret             | —                    | Google is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`.                     |
 | `GOOGLE_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
+| `GITLAB_CLIENT_ID`             | env         | secret             | —                    | GitLab is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/gitlab`.                     |
+| `GITLAB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
+| `GITLAB_ISSUER`                | env         | var                | `https://gitlab.com` | GitLab sign-in goes to gitlab.com. Set it to a self-hosted instance's origin; every GitLab endpoint deevy calls is built from it.                                                                          |
 | `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                       |
 | `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                       |
 | `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                 |
@@ -267,8 +273,8 @@ bindings arrive with the request.
 | `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                        |
 
 The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
-signing in: `BETTER_AUTH_*`, `GITHUB_*`, `GOOGLE_*`, `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME` do on
-Workers exactly what they do on Node, bootstrap and allowlist included.
+signing in: `BETTER_AUTH_*`, `GITHUB_*`, `GOOGLE_*`, `GITLAB_*`, `DEEVY_ADMIN_EMAIL` and
+`DEEVY_WORKSPACE_NAME` do on Workers exactly what they do on Node, bootstrap and allowlist included.
 
 ### Background work, on a timer or on a Cron Trigger
 
@@ -293,8 +299,9 @@ missing from it is answered with the SPA's `index.html` — a 200 with the wrong
 `packages/core/tests/worker-routes.test.ts` asserts the list against the app's own routes, and
 `vp run web#test:workers` drives the built Worker on `wrangler dev --local` to prove it over HTTP.
 
-The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules. deevy requests it, so an App
-created before that will ask for the extra scope at the next sign-in.
+The GitHub OAuth App needs the `read:org` scope for `github_org` allowlist rules, and a GitLab application
+needs `read_api` for `gitlab_group` ones. deevy requests both, so a client created before the slice that
+added one will ask for the extra scope at the next sign-in.
 
 ### Queues, when the account has them
 
@@ -343,14 +350,26 @@ value much over 90 spends the whole cap on polling and leaves none for signing t
 Which providers an instance offers is what its environment sets: `createAuth` registers the entries whose
 client id and secret are both present, `health.ping` reports the same list publicly, and the sign-in page
 draws one button per entry in that order. An instance with none configured says so on the page instead of
-offering a button that goes nowhere. GitHub and Google are the entries today, `GITHUB_CLIENT_ID` with
-`GITHUB_CLIENT_SECRET` and `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`; either, both or neither
-(docs/plans/sign-in.md).
+offering a button that goes nowhere. GitHub, Google and GitLab are the entries today, `GITHUB_CLIENT_ID` with
+`GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET` and `GITLAB_CLIENT_ID` with
+`GITLAB_CLIENT_SECRET`; any of them, all of them or none (docs/plans/sign-in.md).
 
 Google is registered with its default scopes and no `hd`, so it does not decide who may join. Who may join is
 the allowlist: a Google Workspace is an email domain, and an `email_domain` rule under Settings, Allowlist
 admits it in the one place an admin already looks. Configuring the client pair therefore lets anyone with a
 Google account sign in — and leaves them signed in, not a Member, until a rule matches them.
+
+GitLab is one entry for both gitlab.com and a self-hosted instance: `GITLAB_ISSUER` is where it is, defaulting
+to `https://gitlab.com`, and the authorization, token and `/api/v4` endpoints are all built from it. It is
+registered with `read_user`, which is the profile, and `read_api`, which is the only scope GitLab has that
+lists a person's groups — so a `gitlab_group` rule costs the sign-in a token that can read the API it can
+reach. That token is Better Auth's, stored on the `account` row, read once on the join and never again;
+an instance with no `gitlab_group` rule never spends it, because the groups are only asked for when such a
+rule exists and no email domain matched. Note what that does and does not buy an operator who would rather
+not grant it: the scope is on the registration, so every GitLab sign-in consents to it and stores a token
+that could read the API, whether or not a group rule exists. Leaving group rules alone means the token is
+never used; it does not mean it is never issued. An operator who wants it never issued has to leave GitLab
+unconfigured.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,
@@ -388,13 +407,15 @@ Every provider's callback follows from it, and each ends in the provider's own i
 | a custom domain           | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/<provider>`             |
 | the Docker image          | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/<provider>`             |
 
-`<provider>` is `github` for the GitHub OAuth App's Authorization callback URL and `google` for the
-Authorized redirect URI of the Google OAuth client (an OAuth 2.0 Client ID of type "Web application" in a
-Google Cloud project's Credentials, with the consent screen's scopes left at email and profile).
+`<provider>` is `github` for the GitHub OAuth App's Authorization callback URL, `google` for the Authorized
+redirect URI of the Google OAuth client (an OAuth 2.0 Client ID of type "Web application" in a Google Cloud
+project's Credentials, with the consent screen's scopes left at email and profile), and `gitlab` for the
+Redirect URI of the GitLab application (User settings › Applications, confidential, scopes `read_user` and
+`read_api`).
 
 A GitHub OAuth App holds one callback URL, so a Worker reachable both on its `workers.dev` subdomain and on a
-custom domain needs an App for each, or a decision that sign-in happens on one of them; a Google client holds
-a list, so one client can carry both. Move between origins by changing `wrangler secret put BETTER_AUTH_URL`
+custom domain needs an App for each, or a decision that sign-in happens on one of them; a Google client and a
+GitLab application each hold a list, so one of those can carry both. Move between origins by changing `wrangler secret put BETTER_AUTH_URL`
 and the callbacks together: either one alone leaves sign-in refused by the provider or the session cookie set
 for an origin nobody is on.
 

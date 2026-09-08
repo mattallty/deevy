@@ -18,6 +18,10 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITLAB_CLIENT_ID: ${GITLAB_CLIENT_ID:-}
+      GITLAB_CLIENT_SECRET: ${GITLAB_CLIENT_SECRET:-}
+      # A self-hosted GitLab, if it is not gitlab.com.
+      GITLAB_ISSUER: ${GITLAB_ISSUER:-}
       DEEVY_ADMIN_EMAIL: ${DEEVY_ADMIN_EMAIL:?set the email that becomes the Workspace admin}
       DEEVY_WORKSPACE_NAME: ${DEEVY_WORKSPACE_NAME:-deevy}
     healthcheck:

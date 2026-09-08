@@ -319,6 +319,34 @@ that throws leaves the sign-in without a Member rather than failing the sign-in.
 `acme/platform` for a group rule and still refuses it for an email domain. OpenAPI snapshot updated: the
 enum widened.
 
+What shipped differently:
+
+- **`vp run db#generate` produced nothing, as the slice said it would.** `kind` is `text(..., { enum })`,
+  which SQLite carries no CHECK for, so `gitlab_group` is a type change and there is no migration in this
+  commit. `vp run db#check:migrations` is green on the twenty-four that were already there.
+- **`scope` is `["read_api"]`, not `["read_user", "read_api"]`.** Better Auth's GitLab provider hands
+  `read_user` out by default and adds `options.scope` to it, so naming it again would put the same scope in
+  the authorization URL twice. The comment names both, beside the one `read:org` already has.
+- **The per-kind validation is a refinement on the pair, not three schemas.** `AllowlistRuleInput` in
+  `operations/shared.ts` checks the value against the pattern its `kind` names, so the message says the shape
+  the admin was actually asked for. A discriminated union would have said the same thing in the OpenAPI
+  document at the cost of turning one object into a `oneOf` of three, and the slice asked for a widened enum.
+  What the document advertises for `value` is now the widest of the three patterns, since a JSON Schema
+  `pattern` cannot depend on a sibling field; the exact shape is enforced by the server either way.
+- **`joinPorts` supplies every port rather than dispatching to one.** `admit` runs from Better Auth's user
+  and session hooks, which do not say which provider just signed in, and a Human may have both accounts
+  linked — so each port dispatches on its own `providerId` when it is called, and a Human with no such
+  account is simply not in the group. Every port stays as lazy as `listOrgs` was.
+- **A port that fails is not a sign-in that fails.** The four cases the slice asks for include one the
+  existing `github_org` code could not pass: the join runs inside a database hook, so a throwing port was a
+  refused sign-in. `matchesMemberships` now treats an error as no memberships, for organizations and groups
+  alike, and the Human lands signed in and not a Member — which is the state the SPA has a screen for, and
+  the next sign-in asks the provider again.
+- **The end-to-end sign-in needed no new test.** `apps/server/tests/stub-oauth.test.ts` loops
+  `signInProviders(env)`, so adding GitLab's pair and a self-hosted `GITLAB_ISSUER` to that environment is
+  what drives Better Auth's real GitLab dance — the token endpoint and `/api/v4/user` on the operator's own
+  host — to a session.
+
 ---
 
 ## Slice 6: A generic OIDC provider (M)

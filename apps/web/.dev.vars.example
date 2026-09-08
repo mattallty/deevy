@@ -17,6 +17,11 @@ GITHUB_CLIENT_SECRET=
 # Google OAuth client. Authorized redirect URI: ${BETTER_AUTH_URL}/api/auth/callback/google
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+# GitLab application. Redirect URI: ${BETTER_AUTH_URL}/api/auth/callback/gitlab
+GITLAB_CLIENT_ID=
+GITLAB_CLIENT_SECRET=
+# A self-hosted GitLab, if it is not gitlab.com.
+# GITLAB_ISSUER=https://gitlab.example.com
 # The first sign-in with this email becomes the Workspace admin and creates the Workspace.
 DEEVY_ADMIN_EMAIL=
 DEEVY_WORKSPACE_NAME=deevy

@@ -1,12 +1,11 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { allowlistRule as allowlistRuleTable } from "@deevy/db";
-import { allowlistRuleKinds } from "@deevy/db";
 import { AllowlistRuleSchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { NoInput, defineOperation } from "./registry.ts";
-import { AllowlistValue } from "./shared.ts";
+import { AllowlistRuleInput } from "./shared.ts";
 import { newId } from "../ids.ts";
 
 export const allowlist = {
@@ -29,11 +28,12 @@ export const allowlist = {
 
   add: defineOperation({
     name: "allowlist.add",
-    summary: "Admit every sign-in matching an email domain or a GitHub organization",
+    summary:
+      "Admit every sign-in matching an email domain, a GitHub organization or a GitLab group",
     method: "POST",
     path: "/allowlist",
     auth: "admin",
-    input: z.object({ kind: z.enum(allowlistRuleKinds), value: AllowlistValue }),
+    input: AllowlistRuleInput,
     output: AllowlistRuleSchema,
     handler: async ({ input, context }) => {
       const existing = await context.db.query.allowlistRule.findFirst({

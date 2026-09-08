@@ -1,4 +1,4 @@
-import { account, allowlistRule, member, user } from "@deevy/db";
+import { account, allowlistRule, allowlistRuleKinds, member, user } from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
@@ -11,13 +11,13 @@ import { authId, newId } from "../src/ids.ts";
 async function allow(
   db: Parameters<typeof memberContext>[0],
   value: string,
-  kind = "email_domain",
+  kind: (typeof allowlistRuleKinds)[number] = "email_domain",
 ) {
   const admin = await memberContext(db, { role: "admin", name: "Ada" });
   await db.insert(allowlistRule).values({
     id: newId("allowlistRule"),
     workspaceId: admin.workspace.id,
-    kind: kind as "email_domain" | "github_org",
+    kind,
     value,
     createdBy: admin.member.id,
   });
@@ -72,7 +72,7 @@ describe("joinWorkspace", () => {
 });
 
 describe("the handle a Member joins with", () => {
-  it("takes the GitHub login when the sign-in supplies one", async () => {
+  it("takes the login the provider gave, whichever provider it was", async () => {
     const { db, close } = testDb();
     closers.push(close);
     await allow(db, "example.com");
@@ -81,7 +81,7 @@ describe("the handle a Member joins with", () => {
     await joinWorkspace(
       db,
       { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" },
-      { githubLogin: "bvance" },
+      { login: "bvance" },
     );
 
     expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
@@ -190,6 +190,89 @@ describe("a github_org rule", () => {
   });
 });
 
+/**
+ * A GitLab group is a rule the way a GitHub organization is
+ * (docs/plans/sign-in.md slice 5), decided through the same kind of lazy port
+ * and holding a path rather than a single label.
+ */
+describe("a gitlab_group rule", () => {
+  it("admits a sign-in whose groups include the rule's value", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await allow(db, "acme/platform", "gitlab_group");
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.org" });
+
+    await joinWorkspace(
+      db,
+      { userId: "u-bob", email: "bob@example.org", name: "Bob" },
+      { listGroups: async () => ["Acme/Platform", "acme"] },
+    );
+
+    expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toMatchObject({
+      role: "member",
+    });
+  });
+
+  it("turns away a sign-in in none of the allowed groups", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await allow(db, "acme/platform", "gitlab_group");
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.org" });
+
+    await joinWorkspace(
+      db,
+      { userId: "u-bob", email: "bob@example.org", name: "Bob" },
+      // A parent group is not the group the rule names: a rule is a path, and
+      // `acme` is not `acme/platform`.
+      { listGroups: async () => ["acme", "globex/platform"] },
+    );
+
+    expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toBeUndefined();
+  });
+
+  it("never asks for groups when an email domain already matched", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await allow(db, "example.com");
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.com" });
+    let asked = false;
+
+    await joinWorkspace(
+      db,
+      { userId: "u-bob", email: "bob@example.com", name: "Bob" },
+      {
+        listGroups: async () => {
+          asked = true;
+          return [];
+        },
+      },
+    );
+
+    expect(asked).toBe(false);
+  });
+
+  it("leaves a sign-in no Member, rather than no sign-in, when GitLab is down", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    await allow(db, "acme/platform", "gitlab_group");
+    await db.insert(user).values({ id: "u-bob", name: "Bob", email: "bob@example.org" });
+
+    // The join runs inside a Better Auth database hook, so a port that threw
+    // would be a sign-in that failed. The Human signs in and asks the admin.
+    await joinWorkspace(
+      db,
+      { userId: "u-bob", email: "bob@example.org", name: "Bob" },
+      {
+        listGroups: async () => {
+          throw new Error("gitlab is down");
+        },
+      },
+    );
+
+    expect(await db.query.member.findFirst({ where: { userId: "u-bob" } })).toBeUndefined();
+  });
+});
+
 describe("a suspended Member", () => {
   it("is turned away from Workspace operations", async () => {
     const { db, close } = testDb();
@@ -276,7 +359,7 @@ describe("one Human, one Member", () => {
     const admin = await allow(db, "example.com");
     await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
     const bob = { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" };
-    await joinWorkspace(db, bob, { githubLogin: "bvance" });
+    await joinWorkspace(db, bob, { login: "bvance" });
 
     // What a linked account looks like on the way back in: the same user, a
     // second provider, and the join running again from Better Auth's hooks.

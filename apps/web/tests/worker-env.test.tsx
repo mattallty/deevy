@@ -47,6 +47,18 @@ describe("the Worker's sign-in providers", () => {
         GOOGLE_CLIENT_SECRET: "secret",
       }),
     ).toEqual(["github", "google"]);
+    expect(
+      offered({
+        GITHUB_CLIENT_ID: "id",
+        GITHUB_CLIENT_SECRET: "secret",
+        GITLAB_CLIENT_ID: "id",
+        GITLAB_CLIENT_SECRET: "secret",
+        // A self-hosted GitLab is the same entry pointed somewhere else, so an
+        // issuer alone offers nothing (docs/plans/sign-in.md slice 5).
+        GITLAB_ISSUER: "https://gitlab.example.com",
+      }),
+    ).toEqual(["github", "gitlab"]);
+    expect(offered({ GITLAB_ISSUER: "https://gitlab.example.com" })).toEqual([]);
     expect(offered({ GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" })).toEqual(["google"]);
     expect(offered({ GOOGLE_CLIENT_ID: "id" })).toEqual([]);
     expect(offered({})).toEqual([]);
