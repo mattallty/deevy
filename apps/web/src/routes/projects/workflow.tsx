@@ -51,6 +51,8 @@ interface ServerState {
   documentTemplate: string | null;
   triggerAgentMemberId: string | null;
   approverMemberIds?: string[] | null;
+  approvalsRequired?: number;
+  excludeRequester?: boolean;
 }
 
 /** The server's States as the editor's working copy; a saved State's `uid` is its id. */
@@ -65,6 +67,8 @@ function toDraft(states: ServerState[]): DraftState[] {
     documentTemplate: state.documentTemplate,
     triggerAgentMemberId: state.triggerAgentMemberId,
     approverMemberIds: state.approverMemberIds ?? [],
+    approvalsRequired: state.approvalsRequired ?? 1,
+    excludeRequester: state.excludeRequester ?? false,
   }));
 }
 
@@ -149,6 +153,8 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
       (was.documentName ?? null) !== state.documentName ||
       (was.documentTemplate ?? null) !== state.documentTemplate ||
       (was.triggerAgentMemberId ?? null) !== state.triggerAgentMemberId ||
+      (was.approvalsRequired ?? 1) !== state.approvalsRequired ||
+      (was.excludeRequester ?? false) !== state.excludeRequester ||
       [...(was.approverMemberIds ?? [])].sort().join() !==
         [...state.approverMemberIds].sort().join()
     );
@@ -382,6 +388,10 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
                 // A State that is not a Gate names nobody, whatever it named
                 // while it was one: the list and the flag never disagree.
                 approverMemberIds: state.isGate ? state.approverMemberIds : [],
+                // Same rule for the two Gate rules: a State that is not a Gate
+                // carries neither, so ticking the box later starts from one.
+                approvalsRequired: state.isGate ? state.approvalsRequired : 1,
+                excludeRequester: state.isGate ? state.excludeRequester : false,
               })),
               deleteStates: removed,
               moveIssuesTo,

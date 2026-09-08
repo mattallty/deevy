@@ -480,3 +480,85 @@ describe("a Gate that excludes the requester", () => {
     expect((await asInes.gates.approve({ key: "DEV-1" })).state.name).toBe("Done");
   });
 });
+
+/**
+ * What the Issue page reads (docs/plans/four-eyes-gates.md slice 3): the same
+ * arithmetic `gates.approve` will do, so no screen promises what the operation
+ * then refuses.
+ */
+describe("the standing of the Gate an Issue is in", () => {
+  it("counts what is wanted, names who agreed, and is absent outside a Gate", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace, grace } = await withTwoHumans(db);
+    await wants(client, project.states, "Intent", { approvalsRequired: 2 });
+
+    const fresh = await client.issues.get({ key: "DEV-1" });
+    expect(fresh.gate).toMatchObject({ required: 2, eligible: 2, approvals: [], mayApprove: true });
+
+    await asGrace.gates.approve({ key: "DEV-1", note: "Looks right" });
+    const partly = await client.issues.get({ key: "DEV-1" });
+    expect(partly.gate?.approvals).toMatchObject([
+      { memberId: grace.member.id, name: "Grace", note: "Looks right" },
+    ]);
+    expect(partly.gate).toMatchObject({ mayApprove: true, refusedBecause: null });
+
+    // Grace, reading the same Issue, has already had her say.
+    const asSeenByGrace = await asGrace.issues.get({ key: "DEV-1" });
+    expect(asSeenByGrace.gate).toMatchObject({ mayApprove: false, refusedBecause: "approved" });
+
+    await client.gates.approve({ key: "DEV-1" });
+    expect((await client.issues.get({ key: "DEV-1" })).state.name).toBe("Spec");
+    for (const _ of ["Spec", "Plan"]) await client.gates.approve({ key: "DEV-1" });
+    const inBuild = await client.issues.get({ key: "DEV-1" });
+    expect(inBuild.state.name).toBe("Build");
+    expect(inBuild.gate).toBeNull();
+  });
+
+  it("says which of the four things stands in a Human's way", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace, grace } = await withTwoHumans(db);
+
+    // Named approvers that leave Ada out.
+    await client.workflow.update({
+      projectKey: "DEV",
+      states: project.states.map((state) => ({
+        id: state.id,
+        name: state.name,
+        isGate: state.isGate,
+        category: state.category,
+        approverMemberIds: state.name === "Intent" ? [grace.member.id] : [],
+      })),
+    });
+    expect((await client.issues.get({ key: "DEV-1" })).gate).toMatchObject({
+      mayApprove: false,
+      refusedBecause: "not_an_approver",
+      eligible: 1,
+    });
+    expect((await asGrace.issues.get({ key: "DEV-1" })).gate?.mayApprove).toBe(true);
+
+    // The requester: Ada created the Issue, so Ada brought it here.
+    await wants(client, project.states, "Intent", { excludeRequester: true });
+    expect((await client.issues.get({ key: "DEV-1" })).gate).toMatchObject({
+      mayApprove: false,
+      refusedBecause: "requester",
+    });
+
+    // And a Gate wanting more Humans than are left: suspend Grace under it.
+    await wants(client, project.states, "Intent", {
+      excludeRequester: false,
+      approvalsRequired: 2,
+    });
+    await db
+      .update(memberTable)
+      .set({ suspendedAt: new Date() })
+      .where(eq(memberTable.id, grace.member.id));
+    expect((await client.issues.get({ key: "DEV-1" })).gate).toMatchObject({
+      required: 2,
+      eligible: 1,
+      mayApprove: false,
+      refusedBecause: "too_few_humans",
+    });
+  });
+});

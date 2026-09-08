@@ -34,6 +34,10 @@ export interface DraftState {
   triggerAgentMemberId: string | null;
   /** The Humans this Gate names. Empty means any Human may decide it. */
   approverMemberIds: string[];
+  /** How many distinct Humans must approve before an Issue leaves this Gate. */
+  approvalsRequired: number;
+  /** Whether the Human who brought the Issue here may be one of them. */
+  excludeRequester: boolean;
 }
 
 export function newDraftState(): DraftState {
@@ -47,6 +51,8 @@ export function newDraftState(): DraftState {
     documentTemplate: null,
     triggerAgentMemberId: null,
     approverMemberIds: [],
+    approvalsRequired: 1,
+    excludeRequester: false,
   };
 }
 
@@ -182,13 +188,45 @@ export function StateFields({
         </Select>
       </div>
       {state.isGate ? (
-        <div className="flex w-full flex-col gap-2">
-          <Label htmlFor={`state-approvers-${index}`}>Approvers for {state.name}</Label>
-          <p className="text-xs text-muted-foreground">
-            Leave this empty to let any Human rule on this Gate.
-          </p>
-          {renderApprovers(state, onEdit)}
-        </div>
+        <>
+          <div className="flex w-full flex-col gap-2">
+            <Label htmlFor={`state-approvers-${index}`}>Approvers for {state.name}</Label>
+            <p className="text-xs text-muted-foreground">
+              Leave this empty to let any Human rule on this Gate.
+            </p>
+            {renderApprovers(state, onEdit)}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`state-approvals-${index}`}>Humans who must agree</Label>
+            <Input
+              id={`state-approvals-${index}`}
+              type="number"
+              min={1}
+              max={20}
+              className="w-24"
+              value={String(state.approvalsRequired)}
+              onChange={(changed) =>
+                onEdit({ approvalsRequired: Math.max(Number(changed.target.value) || 1, 1) })
+              }
+            />
+          </div>
+          <div className="flex w-full items-start gap-2 pb-2">
+            <Checkbox
+              id={`state-exclude-${index}`}
+              checked={state.excludeRequester}
+              onCheckedChange={(checked) => onEdit({ excludeRequester: checked === true })}
+            />
+            <div className="flex flex-col gap-1">
+              <Label htmlFor={`state-exclude-${index}`}>
+                Whoever brings an Issue here cannot approve it
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                They can still reject it. This asks one Human more of every Issue, so a Workspace
+                needs enough of them.
+              </p>
+            </div>
+          </div>
+        </>
       ) : null}
     </div>
   );

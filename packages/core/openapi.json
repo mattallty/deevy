@@ -9055,6 +9055,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -9078,7 +9166,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }
@@ -10708,6 +10797,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -10731,7 +10908,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }
@@ -11891,6 +12069,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -11914,7 +12180,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }
@@ -13055,6 +13322,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -13078,7 +13433,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }
@@ -14222,6 +14578,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -14245,7 +14689,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }
@@ -15390,6 +15835,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -15413,7 +15946,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }
@@ -16558,6 +17092,94 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "gate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "eligible": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "excludeRequester": {
+                              "type": "boolean"
+                            },
+                            "approvals": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "memberId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "note": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "x-native-type": "date"
+                                  }
+                                },
+                                "required": [
+                                  "memberId",
+                                  "name",
+                                  "note",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "mayApprove": {
+                              "type": "boolean"
+                            },
+                            "refusedBecause": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_an_approver",
+                                    "requester",
+                                    "approved",
+                                    "too_few_humans"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "required",
+                            "eligible",
+                            "excludeRequester",
+                            "approvals",
+                            "mayApprove",
+                            "refusedBecause"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -16581,7 +17203,8 @@
                     "project",
                     "parent",
                     "children",
-                    "gateDecisions"
+                    "gateDecisions",
+                    "gate"
                   ],
                   "additionalProperties": false
                 }

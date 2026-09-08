@@ -32,8 +32,16 @@ const d1StatementsPerInvocation = 50;
  * `countingDb` swapped back for `testDb`, leaves the array empty and a ceiling
  * is happy with nothing. A change that genuinely spends fewer statements is
  * welcome and edits this number; one that spends more has to explain itself.
+ *
+ * It went from 22 to 24 when a Gate gained a standing (docs/plans/four-eyes-gates.md
+ * slice 3): the Issue an Agent or a Human is looking at says how many Humans
+ * must approve, how many could, and whether the reader is one of them, and the
+ * two statements are the two eligibility questions — the approvers this Gate
+ * names, and the Humans of the Workspace who are not suspended. The rulings
+ * themselves cost nothing extra, because the Issue page already loads them for
+ * its history. An Issue in a State that is not a Gate asks neither question.
  */
-const budget = 22;
+const budget = 24;
 
 describe(`the D1 request budget: ${String(budget)} statements, under D1's ${String(d1StatementsPerInvocation)}`, () => {
   it("is what creating an Issue with one mention, one Slack Channel and one webhook subscription costs", async () => {

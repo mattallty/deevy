@@ -185,6 +185,7 @@ export function IssuePage({
               projectKey={issue.data.project.key}
               state={state}
               decisions={gateDecisions}
+              standing={issue.data.gate}
               shortcutScope={shortcutScope}
             />
           </div>
