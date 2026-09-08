@@ -697,6 +697,43 @@ Slack messages link back to the Issue, so they are only sent when the instance k
 `BETTER_AUTH_URL` the rows are written and wait** rather than going out with a dead link; the first tick after
 the instance is given an origin sends them.
 
+## Gates, and how many Humans they ask for
+
+A Gate is a State an Issue cannot leave without a Human's approval, and by default one approval from any
+Human of the Workspace opens it. Two settings on each Gate, in the Project's Workflow editor, change that
+([ADR-0020](./adr/0020-a-gate-may-want-more-than-one-human-and-may-exclude-the-one-who-asked.md)):
+
+| Setting                                            | Default | What it does                                                                           |
+| -------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| **Humans who must agree**                          | 1       | The Issue stays in the Gate until that many _distinct_ Humans have approved this visit |
+| **Whoever brings an Issue here cannot approve it** | off     | The Human who moved the Issue into the Gate is refused their own approval              |
+| **Approvers**                                      | empty   | Names who may rule at all; empty means any Human                                       |
+
+**The defaults leave every Workflow exactly as it was**, including a Workspace of one Human, which is what an
+upgrade to this version does to an instance that changes nothing.
+
+What is worth knowing before turning either on:
+
+- **One rejection ends it, whatever the threshold**, and the Human who brought the Issue may still reject it.
+  Consensus is for letting work through; one reason to stop is enough.
+- **Approvals count for one visit to the Gate.** Entering the State starts a visit and so does every
+  rejection — including a rejection in the first State of a Workflow, which has nowhere to send the Issue and
+  leaves it where it is. Approvals given before a rejection are spent.
+- **Excluding the requester costs a Human from every count.** Which Human it will be is not known until there
+  is an Issue, but that one of them will be is, so saving the Workflow refuses a threshold that could not be
+  met once they are left out. **A Workspace with one Human cannot exclude the requester at all** — every Gate
+  would be a dead end — and a Gate asking two approvals with the exclusion on needs three Humans.
+- **Suspending a Member can strand an Issue.** Configuration-time checking cannot prevent it: a Gate wanting
+  two approvals in a Workspace of two is fine until one of them is suspended. The Issue says so where the
+  approve button would be, naming both numbers, and the fix is an admin's — lower the Gate's threshold in the
+  Workflow, or reinstate the Member. deevy does not quietly lower it for you.
+- **An Agent still never approves anything** (ADR-0004), whatever these are set to, and neither does a
+  Human's delegated credential (ADR-0010). A Gate that names approvers may only name Humans.
+
+A Gate short of its threshold appends a `gate.approval` Event carrying how many approvals are still wanted;
+`gate.approved` is appended only when the last one lands and the Issue actually leaves. Webhook subscribers
+receive the new kind, and anything switching on kinds ignores it.
+
 ## The reference agent runtime
 
 deevy never runs an agent (ADR-0003). `apps/agent` is the thing on the other side: a service that

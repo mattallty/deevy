@@ -19,7 +19,9 @@ behind a loopback proxy that holds the credential, so an Agent pushes where it l
 is in the Run's feed (`docs/plans/agent-owns-git.md`, ADR-0019); the sign-in work then closed what M1 and M2
 both deferred, making a provider configuration (GitHub, Google, GitLab, one generic OIDC), one Human one
 Member across providers, a GitLab group an allowlist rule, and an invitation a link an admin sends
-(`docs/plans/sign-in.md`). v1 is complete; what comes next is PLAN.md's after-v1 list.
+(`docs/plans/sign-in.md`); and four-eyes Gates then took the first feature off the after-v1 list, giving each
+Gate a number of distinct Humans it wants and a choice about whether the one who brought the Issue counts
+(`docs/plans/four-eyes-gates.md`, ADR-0020). v1 is complete; what comes next is PLAN.md's after-v1 list.
 
 ## Commands
 

@@ -61,7 +61,8 @@ and Notion converged on, so existing agents port with a thin adapter.
 
 **Gates.** When an Issue reaches a Gate, Humans with Project access (or the approvers the Gate names) get a
 Notification. Approval or rejection is an Event. An Agent that reaches a Gate mid-Run can surface it as a URL
-elicitation so the Human approves in deevy and the Agent resumes. No requester-cannot-approve rule in v1.
+elicitation so the Human approves in deevy and the Agent resumes. One approval from anybody, with no
+requester-cannot-approve rule, was v1; both are now settings on the Gate (see Four-eyes Gates, below).
 
 **Accountability.** The Run records the Member that triggered it. The accountable Human for any agent action is
 one hop away: the triggering Human, or the Sponsor when an Agent triggered it.
@@ -232,9 +233,21 @@ and an Event rather than a branch inside an auth hook. The dev stub that lets al
 without an account anywhere answers for every provider. Built in eight slices from
 [sign-in.md](./plans/sign-in.md).
 
+**Four-eyes Gates.** The two things M1 and M2 both deferred, and the first feature off the list below. A Gate
+now carries how many distinct Humans must approve before an Issue leaves it, and whether the Human who
+brought the Issue there may be one of them — two settings rather than one, defaulting to one approval from
+anybody, so every Workflow that existed behaves as it did. Approvals count for one visit to the Gate, which
+begins when the Issue enters the State and again at every rejection; one rejection ends the matter whatever
+the threshold, and the requester may still be the one to make it. A partial approval is its own
+`gate.approval` Event, so `gate.approved` keeps meaning the Issue left and nothing that reads the log had to
+learn a new shape. A threshold nobody could meet is refused when the Workflow is saved, and a Gate stranded
+afterwards by a suspension states its arithmetic on the Issue rather than being quietly lowered. Built in
+four slices from [four-eyes-gates.md](./plans/four-eyes-gates.md), recorded in
+[ADR-0020](./adr/0020-a-gate-may-want-more-than-one-human-and-may-exclude-the-one-who-asked.md).
+
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
-mirroring Documents into the code repository; the Slack app; email Channel; private Projects; four-eyes Gates;
-Postgres adapter; a CLI.
+mirroring Documents into the code repository; the Slack app; email Channel; private Projects; Postgres
+adapter; a CLI.
 
 ## Risks worth naming
 

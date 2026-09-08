@@ -56,7 +56,8 @@ A named, versioned markdown text on an Issue, such as its intent, spec, or plan,
 _Avoid_: artifact, page, attachment, file
 
 **Gate**:
-A workflow state an Issue cannot leave without a Human's approval.
+A workflow state an Issue cannot leave without a Human's approval. It may ask for more than one, and may
+refuse the approval of the Human who brought the Issue to it.
 _Avoid_: approval step, checkpoint, review stage
 
 **Run**:
