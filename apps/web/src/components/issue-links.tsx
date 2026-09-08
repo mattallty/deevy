@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,7 +83,6 @@ export function IssueLinks({ issueKey }: { issueKey: string }) {
                 >
                   {link.title ?? link.ref ?? link.url}
                 </a>
-                {link.repository ? <Badge variant="outline">{link.repository.name}</Badge> : null}
                 <span className="flex-1" />
                 <Button
                   variant="destructive"

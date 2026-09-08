@@ -15,7 +15,7 @@ Decided 2026-09-06, after the round-2 UI work; `packages/core/src/ids.ts` is the
 `ws` Workspace · `mem` Member · `team` Team · `proj` Project · `st` Workflow State · `dec` Gate decision ·
 `iss` Issue · `cmt` Comment · `doc` Document · `docv` Document version · `lnk` Link · `lbl` Label · `run`
 Run · `act` Run activity · `ntf` Notification · `whk` webhook subscription · `dlv` delivery · `chan` Channel
-· `rte` routing rule · `repo` Repository · `alw` allowlist rule · `inv` invitation. Better Auth's models, through its
+· `rte` routing rule · `alw` allowlist rule · `inv` invitation. Better Auth's models, through its
 `generateId` hook: `usr`, `ses`, `acct`, `ver`, `key` (the API key row; the secret stays `deevy_sk_…`),
 `jwk`, and the oauth-provider plugin's `oacl` client, `oars` resource, `oacr` client-resource link, `oaat`
 access token, `oart` refresh token, `oacs` consent and `oaca` client assertion. The hook is handed the

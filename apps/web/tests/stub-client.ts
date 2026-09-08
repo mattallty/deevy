@@ -185,11 +185,6 @@ export function stubClient(overrides: StubOverrides = {}): never {
       get: async () => ({ preferences: [] }),
       set: async () => ({ preferences: [] }),
     },
-    repositories: {
-      list: async () => ({ repositories: [] }),
-      create: async () => ({}),
-      delete: async () => ({ deleted: true }),
-    },
     links: {
       list: async () => ({ links: [] }),
       add: async () => ({}),

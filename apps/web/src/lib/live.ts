@@ -51,9 +51,6 @@ export function keysFor(event: LiveEvent): QueryKey[] {
     case "label":
       keys.push(orpc.labels.key(), orpc.issues.key());
       break;
-    case "repository":
-      keys.push(orpc.repositories.key(), orpc.links.key());
-      break;
     case "channel":
       keys.push(orpc.channels.key(), orpc.routing.key());
       break;

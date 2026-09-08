@@ -191,7 +191,7 @@ describe("an invitation link", () => {
     window.history.pushState({}, "", "/invite/tok-1");
     mount(<App />);
 
-    expect(await screen.findByText(/An invitation to this Workspace is waiting/)).toBeTruthy();
+    expect(await screen.findByText(/You have an invitation waiting/)).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Sign in with GitHub" })).toBeTruthy();
     // Held, because signing in leaves the SPA and comes back to "/".
     expect(window.sessionStorage.getItem("deevy.invitation")).toBe("tok-1");

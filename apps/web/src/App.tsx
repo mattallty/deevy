@@ -68,8 +68,8 @@ export function SignedOut({ invitation = null }: { invitation?: string | null })
             token, so the line says one is waiting and no more than that. */}
         <p className="text-sm text-muted-foreground">
           {invitation
-            ? "An invitation to this Workspace is waiting. Sign in with the address it was sent to."
-            : "With an account your Workspace admin allowlisted."}
+            ? "You have an invitation waiting. Sign in with the address it was sent to."
+            : "Use an account your Workspace admin has approved."}
         </p>
       </div>
       {providers?.map((provider) => (
@@ -86,7 +86,7 @@ export function SignedOut({ invitation = null }: { invitation?: string | null })
             });
             if (started.error) {
               setFailed(
-                `Sign-in with ${provider.label} could not start. Ask an operator to check this deployment's configuration.`,
+                `We couldn't start sign-in with ${provider.label}. Ask your administrator to check this deployment's configuration.`,
               );
             }
           }}
@@ -96,16 +96,15 @@ export function SignedOut({ invitation = null }: { invitation?: string | null })
       ))}
       {providers?.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          This deployment has no sign-in provider configured. An operator sets a provider’s client
-          id and secret and restarts it.
+          No sign-in provider has been set up yet. Your administrator can add one and restart deevy.
         </p>
       ) : null}
       {/* A page that cannot ask what it offers says so. Without this the
           buttons and the line above are both absent and the card is empty. */}
       {health.isError ? (
         <p className="text-sm text-destructive">
-          This deevy could not be reached, so there is nothing to sign in with yet. Reload to try
-          again.
+          We couldn&apos;t reach deevy, so there is nothing to sign in with yet. Reload the page to
+          try again.
         </p>
       ) : null}
       {failed ? <p className="text-sm text-destructive">{failed}</p> : null}
@@ -283,9 +282,8 @@ export function NotAMember({
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Signed in, not yet a Member</h1>
         <p className="text-sm text-muted-foreground">
-          {email} is not a Member of this Workspace. Ask an admin for an invitation, or for an
-          allowlist rule that matches your email domain, your GitHub organization or your GitLab
-          group, then sign in again.
+          {email} isn&apos;t a Member of this Workspace yet. Ask an admin to invite you, or to
+          approve your email domain, GitHub organization or GitLab group — then sign in again.
         </p>
       </div>
       <Button variant="outline" onClick={() => authClient.signOut()}>
@@ -367,7 +365,7 @@ export function Suspended({ email }: { email: string }) {
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Your membership is suspended</h1>
         <p className="text-sm text-muted-foreground">
-          {email} is a Member of this Workspace but is suspended. An admin can reinstate you.
+          Your access to this Workspace is paused. An admin can reinstate {email} at any time.
         </p>
       </div>
       <Button variant="outline" onClick={() => authClient.signOut()}>

@@ -33,8 +33,8 @@ export function NotFoundPage({
         <EmptyDescription className="text-base">
           {detail ?? (
             <>
-              Nothing lives at <code className="font-mono text-sm">{path}</code>. The link may be
-              stale, or the page may have moved.
+              We couldn&apos;t find anything at <code className="font-mono text-sm">{path}</code>.
+              The link may be out of date, or the page may have moved.
             </>
           )}
         </EmptyDescription>

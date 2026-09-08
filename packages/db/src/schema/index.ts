@@ -11,7 +11,7 @@ export * from "./gate.ts";
 export * from "./document.ts";
 export * from "./label.ts";
 export * from "./comment.ts";
-export * from "./repository.ts";
+export * from "./link.ts";
 export * from "./notification.ts";
 export * from "./channel.ts";
 export * from "./delivery.ts";

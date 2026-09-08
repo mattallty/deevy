@@ -61,15 +61,7 @@ export function LabelsPage() {
   ];
 
   return (
-    <SettingsPage
-      title="Labels"
-      description={
-        <>
-          Plain like <code>backend</code>, or scoped like <code>epic: Checkout rewrite</code>. An
-          Issue carries at most one Label per scope.
-        </>
-      }
-    >
+    <SettingsPage title="Labels">
       <form
         // One grid: a label line, then a 32px control row, so the four labels and
         // the four controls each sit on one line. The four columns need ~570px
@@ -151,7 +143,7 @@ export function LabelsPage() {
         empty={{
           icon: Tags,
           title: "No Labels yet",
-          description: "Add one above; an Issue then carries it, one per scope.",
+          description: "Create your first Label above, then add it to any Issue.",
         }}
       />
     </SettingsPage>

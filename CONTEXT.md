@@ -55,10 +55,6 @@ _Avoid_: tag, epic, category
 A named, versioned markdown text on an Issue, such as its intent, spec, or plan, with a template supplied by the workflow State.
 _Avoid_: artifact, page, attachment, file
 
-**Repository**:
-An external code location, such as a GitHub or GitLab repository, that Issues refer to.
-_Avoid_: repo, codebase, project
-
 **Gate**:
 A workflow state an Issue cannot leave without a Human's approval.
 _Avoid_: approval step, checkpoint, review stage

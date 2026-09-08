@@ -17902,207 +17902,6 @@
         }
       }
     },
-    "/repositories": {
-      "get": {
-        "operationId": "repositories.list",
-        "summary": "The Repositories this Workspace knows about",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "repositories": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "workspaceId": {
-                            "type": "string"
-                          },
-                          "provider": {
-                            "type": "string",
-                            "enum": [
-                              "github",
-                              "gitlab",
-                              "other"
-                            ]
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "x-native-type": "date"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "workspaceId",
-                          "provider",
-                          "name",
-                          "url",
-                          "createdAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "repositories"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "operationId": "repositories.create",
-        "summary": "Register a Repository so Links into it are recognised",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "provider": {
-                    "type": "string",
-                    "enum": [
-                      "github",
-                      "gitlab",
-                      "other"
-                    ]
-                  },
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200
-                  },
-                  "url": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "format": "uri"
-                  }
-                },
-                "required": [
-                  "provider",
-                  "name",
-                  "url"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "workspaceId": {
-                      "type": "string"
-                    },
-                    "provider": {
-                      "type": "string",
-                      "enum": [
-                        "github",
-                        "gitlab",
-                        "other"
-                      ]
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "x-native-type": "date"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "workspaceId",
-                    "provider",
-                    "name",
-                    "url",
-                    "createdAt"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/repositories/{repositoryId}": {
-      "delete": {
-        "operationId": "repositories.delete",
-        "summary": "Forget a Repository; Links into it keep working, unmatched",
-        "parameters": [
-          {
-            "in": "path",
-            "required": true,
-            "name": "repositoryId",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {}
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "deleted": {
-                      "type": "boolean",
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "deleted"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/issues/{issueKey}/links": {
       "get": {
         "operationId": "links.list",
@@ -18160,12 +17959,6 @@
                               "null"
                             ]
                           },
-                          "repositoryId": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
                           "runId": {
                             "type": [
                               "string",
@@ -18182,52 +17975,6 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
-                          },
-                          "repository": {
-                            "anyOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "workspaceId": {
-                                    "type": "string"
-                                  },
-                                  "provider": {
-                                    "type": "string",
-                                    "enum": [
-                                      "github",
-                                      "gitlab",
-                                      "other"
-                                    ]
-                                  },
-                                  "name": {
-                                    "type": "string"
-                                  },
-                                  "url": {
-                                    "type": "string"
-                                  },
-                                  "createdAt": {
-                                    "type": "string",
-                                    "format": "date-time",
-                                    "x-native-type": "date"
-                                  }
-                                },
-                                "required": [
-                                  "id",
-                                  "workspaceId",
-                                  "provider",
-                                  "name",
-                                  "url",
-                                  "createdAt"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
                           }
                         },
                         "required": [
@@ -18237,11 +17984,9 @@
                           "url",
                           "title",
                           "ref",
-                          "repositoryId",
                           "runId",
                           "createdBy",
-                          "createdAt",
-                          "repository"
+                          "createdAt"
                         ],
                         "additionalProperties": false
                       }
@@ -18351,12 +18096,6 @@
                         "null"
                       ]
                     },
-                    "repositoryId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
                     "runId": {
                       "type": [
                         "string",
@@ -18373,52 +18112,6 @@
                       "type": "string",
                       "format": "date-time",
                       "x-native-type": "date"
-                    },
-                    "repository": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string"
-                            },
-                            "workspaceId": {
-                              "type": "string"
-                            },
-                            "provider": {
-                              "type": "string",
-                              "enum": [
-                                "github",
-                                "gitlab",
-                                "other"
-                              ]
-                            },
-                            "name": {
-                              "type": "string"
-                            },
-                            "url": {
-                              "type": "string"
-                            },
-                            "createdAt": {
-                              "type": "string",
-                              "format": "date-time",
-                              "x-native-type": "date"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "workspaceId",
-                            "provider",
-                            "name",
-                            "url",
-                            "createdAt"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
                     }
                   },
                   "required": [
@@ -18428,11 +18121,9 @@
                     "url",
                     "title",
                     "ref",
-                    "repositoryId",
                     "runId",
                     "createdBy",
-                    "createdAt",
-                    "repository"
+                    "createdAt"
                   ],
                   "additionalProperties": false
                 }

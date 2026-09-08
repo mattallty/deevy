@@ -67,8 +67,8 @@ export function ConsentPage({ search }: ConsentPageProps = {}) {
       <section className="mx-auto flex max-w-md flex-col gap-3 py-16">
         <h1 className="text-xl font-semibold">Nothing to consent to</h1>
         <p className="text-sm text-muted-foreground">
-          This page is where an MCP client asks to act as you. Reaching it directly means there is
-          no request to answer.
+          This is where a connected tool asks for permission to act as you. There&apos;s no request
+          waiting right now.
         </p>
       </section>
     );
@@ -81,8 +81,8 @@ export function ConsentPage({ search }: ConsentPageProps = {}) {
       <header className="flex flex-col gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Let {name} act as you?</h1>
         <p className="text-sm text-muted-foreground">
-          It will reach deevy as you, with the Projects and Issues you can see. It can never approve
-          a Gate on your behalf: that happens here, in deevy.
+          It will work as you, with access to the same Projects and Issues you can see. It can never
+          rule on a Gate for you — that only happens here in deevy.
         </p>
       </header>
 

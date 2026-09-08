@@ -23,9 +23,9 @@ export function WorkspacePage() {
   const admin = me.data?.member?.role === "admin";
 
   return (
-    <SettingsPage title="Workspace" description="This instance serves one Workspace.">
-      {/* Only an admin can act on any of it, and `allowlist.list` and
-          `channels.list` are admin-only operations besides. */}
+    <SettingsPage title="Workspace">
+      {/* Only an admin can act on any of it, and `channels.list` is an
+          admin-only operation besides. */}
       {admin ? <SetUp /> : null}
       <Identity canRename={admin} />
       {admin ? (
@@ -162,7 +162,7 @@ function Identity({ canRename }: { canRename: boolean }) {
           </>
         ) : null}
         {autosave.status === "idle" && canRename
-          ? "The name saves when you leave the field."
+          ? "Changes save automatically when you click away."
           : null}
       </p>
 
@@ -190,43 +190,29 @@ function Identity({ canRename }: { canRename: boolean }) {
  * checklist of ticks is furniture.
  */
 function SetUp() {
-  const rules = useQuery(orpc.allowlist.list.queryOptions({ input: {} }));
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));
   const agents = useQuery(orpc.agents.list.queryOptions({ input: {} }));
-  const repositories = useQuery(orpc.repositories.list.queryOptions({ input: {} }));
   const channels = useQuery(orpc.channels.list.queryOptions({ input: {} }));
 
   const checks = [
     {
-      done: (rules.data?.rules.length ?? 0) > 0,
-      // Fixed by the Allowlist row further down this same page, so no link.
-      todo: "Nobody but the admin can sign in",
-    },
-    {
       done: (projects.data?.projects.length ?? 0) > 0,
-      todo: "No Project yet, so an Issue has nowhere to live",
+      todo: "Create a Project so your Issues have somewhere to live",
       action: { label: "New Project", to: "/projects" },
     },
     {
       done: (agents.data?.agents.length ?? 0) > 0,
-      todo: "No Agent yet — a Workspace of Humans is half of deevy",
+      todo: "Add an Agent so it can pick up work alongside your team",
       action: { label: "Add one", to: "/settings/agents" },
     },
     {
-      done: (repositories.data?.repositories.length ?? 0) > 0,
-      todo: "No Repository connected, so an Agent has nowhere to push",
-      action: { label: "Connect", to: "/settings/repositories" },
-    },
-    {
       done: (channels.data?.channels.length ?? 0) > 0,
-      todo: "No Channel connected, so nothing reaches Slack",
+      todo: "Connect a Channel to get Notifications in Slack",
       action: { label: "Connect", to: "/settings/channels" },
     },
   ];
 
-  const loading = [rules, projects, agents, repositories, channels].some(
-    (query) => query.isPending,
-  );
+  const loading = [projects, agents, channels].some((query) => query.isPending);
   const left = checks.filter((check) => !check.done);
   // Nothing left to say, or not enough read yet to say it.
   if (loading || left.length === 0) return null;

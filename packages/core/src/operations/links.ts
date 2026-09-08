@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { issueLink as issueLinkTable, issueLinkKinds } from "@deevy/db";
 import { parseLink } from "../links.ts";
-import { IssueLinkWithRepositorySchema } from "../schemas.ts";
+import { IssueLinkSchema } from "../schemas.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
@@ -19,12 +19,11 @@ export const links = {
     agents: true,
     mcp: true,
     input: z.object({ issueKey: z.string() }),
-    output: z.object({ links: z.array(IssueLinkWithRepositorySchema) }),
+    output: z.object({ links: z.array(IssueLinkSchema) }),
     handler: async ({ input, context }) => {
       const { issue } = await requireIssue(context, input.issueKey);
       const rows = await context.db.query.issueLink.findMany({
         where: { issueId: issue.id },
-        with: { repository: true },
         orderBy: { createdAt: "asc" },
       });
       return { links: rows };
@@ -48,7 +47,7 @@ export const links = {
       /** The Run that found it, so evidence is attributed to the attempt that produced it. */
       runId: z.string().optional(),
     }),
-    output: IssueLinkWithRepositorySchema,
+    output: IssueLinkSchema,
     handler: async ({ input, context }) => {
       const { issue, project } = await requireIssue(context, input.issueKey);
       if (input.runId) {
@@ -57,11 +56,7 @@ export const links = {
           throw new ORPCError("BAD_REQUEST", { message: "That Run is on another Issue" });
         }
       }
-      const known = await context.db.query.repository.findMany({
-        where: { workspaceId: context.workspace.id },
-        columns: { id: true, url: true },
-      });
-      const parsed = parseLink(input.url, known);
+      const parsed = parseLink(input.url);
 
       const id = newId("link");
       await context.db.insert(issueLinkTable).values({
@@ -71,7 +66,6 @@ export const links = {
         url: input.url,
         title: input.title ?? null,
         ref: parsed.ref,
-        repositoryId: parsed.repositoryId,
         runId: input.runId ?? null,
         createdBy: context.member.id,
       });
@@ -87,10 +81,7 @@ export const links = {
           ...(input.runId ? { runId: input.runId } : {}),
         },
       });
-      const row = await context.db.query.issueLink.findFirst({
-        where: { id },
-        with: { repository: true },
-      });
+      const row = await context.db.query.issueLink.findFirst({ where: { id } });
       if (!row) throw new ORPCError("INTERNAL_SERVER_ERROR");
       return row;
     },

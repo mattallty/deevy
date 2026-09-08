@@ -205,19 +205,14 @@ export function AgentsPage() {
   return (
     <SettingsPage
       title="Agents"
-      description="Every Agent works under its own identity, with exactly one Human accountable for it. A schedule wakes an Agent on the Issues assigned to it, whether or not anything happened."
       actions={<Button onClick={() => setCreating(true)}>New Agent</Button>}
     >
       <NewAgent open={creating} onOpenChange={setCreating} />
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
-      <SettingsSection
-        aria-label="Connect an Agent"
-        title="Connect an Agent"
-        description="An Agent reaches deevy over MCP with the key its Sponsor issued. The endpoint is"
-      >
+      <SettingsSection aria-label="Connect an Agent" title="Connect an Agent">
         <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
-        <p className="text-sm text-muted-foreground">and Claude Code adds it with</p>
+        <p className="text-sm text-muted-foreground">Or add it to Claude Code with:</p>
         <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
           {`claude mcp add --transport http deevy ${mcpEndpoint()} --header "Authorization: Bearer <the key>"`}
         </code>
@@ -232,7 +227,8 @@ export function AgentsPage() {
         empty={{
           icon: Bot,
           title: "No Agents yet",
-          description: "Create one above to give it an identity and an API key.",
+          description:
+            "Add your first Agent to give it an identity, an API key and Projects to work in.",
         }}
       />
     </SettingsPage>
@@ -266,8 +262,8 @@ function NewAgent({ open, onOpenChange }: { open: boolean; onOpenChange: (to: bo
         <DialogHeader>
           <DialogTitle>New Agent</DialogTitle>
           <DialogDescription>
-            You will be its Sponsor. It can see nothing until you grant it a Project, and it cannot
-            reach deevy until you issue it a key.
+            You&apos;ll be its Sponsor. Once it&apos;s created, grant it a Project to work in and
+            issue it an API key so it can connect.
           </DialogDescription>
         </DialogHeader>
         <form

@@ -85,9 +85,6 @@ export function ProjectsPage() {
       <header className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground">
-            Each Project has a key, a Workflow, and optionally a Team that owns it.
-          </p>
         </div>
         <Button onClick={() => setOpen(true)}>New Project</Button>
       </header>
@@ -108,7 +105,7 @@ export function ProjectsPage() {
           empty={{
             icon: FolderKanban,
             title: "No Projects yet",
-            description: "Create one to give the work a home.",
+            description: "Create your first Project to give your Issues a home.",
           }}
         />
       )}
@@ -147,7 +144,8 @@ function NewProjectDialog({
         <DialogHeader>
           <DialogTitle>New Project</DialogTitle>
           <DialogDescription>
-            The key prefixes every Issue in it, as in DEV-42. It cannot be changed later.
+            The key prefixes every Issue in this Project, like DEV-42. You won&apos;t be able to
+            change it later.
           </DialogDescription>
         </DialogHeader>
         <form

@@ -39,7 +39,6 @@ vi.mock("../src/lib/orpc.ts", async () => {
     runs: { get: async () => ({}), list: async () => ({ runs: [] }) },
     agents: {},
     labels: {},
-    repositories: {},
     channels: {},
     routing: {},
     webhooks: {},

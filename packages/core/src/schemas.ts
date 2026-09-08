@@ -10,7 +10,6 @@ import {
   issueLink,
   label,
   notification,
-  repository,
   member,
   project,
   team,
@@ -97,13 +96,7 @@ export const CommentWithAuthorSchema = CommentSchema.extend({
   author: MemberWithUserSchema.nullable(),
 });
 
-export const RepositorySchema = createSelectSchema(repository);
 export const IssueLinkSchema = createSelectSchema(issueLink);
-
-/** A Link as the Issue page shows one: the row plus the Repository it belongs to. */
-export const IssueLinkWithRepositorySchema = IssueLinkSchema.extend({
-  repository: RepositorySchema.nullable(),
-});
 
 export const NotificationSchema = createSelectSchema(notification);
 

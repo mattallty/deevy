@@ -32,7 +32,7 @@ has a **Workflow**: an ordered list of **States**, some of which are **Gates**, 
 a State. An **Issue** belongs to a Project, has a key, a Description, named **Documents** (intent, spec, plan,
 each versioned markdown with a template from its State), Labels (plain or scoped, one per scope), an optional
 parent Issue, one **Assignee** (Human or Agent), comments, and typed **Links** to pull requests, commits,
-branches, and URLs in linked **Repositories**. An Agent working an Issue produces a **Run** that records who
+branches, and URLs. An Agent working an Issue produces a **Run** that records who
 triggered it, posts **Activities** (thought, action, elicitation, response, error), attaches evidence and
 Links, and ends in a state. Every change becomes an **Event**. **Notifications** derive from Events and are
 delivered to **Channels**: each Human's in-app inbox, and Slack.
@@ -233,7 +233,7 @@ without an account anywhere answers for every provider. Built in eight slices fr
 [sign-in.md](./plans/sign-in.md).
 
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
-mirroring Documents into the Repository; the Slack app; email Channel; private Projects; four-eyes Gates;
+mirroring Documents into the code repository; the Slack app; email Channel; private Projects; four-eyes Gates;
 Postgres adapter; a CLI.
 
 ## Risks worth naming

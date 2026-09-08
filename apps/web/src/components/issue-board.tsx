@@ -375,7 +375,8 @@ function GateDialog({ issue, onClose }: { issue: BoardIssue | null; onClose: () 
         <DialogHeader>
           <DialogTitle>{issue ? `${issue.state.name} Gate on ${issue.key}` : "Gate"}</DialogTitle>
           <DialogDescription>
-            An Issue leaves a Gate on a Human&apos;s decision, not by being dragged.
+            A Gate needs a Human&apos;s ruling before an Issue can move on — dragging it isn&apos;t
+            enough.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">

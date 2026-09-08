@@ -189,14 +189,6 @@ const agentLoop = await label("Agent loop", "#8f5fc0", "epic");
 const high = await label("high", "#d73246", "priority");
 const low = await label("low", "#239d6a", "priority");
 
-// ---------------------------------------------------------------- repository
-
-await admin.api.repositories.create({
-  provider: "github",
-  name: "mattallty/deevy",
-  url: "https://github.com/mattallty/deevy",
-});
-
 // ------------------------------------------------------------------- issues
 
 interface Seed {
@@ -350,7 +342,7 @@ await issue("DEV", {
   assignee: grace.member.id,
 });
 await issue("DEV", {
-  title: "Mirror Documents into the Repository",
+  title: "Mirror Documents into the code repository",
   labels: [backend.id, docs.id, low.id],
 });
 await issue("DEV", {

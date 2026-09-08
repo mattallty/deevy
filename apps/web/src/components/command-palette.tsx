@@ -102,7 +102,7 @@ export function CommandPalette({
       open={open}
       onOpenChange={(next) => (next ? onOpenChange(true) : close())}
       title="Search or jump"
-      description="Type an Issue, where to go, or what to make"
+      description="Search for an Issue, jump to a page, or create something new"
     >
       {/* This CommandDialog puts its children straight into the dialog; the cmdk root is ours to add. */}
       <Command>

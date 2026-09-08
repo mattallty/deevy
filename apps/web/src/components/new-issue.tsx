@@ -137,8 +137,8 @@ function NewIssueDialog({
         <DialogHeader>
           <DialogTitle>New Issue</DialogTitle>
           <DialogDescription>
-            It opens in the first State of its Project&apos;s Workflow. Everything else — the
-            Assignee, the Labels, the Documents — is set on the Issue itself.
+            It starts in the first State of its Project&apos;s Workflow. You can add an Assignee,
+            Labels and Documents once it&apos;s open.
           </DialogDescription>
         </DialogHeader>
         <form

@@ -261,10 +261,6 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
         null,
         "destructive",
       );
-    case "repository.created":
-      return say(`added the Repository ${str(p.name) ?? ""}`, str(p.url));
-    case "repository.deleted":
-      return say(`removed the Repository ${str(p.name) ?? ""}`, null, "destructive");
     case "allowlist.rule_added":
       return say(`allowed ${str(p.kind) ?? ""} ${str(p.value) ?? ""}`.trim());
     case "allowlist.rule_removed":
