@@ -235,22 +235,24 @@ describe("the admin the bootstrap creates", () => {
  * where a real provider and a real callback are.
  */
 describe("one Human, one Member", () => {
-  it("trusts exactly the providers the deployment configured", () => {
+  /**
+   * Trusting a provider by name is not "this deployment offers it"; it is
+   * "link it without reading whether it says the address is verified". Every
+   * provider deevy ships reports a verified address when it has one, so the
+   * list buys no working case and costs the refusal that stops an IdP with
+   * open self-registration linking a stranger onto a Member.
+   */
+  it("trusts no provider by name, whatever the deployment configured", () => {
     const github = { clientId: "id", clientSecret: "secret" };
     expect(accountLinkingOf({ providers: { github } })).toEqual({
       enabled: true,
-      trustedProviders: ["github"],
-      allowDifferentEmails: false,
-    });
-    // Half a pair registers no provider, so it is no provider to trust either:
-    // the two lists are read off the same configuration.
-    expect(accountLinkingOf({ providers: { github: { ...github, clientId: "" } } })).toMatchObject({
       trustedProviders: [],
+      allowDifferentEmails: false,
     });
     expect(accountLinkingOf({})).toMatchObject({ trustedProviders: [] });
   });
 
-  it("carries that list into the instance, where the linking decision reads it", async () => {
+  it("carries that decision into the instance, where the linking rule reads it", async () => {
     const { db, close } = testDb();
     closers.push(close);
     const auth = createAuth({
@@ -264,7 +266,7 @@ describe("one Human, one Member", () => {
 
     // `context.trustedProviders` is what handleOAuthUserInfo consults; the
     // option alone would be a value nothing had resolved.
-    expect((await auth.$context).trustedProviders).toEqual(["github"]);
+    expect((await auth.$context).trustedProviders).toEqual([]);
     expect(auth.options.account?.accountLinking).toMatchObject({ allowDifferentEmails: false });
   });
 
