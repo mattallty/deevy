@@ -2,6 +2,7 @@ export * from "./auth.ts";
 export * from "./workspace.ts";
 export * from "./event.ts";
 export * from "./allowlist.ts";
+export * from "./invitation.ts";
 export * from "./project.ts";
 export * from "./agent.ts";
 export * from "./run.ts";

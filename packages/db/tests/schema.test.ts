@@ -1,8 +1,17 @@
 import { DatabaseSync } from "node:sqlite";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-sqlite";
 import { migrate } from "drizzle-orm/node-sqlite/migrator";
 import { describe, expect, it } from "vite-plus/test";
-import { event, member, notification, relations, user, workspace } from "../src/index.ts";
+import {
+  event,
+  invitation,
+  member,
+  notification,
+  relations,
+  user,
+  workspace,
+} from "../src/index.ts";
 
 const migrationsFolder = new URL("../drizzle", import.meta.url).pathname;
 
@@ -91,5 +100,59 @@ describe("what a Member may be owed for one Event", () => {
       .values({ id: "n2", recipientMemberId: "m1", kind: "assignment", eventId: seq });
 
     expect(await db.query.notification.findMany()).toHaveLength(2);
+  });
+});
+
+/**
+ * One live invitation per address, where live is "neither accepted nor
+ * revoked" (docs/plans/sign-in.md). The partial index is what makes "who is
+ * invited right now" a lookup rather than a replay of the Event log, and the
+ * database is where that is worth asserting: the migration carries the `where`
+ * drizzle-kit generated, and `check:migrations` reads neither.
+ */
+describe("how many invitations one address may have", () => {
+  async function workspaceWithInvitation() {
+    const db = openTestDb();
+    await db.insert(workspace).values({ id: "w1", name: "deevy", slug: "deevy" });
+    await db.insert(invitation).values({
+      id: "inv1",
+      workspaceId: "w1",
+      email: "grace@example.com",
+      tokenHash: "hash-1",
+      expiresAt: new Date("2027-01-01"),
+    });
+    return db;
+  }
+
+  it("refuses a second live one", async () => {
+    const db = await workspaceWithInvitation();
+
+    await expect(
+      db.insert(invitation).values({
+        id: "inv2",
+        workspaceId: "w1",
+        email: "grace@example.com",
+        tokenHash: "hash-2",
+        expiresAt: new Date("2027-01-01"),
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("takes another once the first is revoked, and keeps them both", async () => {
+    const db = await workspaceWithInvitation();
+    await db
+      .update(invitation)
+      .set({ revokedAt: new Date("2026-09-07") })
+      .where(eq(invitation.id, "inv1"));
+
+    await db.insert(invitation).values({
+      id: "inv2",
+      workspaceId: "w1",
+      email: "grace@example.com",
+      tokenHash: "hash-2",
+      expiresAt: new Date("2027-01-01"),
+    });
+
+    expect(await db.query.invitation.findMany()).toHaveLength(2);
   });
 });

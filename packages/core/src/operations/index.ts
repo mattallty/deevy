@@ -14,6 +14,7 @@ import { documents } from "./documents.ts";
 import { events } from "./events.ts";
 import { gates } from "./gates.ts";
 import { inbox } from "./inbox.ts";
+import { invitations } from "./invitations.ts";
 import { issues } from "./issues.ts";
 import { labels } from "./labels.ts";
 import { links } from "./links.ts";
@@ -39,6 +40,7 @@ export const router = {
   members,
   agents,
   allowlist,
+  invitations,
   projects,
   teams,
   issues,
@@ -68,6 +70,7 @@ export {
   gates,
   health,
   inbox,
+  invitations,
   issues,
   labels,
   links,

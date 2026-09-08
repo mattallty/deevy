@@ -21,6 +21,7 @@ import { channel, notificationPreference, routingRule } from "./schema/channel.t
 import { delivery } from "./schema/delivery.ts";
 import { webhookSubscription } from "./schema/webhook.ts";
 import { allowlistRule } from "./schema/allowlist.ts";
+import { invitation } from "./schema/invitation.ts";
 import { event } from "./schema/event.ts";
 import { comment } from "./schema/comment.ts";
 import { notification } from "./schema/notification.ts";
@@ -50,6 +51,7 @@ export const tables = {
   member,
   event,
   allowlistRule,
+  invitation,
   team,
   teamMember,
   project,
@@ -86,6 +88,7 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       from: r.workspace.id,
       to: r.allowlistRule.workspaceId,
     }),
+    invitations: r.many.invitation({ from: r.workspace.id, to: r.invitation.workspaceId }),
     teams: r.many.team({ from: r.workspace.id, to: r.team.workspaceId }),
     projects: r.many.project({ from: r.workspace.id, to: r.project.workspaceId }),
   },
@@ -250,6 +253,15 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       optional: false,
     }),
     creator: r.one.member({ from: r.allowlistRule.createdBy, to: r.member.id }),
+  },
+  invitation: {
+    workspace: r.one.workspace({
+      from: r.invitation.workspaceId,
+      to: r.workspace.id,
+      optional: false,
+    }),
+    creator: r.one.member({ from: r.invitation.createdBy, to: r.member.id }),
+    acceptedBy: r.one.member({ from: r.invitation.acceptedMemberId, to: r.member.id }),
   },
   notification: {
     recipient: r.one.member({

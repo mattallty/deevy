@@ -31,11 +31,26 @@ const ANY = "__any";
 const kindFamilies = [
   { label: "Issues", prefixes: ["issue", "gate", "document", "comment"] },
   { label: "Runs", prefixes: ["run"] },
-  { label: "Workspace", prefixes: ["member", "agent", "project", "workspace"] },
+  {
+    label: "Workspace",
+    prefixes: ["member", "invitation", "allowlist", "agent", "project", "workspace"],
+  },
 ];
 const subjectFamilies = [
   { label: "Work", types: ["issue", "run", "project"] },
-  { label: "Workspace", types: ["member", "team", "label", "channel", "webhook", "workspace"] },
+  {
+    label: "Workspace",
+    types: [
+      "member",
+      "invitation",
+      "allowlist_rule",
+      "team",
+      "label",
+      "channel",
+      "webhook",
+      "workspace",
+    ],
+  },
 ];
 
 interface EventRow {

@@ -273,6 +273,14 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
         null,
         "destructive",
       );
+    // Who may join, one address at a time: the payload carries the address and
+    // the role, so the log reads without a lookup (docs/plans/sign-in.md).
+    case "invitation.created":
+      return say(`invited ${str(p.email) ?? "somebody"} as ${str(p.role) ?? "a member"}`);
+    case "invitation.revoked":
+      return say(`revoked the invitation for ${str(p.email) ?? "somebody"}`, null, "destructive");
+    case "invitation.accepted":
+      return say(`accepted the invitation for ${str(p.email) ?? "their address"}`, null, "human");
     case "channel.created":
       return say(`connected the Channel ${str(p.name) ?? ""}`);
     case "channel.updated":

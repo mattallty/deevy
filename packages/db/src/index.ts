@@ -16,6 +16,7 @@ export type Member = typeof import("./schema/workspace.ts").member.$inferSelect;
 export type User = typeof import("./schema/auth.ts").user.$inferSelect;
 export type Event = typeof import("./schema/event.ts").event.$inferSelect;
 export type AllowlistRule = typeof import("./schema/allowlist.ts").allowlistRule.$inferSelect;
+export type Invitation = typeof import("./schema/invitation.ts").invitation.$inferSelect;
 export type Team = typeof import("./schema/project.ts").team.$inferSelect;
 export type Project = typeof import("./schema/project.ts").project.$inferSelect;
 export type Agent = typeof import("./schema/agent.ts").agent.$inferSelect;
