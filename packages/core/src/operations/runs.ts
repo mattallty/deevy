@@ -273,7 +273,14 @@ export const runs = {
         orderBy: { createdAt: "desc" },
         limit: 1,
       });
-      const decided = decisions.find((row) => row.createdAt >= since) ?? null;
+      const latest = decisions.find((row) => row.createdAt >= since) ?? null;
+      // An approval only answers when it opened the Gate. A Gate that wants two
+      // Humans has one approval on the record after the first of them, and the
+      // Issue still sitting in it: the Agent is owed "awaiting" until it moves
+      // (docs/plans/four-eyes-gates.md). A rejection answers whatever the
+      // threshold is, since one is enough to end it.
+      const opened = issue.stateId !== gate.id;
+      const decided = latest && (latest.decision === "rejected" || opened) ? latest : null;
       const approvers = gateApproversView(await gateApprovers(context.db, gate.id));
       const url = gateUrl(linkOrigin(context), key, gate.id);
 

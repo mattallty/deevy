@@ -2,13 +2,14 @@ import {
   gateApprover as gateApproverTable,
   gateDecision as gateDecisionTable,
   issue as issueTable,
+  member as memberTable,
   type Db,
   type Issue,
   type Member,
   type WorkflowState,
 } from "@deevy/db";
 import { ORPCError } from "@orpc/server";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { issueUrl } from "./slack.ts";
 import { newId } from "./ids.ts";
 
@@ -165,6 +166,79 @@ export function assertNamedApprover(approvers: string[], memberId: string): void
   throw new ORPCError("FORBIDDEN", {
     message: "This Gate names its approvers, and you are not one of them",
   });
+}
+
+/**
+ * The Humans who could rule on this Gate: the ones it names, or every Human of
+ * the Workspace when it names none, less the suspended and less whoever is
+ * being left out. It is one function because four callers need the same answer
+ * and disagreeing about it is how a Gate becomes unopenable — the inbox asks
+ * who to tell, `workflow.update` asks whether a threshold can ever be met,
+ * `gates.approve` asks whether this Human counts, and the Issue page asks what
+ * to say (docs/plans/four-eyes-gates.md).
+ *
+ * `named` is passed in rather than read here because `workflow.update` asks
+ * about a list it has not written yet.
+ */
+export async function eligibleApprovers(
+  db: Db,
+  input: { workspaceId: string; named: string[]; exclude?: string | null },
+): Promise<string[]> {
+  const rows = await db
+    .select({ id: memberTable.id })
+    .from(memberTable)
+    .where(
+      and(
+        eq(memberTable.workspaceId, input.workspaceId),
+        eq(memberTable.kind, "human"),
+        isNull(memberTable.suspendedAt),
+        input.exclude ? ne(memberTable.id, input.exclude) : undefined,
+        input.named.length > 0 ? inArray(memberTable.id, input.named) : undefined,
+      ),
+    );
+  return rows.map((row) => row.id);
+}
+
+/**
+ * The distinct Humans who have approved this Gate during the Issue's current
+ * visit to it, oldest first.
+ *
+ * A visit begins when the Issue enters the State, and begins again at every
+ * rejection: a rejection is the answer, so approvals given before it are spent
+ * whether or not the Issue moved. That second half matters because a rejection
+ * in the first State has nowhere to send the Issue and so does not stamp
+ * `stateEnteredAt` — without it, a Gate a Human had just rejected would open on
+ * the next approval. Approvals do not begin a visit; they accumulate within one.
+ *
+ * A decision whose Member has been deleted counts for nobody: `memberId` is
+ * `set null` on delete (schema/gate.ts), and a Gate must not be held open on
+ * behalf of a Member who is gone.
+ */
+export async function approvalsThisVisit(
+  db: Db,
+  issue: Pick<Issue, "id" | "stateEnteredAt">,
+  stateId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({
+      memberId: gateDecisionTable.memberId,
+      decision: gateDecisionTable.decision,
+      createdAt: gateDecisionTable.createdAt,
+    })
+    .from(gateDecisionTable)
+    .where(and(eq(gateDecisionTable.issueId, issue.id), eq(gateDecisionTable.stateId, stateId)))
+    .orderBy(asc(gateDecisionTable.createdAt));
+
+  const approvals: string[] = [];
+  for (const row of rows) {
+    if (row.createdAt < issue.stateEnteredAt) continue;
+    if (row.decision === "rejected") {
+      approvals.length = 0;
+      continue;
+    }
+    if (row.memberId && !approvals.includes(row.memberId)) approvals.push(row.memberId);
+  }
+  return approvals;
 }
 
 /**

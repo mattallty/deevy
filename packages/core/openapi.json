@@ -5905,6 +5905,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -5943,6 +5948,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -6138,6 +6144,11 @@
                           "isGate": {
                             "type": "boolean"
                           },
+                          "approvalsRequired": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -6176,6 +6187,7 @@
                           "name",
                           "position",
                           "isGate",
+                          "approvalsRequired",
                           "category",
                           "documentName",
                           "documentTemplate",
@@ -6335,6 +6347,11 @@
                           "isGate": {
                             "type": "boolean"
                           },
+                          "approvalsRequired": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -6373,6 +6390,7 @@
                           "name",
                           "position",
                           "isGate",
+                          "approvalsRequired",
                           "category",
                           "documentName",
                           "documentTemplate",
@@ -6563,6 +6581,11 @@
                           "isGate": {
                             "type": "boolean"
                           },
+                          "approvalsRequired": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -6601,6 +6624,7 @@
                           "name",
                           "position",
                           "isGate",
+                          "approvalsRequired",
                           "category",
                           "documentName",
                           "documentTemplate",
@@ -6770,6 +6794,11 @@
                           "isGate": {
                             "type": "boolean"
                           },
+                          "approvalsRequired": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -6808,6 +6837,7 @@
                           "name",
                           "position",
                           "isGate",
+                          "approvalsRequired",
                           "category",
                           "documentName",
                           "documentTemplate",
@@ -8005,6 +8035,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -8043,6 +8078,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -8369,6 +8405,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -8407,6 +8448,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -8697,6 +8739,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -8735,6 +8782,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -9248,6 +9296,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -9286,6 +9339,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -9618,6 +9672,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -9656,6 +9715,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -9982,6 +10042,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -10020,6 +10085,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -10310,6 +10376,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -10348,6 +10419,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -10771,6 +10843,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -10809,6 +10886,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -11135,6 +11213,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -11173,6 +11256,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -11463,6 +11547,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -11501,6 +11590,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -11905,6 +11995,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -11943,6 +12038,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -12269,6 +12365,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -12307,6 +12408,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -12597,6 +12699,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -12635,6 +12742,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -13042,6 +13150,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -13080,6 +13193,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -13406,6 +13520,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -13444,6 +13563,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -13734,6 +13854,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -13772,6 +13897,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -14180,6 +14306,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -14218,6 +14349,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -14544,6 +14676,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -14582,6 +14719,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -14872,6 +15010,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -14910,6 +15053,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -15318,6 +15462,11 @@
                         "isGate": {
                           "type": "boolean"
                         },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
                         "category": {
                           "type": "string",
                           "enum": [
@@ -15356,6 +15505,7 @@
                         "name",
                         "position",
                         "isGate",
+                        "approvalsRequired",
                         "category",
                         "documentName",
                         "documentTemplate",
@@ -15682,6 +15832,11 @@
                                 "isGate": {
                                   "type": "boolean"
                                 },
+                                "approvalsRequired": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
                                 "category": {
                                   "type": "string",
                                   "enum": [
@@ -15720,6 +15875,7 @@
                                 "name",
                                 "position",
                                 "isGate",
+                                "approvalsRequired",
                                 "category",
                                 "documentName",
                                 "documentTemplate",
@@ -16010,6 +16166,11 @@
                               "isGate": {
                                 "type": "boolean"
                               },
+                              "approvalsRequired": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "category": {
                                 "type": "string",
                                 "enum": [
@@ -16048,6 +16209,7 @@
                               "name",
                               "position",
                               "isGate",
+                              "approvalsRequired",
                               "category",
                               "documentName",
                               "documentTemplate",
@@ -16366,6 +16528,11 @@
                           "isGate": {
                             "type": "boolean"
                           },
+                          "approvalsRequired": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -16410,6 +16577,7 @@
                           "name",
                           "position",
                           "isGate",
+                          "approvalsRequired",
                           "category",
                           "documentName",
                           "documentTemplate",
@@ -16511,6 +16679,11 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "approvalsRequired": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 20
                         }
                       },
                       "required": [
@@ -16570,6 +16743,11 @@
                           "isGate": {
                             "type": "boolean"
                           },
+                          "approvalsRequired": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -16614,6 +16792,7 @@
                           "name",
                           "position",
                           "isGate",
+                          "approvalsRequired",
                           "category",
                           "documentName",
                           "documentTemplate",
@@ -18378,6 +18557,11 @@
                                       "isGate": {
                                         "type": "boolean"
                                       },
+                                      "approvalsRequired": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
                                       "category": {
                                         "type": "string",
                                         "enum": [
@@ -18416,6 +18600,7 @@
                                       "name",
                                       "position",
                                       "isGate",
+                                      "approvalsRequired",
                                       "category",
                                       "documentName",
                                       "documentTemplate",

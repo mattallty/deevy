@@ -155,6 +155,17 @@ export function describeEvent(event: EventLike, context: EventContext = {}): Eve
         agentTone,
         true,
       );
+    case "gate.approval": {
+      const approvals = typeof p.approvals === "number" ? p.approvals : null;
+      const required = typeof p.required === "number" ? p.required : null;
+      const counted =
+        approvals !== null && required !== null ? ` (${approvals} of ${required})` : "";
+      return say(
+        `approved the ${str(p.state) ?? ""} Gate${counted}`.replace("  ", " "),
+        str(p.note),
+        "gate",
+      );
+    }
     case "gate.approved":
       return say(
         `approved the ${str(p.state) ?? ""} Gate → ${str(p.to) ?? ""}`.replace("  ", " "),

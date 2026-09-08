@@ -37,9 +37,11 @@ export async function triggersFor(db: Db, event: Event): Promise<EventInput[]> {
   }
 
   // Where the Issue ended up, not how it got there: a State's rule fires on
-  // every arrival, including arriving by a Human's decision on a Gate. This is
-  // the same set of kinds `gate_awaiting` watches in notifications.ts, for the
-  // same reason.
+  // every arrival, including arriving by a Human's decision on a Gate.
+  // `gate.approval` is deliberately not one of these — a Gate short of its
+  // threshold has moved the Issue nowhere, so no State was entered and no rule
+  // fires (docs/plans/four-eyes-gates.md). It is the one kind `gate_awaiting`
+  // watches in notifications.ts that this does not.
   if (
     event.kind === "issue.created" ||
     event.kind === "issue.moved" ||

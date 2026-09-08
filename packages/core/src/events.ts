@@ -45,6 +45,13 @@ export type EventKind =
   | "issue.assigned"
   | "issue.reparented"
   | "issue.moved"
+  /**
+   * One Human's approval of a Gate that wants more than one, and the Issue
+   * still in it. `gate.approved` stays the Event that means the Issue left, so
+   * everything that reads the log keeps meaning what it meant
+   * (docs/plans/four-eyes-gates.md).
+   */
+  | "gate.approval"
   | "gate.approved"
   | "gate.rejected"
   | "workflow.updated"

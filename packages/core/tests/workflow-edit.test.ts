@@ -1,4 +1,6 @@
 import { createRouterClient } from "@orpc/server";
+import { member as memberTable } from "@deevy/db";
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { router } from "../src/operations/index.ts";
 import type { WorkflowState } from "@deevy/db";
@@ -238,5 +240,109 @@ describe("the approvers a Gate names", () => {
         })),
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+/**
+ * A threshold no one could meet is refused where it is written, not found later
+ * by an Issue nobody can move (docs/plans/four-eyes-gates.md).
+ */
+describe("workflow.update and a Gate's threshold", () => {
+  it("refuses more approvals than there are Humans to give them, naming both numbers", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, state } = await withProject(db);
+    await memberContext(db, { name: "Grace" });
+
+    await expect(
+      client.workflow.update({
+        projectKey: "DEV",
+        states: [
+          {
+            id: state("Intent").id,
+            name: "Intent",
+            isGate: true,
+            category: "backlog",
+            approvalsRequired: 3,
+          },
+          { id: state("Done").id, name: "Done", isGate: false, category: "done" },
+        ],
+        deleteStates: [state("Spec").id, state("Plan").id, state("Build").id, state("Review").id],
+      }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "That Gate asks for 3 approvals and only 2 Humans could give one",
+    });
+  });
+
+  it("does not count a suspended Human, nor the Humans a Gate does not name", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, state } = await withProject(db);
+    const grace = await memberContext(db, { name: "Grace" });
+    const ines = await memberContext(db, { name: "Ines" });
+    await db
+      .update(memberTable)
+      .set({ suspendedAt: new Date() })
+      .where(eq(memberTable.id, ines.member.id));
+
+    const two = [
+      { id: state("Intent").id, name: "Intent", isGate: true, category: "backlog" as const },
+      { id: state("Done").id, name: "Done", isGate: false, category: "done" as const },
+    ];
+    const rest = [state("Spec").id, state("Plan").id, state("Build").id, state("Review").id];
+
+    // Three Humans, one of them suspended: two can approve, not three.
+    await expect(
+      client.workflow.update({
+        projectKey: "DEV",
+        states: [{ ...two[0]!, approvalsRequired: 3 }, two[1]!],
+        deleteStates: rest,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    // And a Gate that names one Human cannot want two, whoever else is about.
+    await expect(
+      client.workflow.update({
+        projectKey: "DEV",
+        states: [
+          { ...two[0]!, approvalsRequired: 2, approverMemberIds: [grace.member.id] },
+          two[1]!,
+        ],
+        deleteStates: rest,
+      }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "That Gate asks for 2 approvals and only 1 Human could give one",
+    });
+  });
+
+  it("keeps a threshold a client did not mention, and clears one from a State that stops being a Gate", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, state } = await withProject(db);
+    await memberContext(db, { name: "Grace" });
+    const all = (isGate: boolean, approvalsRequired?: number) => ({
+      projectKey: "DEV" as const,
+      states: [
+        {
+          id: state("Intent").id,
+          name: "Intent",
+          isGate,
+          category: "backlog" as const,
+          approvalsRequired,
+        },
+        { id: state("Done").id, name: "Done", isGate: false, category: "done" as const },
+      ],
+      deleteStates: [state("Spec").id, state("Plan").id, state("Build").id, state("Review").id],
+    });
+    await client.workflow.update(all(true, 2));
+
+    // A client written before this field saves the Workflow and widens nothing.
+    const kept = await client.workflow.update(all(true));
+    expect(kept.states[0]).toMatchObject({ name: "Intent", approvalsRequired: 2 });
+
+    const plain = await client.workflow.update(all(false));
+    expect(plain.states[0]).toMatchObject({ name: "Intent", approvalsRequired: 1 });
   });
 });

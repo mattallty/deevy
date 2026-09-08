@@ -7,6 +7,7 @@ import {
   workflowStateCategories,
 } from "@deevy/db";
 import { WorkflowStateSchema } from "../schemas.ts";
+import { eligibleApprovers } from "../workflow.ts";
 import { ORPCError } from "@orpc/server";
 import { appendEvent } from "../events.ts";
 import { defineOperation } from "./registry.ts";
@@ -39,6 +40,32 @@ async function statesWithApprovers(context: ContextFor<"member">, projectId: str
     ...state,
     approverMemberIds: rows.filter((row) => row.stateId === state.id).map((row) => row.memberId),
   }));
+}
+
+/**
+ * A threshold no one could ever meet is refused here rather than discovered by
+ * an Issue nobody can move: deevy's zero-config case is a solo developer, and
+ * the failure has no error of its own (docs/plans/four-eyes-gates.md). It asks
+ * `eligibleApprovers` about the list being saved, not the one on disk.
+ */
+async function assertReachableThresholds(
+  context: ContextFor<"member">,
+  states: Array<{ isGate: boolean; approverMemberIds: string[]; approvalsRequired: number }>,
+): Promise<void> {
+  for (const state of states) {
+    if (!state.isGate || state.approvalsRequired <= 1) continue;
+    const eligible = await eligibleApprovers(context.db, {
+      workspaceId: context.workspace.id,
+      named: state.approverMemberIds,
+    });
+    if (state.approvalsRequired > eligible.length) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: `That Gate asks for ${state.approvalsRequired} approvals and only ${eligible.length} ${
+          eligible.length === 1 ? "Human could give one" : "Humans could give one"
+        }`,
+      });
+    }
+  }
 }
 
 /**
@@ -129,6 +156,13 @@ export const workflow = {
            * decide it, which is what M1 shipped (docs/plans/m2.md).
            */
           approverMemberIds: z.array(z.string()).default([]),
+          /**
+           * How many distinct Humans this Gate wants before an Issue leaves it.
+           * Left out, an existing State keeps the number it has and a new one
+           * gets 1, so a client written before this field cannot silently widen
+           * a Gate by saving the Workflow (docs/plans/four-eyes-gates.md).
+           */
+          approvalsRequired: z.number().int().min(1).max(20).optional(),
         }),
       ),
       deleteStates: z.array(z.string()).default([]),
@@ -155,6 +189,18 @@ export const workflow = {
 
       await assertAgents(context, input.states);
       await assertHumanApprovers(context, input.states);
+
+      // A State that is not a Gate is never approved, so it holds no threshold:
+      // resetting it keeps a number from lying in wait for the day somebody
+      // ticks the Gate box.
+      const stored = new Map(existing.map((state) => [state.id, state.approvalsRequired]));
+      const resolved = input.states.map((state) => ({
+        ...state,
+        approvalsRequired: !state.isGate
+          ? 1
+          : (state.approvalsRequired ?? (state.id ? (stored.get(state.id) ?? 1) : 1)),
+      }));
+      await assertReachableThresholds(context, resolved);
 
       const doomed = input.deleteStates.filter((id) => known.has(id));
       if (doomed.length > 0) {
@@ -183,7 +229,7 @@ export const workflow = {
       // Positions come from the order of `states`, so a reorder is just a
       // different array. Kept as sequential writes: D1 has no transactions.
       const kept: string[] = [];
-      for (const [position, state] of input.states.entries()) {
+      for (const [position, state] of resolved.entries()) {
         if (state.id) {
           await context.db
             .update(workflowStateTable)
@@ -191,6 +237,7 @@ export const workflow = {
               name: state.name,
               position,
               isGate: state.isGate,
+              approvalsRequired: state.approvalsRequired,
               category: state.category,
               documentName: state.documentName ?? null,
               documentTemplate: state.documentTemplate ?? null,
@@ -206,6 +253,7 @@ export const workflow = {
             name: state.name,
             position,
             isGate: state.isGate,
+            approvalsRequired: state.approvalsRequired,
             category: state.category,
             documentName: state.documentName ?? null,
             documentTemplate: state.documentTemplate ?? null,
@@ -217,7 +265,7 @@ export const workflow = {
       // Approvers are rewritten whole per State, like the States themselves: the
       // array given is the list, and an empty one widens the Gate back to any
       // Human. A deleted State takes its rows with it by cascade.
-      for (const [at, state] of input.states.entries()) {
+      for (const [at, state] of resolved.entries()) {
         const stateId = kept[at] as string;
         await context.db.delete(gateApproverTable).where(eq(gateApproverTable.stateId, stateId));
         if (state.approverMemberIds.length === 0) continue;
