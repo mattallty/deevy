@@ -42,6 +42,7 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_URL=https://deevy.example.com \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
+  -e GITLAB_CLIENT_ID=... -e GITLAB_CLIENT_SECRET=... \
   -e GOOGLE_CLIENT_ID=... -e GOOGLE_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
   deevy:local   # or ghcr.io/mattallty/deevy:latest
@@ -364,8 +365,11 @@ registered with `read_user`, which is the profile, and `read_api`, which is the 
 lists a person's groups — so a `gitlab_group` rule costs the sign-in a token that can read the API it can
 reach. That token is Better Auth's, stored on the `account` row, read once on the join and never again;
 an instance with no `gitlab_group` rule never spends it, because the groups are only asked for when such a
-rule exists and no email domain matched. An operator who would rather not grant it should admit teammates by
-email domain and leave group rules alone.
+rule exists and no email domain matched. Note what that does and does not buy an operator who would rather
+not grant it: the scope is on the registration, so every GitLab sign-in consents to it and stores a token
+that could read the API, whether or not a group rule exists. Leaving group rules alone means the token is
+never used; it does not mean it is never issued. An operator who wants it never issued has to leave GitLab
+unconfigured.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,

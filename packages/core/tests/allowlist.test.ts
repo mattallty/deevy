@@ -34,6 +34,32 @@ describe("allowlist.add", () => {
     ]);
   });
 
+  /**
+   * A GitHub login is one label and can never contain a dot, so a rule shaped
+   * like an email domain is a rule that can never match. It was accepted
+   * because this kind was handed the domain's shape (docs/plans/sign-in.md).
+   */
+  it("refuses a value shaped like another kind's", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await memberContext(db, { role: "admin", name: "Ada" });
+    const client = createRouterClient(router, { context: admin });
+
+    await expect(
+      client.allowlist.add({ kind: "github_org", value: "example.com" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      client.allowlist.add({ kind: "email_domain", value: "acme/platform" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // The shapes each kind does take, unchanged.
+    expect(await client.allowlist.add({ kind: "github_org", value: "acme-labs" })).toMatchObject({
+      value: "acme-labs",
+    });
+    expect(
+      await client.allowlist.add({ kind: "gitlab_group", value: "acme/platform" }),
+    ).toMatchObject({ value: "acme/platform" });
+  });
+
   it("reports a rule that already exists as a conflict", async () => {
     const { db, close } = testDb();
     closers.push(close);

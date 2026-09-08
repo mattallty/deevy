@@ -119,7 +119,11 @@ const allowlistValueShapes = {
     message: "A domain such as example.com",
   },
   github_org: {
-    pattern: /^[a-z0-9-]+(\.[a-z0-9-]+)*$/,
+    // A GitHub login is one label: letters, digits and single hyphens, never a
+    // dot. `example.com` in this field is a rule that can never match, and it
+    // was accepted because this shape was the email domain's
+    // (docs/plans/sign-in.md).
+    pattern: /^[a-z0-9](-?[a-z0-9])*$/,
     message: "An organization login such as acme",
   },
   gitlab_group: {

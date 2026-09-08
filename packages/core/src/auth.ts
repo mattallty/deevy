@@ -241,6 +241,15 @@ function socialProvidersOf(providers: AuthProviders) {
             ...gitlab,
             issuer: gitlabIssuer(providers.gitlab),
             scope: ["read_api"],
+            // GitLab's profile has no `email_verified`, and Better Auth's
+            // provider reads `profile.email_verified ?? false` — so without
+            // this every GitLab sign-in creates an unverified row, and
+            // Better Auth then refuses that Human every second provider
+            // forever. A confirmed address is a `confirmed_at` stamp
+            // (docs/plans/sign-in.md).
+            mapProfileToUser: (profile: { confirmed_at?: string | null }) => ({
+              emailVerified: Boolean(profile.confirmed_at),
+            }),
           },
         }
       : {}),
@@ -370,6 +379,9 @@ async function admit(db: Db, env: AuthEnv, user: JoiningUser): Promise<void> {
  * to spend a round trip, and `joinWorkspace` skips them all when an email
  * domain already matched.
  */
+/** How long a forge has to answer a question about a sign-in's memberships. */
+const FORGE_TIMEOUT_MS = 5_000;
+
 function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
   const token = async (providerId: string) => {
     const account = await db.query.account.findFirst({ where: { userId, providerId } });
@@ -384,6 +396,13 @@ function joinPorts(db: Db, env: AuthEnv, userId: string): JoinOptions {
         accept,
         "user-agent": "deevy",
       },
+      // A join costs a teammate their Member and never their sign-in, which was
+      // true of a forge that fails and not of one that is merely slow: this
+      // runs inside a Better Auth hook, so a host that accepts the connection
+      // and never answers held the sign-in open for as long as the runtime
+      // allowed. The abort is caught where the ports are read, so a timed-out
+      // question is a question with no answer (docs/plans/sign-in.md).
+      signal: AbortSignal.timeout(FORGE_TIMEOUT_MS),
     });
     return res.ok ? ((await res.json()) as T) : null;
   };
