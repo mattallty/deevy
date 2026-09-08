@@ -77,24 +77,12 @@ export function McpClientsPage() {
   ];
 
   return (
-    <SettingsPage
-      title="MCP clients"
-      description={
-        <>
-          The clients you have let act as you. Each one reaches deevy as you, with everything you
-          can do — except deciding a Gate, which happens here, in deevy, or not at all.
-        </>
-      }
-    >
-      <SettingsSection
-        aria-label="Connect your MCP client"
-        title="Connect your MCP client"
-        description="The endpoint is"
-      >
+    <SettingsPage title="MCP clients">
+      <SettingsSection aria-label="Connect your MCP client" title="Connect your MCP client">
         <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
         <p className="text-sm text-muted-foreground">
-          and Claude Code adds it with no header at all — the second command signs you in through a
-          browser and asks you to consent:
+          Or add it to Claude Code — no key needed. The second command signs you in through your
+          browser and asks you to approve the connection:
         </p>
         <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
           {`claude mcp add --transport http deevy ${mcpEndpoint()}`}
@@ -119,15 +107,15 @@ export function McpClientsPage() {
           empty={{
             icon: Plug,
             title: "No MCP clients yet",
-            description: "Nothing is connected as you. Add one with the command above.",
+            description: "Connect your first client with the command above.",
           }}
         />
       )}
 
       {rows.length > 0 ? (
         <p className="text-sm text-muted-foreground">
-          Revoking stops a client asking for anything new. A token deevy already handed it keeps
-          working until it expires, within the hour.
+          Revoking stops a client from asking for anything new. Any access it already has keeps
+          working until it expires, usually within the hour.
         </p>
       ) : null}
     </SettingsPage>

@@ -206,10 +206,7 @@ export function EventLogPage() {
   );
 
   return (
-    <SettingsPage
-      title="Event log"
-      description="Every change in this Workspace, newest first: who did what, to which Issue or Project, and when. The Activity, the live stream and the inbox all derive from this; a row opens its raw payload."
-    >
+    <SettingsPage title="Event log">
       {/* Each filter says what it filters on: "Every kind" alone reads as a
           value with no field, and three of them side by side read as three
           unrelated words. The label is the control's name, so `aria-label` on
@@ -342,7 +339,7 @@ export function EventLogPage() {
               ? {
                   icon: SearchX,
                   title: "No Events match your filters",
-                  description: "Try other filters, or clear them.",
+                  description: "Try adjusting or clearing your filters.",
                   action: (
                     <Button
                       variant="outline"
@@ -362,12 +359,12 @@ export function EventLogPage() {
                 ? {
                     icon: ScrollText,
                     title: "Nothing older",
-                    description: "The log starts here.",
+                    description: "You have reached the beginning of the log.",
                   }
                 : {
                     icon: ScrollText,
                     title: "Nothing yet",
-                    description: "The first Event lands when anything happens.",
+                    description: "Events will appear here as soon as anything happens.",
                   }
           }
         />

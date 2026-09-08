@@ -79,7 +79,7 @@ describe("SignedOut", () => {
   it("says so when the deployment configured no provider at all", async () => {
     stub.providers = [];
     mount(<SignedOut />);
-    expect(await screen.findByText(/no sign-in provider configured/)).toBeTruthy();
+    expect(await screen.findByText(/no sign-in provider has been set up/i)).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
   });
 
@@ -98,9 +98,9 @@ describe("SignedOut", () => {
   it("says so when it could not ask what this deployment offers", async () => {
     stub.unreachable = true;
     mount(<SignedOut />);
-    expect(await screen.findByText(/could not be reached/)).toBeTruthy();
+    expect(await screen.findByText(/couldn’t reach deevy|couldn't reach deevy/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Sign in with/ })).toBeNull();
-    expect(screen.queryByText(/no sign-in provider configured/)).toBeNull();
+    expect(screen.queryByText(/no sign-in provider has been set up/i)).toBeNull();
   });
 
   /**
@@ -135,7 +135,7 @@ describe("SignedOut", () => {
     stub.signInError = { message: "PROVIDER_NOT_FOUND" };
     mount(<SignedOut />);
     fireEvent.click(await screen.findByRole("button", { name: "Sign in with GitHub" }));
-    expect(await screen.findByText(/could not start/)).toBeTruthy();
+    expect(await screen.findByText(/couldn’t start sign-in|couldn't start sign-in/)).toBeTruthy();
   });
 });
 

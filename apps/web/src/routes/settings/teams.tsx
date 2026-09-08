@@ -137,12 +137,7 @@ export function TeamsPage({ selected, onSelect }: TeamsPageProps) {
   );
 
   return (
-    <SettingsPage
-      title="Teams"
-      description={
-        <>A Team owns Projects and can be mentioned. Every Human still sees every Project.</>
-      }
-    >
+    <SettingsPage title="Teams">
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       {teams.isPending ? <p className="text-muted-foreground">Loading Teams…</p> : null}
@@ -156,7 +151,8 @@ export function TeamsPage({ selected, onSelect }: TeamsPageProps) {
               </EmptyMedia>
               <EmptyTitle>No Teams yet</EmptyTitle>
               <EmptyDescription>
-                A Team owns Projects and can be mentioned as one. Name the first.
+                Teams own Projects and can be mentioned as a group. Create your first one to get
+                started.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

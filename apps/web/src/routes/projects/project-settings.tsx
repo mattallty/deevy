@@ -150,7 +150,8 @@ export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            A Team owns a Project and can be mentioned; it is not a permission wall.
+            The Team that owns this Project and can be mentioned as a group. Everyone can still see
+            it.
           </p>
         </div>
         <p role="status" className="flex min-h-5 items-center gap-2 text-xs text-muted-foreground">
@@ -172,8 +173,8 @@ export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
         <section className="flex flex-col gap-2 rounded-md border border-destructive/30 p-4">
           <h2 className="text-sm font-medium">Archive this Project</h2>
           <p className="text-sm text-muted-foreground">
-            It leaves the Projects list and the Issues home. Its Issues and their Events stay: the
-            log is the record.
+            The Project disappears from your Projects list and Issues home. Nothing is deleted — its
+            Issues and their history are kept.
           </p>
           <div className="flex gap-2">
             {confirming ? (

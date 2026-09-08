@@ -163,10 +163,10 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
       <header>
         <h2 className="text-base font-semibold">Workflow</h2>
         <p className="text-sm text-muted-foreground">
-          The States {projectKey} Issues move through, in order. A Gate is one an Issue cannot leave
-          without a Human&apos;s approval, and a State that names an Agent hands it the Issue and
-          starts a Run the moment one arrives. Pick a State to edit its rules; drag, or use the
-          arrows, to reorder.
+          The States {projectKey} Issues move through, in order. Make a State a Gate to require a
+          Human&apos;s approval before an Issue can leave it, or assign an Agent to have it pick up
+          every Issue that arrives. Select a State to edit it, and drag or use the arrows to
+          reorder.
         </p>
       </header>
 
@@ -290,7 +290,7 @@ export function WorkflowPage({ projectKey }: { projectKey: string }) {
           </form>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No States. Add one to give the work a path.
+            No States yet. Add your first one to map out how work moves through this Project.
           </p>
         )}
       </div>

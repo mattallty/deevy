@@ -159,7 +159,6 @@ export function InboxPage({
       <PageHeader
         className="px-4 pt-4"
         title={<span id="inbox-heading">Inbox</span>}
-        description="Mentions, assignments, and Gates waiting on a Human."
         actions={
           picked.size > 0 ? (
             <div role="toolbar" aria-label="Selection" className="flex items-center gap-2">
@@ -213,8 +212,8 @@ export function InboxPage({
               </EmptyTitle>
               <EmptyDescription>
                 {search.unread === "1"
-                  ? "You are caught up. All shows what you have read."
-                  : "Mentions, assignments and Gates land here as they happen."}
+                  ? "You're all caught up. Switch to All to see what you've already read."
+                  : "Mentions, assignments and Gates will show up here as they happen."}
               </EmptyDescription>
             </EmptyHeader>
             {search.unread === "1" ? (
@@ -350,7 +349,8 @@ export function InboxPage({
         </EmptyMedia>
         <EmptyTitle>Pick a Notification</EmptyTitle>
         <EmptyDescription>
-          The Issue it is about opens here, with what it asks of you in front.
+          Choose one from the list and its Issue opens here, with whatever it needs from you up
+          front.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

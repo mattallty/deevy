@@ -97,10 +97,7 @@ export function AgentPage({ memberId }: { memberId: string }) {
       <Grants memberId={memberId} onChanged={refresh} />
       <Keys memberId={memberId} onChanged={refresh} />
 
-      <SettingsSection
-        title="Schedule"
-        description="A schedule wakes the Agent on the Issues assigned to it, whether or not anything happened. Never means it only reacts."
-      >
+      <SettingsSection title="Schedule">
         <div className="flex flex-col gap-2">
           <Label htmlFor="agent-schedule">Wake</Label>
           {/* shadcn's Base UI Select, as its docs compose it: trigger and value, then a group of items. */}
@@ -139,15 +136,7 @@ export function AgentPage({ memberId }: { memberId: string }) {
 
       <RecentRuns memberId={memberId} />
 
-      <SettingsSection
-        tone="danger"
-        title={agent.suspendedAt ? "Suspended" : "Suspend this Agent"}
-        description={
-          agent.suspendedAt
-            ? "Its keys are refused and its Runs stop until it is reinstated."
-            : "Its keys are refused and its Runs stop. Nothing it did is undone: the log is the record."
-        }
-      >
+      <SettingsSection tone="danger" title={agent.suspendedAt ? "Suspended" : "Suspend this Agent"}>
         <div>
           {agent.suspendedAt ? (
             <Button
@@ -248,11 +237,7 @@ function Grants({ memberId, onChanged }: { memberId: string; onChanged: () => Pr
   );
 
   return (
-    <SettingsSection
-      aria-label="Projects"
-      title="Projects"
-      description="It can read and write Issues in these and nowhere else. A Project it was not granted does not exist to it."
-    >
+    <SettingsSection aria-label="Projects" title="Projects">
       {mine.length === 0 ? (
         <p className="text-sm text-muted-foreground">None yet, so it can see nothing.</p>
       ) : (
@@ -342,11 +327,7 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
   const revoke = useMutation(orpc.agents.keys.revoke.mutationOptions({ onSuccess: onChanged }));
 
   return (
-    <SettingsSection
-      aria-label="API keys"
-      title="API keys"
-      description="The Agent sends one as a bearer token. deevy keeps only a hash, so a key it has issued cannot be shown again."
-    >
+    <SettingsSection aria-label="API keys" title="API keys">
       {minted ? (
         <div className="flex flex-col gap-1 rounded-md border border-gate/50 bg-gate/10 p-3">
           <p className="text-sm font-medium">Copy this now: it is the only time you will see it.</p>
@@ -420,7 +401,7 @@ function RecentRuns({ memberId }: { memberId: string }) {
     createdAt: string | Date;
   }>;
   return (
-    <SettingsSection title="Recent Runs" description="The last ten attempts this Agent made.">
+    <SettingsSection title="Recent Runs">
       {runs.isPending ? <Skeleton className="h-16 w-full" /> : null}
       {runs.data && rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No Runs yet.</p>

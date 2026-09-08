@@ -149,15 +149,7 @@ export function ChannelsPage() {
   ];
 
   return (
-    <SettingsPage
-      title="Channels"
-      description={
-        <>
-          Where Notifications are delivered. Every Human has an inbox; a Slack Channel is an
-          incoming webhook this Workspace posts to.
-        </>
-      }
-    >
+    <SettingsPage title="Channels">
       <form
         className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
@@ -202,14 +194,11 @@ export function ChannelsPage() {
         empty={{
           icon: MessageSquare,
           title: "No Channels yet",
-          description: "Connect one above, and route a kind of Notification to it.",
+          description: "Add a Slack Channel above, then choose which Notifications go to it.",
         }}
       />
 
-      <SettingsSection
-        title="Routing"
-        description="Which Notifications reach which Channel. A rule left on Any covers every kind or every Project. Each Human still chooses what reaches them, under Notifications."
-      >
+      <SettingsSection title="Routing">
         {draft.map((rule, at) => (
           <div key={at} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
             <div className="flex flex-col gap-2">

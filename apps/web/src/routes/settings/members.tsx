@@ -43,10 +43,7 @@ export function MembersPage() {
   }
 
   return (
-    <SettingsPage
-      title="Members"
-      description={<>Everyone in this Workspace. Add an allowlist rule to let more people in.</>}
-    >
+    <SettingsPage title="Members">
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       <Table>

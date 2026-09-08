@@ -63,8 +63,8 @@ export function InvitationsRow() {
       label="Invited"
       hint={
         outstanding.length === 0 && !invitations.isPending
-          ? "Nobody is waiting on an invitation. One admits a single person, whatever the rules say."
-          : "Each of these is one person, invited by address, whatever the rules say."
+          ? "Invite someone by email to bring them in one at a time, even if they don't match any of your rules."
+          : "These people have been invited and haven't joined yet. An invitation works whether or not they match your rules."
       }
       below={
         outstanding.length > 0 ? (
@@ -161,8 +161,8 @@ function InviteDialog({
         <DialogHeader>
           <DialogTitle>Invite someone</DialogTitle>
           <DialogDescription>
-            An invitation admits one person by address, and is good for seven days. deevy sends no
-            email, so you get a link to send them however you like.
+            Invite one person by email address. The invitation is good for seven days. deevy
+            doesn&apos;t send the email itself — you&apos;ll get a link to share however you like.
           </DialogDescription>
         </DialogHeader>
         {link ? (

@@ -117,21 +117,23 @@ export function IssuesPage({
       return {
         icon: ClipboardList,
         title: "Nothing assigned to you",
-        description: "Issues assigned to you show here; All Issues has the rest.",
+        description:
+          "Issues assigned to you will show up here. Check All Issues for everything else.",
       };
     }
     if (onlyFilter === "assignee" && search.assignee === "agents:me") {
       return {
         icon: ClipboardList,
         title: "Nothing assigned to your Agents",
-        description: "Issues your Agents hold show here; All Issues has the rest.",
+        description:
+          "Issues your Agents are working on will show up here. Check All Issues for everything else.",
       };
     }
     if (filtered) {
       return {
         icon: SearchX,
         title: "No Issues match your filters",
-        description: "Try other filters, or clear them.",
+        description: "Try adjusting your filters, or clear them to see everything.",
         action: (
           <Button variant="outline" size="sm" onClick={clearFilters}>
             Clear filters
@@ -143,7 +145,7 @@ export function IssuesPage({
       return {
         icon: ClipboardList,
         title: "No open Issues",
-        description: "Every Issue here is closed. All shows them.",
+        description: "Everything here has been closed. Switch to All to see them.",
         action: (
           <Button variant="outline" size="sm" onClick={() => onSearch({ open: "0" })}>
             Show All
@@ -154,7 +156,7 @@ export function IssuesPage({
     return {
       icon: ClipboardList,
       title: "No Issues yet",
-      description: "Press c to create one. It starts in the first State of its Project's Workflow.",
+      description: "Create your first Issue — press c, or use New Issue up top.",
     };
   })();
 

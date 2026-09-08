@@ -72,8 +72,8 @@ export function AllowlistRow() {
       label="Who may join"
       hint={
         listed.length === 0 && !rules.isPending
-          ? "Nobody new can join until there is a rule. Only the admin in DEEVY_ADMIN_EMAIL gets in."
-          : "A sign-in matching any of these joins the Workspace as a Member."
+          ? "Add a rule to let your team sign in — anyone whose account matches joins automatically. Until then, you're the only one who can get in."
+          : "Anyone signing in with an account that matches one of these joins your Workspace automatically."
       }
       below={
         adding ? (

@@ -55,15 +55,7 @@ export function NotificationsPage() {
     );
 
   return (
-    <SettingsPage
-      title="Notifications"
-      description={
-        <>
-          What reaches you, and where. Slack only arrives for the Channels this Workspace routes a
-          kind to; turning it off here stops it either way.
-        </>
-      }
-    >
+    <SettingsPage title="Notifications">
       {preferences.isPending ? <Skeleton className="h-48 w-full" /> : null}
       {save.error ? <p className="text-sm text-destructive">{save.error.message}</p> : null}
 

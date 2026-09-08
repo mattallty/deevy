@@ -147,15 +147,7 @@ export function WebhooksPage() {
   ];
 
   return (
-    <SettingsPage
-      title="Webhooks"
-      description={
-        <>
-          Where deevy delivers its Events. Every POST is signed with the subscription&apos;s secret
-          in a <code>deevy-signature</code> header, and retried until it lands or is given up on.
-        </>
-      }
-    >
+    <SettingsPage title="Webhooks">
       <form
         className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4"
         onSubmit={(submitted) => {
@@ -218,18 +210,15 @@ export function WebhooksPage() {
         empty={{
           icon: Webhook,
           title: "No Webhooks yet",
-          description: "Subscribe a URL above; every Event it names is delivered there.",
+          description: "Add a URL above and choose the Events you want delivered to it.",
         }}
       />
 
       {open ? (
-        <SettingsSection
-          title="Recent deliveries"
-          description="What this subscription was owed lately. A failed one is tried again on its own; Redeliver owes it from the beginning."
-        >
+        <SettingsSection title="Recent deliveries">
           {deliveries.isPending ? <Skeleton className="h-20 w-full" /> : null}
           {(deliveries.data?.deliveries ?? []).length === 0 && !deliveries.isPending ? (
-            <p className="text-sm text-muted-foreground">Nothing has been owed to it yet.</p>
+            <p className="text-sm text-muted-foreground">Nothing has been delivered yet.</p>
           ) : null}
           {(deliveries.data?.deliveries ?? []).map((delivery) => (
             <div

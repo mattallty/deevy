@@ -185,7 +185,7 @@ export function StateFields({
         <div className="flex w-full flex-col gap-2">
           <Label htmlFor={`state-approvers-${index}`}>Approvers for {state.name}</Label>
           <p className="text-xs text-muted-foreground">
-            Naming nobody leaves it to any Human, which is the default.
+            Leave this empty to let any Human rule on this Gate.
           </p>
           {renderApprovers(state, onEdit)}
         </div>

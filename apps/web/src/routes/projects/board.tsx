@@ -128,10 +128,7 @@ export function BoardPage({
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader
-        title="Board"
-        description={`${projectKey} by State. An Issue leaves a Gate by a ruling, not a drop.`}
-      >
+      <PageHeader title="Board">
         <IssueFilters
           value={search}
           onChange={onSearch}
