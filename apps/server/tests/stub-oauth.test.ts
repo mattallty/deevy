@@ -177,5 +177,56 @@ describe("the stub's providers", () => {
     // Nothing is listening, so a request that reached the network is a
     // connection error — and one the stub had answered would be a document.
     await expect(fetch("http://127.0.0.1:1/.well-known/openid-configuration")).rejects.toThrow();
+    // Every form of it, not the four literals this used to list: deevy on
+    // 127.0.0.2 or 0.0.0.0 is still deevy, and the stub in front of its own
+    // .well-known routes would answer for the authorization server.
+    await expect(fetch("http://127.0.0.2:1/.well-known/openid-configuration")).rejects.toThrow();
+    await expect(fetch("http://0.0.0.0:1/.well-known/openid-configuration")).rejects.toThrow();
+  });
+
+  /**
+   * A self-hosted GitLab under a relative URL root builds every endpoint under
+   * that prefix. An exact path match let those requests through to the real
+   * network from a dev loop, silently (docs/plans/sign-in.md).
+   */
+  it("answers a GitLab that lives under a URL root", async () => {
+    const issuer = "https://example.test/gitlab";
+    const { access_token } = await tokenFrom(`${issuer}/oauth/token`, "ada@example.com", "gitlab");
+    expect(access_token).toBeTruthy();
+    const profile = (await (
+      await fetch(`${issuer}/api/v4/user`, { headers: { authorization: `Bearer ${access_token}` } })
+    ).json()) as { username: string };
+    expect(profile.username).toBe("ada");
+  });
+
+  /**
+   * The stub reported every address verified, which is what let a linking rule
+   * that turns on the claim look tested when nothing drove it. An address
+   * marked `+unverified` is the one a provider says it has not proved.
+   */
+  it("reports an address the providers have not verified", async () => {
+    const unverified = "mallory+unverified@example.com";
+    const { id_token } = await tokenFrom(
+      "https://oauth2.googleapis.com/token",
+      unverified,
+      "google-client",
+    );
+    expect(claimsOf(id_token ?? "").email_verified).toBe(false);
+
+    const emails = (await (
+      await fetch("https://api.github.com/user/emails", {
+        headers: { authorization: `Bearer gho_${unverified}` },
+      })
+    ).json()) as Array<{ verified: boolean }>;
+    expect(emails[0]?.verified).toBe(false);
+
+    // GitLab has no such claim at all: an unconfirmed address is a null stamp.
+    const issuer = "https://gitlab.example.test";
+    const { access_token } = await tokenFrom(`${issuer}/oauth/token`, unverified, "gitlab");
+    const profile = (await (
+      await fetch(`${issuer}/api/v4/user`, { headers: { authorization: `Bearer ${access_token}` } })
+    ).json()) as { confirmed_at: string | null; email_verified?: unknown };
+    expect(profile.confirmed_at).toBeNull();
+    expect(profile.email_verified).toBeUndefined();
   });
 });

@@ -44,9 +44,26 @@ function positive(value: string | undefined, fallback: number): number {
  * of its client pair are set, and a developer running without an OAuth App has
  * neither. So the flag supplies the halves it does not have, and a real value
  * always wins — an instance configured with a pair keeps it
- * (docs/DEVELOPMENT.md, "Running without an OAuth App").
+ * (docs/DEVELOPMENT.md, "Running without an OAuth App"). The stub answers
+ * whatever pair it is handed, because the OAuth `code` is the email address.
  */
-const stubbed = "dev-stub";
+const STUB_CLIENT = { clientId: "stub-client", clientSecret: "stub-secret" };
+
+/**
+ * Every entry with both halves filled in, so a provider added later is stubbed
+ * by being added rather than by remembering this function.
+ */
+function stubbedProviders(providers: AuthProviders): AuthProviders {
+  const filled: AuthProviders = {};
+  for (const [id, client] of Object.entries(providers)) {
+    filled[id as keyof AuthProviders] = {
+      ...client,
+      clientId: client.clientId || STUB_CLIENT.clientId,
+      clientSecret: client.clientSecret || STUB_CLIENT.clientSecret,
+    };
+  }
+  return filled;
+}
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
   const devStubOAuth = env.DEEVY_DEV_STUB_OAUTH === "1";
@@ -55,7 +72,12 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
       "DEEVY_DEV_STUB_OAUTH replaces every sign-in provider and cannot be set in production",
     );
   }
-  const half = (value: string | undefined) => value || (devStubGithub ? stubbed : "");
+  const providers: AuthProviders = {
+    github: {
+      clientId: env.GITHUB_CLIENT_ID ?? "",
+      clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+    },
+  };
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.
     port: Number(env.DEEVY_PORT ?? env.PORT ?? 3000),
@@ -64,12 +86,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     webOrigin: env.DEEVY_WEB_ORIGIN,
-    providers: {
-      github: {
-        clientId: half(env.GITHUB_CLIENT_ID),
-        clientSecret: half(env.GITHUB_CLIENT_SECRET),
-      },
-    },
+    providers: devStubOAuth ? stubbedProviders(providers) : providers,
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,
     webDist: env.DEEVY_WEB_DIST,

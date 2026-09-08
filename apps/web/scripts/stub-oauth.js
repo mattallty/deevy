@@ -42,9 +42,32 @@
     return emailIn(request.headers.get("authorization")?.split(" ")[1]);
   }
 
-  /** deevy's own origin is not a provider: loopback goes straight past. */
+  /**
+   * deevy's own origin is not a provider: loopback goes straight past. Every
+   * form of it, not four literals — `127.0.0.2` and `0.0.0.0` are this machine
+   * too, and a path-matched provider in front of deevy's own `.well-known`
+   * routes would answer for the authorization server. A deevy reached on a LAN
+   * address or a container name is still outside this test, which is why
+   * `BETTER_AUTH_URL` in the `dev:stub` configuration is a loopback URL.
+   */
   function isLoopback(host) {
-    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+    const bare = host.replace(/^\[/, "").replace(/\]$/, "");
+    return (
+      bare === "localhost" ||
+      bare === "::1" ||
+      bare === "::" ||
+      bare === "0.0.0.0" ||
+      bare.startsWith("127.")
+    );
+  }
+
+  /**
+   * An address the providers say they have not verified. A sign-in through the
+   * stub is otherwise always verified, which is what let a linking rule that
+   * turns on the claim look tested when nothing drove it (docs/plans/sign-in.md).
+   */
+  function isVerified(email) {
+    return !email.includes("+unverified@");
   }
 
   /** The name a provider would show for an address, from its local part. */
@@ -152,25 +175,29 @@
     return { email: params.get("code") ?? "", clientId };
   }
 
-  /** Who the sign-in is, in the claims every OpenID issuer here agrees on. */
-  function profileClaims(email) {
+  /**
+   * Who the sign-in is, in the claims every OpenID issuer here agrees on. The
+   * extra ones an OpenID Connect provider may send are asked for by name:
+   * Google issues no `preferred_username`, and a stub that sends one would let
+   * a slice read a claim that is not there in production.
+   */
+  function profileClaims(email, extras = false) {
     const { login, name } = nameFor(email);
     return {
       sub: email,
       email,
-      email_verified: true,
+      email_verified: isVerified(email),
       name,
       given_name: name,
-      family_name: "",
-      preferred_username: login,
       // No picture: a host that does not resolve is a red line in every dev console.
       picture: null,
+      ...(extras ? { preferred_username: login } : {}),
     };
   }
 
   /** Those claims as an issuer signs them: bound to an issuer and an audience. */
-  function idTokenClaims(email, issuer, clientId) {
-    return { iss: issuer, aud: clientId, ...profileClaims(email) };
+  function idTokenClaims(email, issuer, clientId, extras = false) {
+    return { iss: issuer, aud: clientId, ...profileClaims(email, extras) };
   }
 
   // ------------------------------------------------------- the providers
@@ -189,7 +216,11 @@
       username: login,
       name,
       email,
-      email_verified: true,
+      // GitLab's /api/v4/user has no `email_verified`; a confirmed address is
+      // a `confirmed_at` stamp, and an unconfirmed one is null. Inventing the
+      // claim here made every GitLab sign-in look verified to Better Auth,
+      // which is not what production does (docs/plans/sign-in.md).
+      confirmed_at: isVerified(email) ? "2020-01-01T00:00:00.000Z" : null,
       state: "active",
       locked: false,
       avatar_url: null,
@@ -227,7 +258,9 @@
     if (host === "api.github.com") {
       const email = bearerEmail(request);
       if (path === "/user") return Response.json(githubProfile(email));
-      if (path === "/user/emails") return Response.json([{ email, primary: true, verified: true }]);
+      if (path === "/user/emails") {
+        return Response.json([{ email, primary: true, verified: isVerified(email) }]);
+      }
       if (path === "/user/orgs") return Response.json([]);
     }
 
@@ -249,7 +282,10 @@
     // GitLab and the generic OIDC provider live wherever the operator's issuer
     // is, so they are matched by path. Never on loopback: that is deevy.
     if (!isLoopback(host)) {
-      if (path === "/oauth/token") {
+      // `endsWith`, not `===`: a self-hosted GitLab under a relative URL root
+      // (`https://example.com/gitlab`) builds every endpoint under that prefix,
+      // and an exact match sent the dev loop's request to the real network.
+      if (path.endsWith("/oauth/token")) {
         const { email } = await tokenRequest(request);
         return Response.json({
           access_token: tokenFor(email),
@@ -258,8 +294,8 @@
           scope: "read_user read_api",
         });
       }
-      if (path === "/api/v4/user") return Response.json(gitlabProfile(bearerEmail(request)));
-      if (path === "/api/v4/groups") return Response.json([]);
+      if (path.endsWith("/api/v4/user")) return Response.json(gitlabProfile(bearerEmail(request)));
+      if (path.endsWith("/api/v4/groups")) return Response.json([]);
 
       if (path.endsWith(OIDC_DISCOVERY)) {
         const issuer = issuerOf(url, OIDC_DISCOVERY);
@@ -285,10 +321,14 @@
           token_type: "bearer",
           expires_in: 3600,
           scope: "openid profile email",
-          id_token: await idToken(idTokenClaims(email, issuerOf(url, OIDC_TOKEN), clientId)),
+          // An OpenID Connect provider is the one that may carry the extra
+          // claims; Google's token above deliberately does not.
+          id_token: await idToken(idTokenClaims(email, issuerOf(url, OIDC_TOKEN), clientId, true)),
         });
       }
-      if (path.endsWith(OIDC_USERINFO)) return Response.json(profileClaims(bearerEmail(request)));
+      if (path.endsWith(OIDC_USERINFO)) {
+        return Response.json(profileClaims(bearerEmail(request), true));
+      }
       if (path.endsWith(OIDC_JWKS)) return jwksResponse();
     }
 

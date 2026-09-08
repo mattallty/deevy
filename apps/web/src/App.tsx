@@ -124,7 +124,7 @@ export function DevSignIn({
       }}
     >
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium">GitHub is a stub on this instance</span>
+        <span className="text-sm font-medium">Sign-in is a stub on this instance</span>
         <span className="text-xs text-muted-foreground">
           Any email signs in. The one in DEEVY_ADMIN_EMAIL becomes the Workspace admin.
         </span>
