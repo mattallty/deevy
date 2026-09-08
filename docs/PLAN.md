@@ -68,9 +68,17 @@ one hop away: the triggering Human, or the Sponsor when an Agent triggered it.
 
 ## Authentication and access
 
-- Humans sign in with GitHub, GitLab, Google, or generic OpenID Connect. No local passwords.
+- Humans sign in with GitHub, GitLab, Google, or generic OpenID Connect. No local passwords. Each provider is
+  a client pair in the environment — GitLab and the OIDC provider also take an issuer, so a self-hosted GitLab
+  and any one IdP behind Okta, Entra, Keycloak or Authentik work — and an instance offers exactly the
+  providers whose variables are set, reported publicly by `health.ping` and rendered as one button each.
+- A Human who signs in with a second configured provider on the same verified address links onto the user row
+  they already have: one Human is one Member, with one handle and one inbox.
 - A Workspace admin allowlists a GitHub organization, a GitLab group, or an email domain; matching sign-ins
-  auto-join. Everyone else is invited. The first sign-in matching the configured admin email becomes admin.
+  auto-join. Everyone else is invited: an admin creates an invitation for one address and gets a URL to send
+  however they like, good for seven days, spent after sign-in by the Human whose address it names. deevy sends
+  no email until the email Channel exists, and never needs to. The first sign-in matching the configured admin
+  email becomes admin.
 - Every Member is a Better Auth user. Agents are token-only users created by their Sponsor, who issues and
   rotates their API keys. A suspended Sponsor suspends their Agents until someone else sponsors them.
 - Agents get a fixed capability set scoped to granted Projects: read and write Issues, comment, create and
@@ -214,6 +222,15 @@ protections rather than a list the runtime wrote; and every ref a Run moves is a
 commits and whether history was rewritten. Built in five slices from
 [agent-owns-git.md](./plans/agent-owns-git.md), recorded in
 [ADR-0019](./adr/0019-the-session-is-its-own-user-and-git-goes-through-the-supervisor.md).
+
+**Sign-in and invitations.** The two things the section above promised that M1 and M2 both deferred. A sign-in
+provider is now configuration rather than a constant, so GitHub, Google, GitLab and one generic OIDC provider
+are each a client pair (and an issuer, for the last two) that an operator sets or leaves unset; a Human who
+uses two of them stays one Member; a GitLab group is an allowlist rule beside a GitHub organization; and an
+invitation is a link an admin creates for one address, accepted after sign-in as an operation with a Member
+and an Event rather than a branch inside an auth hook. The dev stub that lets all of this be walked and tested
+without an account anywhere answers for every provider. Built in eight slices from
+[sign-in.md](./plans/sign-in.md).
 
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
 mirroring Documents into the Repository; the Slack app; email Channel; private Projects; four-eyes Gates;

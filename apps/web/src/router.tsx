@@ -13,6 +13,7 @@ declare module "@tanstack/react-router" {
     bleed?: boolean;
   }
 }
+import { dropInvitation } from "./lib/invitation.ts";
 import { parseIssuesSearch, type IssuesSearch } from "./components/issue-filters.tsx";
 import { IssuesPage } from "./routes/issues/list.tsx";
 import { ProjectsPage } from "./routes/projects/projects.tsx";
@@ -274,6 +275,18 @@ const agentRoute = createRoute({
   },
 });
 
+// An invitation link is answered by App.tsx, which is mounted for a Human who
+// is not a Member yet; the router only exists once somebody is one. So a
+// Member who lands on `/invite/<token>` is already in — the link has nothing
+// left to do, and home is where they were going.
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invite/$token",
+  beforeLoad: () => {
+    dropInvitation();
+    throw redirect({ to: "/" });
+  },
+});
 // Where the OAuth provider sends a Human mid-authorization (packages/core/src/auth.ts).
 const consentRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -316,6 +329,7 @@ const routeTree = rootRoute.addChildren([
     mcpClientsRoute,
     eventLogRoute,
   ]),
+  inviteRoute,
   consentRoute,
   tokensRoute,
 ]);

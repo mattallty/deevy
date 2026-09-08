@@ -8,6 +8,7 @@ import { appendEvent } from "../events.ts";
 import { InvitationSchema, MemberSchema } from "../schemas.ts";
 import { newId } from "../ids.ts";
 import { defineOperation, NoInput, type AppContext } from "./registry.ts";
+import { linkOrigin } from "./shared.ts";
 
 /**
  * An invitation admits one person where an allowlist rule admits a category
@@ -140,6 +141,14 @@ export const invitations = {
        * another.
        */
       url: z.string(),
+      /**
+       * The same link, site-relative. `url` is built from this instance's own
+       * origin, which serves the SPA in the image and on Workers but not on a
+       * split-origin deployment or in the `dev` loop, where the API and the SPA
+       * are two ports. A browser knows the origin it is on; this is the half it
+       * cannot know (docs/plans/sign-in.md).
+       */
+      path: z.string(),
     }),
     handler: async ({ input, context }) => {
       const live = await context.db.query.invitation.findFirst({
@@ -179,7 +188,8 @@ export const invitations = {
         subjectId: row.id,
         payload: { email: row.email, role: row.role },
       });
-      return { ...shown(row), url: `${context.baseURL ?? ""}/invite/${token}` };
+      const path = `/invite/${token}`;
+      return { ...shown(row), url: `${linkOrigin(context)}${path}`, path };
     },
   }),
 

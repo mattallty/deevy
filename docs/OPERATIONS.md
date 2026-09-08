@@ -2,7 +2,7 @@
 
 deevy is one container and one volume. A self-hosted instance serves one Workspace (CONTEXT.md), so there is
 no tenancy to configure: the first sign-in with `DEEVY_ADMIN_EMAIL` creates the Workspace and becomes its
-admin, and everyone else joins through the allowlist.
+admin, and everyone else joins through the allowlist or an invitation.
 
 ## The image
 
@@ -268,7 +268,7 @@ bindings arrive with the request.
 | `DEEVY_OIDC_NAME`              | env         | var                | `Single sign-on`     | The button says "Sign in with Single sign-on". Set it to what your teammates call the IdP.                                                                                                                                                                                |
 | `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                                                                                      |
 | `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                                                                                      |
-| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                                                                                |
+| `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS, and every link deevy hands a Human — a Gate, an invitation, a Slack message — points at the API rather than at the page.                                                       |
 | `DEEVY_RUN_STALE_MINUTES`      | env         | var                | 30                   | Nothing: 30 minutes of silence makes a Run `stale`, which its next Activity undoes.                                                                                                                                                                                       |
 | `DEEVY_SWEEP_INTERVAL_SECONDS` | env         | — the Cron Trigger | 60                   | Nothing: the sweep looks every minute. Node-only, because on Workers the schedule is `triggers.crons` in `apps/web/wrangler.jsonc`.                                                                                                                                       |
 | `DEEVY_GATE_REMINDER_HOURS`    | env         | var                | 4                    | Nothing: an undecided Gate asks its approvers again every four hours.                                                                                                                                                                                                     |
@@ -399,6 +399,22 @@ something reachable, or leave it unset. And an IdP that sends no `email_verified
 sends none — can sign a teammate in, but cannot become the _second_ provider for a Human who already has one
 here: that link is refused, for the reason under **One Human is one Member** below.
 
+**Who may join, and who is invited.** A rule admits a category — an email domain, a GitHub organization, a
+GitLab group — and it goes on admitting everybody who matches it, this month and next. An invitation admits
+one person: an admin creates it in Settings, Workspace with an address and a role, and gets a link back
+once, because deevy has no email Channel to send it with and keeps only a hash of the token. The invited
+Human clicks the link, signs in with whichever provider the instance offers, and accepting is what makes
+them a Member — the address that signs in has to be the address that was invited, so a forwarded link is not
+a second seat. An invitation is good for seven days, one address holds one live invitation at a time
+(revoke it to send another), and an admin who loses a link revokes the invitation and issues a new one.
+Neither is a Gate: nothing waits on a Human's ruling, and neither reaches an inbox — the admin is holding
+the link.
+
+The link points where a browser finds deevy, which is `BETTER_AUTH_URL` in the image and on the Worker,
+since both serve the SPA themselves. Where the SPA has an origin of its own, that is `DEEVY_WEB_ORIGIN`, and
+setting it is what keeps an invitation link, a Gate link and a Slack message pointing at the page rather than
+at the API beside it.
+
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,
 one inbox and one Member rather than becoming two people who share an email.
@@ -419,6 +435,16 @@ second Human is created on the address. Note what that row's flag is: deevy neve
 whatever the provider that created the row reported. A Human whose first sign-in was unverified therefore
 stays on that provider until an operator changes the row. Linking is also same-address only — two addresses are two Humans, and deevy has no
 screen that says otherwise.
+
+Whether a provider proved the address is the provider's own answer, and they word it differently. GitHub and
+Google say so directly. GitLab does not: its `/api/v4/user` has no `email_verified` at all, only
+`confirmed_at`, the moment the address answered GitLab's confirmation mail — so deevy reads that as the proof
+it is, and a GitLab account whose address was never confirmed lands unverified. A generic OIDC provider is
+taken at the `email_verified` claim of its `id_token`, and an IdP that publishes no such claim — Entra is one
+— therefore leaves every Human it signs in unverified: they sign in and become Members as usual, but a second
+provider on the same address is refused with `account_not_linked` until that IdP asserts the claim. An
+operator behind such an IdP should offer it alone rather than beside a second provider, or configure the IdP
+to release `email_verified`.
 
 `BETTER_AUTH_URL` has to be the origin the browser actually visits, character for character. Better Auth
 builds the OAuth callback from it and sets the session cookie for it, and `packages/core/src/auth.ts` pins

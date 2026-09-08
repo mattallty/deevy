@@ -49,8 +49,10 @@ rules) and `frontend-design` (design process) beside it.
 
 `DEEVY_DEV_STUB_OAUTH=1` makes the Node server import `apps/web/scripts/stub-oauth.js` — the same stub the
 acceptance walk and the Workers smoke prepend to their bundles — so the OAuth `code` is the email address and
-the signed-out page offers "Sign in as this email". Refused under `NODE_ENV=production`. The Worker never has
-it. `health.ping` reports `devSignIn`, which is how the SPA knows to show the form.
+the signed-out page offers "Sign in as this email". It stands in for the client pairs too, so an environment
+that configures no provider still offers all four buttons: GitHub, Google, GitLab and one generic OpenID
+Connect entry, which is what the signed-out screenshots show. Refused under `NODE_ENV=production`. The Worker
+never has it. `health.ping` reports `devSignIn`, which is how the SPA knows to show the form.
 
 ```bash
 # in .claude/launch.json as "dev:stub": the stubbed instance on its own database file
@@ -414,6 +416,13 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   signs in through the first provider that list carries rather than naming one, so a stubbed instance offering
   only Google still signs in; when the authorization URL carries an `id_token` nonce (an OpenID Connect
   provider does), the code it lands with is `email|nonce`.
+- **An invitation link is answered outside the router.** `/invite/<token>` reaches somebody who is not a
+  Member yet, and the router is only mounted for a Member — so `App.tsx` reads the token off the path on its
+  first render and holds it in `sessionStorage` (`lib/invitation.ts`), the signed-out page says an invitation
+  is waiting and no more (the token is a bearer; there is nothing to read without one), and `NotAMember`
+  spends it through `invitations.accept` and re-reads `me.get`. A refusal is the operation's own message,
+  since only it knows which address was invited. A Member who lands on the path is already in: the router's
+  `/invite/$token` route drops the held token and redirects home (docs/plans/sign-in.md slice 8).
 - **`ui/*` hygiene:** a `ui/*` file may sit unimported (it is the kit), but a dependency only an unimported
   file needs goes with the file. Removed in slice 11: `chart`, `carousel`, `calendar`, `input-otp`,
   `aspect-ratio`, `menubar`, `navigation-menu`, `slider`, `progress`, `radio-group`, `drawer`,
@@ -506,7 +515,9 @@ name, a State); `Group by <label>` as each option's text.
 The Settings rework added: `combobox "Settings page"` (the compact nav below `lg`, whose classes the shell
 test asserts as `lg:hidden` / `lg:flex`); `Who may join`, `Add rule`, `Stop allowing <value>` and the
 `Match on` field behind it, whose value field is named by the kind chosen — `Domain`, `Organization login`,
-`Group path` (Workspace › General); `nav "Teams"`, `article "<Team>"`,
+`Group path` (Workspace › General); `Invited`, `Invite someone`, `Create invitation`, `list "Invitations"`
+and `Revoke the invitation for <address>` beside it, with the link shown once in the dialog that made it and
+never on a row; `nav "Teams"`, `article "<Team>"`,
 `list "Members of <Team>"`, `Actions for <name>`, `Disband <Team>`; `Kind` / `Subject` / `Project` on the
 Event log, now named by a `<label>` rather than an `aria-label`.
 

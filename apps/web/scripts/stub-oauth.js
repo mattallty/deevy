@@ -229,7 +229,14 @@
     return { id: email, login, node_id: login, name, email, avatar_url: null };
   }
 
-  /** The GitLab profile of whoever the code named. `state` decides the sign-in. */
+  /**
+   * The GitLab profile of whoever the code named. `state` decides the sign-in.
+   *
+   * There is no `email_verified` here, because there is none in GitLab's own
+   * `/api/v4/user`: a confirmed address is `confirmed_at`, and a stub that
+   * invents the OpenID Connect claim beside it hides the mapping deevy has to
+   * do for a real GitLab (packages/core/src/auth.ts).
+   */
   function gitlabProfile(email) {
     const { login, name } = nameFor(email);
     return {

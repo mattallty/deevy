@@ -122,6 +122,36 @@ describe("a sign-in through the stub", () => {
 });
 
 /**
+ * The documented dev loop: a checkout of `.env.example`, whose client pairs are
+ * all empty, and the flag (docs/DEVELOPMENT.md, "Running without an OAuth
+ * App"). Half a pair is no provider, so what the flag stubs is the pairs as
+ * well as the endpoints — otherwise a developer with no OAuth App gets a page
+ * that says this deployment has none configured, which is the state the stub
+ * exists to spare them.
+ */
+describe("a stubbed instance with nothing configured", () => {
+  it("offers every provider, and signs a Human in with each", async () => {
+    const env = readEnv({ DEEVY_DEV_STUB_OAUTH: "1" });
+    const offered = signInProviders(env);
+    expect(offered.map((provider) => provider.id)).toEqual(["github", "google", "gitlab", "oidc"]);
+
+    for (const provider of offered) {
+      const { app, close } = buildServer({
+        ...env,
+        databasePath: ":memory:",
+        migrationsFolder,
+        baseURL: origin,
+        secret,
+      });
+      expect(await signIn(app, provider.id, `ada+${provider.id}@example.com`)).toContain(
+        "session_token",
+      );
+      close();
+    }
+  });
+});
+
+/**
  * One Human, one Member (docs/plans/sign-in.md slice 3): the linking policy
  * `createAuth` states, decided by Better Auth's real callback rather than by a
  * test of the options object.
@@ -276,6 +306,42 @@ describe("a Google sign-in", () => {
 });
 
 /**
+ * GitLab (docs/plans/sign-in.md slice 5). GitLab's `/api/v4/user` carries no
+ * `email_verified` — a confirmed address is `confirmed_at` — so what is under
+ * test is deevy's own mapping of the one onto the other: without it every
+ * GitLab sign-in lands as an unverified row, and `requireLocalEmailVerified`
+ * then refuses that Human every later link, which is exactly the promise of
+ * slice 3 failing for slice 5's provider.
+ */
+describe("a GitLab sign-in", () => {
+  it("proves the address, so a second provider links onto it", async () => {
+    const email = "grace@example.com";
+    const { app, db, workspaceId, close } = await seededByGoogle();
+    await db.insert(allowlistRule).values({
+      id: newId("allowlistRule"),
+      workspaceId,
+      kind: "email_domain",
+      value: "example.com",
+    });
+
+    expect(await signIn(app, "gitlab", email)).toContain("session_token");
+    const human = await db.query.user.findFirst({ where: { email } });
+    expect(human?.emailVerified).toBe(true);
+
+    const callback = await callbackFor(app, "google", email);
+    expect(callback.headers.get("location") ?? "").not.toContain("account_not_linked");
+    expect(cookiesOf(callback)).toContain("session_token");
+    expect(
+      (await db.query.account.findMany({ where: { userId: human?.id } }))
+        .map((row) => row.providerId)
+        .sort(),
+    ).toEqual(["gitlab", "google"]);
+    expect(await db.query.member.findMany({ where: { userId: human?.id } })).toHaveLength(1);
+    close();
+  });
+});
+
+/**
  * The generic OpenID Connect provider (docs/plans/sign-in.md slice 6). Four
  * variables and nothing else: the pair, the issuer everything is discovered
  * from, and the name the button carries.
@@ -297,10 +363,16 @@ describe("a generic OIDC sign-in", () => {
       }),
     ).toContainEqual({ id: "oidc", label: "Single sign-on", kind: "social" });
     // An issuer is as load-bearing as the pair: without one there is no
-    // discovery document, so there is nothing to offer.
+    // discovery document, so there is nothing to offer. Asked of an instance
+    // that is not stubbed, because the flag stands in for a missing issuer the
+    // way it stands in for a missing pair.
     expect(
       signInProviders({
-        providers: readEnv({ ...stubbedEnv, DEEVY_OIDC_ISSUER: undefined }).providers,
+        providers: readEnv({
+          ...stubbedEnv,
+          DEEVY_DEV_STUB_OAUTH: undefined,
+          DEEVY_OIDC_ISSUER: undefined,
+        }).providers,
       }).map((provider) => provider.id),
     ).not.toContain("oidc");
   });

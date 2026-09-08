@@ -58,6 +58,11 @@ describe("invitations.create", () => {
     });
     expect(created.id).toMatch(/^inv_/);
     const token = created.url.replace("https://deevy.test/invite/", "");
+    // The absolute URL is this instance's own origin, which serves the SPA in
+    // the image and on Workers; the site-relative one is for everywhere else,
+    // where the browser knows the origin and the server does not
+    // (docs/plans/sign-in.md).
+    expect(created.path).toBe(`/invite/${token}`);
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     // Seven days, give or take the second this test took.
     const week = 7 * 24 * 60 * 60 * 1000;
@@ -127,6 +132,21 @@ describe("invitations.create", () => {
     await expect(client.invitations.create({ email: "grace@example.com" })).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
+  });
+  it("builds that link on the SPA's origin when this deployment gives it one", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin } = await workspaceWithAdmin(db);
+    // The `dev` loop and a split-origin deployment: the API answers on one
+    // port and the page a Human has open is on another
+    // (docs/plans/sign-in.md).
+    const split = createRouterClient(router, {
+      context: { ...admin, webURL: "https://app.deevy.test" },
+    });
+
+    const created = await split.invitations.create({ email: "grace@example.com" });
+
+    expect(created.url).toBe(`https://app.deevy.test${created.path}`);
   });
 });
 

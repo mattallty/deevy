@@ -1,4 +1,5 @@
 import { fetchClientMetadataResource as shapeCheckTransport } from "@deevy/core/cimd";
+import { signInProviders } from "@deevy/core";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
 import { readEnv } from "../src/env.ts";
@@ -117,6 +118,11 @@ describe("the development OAuth stub", () => {
     expect(env.devStubOAuth).toBe(true);
     const { app, close } = buildServer({
       ...env,
+      // Without the stubbed OIDC entry: registering one reads a discovery
+      // document over `fetch`, and the stub that answers it replaces `fetch`
+      // for a whole process, so it lives in `stub-oauth.test.ts` — which is
+      // where a stubbed instance is signed in to.
+      providers: { ...env.providers, oidc: undefined },
       databasePath: ":memory:",
       migrationsFolder,
       baseURL: "http://localhost:3000",
@@ -125,6 +131,39 @@ describe("the development OAuth stub", () => {
     const body = (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
     expect(body.devSignIn).toBe(true);
     close();
+  });
+
+  /**
+   * The flag's promise is a dev loop with no account anywhere, and
+   * `.env.example` ships every client pair empty — so the stub supplies the
+   * pairs as well as the endpoints. Without that a stubbed instance offers no
+   * button at all (half a pair is not a provider), the sign-in page says the
+   * deployment has none configured, and the development form's sign-in answers
+   * `PROVIDER_NOT_FOUND` (docs/DEVELOPMENT.md, "Running without an OAuth App").
+   */
+  it("stands in for every provider the environment configured none of", () => {
+    expect(signInProviders(readEnv({ DEEVY_DEV_STUB_OAUTH: "1" })).map(({ id }) => id)).toEqual([
+      "github",
+      "google",
+      "gitlab",
+      "oidc",
+    ]);
+    // Without the flag the same environment is what it always was: nothing.
+    expect(signInProviders(readEnv({}))).toEqual([]);
+  });
+
+  it("leaves a pair the environment did set alone", () => {
+    const env = readEnv({
+      DEEVY_DEV_STUB_OAUTH: "1",
+      GITHUB_CLIENT_ID: "real-client",
+      GITHUB_CLIENT_SECRET: "real-secret",
+    });
+    expect(env.providers.github).toEqual({
+      clientId: "real-client",
+      clientSecret: "real-secret",
+    });
+    // And the gaps beside it are still the stub's, so every provider answers.
+    expect(signInProviders(env).map(({ id }) => id)).toContain("google");
   });
 
   it("is refused in production rather than ignored", () => {

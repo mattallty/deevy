@@ -37,6 +37,12 @@ export interface DeevyMcpOptions {
    */
   baseURL?: string;
   /**
+   * Where a Human's browser finds this deevy, when the SPA is not served from
+   * the origin above. A Gate link an Agent is handed over MCP is for a Human
+   * to open, so it is built on this (`linkOrigin`, operations/shared.ts).
+   */
+  webURL?: string;
+  /**
    * The instance secret, which signs the `requestState` a Gate elicitation
    * hands the client (mcp/elicitation.ts). Absent, a random per-process key is
    * used: correct while one process serves every round of a flow, and a clean
@@ -74,6 +80,7 @@ export function createDeevyMcp({
   db,
   auth,
   baseURL,
+  webURL,
   secret,
   stateTtlSeconds,
   jobs,
@@ -94,6 +101,7 @@ export function createDeevyMcp({
       const origin = baseURL ?? new URL(request.url).origin;
       const context = {
         ...(await buildContext(db, auth, request.headers, origin)),
+        ...(webURL ? { webURL } : {}),
         ...(jobs ? { jobs } : {}),
       };
       // No credential at all is an authentication answer, not a tool error:

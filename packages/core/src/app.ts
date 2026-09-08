@@ -64,6 +64,14 @@ export interface AppOptions {
    * registered rather than a constant of its own (docs/plans/sign-in.md).
    */
   signInProviders?: SignInProvider[];
+  /**
+   * Where a Human's browser finds this deevy, when the SPA is not served from
+   * the origin the API answers on (`DEEVY_WEB_ORIGIN`). A Gate link and an
+   * invitation link are built on it; everything bound to this instance's own
+   * identity — the OAuth issuer, the MCP resource — stays on `baseURL`
+   * (docs/plans/sign-in.md).
+   */
+  webURL?: string;
 }
 
 /**
@@ -103,6 +111,7 @@ export function createApp({
   onError: report = console.error,
   devSignIn = false,
   signInProviders = [],
+  webURL,
 }: AppOptions) {
   // A client asking for a Run that does not exist is a 404, not something for
   // an operator to read. Reporting every refusal buried the ones that matter in
@@ -135,7 +144,17 @@ export function createApp({
 
   // Before the oRPC handlers: the MCP surface builds its own context, because
   // an unauthenticated call there is a 401 challenge rather than an error body.
-  const mcp = createDeevyMcp({ db, auth, baseURL, secret, jobs, onError: reportUnexpected });
+  const mcp = createDeevyMcp({
+    db,
+    auth,
+    baseURL,
+    // An Agent asking for a ruling over MCP is handed a link for a Human to
+    // open, so the tool surface builds one the same way the API does.
+    ...(webURL ? { webURL } : {}),
+    secret,
+    jobs,
+    onError: reportUnexpected,
+  });
   app.all("/mcp", (c) => mcp.fetch(c.req.raw));
 
   // The origin a handler builds a link back into deevy from: what this
@@ -165,6 +184,7 @@ export function createApp({
   const contextFor = async (request: Request) => ({
     ...(await buildContext(db, auth, request.headers, originOf(request.url))),
     ...(live ? { live } : {}),
+    ...(webURL ? { webURL } : {}),
     jobs,
     devSignIn,
     signInProviders: await offeredProviders(),

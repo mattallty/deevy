@@ -74,6 +74,10 @@ export function isolateFor(bindings: WorkerBindings): Isolate {
       auth,
       origin,
       baseURL: env.baseURL,
+      // Where a Human's browser finds this instance, when the SPA is somewhere
+      // else: a Gate link and an invitation link are built on it, and the API's
+      // own origin serves no page in the dev loop (docs/plans/sign-in.md).
+      ...(env.webOrigin ? { webURL: env.webOrigin } : {}),
       secret: env.secret,
       // A stream ends before the platform ends it: one D1 query per poll
       // against a per-invocation cap makes a stream's life arithmetic, and a
@@ -149,7 +153,11 @@ export default {
             silenceMs: isolate.env.runStaleMinutes * 60_000,
             gateSilenceMs: isolate.env.gateReminderHours * 3_600_000,
           },
-          ...(isolate.env.baseURL ? { baseUrl: isolate.env.baseURL } : {}),
+          // As in the request path: a link a Human clicks is built on the
+          // SPA's origin when it has one (docs/plans/sign-in.md).
+          ...((isolate.env.webOrigin ?? isolate.env.baseURL)
+            ? { baseUrl: isolate.env.webOrigin ?? isolate.env.baseURL }
+            : {}),
         }),
       ),
     );

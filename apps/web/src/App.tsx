@@ -1,24 +1,55 @@
 import { RouterProvider } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MemberChip } from "@/components/member-chip";
 import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth.ts";
+import {
+  dropInvitation,
+  heldInvitation,
+  holdInvitation,
+  invitationInPath,
+} from "@/lib/invitation.ts";
 import { orpc } from "@/lib/orpc.ts";
 import { createAppRouter } from "@/router.tsx";
 import type { ShellProps } from "@/routes/shell.tsx";
 
 export default function App() {
+  // An invitation link is answered here rather than by the router: whoever
+  // holds one is not a Member yet, and the router is only mounted for a Member.
+  const [invitation, setInvitation] = useInvitation();
   const { data: session, isPending } = authClient.useSession();
   if (isPending) return <Centered>Loading…</Centered>;
-  if (!session) return <SignedOut />;
-  return <SignedIn />;
+  if (!session) return <SignedOut invitation={invitation} />;
+  return <SignedIn invitation={invitation} onInvitationDropped={() => setInvitation(null)} />;
 }
 
-export function SignedOut() {
+/**
+ * The token `/invite/<token>` carried, read once on the first render and kept
+ * for the sign-in that follows (`lib/invitation.ts`), so somebody who clicks
+ * the link and then signs in joins, and so does somebody who signs in first
+ * and clicks second.
+ */
+function useInvitation(): [string | null, (token: null) => void] {
+  const [token, setToken] = useState(() => {
+    const inPath = invitationInPath(window.location.pathname);
+    if (inPath) holdInvitation(inPath);
+    return inPath ?? heldInvitation();
+  });
+  // The token is a bearer, and a path is the one place a URL is copied,
+  // bookmarked, kept in history and sent as a `Referer`. Once it is held there
+  // is nothing left for the address bar to carry (docs/plans/sign-in.md).
+  useEffect(() => {
+    if (!invitationInPath(window.location.pathname)) return;
+    window.history.replaceState(null, "", "/");
+  }, []);
+  return [token, setToken];
+}
+
+export function SignedOut({ invitation = null }: { invitation?: string | null }) {
   // Public, so it answers before anyone is signed in: which providers this
   // deployment configured, and whether sign-in goes through the development
   // stub (DEEVY_DEV_STUB_OAUTH).
@@ -33,8 +64,12 @@ export function SignedOut() {
     <SignInFrame>
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+        {/* An invitation is a bearer: there is nothing to read without the
+            token, so the line says one is waiting and no more than that. */}
         <p className="text-sm text-muted-foreground">
-          With an account your Workspace admin allowlisted.
+          {invitation
+            ? "An invitation to this Workspace is waiting. Sign in with the address it was sent to."
+            : "With an account your Workspace admin allowlisted."}
         </p>
       </div>
       {providers?.map((provider) => (
@@ -163,7 +198,13 @@ export function DevSignIn({
   );
 }
 
-function SignedIn() {
+function SignedIn({
+  invitation = null,
+  onInvitationDropped,
+}: {
+  invitation?: string | null;
+  onInvitationDropped?: () => void;
+}) {
   const me = useQuery(orpc.me.get.queryOptions());
   const context: ShellProps = {
     workspaceName: me.data?.workspace?.name ?? "deevy",
@@ -195,24 +236,127 @@ function SignedIn() {
   if (me.isError) return <Centered>Could not load your profile: {me.error.message}</Centered>;
 
   const { user, member, workspace } = me.data;
-  if (!workspace || !member) return <NotAMember email={user.email} />;
+  if (!workspace || !member) {
+    return (
+      <NotAMember
+        email={user.email}
+        invitation={invitation}
+        {...(onInvitationDropped ? { onInvitationDropped } : {})}
+      />
+    );
+  }
   if (member.suspendedAt) return <Suspended email={user.email} />;
   return <RouterProvider router={router} />;
 }
 
-export function NotAMember({ email }: { email: string }) {
+/**
+ * Signed in and nobody yet — which is where an invited Human lands, so this
+ * screen picks up a held token and accepts it rather than telling everybody
+ * who reaches it to go and ask for an allowlist rule.
+ */
+export function NotAMember({
+  email,
+  invitation = null,
+  onInvitationDropped,
+}: {
+  email: string;
+  invitation?: string | null;
+  /** So the tab stops holding what this screen just gave up on. */
+  onInvitationDropped?: () => void;
+}) {
+  const [token, setToken] = useState(invitation);
+  if (token) {
+    return (
+      <AcceptingInvitation
+        email={email}
+        token={token}
+        onGiveUp={() => {
+          dropInvitation();
+          setToken(null);
+          onInvitationDropped?.();
+        }}
+      />
+    );
+  }
   return (
     <SignInFrame>
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Signed in, not yet a Member</h1>
         <p className="text-sm text-muted-foreground">
-          {email} is not a Member of this Workspace. Ask an admin to add an allowlist rule that
-          matches your email domain or your GitHub organization, then sign in again.
+          {email} is not a Member of this Workspace. Ask an admin for an invitation, or for an
+          allowlist rule that matches your email domain, your GitHub organization or your GitLab
+          group, then sign in again.
         </p>
       </div>
       <Button variant="outline" onClick={() => authClient.signOut()}>
         Sign out
       </Button>
+    </SignInFrame>
+  );
+}
+
+/**
+ * The invitation being spent. It is accepted once, on arrival — the Human has
+ * already chosen by clicking the link and signing in, so a second button
+ * saying "yes, really" would be furniture. A refusal is the operation's own
+ * message, because only it knows which address the invitation was for.
+ */
+function AcceptingInvitation({
+  email,
+  token,
+  onGiveUp,
+}: {
+  email: string;
+  token: string;
+  onGiveUp: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const accept = useMutation(
+    orpc.invitations.accept.mutationOptions({
+      onSuccess: async () => {
+        // Spent: the row is marked accepted, so holding it any longer would
+        // only make the next sign-in in this tab fail on it.
+        dropInvitation();
+        await queryClient.invalidateQueries({ queryKey: orpc.me.key() });
+      },
+    }),
+  );
+  // Once, whatever React does with this component's identity: accepting is a
+  // write, and the second call would be answered from the wrong branch.
+  const sent = useRef(false);
+  useEffect(() => {
+    if (sent.current) return;
+    sent.current = true;
+    accept.mutate({ token });
+  }, [accept, token]);
+
+  if (accept.isError) {
+    return (
+      <SignInFrame>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold tracking-tight">That invitation is not yours yet</h1>
+          <p className="text-sm text-muted-foreground">
+            {accept.error.message}. You are signed in as {email}.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Button onClick={() => authClient.signOut()}>Sign out and try another account</Button>
+          <Button variant="outline" onClick={onGiveUp}>
+            Continue without it
+          </Button>
+        </div>
+      </SignInFrame>
+    );
+  }
+
+  return (
+    <SignInFrame>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-semibold tracking-tight">Joining this Workspace</h1>
+        <p className="text-sm text-muted-foreground">
+          Accepting the invitation you were sent, as {email}…
+        </p>
+      </div>
     </SignInFrame>
   );
 }

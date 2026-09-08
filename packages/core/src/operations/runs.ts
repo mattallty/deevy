@@ -27,7 +27,14 @@ import {
 import { gateApprovers, gateUrl } from "../workflow.ts";
 import { defineOperation } from "./registry.ts";
 import type { Activity, Run } from "@deevy/db";
-import { assertOwnRun, parseRunCursor, requireIssue, requireRun, runView } from "./shared.ts";
+import {
+  assertOwnRun,
+  linkOrigin,
+  parseRunCursor,
+  requireIssue,
+  requireRun,
+  runView,
+} from "./shared.ts";
 import { newId } from "../ids.ts";
 
 export const runs = {
@@ -268,7 +275,7 @@ export const runs = {
       });
       const decided = decisions.find((row) => row.createdAt >= since) ?? null;
       const approvers = gateApproversView(await gateApprovers(context.db, gate.id));
-      const url = gateUrl(context.baseURL ?? "", key, gate.id);
+      const url = gateUrl(linkOrigin(context), key, gate.id);
 
       if (decided) {
         // The ruling joins the feed as a `prompt`, the same word a Human's own

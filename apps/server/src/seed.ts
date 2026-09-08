@@ -19,11 +19,16 @@ import { buildContext } from "@deevy/core/app";
 import { router } from "@deevy/core/router";
 import { discardingJobQueue, signInProviders, sweepStaleRuns } from "@deevy/core";
 import { createRouterClient } from "@orpc/server";
-import { readEnv } from "./env.ts";
+import { readEnv, stubbedProviders } from "./env.ts";
 import { buildServer } from "./server.ts";
 
 const force = process.argv.includes("--force");
-const env = readEnv();
+const read = readEnv();
+// Every provider is the stub here, whatever the environment configured and
+// whatever the flag says — the stub itself is imported below on the same
+// grounds. A `.env` with no client pair in it would otherwise leave nothing
+// registered for the seed to sign its Humans in with (docs/DEVELOPMENT.md).
+const env = { ...read, providers: stubbedProviders(read.providers) };
 if (!env.adminEmail)
   throw new Error("DEEVY_ADMIN_EMAIL must be set: it names the admin the seed signs in as");
 if (!env.baseURL || !env.secret)

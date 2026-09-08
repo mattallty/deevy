@@ -28,6 +28,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
     members: { list: async () => ({ members: [] }) },
     teams: { list: async () => ({ teams: [] }) },
     allowlist: { list: async () => ({ rules: [] }) },
+    invitations: { list: async () => ({ invitations: [] }) },
     workflow: { get: async () => ({ states: [] }) },
     // Namespaces the hook only ever names a key of; nothing here is called.
     comments: {},

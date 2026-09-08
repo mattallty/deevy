@@ -16,8 +16,10 @@ both deployments locally on every commit — no Cloudflare account, no OAuth App
 OpenCode, Cursor CLI or Copilot CLI as a subprocess behind one contract (`docs/plans/harnesses.md`,
 `docs/harnesses.md`, ADR-0018), and the agent-owns-git work then gave each session its own user and put git
 behind a loopback proxy that holds the credential, so an Agent pushes where it likes and every ref it moved
-is in the Run's feed (`docs/plans/agent-owns-git.md`, ADR-0019). v1 is complete;
-what comes next is PLAN.md's after-v1 list.
+is in the Run's feed (`docs/plans/agent-owns-git.md`, ADR-0019); the sign-in work then closed what M1 and M2
+both deferred, making a provider configuration (GitHub, Google, GitLab, one generic OIDC), one Human one
+Member across providers, a GitLab group an allowlist rule, and an invitation a link an admin sends
+(`docs/plans/sign-in.md`). v1 is complete; what comes next is PLAN.md's after-v1 list.
 
 ## Commands
 

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SettingsPage } from "@/components/settings-page";
 import { AllowlistRow } from "@/routes/settings/allowlist";
+import { InvitationsRow } from "@/routes/settings/invitations";
 import { useAutosave } from "@/lib/autosave";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ export function WorkspacePage() {
       {admin ? (
         <div className="flex flex-col">
           <AllowlistRow />
+          <InvitationsRow />
         </div>
       ) : null}
     </SettingsPage>
