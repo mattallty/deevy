@@ -2,7 +2,7 @@ import { createRouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { invitation as invitationTable, user, type Db } from "@deevy/db";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import type { Session } from "../src/auth.ts";
+import { joinWorkspace, type Session } from "../src/auth.ts";
 import { newId } from "../src/ids.ts";
 import { router } from "../src/operations/index.ts";
 import type { AppContext } from "../src/operations/registry.ts";
@@ -357,5 +357,75 @@ describe("invitations.accept", () => {
         token: created.url.split("/").at(-1) as string,
       }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
+
+describe("an invitation somebody else's route already spent", () => {
+  /**
+   * The link has done its work, but the row had not: an address that became a
+   * Member some other way kept a live invitation nobody could accept and no
+   * admin could replace, because one live invitation per address refuses the
+   * next (docs/plans/sign-in.md).
+   */
+  it("is spent when the caller turns out to be a Member already", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await workspaceWithAdmin(db);
+    const created = await client.invitations.create({ email: "grace@example.com" });
+    const token = created.url.split("/").at(-1) as string;
+    const grace = await memberContext(db, { name: "Grace", email: "grace@example.com" });
+
+    // Grace joined by a rule in the meantime, so she is a Member before she
+    // ever spends the link.
+    await createRouterClient(router, { context: grace }).invitations.accept({ token });
+
+    const [row] = (await client.invitations.list({})).invitations;
+    expect(row?.acceptedAt).not.toBeNull();
+    // And the address can be invited again, rather than being refused for a
+    // link that will never be used.
+    await expect(client.invitations.create({ email: "grace@example.com" })).resolves.toMatchObject({
+      email: "grace@example.com",
+    });
+  });
+
+  it("is spent when a rule admits the same address", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await workspaceWithAdmin(db);
+    await client.allowlist.add({ kind: "email_domain", value: "example.com" });
+    await client.invitations.create({ email: "grace@example.com" });
+
+    await db
+      .insert(user)
+      .values({ id: "usr_grace000001", name: "Grace", email: "grace@example.com" });
+    await joinWorkspace(db, {
+      userId: "usr_grace000001",
+      email: "grace@example.com",
+      name: "Grace",
+    });
+
+    const [row] = (await client.invitations.list({})).invitations;
+    expect(row?.acceptedAt).not.toBeNull();
+  });
+});
+
+describe("who may read an invitation Event", () => {
+  /**
+   * `invitations.list` is an admin's, and the Event log is every Member's, so
+   * the payload naming the address and the role would have been the way around
+   * it (docs/plans/sign-in.md).
+   */
+  it("keeps the address out of a Member's Event log, and in an admin's", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await workspaceWithAdmin(db);
+    await client.invitations.create({ email: "grace@example.com", role: "admin" });
+    const bob = await memberContext(db, { name: "Bob", email: "bob@example.com" });
+
+    const asMember = await createRouterClient(router, { context: bob }).events.list({});
+    expect(asMember.events.map((row) => row.kind)).not.toContain("invitation.created");
+
+    const asAdmin = await client.events.list({});
+    expect(asAdmin.events.map((row) => row.kind)).toContain("invitation.created");
   });
 });

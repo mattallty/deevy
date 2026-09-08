@@ -106,8 +106,9 @@ describe("what a Member may be owed for one Event", () => {
 /**
  * One live invitation per address, where live is "neither accepted nor
  * revoked" (docs/plans/sign-in.md). The partial index is what makes "who is
- * invited right now" a lookup rather than a replay of the Event log, and it is
- * hand-written into the migration, so it is worth one test that it is there.
+ * invited right now" a lookup rather than a replay of the Event log, and the
+ * database is where that is worth asserting: the migration carries the `where`
+ * drizzle-kit generated, and `check:migrations` reads neither.
  */
 describe("how many invitations one address may have", () => {
   async function workspaceWithInvitation() {

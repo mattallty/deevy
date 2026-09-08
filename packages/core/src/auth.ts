@@ -2,8 +2,8 @@ import { apiKey } from "@better-auth/api-key";
 import { cimd } from "@better-auth/cimd";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { mcp } from "@better-auth/mcp";
-import { allowlistRule, member, workspace, type Db } from "@deevy/db";
-import { eq } from "drizzle-orm";
+import { allowlistRule, invitation, member, workspace, type Db } from "@deevy/db";
+import { and, eq, isNull } from "drizzle-orm";
 import { allocateHandle, slugify } from "./handles.ts";
 import { betterAuth } from "better-auth";
 import { genericOAuth, jwt } from "better-auth/plugins";
@@ -629,6 +629,21 @@ export async function joinWorkspace(
       payload: { role: "member", kind: "human" },
     },
   );
+  // Somebody who was invited and then matched a rule is in, so the invitation
+  // is spent: an open row for an address that is already a Member is one an
+  // admin reads as "has not answered yet" and cannot replace, because one live
+  // invitation per address refuses the next (docs/plans/sign-in.md).
+  await db
+    .update(invitation)
+    .set({ acceptedAt: new Date(), acceptedMemberId: memberId })
+    .where(
+      and(
+        eq(invitation.workspaceId, ws.id),
+        eq(invitation.email, user.email.toLowerCase()),
+        isNull(invitation.acceptedAt),
+        isNull(invitation.revokedAt),
+      ),
+    );
 }
 
 async function matchesAllowlist(

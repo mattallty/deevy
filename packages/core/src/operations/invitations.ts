@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { invitation as invitationTable, member as memberTable, memberRoles } from "@deevy/db";
 import type { Db, Invitation, Workspace } from "@deevy/db";
@@ -82,6 +82,28 @@ async function invitationFor(db: Db, workspaceId: string, token: string): Promis
   });
   if (!found) throw new ORPCError("NOT_FOUND", { message: "No such invitation" });
   return found;
+}
+
+/**
+ * Mark the live invitation this token names as accepted, if it is this
+ * Workspace's and still open. Used where somebody turns out to be a Member
+ * already: the row is what an admin reads as "has not answered yet", so a
+ * spent link must not go on sitting in that list.
+ */
+async function spend(context: AppContext, token: string, memberId: string): Promise<void> {
+  if (!context.workspace) return;
+  const hash = await hashInvitationToken(token);
+  await context.db
+    .update(invitationTable)
+    .set({ acceptedAt: new Date(), acceptedMemberId: memberId })
+    .where(
+      and(
+        eq(invitationTable.workspaceId, context.workspace.id),
+        eq(invitationTable.tokenHash, hash),
+        isNull(invitationTable.acceptedAt),
+        isNull(invitationTable.revokedAt),
+      ),
+    );
 }
 
 export const invitations = {
@@ -208,8 +230,15 @@ export const invitations = {
     handler: async ({ input, context }) => {
       // Already a Member: the link has done its work, whether this caller
       // accepted it a moment ago or joined by a rule years back. Accepting
-      // twice is that, and it is a no-op rather than an error.
-      if (context.member) return context.member;
+      // twice is that, and it is a no-op rather than an error — but the
+      // invitation is spent all the same. Leaving it live left an address that
+      // held a pending invitation nobody could ever accept and no admin could
+      // replace, since one live invitation per address is a CONFLICT on the
+      // next one (docs/plans/sign-in.md).
+      if (context.member) {
+        await spend(context, input.token, context.member.id);
+        return context.member;
+      }
 
       const ws = await acceptingWorkspace(context);
       const found = await invitationFor(context.db, ws.id, input.token);
@@ -229,6 +258,11 @@ export const invitations = {
         });
       }
 
+      // Four sequential writes, no transaction: D1 has none (ADR-0006), and
+      // `joinWorkspace` joins the same way. A request that dies between the
+      // Member and the invitation leaves a Member whose `member.joined` never
+      // landed — the same shape a rule-based join has, and the reason the
+      // Member row rather than the invitation is what deevy reads back.
       const memberId = newId("member");
       await context.db.insert(memberTable).values({
         id: memberId,

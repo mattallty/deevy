@@ -154,4 +154,33 @@ describe("describeEvent", () => {
     );
     expect(describeEvent({ kind: "some.unknown", payload: {} })?.text).toBe("some.unknown");
   });
+
+  /**
+   * An admin reading Settings › Event log saw the literal `invitation.created`
+   * where the payload already carried the address and the role
+   * (docs/plans/sign-in.md).
+   */
+  it("says who was invited, and what became of the invitation", () => {
+    expect(
+      describeEvent({
+        kind: "invitation.created",
+        payload: { email: "grace@example.com", role: "member" },
+      })?.text,
+    ).toBe("invited grace@example.com as member");
+    expect(
+      describeEvent({
+        kind: "invitation.revoked",
+        payload: { email: "grace@example.com", role: "member" },
+      }),
+    ).toMatchObject({
+      text: "revoked the invitation for grace@example.com",
+      tone: "destructive",
+    });
+    expect(
+      describeEvent({
+        kind: "invitation.accepted",
+        payload: { email: "grace@example.com", role: "admin" },
+      })?.text,
+    ).toBe("accepted the invitation for grace@example.com");
+  });
 });

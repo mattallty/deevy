@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, like, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, like, lt, ne } from "drizzle-orm";
 import { z } from "zod";
 import { event as eventTable } from "@deevy/db";
 import { EventSchema, MemberWithUserSchema } from "../schemas.ts";
@@ -70,6 +70,11 @@ export const events = {
               : eq(eventTable.subjectType, input.subjectType),
             input.subjectId === undefined ? undefined : eq(eventTable.subjectId, input.subjectId),
             input.projectId === undefined ? undefined : eq(eventTable.projectId, input.projectId),
+            // An invitation names an address and a role, and who was invited
+            // is an admin's to read: `invitations.list` is admin-only, and the
+            // Event log is every Member's, so these rows would have been the
+            // way around it (docs/plans/sign-in.md).
+            context.member.role === "admin" ? undefined : ne(eventTable.subjectType, "invitation"),
           ),
         )
         .orderBy(order === "desc" ? desc(eventTable.seq) : asc(eventTable.seq))

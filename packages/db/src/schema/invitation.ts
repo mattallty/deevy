@@ -14,8 +14,9 @@ const now = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
  * Spent and revoked rows are kept: the Workspace's history is the Event log,
  * and "who is invited right now" should be a question one index answers rather
  * than a replay. Hence the partial unique index below — at most one live
- * invitation per address — which is hand-written into the generated migration,
- * beside the `NOT NULL` the drizzle-kit rc also needs (ADR-0008).
+ * invitation per address — whose `where` drizzle-kit emits into the migration
+ * itself; only the `NOT NULL` on the text primary key is hand-patched there,
+ * as the drizzle-kit rc needs everywhere (ADR-0008).
  */
 export const invitation = sqliteTable(
   "invitation",
