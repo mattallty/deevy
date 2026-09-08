@@ -60,7 +60,10 @@ services:
         condition: service_healthy
     environment:
       DEEVY_URL: ${DEEVY_AGENT_URL:-http://deevy:3000}
-      DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:?issue an API key for the Agent under Settings, Agents}
+      # Interpolated when the file is read, not when the profile is selected, so
+      # a `:?` here refused `docker compose up` for the deevy service too — on
+      # an instance that never asked for the Agent (docs/plans/sign-in.md).
+      DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEVY_AGENT_HARNESS: ${DEEVY_AGENT_HARNESS:-claude-code}
       DEEVY_AGENT_POLL_SECONDS: ${DEEVY_AGENT_POLL_SECONDS:-30}

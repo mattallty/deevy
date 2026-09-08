@@ -108,6 +108,29 @@ describe("SignedOut", () => {
    * discovery document that could not be fetched at startup leaves exactly
    * this — answers the click with an error rather than a redirect.
    */
+  /**
+   * The one line slice 4 changed in this component: the dev form is handed the
+   * first provider the server offers rather than the word "github", so a
+   * stubbed instance configured with only Google can still sign in. Mounting
+   * `DevSignIn` directly asserts the prop; this asserts the plumbing.
+   */
+  it("hands the development form the first provider it offers, not GitHub", async () => {
+    stub.devSignIn = true;
+    stub.providers = [{ id: "google", label: "Google", kind: "social" }];
+    const fetched = vi.fn(async () => new Response(JSON.stringify({ url: null })));
+    vi.stubGlobal("fetch", fetched);
+    mount(<SignedOut />);
+
+    fireEvent.change(await screen.findByLabelText("Email"), {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in as this email" }));
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const [, init] = fetched.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ provider: "google" });
+  });
+
   it("says so when a button does not start a sign-in", async () => {
     stub.signInError = { message: "PROVIDER_NOT_FOUND" };
     mount(<SignedOut />);

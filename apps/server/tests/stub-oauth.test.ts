@@ -107,11 +107,10 @@ describe("a sign-in through the stub", () => {
  * `createAuth` states, decided by Better Auth's real callback rather than by a
  * test of the options object.
  *
- * The provider that signed the Human up first is a seeded `account` row. Only
- * GitHub is registered until slices 4 to 6 land, and a row written by another
- * provider is the same row whichever one wrote it — what is under test is what
- * happens when a *second* provider arrives on an address a first one already
- * holds, which is exactly what the second half of this drives.
+ * The provider that signed the Human up first is a seeded `account` row — a row
+ * written by one provider is the same row whichever one wrote it — and what is
+ * under test is what happens when a *second* provider arrives on an address a
+ * first one already holds.
  */
 describe("a second provider on an address deevy already knows", () => {
   const email = "ada@example.com";
@@ -120,13 +119,14 @@ describe("a second provider on an address deevy already knows", () => {
   async function signedUpElsewhere(
     db: ReturnType<typeof stubbedServer>["db"],
     emailVerified: boolean,
+    address: string = email,
   ) {
     await db
       .insert(user)
-      .values({ id: "usr_stubada00001", name: "Ada Lovelace", email, emailVerified });
+      .values({ id: "usr_stubada00001", name: "Ada Lovelace", email: address, emailVerified });
     await db.insert(account).values({
       id: "acct_stubada0001",
-      accountId: email,
+      accountId: address,
       providerId: "google",
       userId: "usr_stubada00001",
       updatedAt: new Date(),
@@ -166,6 +166,28 @@ describe("a second provider on an address deevy already knows", () => {
     expect(await db.query.user.findMany()).toHaveLength(1);
     expect(await db.query.account.findMany()).toHaveLength(1);
     expect(await db.query.member.findMany()).toHaveLength(0);
+    close();
+  });
+
+  /**
+   * The half no provider deevy ships can drive, and the reason `trustedProviders`
+   * is empty: a provider that says out loud it has not verified the address does
+   * not get to link onto the Human who holds it. An IdP with open registration
+   * is where this is not hypothetical (docs/plans/sign-in.md).
+   */
+  it("refuses a second provider that will not say the address is verified", async () => {
+    const unverified = "mallory+unverified@example.com";
+    const { app, db, close } = stubbedServer({ adminEmail: unverified });
+    await signedUpElsewhere(db, true, unverified);
+
+    const callback = await callbackFor(app, "github", unverified);
+
+    expect(callback.headers.get("location")).toContain("error=account_not_linked");
+    expect(cookiesOf(callback)).not.toContain("session_token");
+    // One user, one account: the sign-in neither linked nor started a second
+    // Human on the address.
+    expect(await db.query.user.findMany()).toHaveLength(1);
+    expect(await db.query.account.findMany()).toHaveLength(1);
     close();
   });
 });

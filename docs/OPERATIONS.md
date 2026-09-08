@@ -159,9 +159,10 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler's own `d1_migrations`. Applying twice is a no-op. Nothing here touches the local D1 that
    `vp run web#test:workers` uses; `--remote` is the whole difference.
 
-5. **Create the GitHub OAuth App** at <https://github.com/settings/developers>, with that origin as the
-   homepage and `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` as the Authorization callback
-   URL. The table under [Signing in](#signing-in-and-the-origin-better_auth_url-names) is the full set of
+5. **Create a client with a sign-in provider** — at least one, and any of the four does. For GitHub that is
+   an OAuth App at <https://github.com/settings/developers>, with that origin as the homepage and
+   `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` as the Authorization callback URL; for
+   Google, GitLab or an OpenID Connect IdP it is the same origin with `/api/auth/callback/<provider>`. The table under [Signing in](#signing-in-and-the-origin-better_auth_url-names) is the full set of
    origins and callbacks; the rule is that `BETTER_AUTH_URL` and the callback change together or sign-in
    breaks.
 
