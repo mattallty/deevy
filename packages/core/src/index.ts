@@ -5,10 +5,15 @@ export {
   bearerToken,
   bootstrapWorkspace,
   createAuth,
+  signInProviders,
   slugify,
   type Auth,
   type AuthEnv,
+  type AuthProviders,
+  type OAuthClient,
   type Session,
+  type SignInProvider,
+  type SignInProviderKind,
 } from "./auth.ts";
 export {
   boundMetadataResponse,

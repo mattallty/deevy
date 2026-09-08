@@ -22,7 +22,7 @@ function testAuth() {
     env: {
       baseURL: "http://localhost:3000",
       secret,
-      github: { clientId: "github-client", clientSecret: "github-secret" },
+      providers: { github: { clientId: "github-client", clientSecret: "github-secret" } },
     },
   });
   return { db, auth };

@@ -39,7 +39,12 @@ const emptyIssue = {
 export function stubClient(overrides: StubOverrides = {}): never {
   const base: Record<string, Record<string, StubOperation>> = {
     health: {
-      ping: async () => ({ ok: true, time: new Date(0).toISOString(), devSignIn: false }),
+      ping: async () => ({
+        ok: true,
+        time: new Date(0).toISOString(),
+        devSignIn: false,
+        providers: [{ id: "github", label: "GitHub", kind: "social" }],
+      }),
     },
     me: {
       get: async () => ({

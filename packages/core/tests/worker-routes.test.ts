@@ -23,7 +23,7 @@ function testApp(): App {
     env: {
       baseURL: "https://deevy.example.com",
       secret: "test-secret-that-is-at-least-32-characters",
-      github: { clientId: "github-client", clientSecret: "github-secret" },
+      providers: { github: { clientId: "github-client", clientSecret: "github-secret" } },
     },
   });
   return createApp({ db, auth, baseURL: "https://deevy.example.com" });

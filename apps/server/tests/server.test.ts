@@ -84,6 +84,34 @@ describe("the development GitHub stub", () => {
     close();
   });
 
+  /**
+   * The documented no-OAuth-App loop starts from a copied `.env.example`, whose
+   * client pairs are empty — and a provider is registered only when both halves
+   * are set, so without this the stubbed instance offers no way in at all
+   * (docs/plans/sign-in.md).
+   */
+  it("supplies the client pair a developer without an OAuth App does not have", () => {
+    const stubbed = readEnv({
+      DEEVY_DEV_STUB_GITHUB: "1",
+      GITHUB_CLIENT_ID: "",
+      GITHUB_CLIENT_SECRET: "",
+    });
+    expect(stubbed.providers.github).toMatchObject({
+      clientId: expect.stringMatching(/.+/) as unknown as string,
+      clientSecret: expect.stringMatching(/.+/) as unknown as string,
+    });
+    // A real pair always wins, so an instance that has one keeps it.
+    expect(
+      readEnv({
+        DEEVY_DEV_STUB_GITHUB: "1",
+        GITHUB_CLIENT_ID: "real",
+        GITHUB_CLIENT_SECRET: "pair",
+      }).providers.github,
+    ).toMatchObject({ clientId: "real", clientSecret: "pair" });
+    // And without the flag an unset pair stays unset, so the page says so.
+    expect(readEnv({}).providers.github).toMatchObject({ clientId: "", clientSecret: "" });
+  });
+
   it("is on for DEEVY_DEV_STUB_GITHUB=1, and health.ping says so", async () => {
     const env = readEnv({ DEEVY_DEV_STUB_GITHUB: "1" });
     expect(env.devStubGithub).toBe(true);

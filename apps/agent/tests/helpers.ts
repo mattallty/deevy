@@ -52,7 +52,7 @@ export async function instance() {
     env: {
       baseURL,
       secret: "test-secret-that-is-at-least-32-characters",
-      github: { clientId: "id", clientSecret: "secret" },
+      providers: { github: { clientId: "id", clientSecret: "secret" } },
     },
   });
   const app = createApp({ db, auth, baseURL });

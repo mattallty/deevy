@@ -35,7 +35,7 @@ describe("the read surface", () => {
       env: {
         baseURL: "http://localhost:3000",
         secret: "test-secret-that-is-at-least-32-characters",
-        github: { clientId: "id", clientSecret: "secret" },
+        providers: { github: { clientId: "id", clientSecret: "secret" } },
       },
     });
     const ada = await memberContext(db, { role: "admin", name: "Ada" });

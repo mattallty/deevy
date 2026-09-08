@@ -64,7 +64,7 @@ async function agentAtAGate() {
     env: {
       baseURL,
       secret,
-      github: { clientId: "github-client", clientSecret: "github-secret" },
+      providers: { github: { clientId: "github-client", clientSecret: "github-secret" } },
     },
   });
   const admin = await memberContext(db, { role: "admin", name: "Ada" });

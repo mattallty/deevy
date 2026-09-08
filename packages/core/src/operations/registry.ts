@@ -3,7 +3,7 @@ import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "@orpc/contr
 import { openapi } from "@orpc/openapi";
 import { defineMeta, ORPCError, os } from "@orpc/server";
 import { z } from "zod";
-import type { Session } from "../auth.ts";
+import type { Session, SignInProvider } from "../auth.ts";
 import type { JobQueue } from "../jobs.ts";
 import type { LiveOptions } from "../live.ts";
 
@@ -63,6 +63,13 @@ export interface AppContext {
    * `health.ping` reads it, so a signed-out SPA can offer the dev form.
    */
   devSignIn?: boolean;
+  /**
+   * The sign-in providers this deployment configured, in the order the sign-in
+   * page renders them. Only `health.ping` reads it, so a signed-out SPA knows
+   * which buttons to draw; absent means this instance offers none
+   * (docs/plans/sign-in.md).
+   */
+  signInProviders?: SignInProvider[];
 }
 
 export type ContextFor<TAuth extends AuthRule> = TAuth extends "member" | "admin"

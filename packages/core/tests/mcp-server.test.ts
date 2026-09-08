@@ -25,7 +25,7 @@ function testAuth() {
     env: {
       baseURL: "http://localhost:3000",
       secret,
-      github: { clientId: "github-client", clientSecret: "github-secret" },
+      providers: { github: { clientId: "github-client", clientSecret: "github-secret" } },
     },
   });
   return { db, auth };
@@ -130,7 +130,7 @@ describe("POST /mcp without a credential", () => {
     closers.push(close);
     const auth = createAuth({
       db,
-      env: { baseURL, secret, github: { clientId: "id", clientSecret: "secret" } },
+      env: { baseURL, secret, providers: { github: { clientId: "id", clientSecret: "secret" } } },
     });
     const app = createApp({ db, auth, baseURL });
 

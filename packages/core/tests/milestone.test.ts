@@ -84,7 +84,7 @@ describe("the milestone", () => {
       env: {
         baseURL: "http://localhost:3000",
         secret: "test-secret-that-is-at-least-32-characters",
-        github: { clientId: "id", clientSecret: "secret" },
+        providers: { github: { clientId: "id", clientSecret: "secret" } },
       },
     });
     const app = createApp({ db, auth, baseURL: "http://localhost:3000" });
