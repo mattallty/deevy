@@ -279,7 +279,7 @@ bindings arrive with the request.
 | `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                                                                                       |
 
 The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
-signing in: `BETTER_AUTH_*`, `GITHUB_*`, `GOOGLE_*`, `GITLAB_*`, `DEEVY_ADMIN_EMAIL` and
+signing in: `BETTER_AUTH_*`, `GITHUB_*`, `GOOGLE_*`, `GITLAB_*`, `DEEVY_OIDC_*`, `DEEVY_ADMIN_EMAIL` and
 `DEEVY_WORKSPACE_NAME` do on Workers exactly what they do on Node, bootstrap and allowlist included.
 
 ### Background work, on a timer or on a Cron Trigger
@@ -389,6 +389,15 @@ load-bearing as the client pair and an entry missing any of the three is not off
 identity. `DEEVY_OIDC_NAME` is what the button says — "Acme SSO" rather than "Single sign-on" — so an operator
 names their own IdP without a deployment of the SPA. Who may join is still the allowlist: an `email_domain`
 rule admits the addresses the IdP hands out.
+
+Two things to know about pointing it at an IdP. The discovery document is fetched **once, when the instance
+starts**: an IdP that cannot be reached at that moment is skipped with a line in the log and no error, and
+the button is not offered until the process (or, on Workers, the isolate) is replaced — and because the fetch
+is awaited before the first sign-in of any kind, an issuer pointed at an address that hangs delays the first
+GitHub or Google sign-in too, for as long as the runtime's own connect timeout. Point `DEEVY_OIDC_ISSUER` at
+something reachable, or leave it unset. And an IdP that sends no `email_verified` claim — Microsoft Entra
+sends none — can sign a teammate in, but cannot become the _second_ provider for a Human who already has one
+here: that link is refused, for the reason under **One Human is one Member** below.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,

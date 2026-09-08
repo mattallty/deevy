@@ -151,6 +151,44 @@ describe("createApp", () => {
     ).toBeGreaterThanOrEqual(400);
   });
 
+  /**
+   * `genericOAuth` fetches its discovery document while the app is being built
+   * and skips the entry when the IdP cannot be reached, logging rather than
+   * throwing — so a configured provider is not always a registered one, and
+   * only the registered half is a button (docs/plans/sign-in.md).
+   */
+  it("offers no button for a provider Better Auth could not register", async () => {
+    const context = anonymous();
+    const baseURL = "https://deevy.example.com";
+    const pair = { clientId: "id", clientSecret: "secret" };
+    // An issuer in the reserved .example TLD: its discovery document is
+    // unreachable whether or not the machine running this has a network.
+    const providers: AuthProviders = {
+      github: pair,
+      oidc: { ...pair, issuer: "https://idp.example" },
+    };
+    expect(signInProviders({ providers }).map((provider) => provider.id)).toEqual([
+      "github",
+      "oidc",
+    ]);
+
+    const auth = createAuth({
+      db: context.db,
+      env: { baseURL, secret: "test-secret-that-is-at-least-32-characters", providers },
+    });
+    const app = createApp({
+      db: context.db,
+      auth,
+      baseURL,
+      signInProviders: signInProviders({ providers }),
+    });
+    const body = (await (await app.request(`${baseURL}/api/health/ping`)).json()) as {
+      providers: Array<{ id: string }>;
+    };
+
+    expect(body.providers.map((provider) => provider.id)).toEqual(["github"]);
+  });
+
   it("rejects session and member operations for anonymous callers", async () => {
     const context = anonymous();
     const client = createRouterClient(router, { context });
