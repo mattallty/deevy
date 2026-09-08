@@ -77,6 +77,10 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
       clientId: env.GITHUB_CLIENT_ID ?? "",
       clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
     },
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+    },
   };
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.

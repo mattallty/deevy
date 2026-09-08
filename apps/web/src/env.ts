@@ -40,6 +40,8 @@ export interface WorkerBindings {
   DEEVY_WEB_ORIGIN?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   DEEVY_ADMIN_EMAIL?: string;
   DEEVY_WORKSPACE_NAME?: string;
   DEEVY_RUN_STALE_MINUTES?: string;
@@ -98,6 +100,10 @@ export function readWorkerEnv(env: WorkerBindings): WorkerEnv {
       github: {
         clientId: env.GITHUB_CLIENT_ID ?? "",
         clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+      },
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID ?? "",
+        clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
       },
     },
     adminEmail: env.DEEVY_ADMIN_EMAIL,

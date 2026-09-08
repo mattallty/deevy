@@ -1,5 +1,7 @@
+import { signInProviders } from "@deevy/core";
 import { fetchClientMetadataResource } from "@deevy/core/cimd";
 import { describe, expect, it } from "vite-plus/test";
+import { readWorkerEnv } from "../src/env.ts";
 import { isolateFor } from "../src/worker.ts";
 
 /**
@@ -21,5 +23,32 @@ describe("the Worker's identity configuration", () => {
     });
 
     expect(isolate.authEnv.fetchClientMetadataResource).toBe(fetchClientMetadataResource);
+  });
+});
+
+/**
+ * One name per provider on both runtimes (docs/plans/sign-in.md): the bindings
+ * a Worker is deployed with are the variables `apps/server/src/env.ts` reads,
+ * so an operator moves an instance between the two by moving values and not by
+ * renaming them.
+ */
+describe("the Worker's sign-in providers", () => {
+  it("offers the pairs its bindings carry, and only the complete ones", () => {
+    const offered = (bindings: Partial<Record<string, string>>) =>
+      signInProviders(readWorkerEnv({ DB: undefined as never, ...bindings })).map(
+        (provider) => provider.id,
+      );
+
+    expect(
+      offered({
+        GITHUB_CLIENT_ID: "id",
+        GITHUB_CLIENT_SECRET: "secret",
+        GOOGLE_CLIENT_ID: "id",
+        GOOGLE_CLIENT_SECRET: "secret",
+      }),
+    ).toEqual(["github", "google"]);
+    expect(offered({ GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" })).toEqual(["google"]);
+    expect(offered({ GOOGLE_CLIENT_ID: "id" })).toEqual([]);
+    expect(offered({})).toEqual([]);
   });
 });

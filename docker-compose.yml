@@ -11,8 +11,13 @@ services:
     environment:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set a secret of at least 32 characters}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?set the GitHub OAuth App client id}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?set the GitHub OAuth App client secret}
+      # Sign-in providers: set the pairs this instance offers, and leave the
+      # rest empty. A pair with only one half is not registered and not offered,
+      # and an instance with no pair at all says so on its sign-in page.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       DEEVY_ADMIN_EMAIL: ${DEEVY_ADMIN_EMAIL:?set the email that becomes the Workspace admin}
       DEEVY_WORKSPACE_NAME: ${DEEVY_WORKSPACE_NAME:-deevy}
     healthcheck:
@@ -55,7 +60,10 @@ services:
         condition: service_healthy
     environment:
       DEEVY_URL: ${DEEVY_AGENT_URL:-http://deevy:3000}
-      DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:?issue an API key for the Agent under Settings, Agents}
+      # Interpolated when the file is read, not when the profile is selected, so
+      # a `:?` here refused `docker compose up` for the deevy service too — on
+      # an instance that never asked for the Agent (docs/plans/sign-in.md).
+      DEEVY_AGENT_KEY: ${DEEVY_AGENT_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEVY_AGENT_HARNESS: ${DEEVY_AGENT_HARNESS:-claude-code}
       DEEVY_AGENT_POLL_SECONDS: ${DEEVY_AGENT_POLL_SECONDS:-30}

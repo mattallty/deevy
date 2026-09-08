@@ -30,6 +30,7 @@ export interface OAuthClient {
  */
 export interface AuthProviders {
   github?: OAuthClient;
+  google?: OAuthClient;
 }
 
 /**
@@ -140,6 +141,8 @@ export function signInProviders(env: Pick<AuthEnv, "providers">): SignInProvider
   const offered: SignInProvider[] = [];
   if (configuredClient(providers.github))
     offered.push({ id: "github", label: "GitHub", kind: "social" });
+  if (configuredClient(providers.google))
+    offered.push({ id: "google", label: "Google", kind: "social" });
   return offered;
 }
 
@@ -191,16 +194,25 @@ export function accountLinkingOf(_env: Pick<AuthEnv, "providers">) {
  */
 function socialProvidersOf(providers: AuthProviders) {
   const github = configuredClient(providers.github);
-  return github
-    ? {
-        github: {
-          ...github,
-          // The organizations a github_org allowlist rule matches are only
-          // listable with this scope (docs/plans/m1.md).
-          scope: ["read:org"],
-        },
-      }
-    : {};
+  const google = configuredClient(providers.google);
+  return {
+    ...(github
+      ? {
+          github: {
+            ...github,
+            // The organizations a github_org allowlist rule matches are only
+            // listable with this scope (docs/plans/m1.md).
+            scope: ["read:org"],
+          },
+        }
+      : {}),
+    // Google's default scopes are all deevy asks for: the address and the
+    // name, both of which arrive in the `id_token`. `hd` is deliberately
+    // unset — a Google Workspace is an email domain, and who may join is an
+    // `email_domain` rule in deevy's own UI, so there is one place to look
+    // rather than two that can disagree (docs/plans/sign-in.md).
+    ...(google ? { google } : {}),
+  };
 }
 
 /** An entry with both halves of its pair, or nothing. */

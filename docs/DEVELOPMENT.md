@@ -4,7 +4,7 @@
 
 - Node 24 (`.node-version`); Vite+ manages it for you once installed.
 - [Vite+](https://viteplus.dev) 0.3.0: `curl -fsSL https://vite.plus | bash`, then open a new shell.
-- A GitHub OAuth App for sign-in (below).
+- A GitHub OAuth App or a Google OAuth client for sign-in (below), or neither and the stub (below that).
 
 ## First run
 
@@ -24,20 +24,33 @@ the wrong place.
 The SQLite file lives at `DEEVY_DATABASE_PATH` (default `./data/deevy.sqlite`, relative to `apps/server`) and
 is created and migrated on start.
 
-### GitHub OAuth App
+### A sign-in provider
 
-Create one at https://github.com/settings/developers with:
+A provider is configuration, not a constant (docs/plans/sign-in.md): what a deployment sets is what
+`createAuth` registers, what `health.ping` reports, and what the sign-in page draws a button for. Set the
+pairs you want offered and leave the rest empty. Half a pair is no provider — with only `GITHUB_CLIENT_ID`
+set, GitHub is neither registered nor offered, and the page says this deployment has none configured rather
+than offering a button that ends on GitHub's own error page.
+
+**GitHub.** Create an OAuth App at https://github.com/settings/developers with:
 
 - Homepage URL: `http://localhost:5173`
 - Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
 
-Put the client id and secret in `.env`. Set `DEEVY_ADMIN_EMAIL` to the primary email of the GitHub account
-that should become the Workspace admin: the first sign-in with that address creates the Workspace.
+Put the client id and secret in `.env` as `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
 
-A provider is configuration, not a constant (docs/plans/sign-in.md): what a deployment sets is what
-`createAuth` registers, what `health.ping` reports, and what the sign-in page draws a button for. Half a pair
-is no provider — with only `GITHUB_CLIENT_ID` set, GitHub is neither registered nor offered, and the page says
-this deployment has none configured rather than offering a button that ends on GitHub's own error page.
+**Google.** Create an OAuth 2.0 Client ID of type "Web application" in a Google Cloud project's Credentials
+with:
+
+- Authorized JavaScript origin: `http://localhost:5173`
+- Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+
+Put the client id and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. deevy asks for the
+default scopes and sets no `hd`, so Google decides nothing about who may join: a Google Workspace is an email
+domain, and an `email_domain` allowlist rule is what admits it.
+
+Either way, set `DEEVY_ADMIN_EMAIL` to the address that should become the Workspace admin: the first sign-in
+with it creates the Workspace.
 
 Anyone else who signs in joins as a Member when an allowlist rule matches them, and otherwise gets an account
 and no Membership. The admin manages the rules under Settings, Allowlist. A `github_org` rule is matched by

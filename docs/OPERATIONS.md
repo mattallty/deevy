@@ -42,6 +42,7 @@ docker run -d --name deevy -p 3000:3000 -v deevy-data:/data \
   -e BETTER_AUTH_URL=https://deevy.example.com \
   -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   -e GITHUB_CLIENT_ID=... -e GITHUB_CLIENT_SECRET=... \
+  -e GOOGLE_CLIENT_ID=... -e GOOGLE_CLIENT_SECRET=... \
   -e DEEVY_ADMIN_EMAIL=you@example.com \
   deevy:local   # or ghcr.io/mattallty/deevy:latest
 ```
@@ -158,9 +159,10 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler's own `d1_migrations`. Applying twice is a no-op. Nothing here touches the local D1 that
    `vp run web#test:workers` uses; `--remote` is the whole difference.
 
-5. **Create the GitHub OAuth App** at <https://github.com/settings/developers>, with that origin as the
-   homepage and `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` as the Authorization callback
-   URL. The table under [Signing in](#signing-in-and-the-origin-better_auth_url-names) is the full set of
+5. **Create a client with a sign-in provider** — at least one, and any of the four does. For GitHub that is
+   an OAuth App at <https://github.com/settings/developers>, with that origin as the homepage and
+   `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` as the Authorization callback URL; for
+   Google, GitLab or an OpenID Connect IdP it is the same origin with `/api/auth/callback/<provider>`. The table under [Signing in](#signing-in-and-the-origin-better_auth_url-names) is the full set of
    origins and callbacks; the rule is that `BETTER_AUTH_URL` and the callback change together or sign-in
    breaks.
 
@@ -173,7 +175,10 @@ Run steps 3 onward from `apps/web`, so wrangler finds its own configuration.
    wrangler secret put GITHUB_CLIENT_SECRET
    ```
 
-   `wrangler secret list` shows the four names and no values. The rest are not credentials, so they can go in
+   Offering Google as well, or instead, is `wrangler secret put GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET` beside them; the sign-in page draws whichever pairs are complete.
+
+   `wrangler secret list` shows the names you put in and no values. The rest are not credentials, so they can go in
    a `vars` block in `apps/web/wrangler.jsonc`, where a reviewer can see them:
 
    ```jsonc
@@ -247,6 +252,8 @@ bindings arrive with the request.
 | `BETTER_AUTH_SECRET`           | env         | secret             | —                    | Better Auth falls back to a development key and says so; a Gate elicitation signed by one instance is then refused by the next. Changing it signs everyone out.                                            |
 | `GITHUB_CLIENT_ID`             | env         | secret             | —                    | GitHub is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Callback `${BETTER_AUTH_URL}/api/auth/callback/github`.                         |
 | `GITHUB_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
+| `GOOGLE_CLIENT_ID`             | env         | secret             | —                    | Google is neither registered nor offered, and with no other provider set the sign-in page says so. Both halves or neither. Redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`.                     |
+| `GOOGLE_CLIENT_SECRET`         | env         | secret             | —                    | As above.                                                                                                                                                                                                  |
 | `DEEVY_ADMIN_EMAIL`            | env         | var                | —                    | No Workspace is ever created, so nobody is a Member.                                                                                                                                                       |
 | `DEEVY_WORKSPACE_NAME`         | env         | var                | `deevy`              | Nothing: renameable later under Settings, Workspace.                                                                                                                                                       |
 | `DEEVY_WEB_ORIGIN`             | env         | var                | —                    | Nothing, unless the SPA is deployed on its own origin; then its calls are refused by CORS.                                                                                                                 |
@@ -260,8 +267,8 @@ bindings arrive with the request.
 | `DEEVY_WEB_DIST`               | env         | —                  | —                    | Node answers the API and serves no pages. On Workers the SPA is the asset handler's, not the app's.                                                                                                        |
 
 The Worker serves the SPA, the API, the reference at `/api/docs`, the MCP challenge and, since M3 slice 5,
-signing in: `BETTER_AUTH_*`, `GITHUB_*`, `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME` do on Workers exactly
-what they do on Node, bootstrap and allowlist included.
+signing in: `BETTER_AUTH_*`, `GITHUB_*`, `GOOGLE_*`, `DEEVY_ADMIN_EMAIL` and `DEEVY_WORKSPACE_NAME` do on
+Workers exactly what they do on Node, bootstrap and allowlist included.
 
 ### Background work, on a timer or on a Cron Trigger
 
@@ -336,7 +343,14 @@ value much over 90 spends the whole cap on polling and leaves none for signing t
 Which providers an instance offers is what its environment sets: `createAuth` registers the entries whose
 client id and secret are both present, `health.ping` reports the same list publicly, and the sign-in page
 draws one button per entry in that order. An instance with none configured says so on the page instead of
-offering a button that goes nowhere. GitHub is the one entry today (docs/plans/sign-in.md).
+offering a button that goes nowhere. GitHub and Google are the entries today, `GITHUB_CLIENT_ID` with
+`GITHUB_CLIENT_SECRET` and `GOOGLE_CLIENT_ID` with `GOOGLE_CLIENT_SECRET`; either, both or neither
+(docs/plans/sign-in.md).
+
+Google is registered with its default scopes and no `hd`, so it does not decide who may join. Who may join is
+the allowlist: a Google Workspace is an email domain, and an `email_domain` rule under Settings, Allowlist
+admits it in the one place an admin already looks. Configuring the client pair therefore lets anyone with a
+Google account sign in — and leaves them signed in, not a Member, until a rule matches them.
 
 **One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
 same user row: the second sign-in links onto the address the first one registered, so they keep one handle,
@@ -365,19 +379,24 @@ the token issuer and the RFC 8707 resource identifier to it as well. A value nam
 therefore mints tokens bound to that host and a cookie the browser never sends back — and it cannot be
 guessed from the request instead, because then a caller would choose the audience of the tokens deevy signs.
 
-The GitHub OAuth App's Authorization callback URL follows from it:
+Every provider's callback follows from it, and each ends in the provider's own id:
 
-| Where deevy runs          | `BETTER_AUTH_URL`                       | Authorization callback URL                                       |
-| ------------------------- | --------------------------------------- | ---------------------------------------------------------------- |
-| `wrangler dev --local`    | `http://localhost:8787`                 | `http://localhost:8787/api/auth/callback/github`                 |
-| a `workers.dev` subdomain | `https://deevy.<subdomain>.workers.dev` | `https://deevy.<subdomain>.workers.dev/api/auth/callback/github` |
-| a custom domain           | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/github`             |
-| the Docker image          | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/github`             |
+| Where deevy runs          | `BETTER_AUTH_URL`                       | Authorization callback URL                                           |
+| ------------------------- | --------------------------------------- | -------------------------------------------------------------------- |
+| `wrangler dev --local`    | `http://localhost:8787`                 | `http://localhost:8787/api/auth/callback/<provider>`                 |
+| a `workers.dev` subdomain | `https://deevy.<subdomain>.workers.dev` | `https://deevy.<subdomain>.workers.dev/api/auth/callback/<provider>` |
+| a custom domain           | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/<provider>`             |
+| the Docker image          | `https://deevy.example.com`             | `https://deevy.example.com/api/auth/callback/<provider>`             |
+
+`<provider>` is `github` for the GitHub OAuth App's Authorization callback URL and `google` for the
+Authorized redirect URI of the Google OAuth client (an OAuth 2.0 Client ID of type "Web application" in a
+Google Cloud project's Credentials, with the consent screen's scopes left at email and profile).
 
 A GitHub OAuth App holds one callback URL, so a Worker reachable both on its `workers.dev` subdomain and on a
-custom domain needs an App for each, or a decision that sign-in happens on one of them. Move between origins
-by changing `wrangler secret put BETTER_AUTH_URL` and the App's callback together: either one alone leaves
-sign-in refused by GitHub or the session cookie set for an origin nobody is on.
+custom domain needs an App for each, or a decision that sign-in happens on one of them; a Google client holds
+a list, so one client can carry both. Move between origins by changing `wrangler secret put BETTER_AUTH_URL`
+and the callbacks together: either one alone leaves sign-in refused by the provider or the session cookie set
+for an origin nobody is on.
 
 ## Agents and MCP
 

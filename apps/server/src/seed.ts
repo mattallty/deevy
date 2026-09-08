@@ -17,7 +17,7 @@
 import { existsSync, unlinkSync } from "node:fs";
 import { buildContext } from "@deevy/core/app";
 import { router } from "@deevy/core/router";
-import { discardingJobQueue, sweepStaleRuns } from "@deevy/core";
+import { discardingJobQueue, signInProviders, sweepStaleRuns } from "@deevy/core";
 import { createRouterClient } from "@orpc/server";
 import { readEnv } from "./env.ts";
 import { buildServer } from "./server.ts";
@@ -56,18 +56,26 @@ function cookiesOf(response: Response): string {
     .join("; ");
 }
 
-/** One Human signing in with GitHub, exactly as the dev form does it. */
+/**
+ * One Human signing in, exactly as the dev form does it: through whichever
+ * provider this instance offers first, because under the stub they all answer
+ * and the address in the `code` is what decides who signs in. Naming GitHub
+ * here meant a stubbed instance configured with only Google could not be seeded
+ * at all (docs/plans/sign-in.md).
+ */
 async function signIn(email: string): Promise<string> {
+  const provider = signInProviders(env)[0]?.id;
+  if (!provider) throw new Error("this instance offers no sign-in provider to seed through");
   const started = await app.request("/api/auth/sign-in/social", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ provider: "github", callbackURL: "/" }),
+    body: JSON.stringify({ provider, callbackURL: "/" }),
   });
   const { url } = (await started.json()) as { url?: string };
   if (!url) throw new Error(`sign-in did not start for ${email}: ${String(started.status)}`);
   const state = new URL(url).searchParams.get("state") ?? "";
   const callback = await app.request(
-    `/api/auth/callback/github?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`,
+    `/api/auth/callback/${provider}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`,
     { headers: { cookie: cookiesOf(started) }, redirect: "manual" },
   );
   const cookie = cookiesOf(callback);
