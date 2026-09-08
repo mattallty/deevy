@@ -90,6 +90,24 @@ describe("createApp", () => {
     expect(await providers({ gitlab: { ...pair, issuer: "https://gitlab.example.com" } })).toEqual([
       { id: "gitlab", label: "GitLab", kind: "social" },
     ]);
+    // The generic OIDC entry is labelled by the deployment, so an operator
+    // names their own IdP without touching the SPA, and falls back to what a
+    // teammate who has never heard of it would read (docs/plans/sign-in.md
+    // slice 6).
+    expect(
+      await providers({ oidc: { ...pair, issuer: "https://idp.example", name: "Acme SSO" } }),
+    ).toEqual([{ id: "oidc", label: "Acme SSO", kind: "social" }]);
+    expect(await providers({ oidc: { ...pair, issuer: "https://idp.example" } })).toEqual([
+      { id: "oidc", label: "Single sign-on", kind: "social" },
+    ]);
+    // An issuer is as load-bearing as the pair: without a discovery document
+    // there is nothing to register and nothing a button could start.
+    expect(await providers({ oidc: { ...pair, issuer: "" } })).toEqual([]);
+    expect(
+      await providers({
+        oidc: { clientId: "id", clientSecret: "", issuer: "https://idp.example" },
+      }),
+    ).toEqual([]);
     // Half a pair is not a provider: a button that only leads to the
     // provider's own error page is worse than no button (docs/plans/sign-in.md).
     expect(await providers({ github: { clientId: "", clientSecret: "secret" } })).toEqual([]);
@@ -131,6 +149,44 @@ describe("createApp", () => {
     expect(
       (await startSignIn({ clientId: "", clientSecret: "secret" })).status,
     ).toBeGreaterThanOrEqual(400);
+  });
+
+  /**
+   * `genericOAuth` fetches its discovery document while the app is being built
+   * and skips the entry when the IdP cannot be reached, logging rather than
+   * throwing — so a configured provider is not always a registered one, and
+   * only the registered half is a button (docs/plans/sign-in.md).
+   */
+  it("offers no button for a provider Better Auth could not register", async () => {
+    const context = anonymous();
+    const baseURL = "https://deevy.example.com";
+    const pair = { clientId: "id", clientSecret: "secret" };
+    // An issuer in the reserved .example TLD: its discovery document is
+    // unreachable whether or not the machine running this has a network.
+    const providers: AuthProviders = {
+      github: pair,
+      oidc: { ...pair, issuer: "https://idp.example" },
+    };
+    expect(signInProviders({ providers }).map((provider) => provider.id)).toEqual([
+      "github",
+      "oidc",
+    ]);
+
+    const auth = createAuth({
+      db: context.db,
+      env: { baseURL, secret: "test-secret-that-is-at-least-32-characters", providers },
+    });
+    const app = createApp({
+      db: context.db,
+      auth,
+      baseURL,
+      signInProviders: signInProviders({ providers }),
+    });
+    const body = (await (await app.request(`${baseURL}/api/health/ping`)).json()) as {
+      providers: Array<{ id: string }>;
+    };
+
+    expect(body.providers.map((provider) => provider.id)).toEqual(["github"]);
   });
 
   it("rejects session and member operations for anonymous callers", async () => {

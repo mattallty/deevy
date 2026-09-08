@@ -91,6 +91,11 @@ export function SignedOut() {
  * in, so any offered provider ends in the same session. It takes the first one
  * rather than GitHub by name so a stubbed instance that offers only Google
  * still signs in (docs/plans/sign-in.md).
+ *
+ * An OpenID Connect sign-in also binds its `id_token` to a nonce, which is in
+ * the authorization URL this form skips past. So when the URL carries one, the
+ * code carries it too — `email|nonce` — and the stub signs it into the token
+ * it hands back (apps/web/scripts/stub-oauth.js).
  */
 export function DevSignIn({
   provider = "github",
@@ -119,11 +124,13 @@ export function DevSignIn({
             body: JSON.stringify({ provider, callbackURL: home() }),
           });
           const { url } = (await started.json()) as { url?: string };
-          const state = url ? new URL(url).searchParams.get("state") : null;
+          const authorization = url ? new URL(url) : null;
+          const state = authorization?.searchParams.get("state") ?? null;
           if (!state) throw new Error("the server did not start a sign-in");
+          const nonce = authorization?.searchParams.get("nonce");
           const callback = new URL(`/api/auth/callback/${provider}`, window.location.origin);
           callback.searchParams.set("state", state);
-          callback.searchParams.set("code", email.trim());
+          callback.searchParams.set("code", nonce ? `${email.trim()}|${nonce}` : email.trim());
           navigate(callback.toString());
         } catch (failed) {
           setError(failed instanceof Error ? failed.message : String(failed));

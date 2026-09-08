@@ -59,6 +59,20 @@ Put the id and secret in `.env` as `GITLAB_CLIENT_ID` and `GITLAB_CLIENT_SECRET`
 `GITLAB_ISSUER=https://gitlab.example.com`; unset, it is `https://gitlab.com`. Every GitLab endpoint deevy
 calls is built from the issuer, so one entry serves either.
 
+**OpenID Connect.** Anything that speaks OIDC — Okta, Entra, Keycloak, Authentik — is one entry, configured
+from the issuer and nothing else:
+
+- Redirect URI: `http://localhost:3000/api/auth/callback/oidc`
+- Scopes: `openid`, `profile`, `email`
+- Grant: authorization code with PKCE
+
+Put the issuer in `.env` as `DEEVY_OIDC_ISSUER` — where the IdP publishes `/.well-known/openid-configuration`,
+so `https://acme.okta.com` or a Keycloak realm URL with its path — and the client pair as
+`DEEVY_OIDC_CLIENT_ID` and `DEEVY_OIDC_CLIENT_SECRET`. All three or none: the authorization, token, userinfo
+and JWKS endpoints are read out of the discovery document, so an issuer is as load-bearing as a client id.
+`DEEVY_OIDC_NAME` is what the button says, "Single sign-on" unset. The callback is `oidc` whatever the IdP is
+called, because that is deevy's own name for the entry.
+
 Either way, set `DEEVY_ADMIN_EMAIL` to the address that should become the Workspace admin: the first sign-in
 with it creates the Workspace.
 
@@ -82,7 +96,9 @@ The stub answers GitHub's and Google's endpoints by host, because Better Auth ha
 and a generic OIDC provider's by path, because those live wherever the operator's issuer is — never on a
 loopback host, which is deevy itself. It generates an RS256 key pair on first use, serves the JWKS at
 whichever certificate URL was asked for, and signs the `id_token` it hands back, so a provider that verifies
-one against its issuer's keys is satisfied by keys the stub also published.
+one against its issuer's keys is satisfied by keys the stub also published. An OpenID Connect sign-in also
+binds that token to a nonce from the authorization request the form skips past, so the code carries it —
+`ada@example.com|<nonce>` — and the stub signs it in.
 
 `.claude/launch.json` carries a second configuration, `dev:stub`, which runs the same two dev tasks with the
 flag on and `DEEVY_DATABASE_PATH=./data/stub.sqlite`, so a stubbed instance never shares a database with one you

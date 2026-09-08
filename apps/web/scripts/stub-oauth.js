@@ -13,7 +13,11 @@
  *
  * The sign-in under test says who it is in the OAuth `code`, which is the
  * email address. A provider would have handed that code out at the end of a
- * consent screen; here the caller hands it straight to the callback.
+ * consent screen; here the caller hands it straight to the callback. A generic
+ * OIDC sign-in also has an `id_token` nonce to bind, and the nonce is in the
+ * authorization URL the caller skipped, so the code carries it after a `|`:
+ * `ada@example.com|<nonce>` is the same sign-in, saying which authorization
+ * request it belongs to.
  *
  * GitHub and Google are matched by host, because their endpoints are constants
  * in Better Auth. GitLab's and the OIDC provider's are wherever the operator's
@@ -35,6 +39,12 @@
 
   function emailIn(value) {
     return (value ?? "").replace(/^stub_/, "");
+  }
+
+  /** What a code says: who is signing in, and the nonce their issuer must echo. */
+  function codeIn(value) {
+    const [email, nonce] = (value ?? "").split("|");
+    return { email: email ?? "", nonce: nonce || null };
   }
 
   /** The bearer of a request, whatever the provider calls it. */
@@ -159,10 +169,10 @@
   }
 
   /**
-   * What a token request said: the code, which is the email address, and the
-   * client id, which is the audience an `id_token` has to name. Better Auth
-   * sends the pair in the body or as a Basic credential depending on the
-   * provider, so both are read.
+   * What a token request said: the code, which is the sign-in's address and
+   * its nonce, and the client id, which is the audience an `id_token` has to
+   * name. Better Auth sends the pair in the body or as a Basic credential
+   * depending on the provider, so both are read.
    */
   async function tokenRequest(request) {
     const params = new URLSearchParams(await request.text());
@@ -172,7 +182,7 @@
       const decoded = atob(authorization.replace(/^Basic +/i, ""));
       clientId = formDecode(decoded.slice(0, decoded.indexOf(":")));
     }
-    return { email: params.get("code") ?? "", clientId };
+    return { ...codeIn(params.get("code")), clientId };
   }
 
   /**
@@ -195,9 +205,20 @@
     };
   }
 
-  /** Those claims as an issuer signs them: bound to an issuer and an audience. */
-  function idTokenClaims(email, issuer, clientId, extras = false) {
-    return { iss: issuer, aud: clientId, ...profileClaims(email, extras) };
+  /**
+   * Those claims as an issuer signs them: bound to an issuer, an audience and
+   * — when the caller said which authorization request this is — the nonce
+   * Better Auth expects an OpenID Provider to echo back. `extras` adds the
+   * claims only an OpenID Connect provider sends, which Google's token does
+   * not carry.
+   */
+  function idTokenClaims({ email, clientId, nonce }, issuer, extras = false) {
+    return {
+      iss: issuer,
+      aud: clientId,
+      ...(nonce ? { nonce } : {}),
+      ...profileClaims(email, extras),
+    };
   }
 
   // ------------------------------------------------------- the providers
@@ -268,13 +289,13 @@
     // certificates Better Auth verifies it against. Google's profile is the
     // token's claims, so there is no userinfo call to answer.
     if (host === "oauth2.googleapis.com" && path === "/token") {
-      const { email, clientId } = await tokenRequest(request);
+      const token = await tokenRequest(request);
       return Response.json({
-        access_token: tokenFor(email),
+        access_token: tokenFor(token.email),
         token_type: "bearer",
         expires_in: 3600,
         scope: "openid email profile",
-        id_token: await idToken(idTokenClaims(email, "https://accounts.google.com", clientId)),
+        id_token: await idToken(idTokenClaims(token, "https://accounts.google.com")),
       });
     }
     if (host === "www.googleapis.com" && path === "/oauth2/v3/certs") return jwksResponse();
@@ -315,15 +336,15 @@
         });
       }
       if (path.endsWith(OIDC_TOKEN)) {
-        const { email, clientId } = await tokenRequest(request);
+        const token = await tokenRequest(request);
         return Response.json({
-          access_token: tokenFor(email),
+          access_token: tokenFor(token.email),
           token_type: "bearer",
           expires_in: 3600,
           scope: "openid profile email",
           // An OpenID Connect provider is the one that may carry the extra
           // claims; Google's token above deliberately does not.
-          id_token: await idToken(idTokenClaims(email, issuerOf(url, OIDC_TOKEN), clientId, true)),
+          id_token: await idToken(idTokenClaims(token, issuerOf(url, OIDC_TOKEN), true)),
         });
       }
       if (path.endsWith(OIDC_USERINFO)) {

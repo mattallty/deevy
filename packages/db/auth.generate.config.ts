@@ -6,7 +6,7 @@ import { apiKey } from "@better-auth/api-key";
 import { mcp } from "@better-auth/mcp";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { betterAuth } from "better-auth";
-import { jwt } from "better-auth/plugins";
+import { genericOAuth, jwt } from "better-auth/plugins";
 import { drizzle } from "drizzle-orm/node-sqlite";
 
 import * as schema from "./src/schema/index.ts";
@@ -47,6 +47,23 @@ export const auth = betterAuth({
     // mcp() is the OAuth provider, so no separate oauthProvider goes beside it.
     jwt(),
     mcp({ loginPage: "/", consentPage: "/consent", resource: "http://localhost:3000/mcp" }),
+    // The generic OpenID Connect provider (docs/plans/sign-in.md). It adds no
+    // tables — it registers a social provider at init and nothing else — but
+    // the plugin list is what shapes the schema, so it is listed here too.
+    // With its endpoints named rather than discovered, so generating a schema
+    // needs no network and no issuer to be up.
+    genericOAuth({
+      config: [
+        {
+          providerId: "oidc",
+          clientId: "generate-only",
+          clientSecret: "generate-only",
+          authorizationUrl: "http://localhost:3000/authorize",
+          tokenUrl: "http://localhost:3000/token",
+          scopes: ["openid", "profile", "email"],
+        },
+      ],
+    }),
   ],
   user: {
     additionalFields: {

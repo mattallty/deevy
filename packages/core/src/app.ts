@@ -145,12 +145,29 @@ export function createApp({
   // The stream settings ride on the context beside the caller's identity: the
   // handler is the same on both runtimes and the entry supplies the numbers,
   // so there is no `if (workers)` anywhere in here (docs/plans/m3.md).
+  // A configured provider is not always a registered one. `genericOAuth`
+  // fetches its discovery document while the app is being built and skips the
+  // entry when the IdP cannot be reached, logging rather than throwing — so an
+  // IdP that was down at startup left a button on the sign-in page that
+  // answered PROVIDER_NOT_FOUND until the process was restarted. What
+  // `health.ping` offers is therefore what Better Auth actually registered.
+  // Asked once per app: `$context` settles at startup, and an instance that
+  // cannot be asked reports what it was configured with (docs/plans/sign-in.md).
+  let registeredIds: Promise<Set<string> | null> | undefined;
+  const offeredProviders = async (): Promise<SignInProvider[]> => {
+    if (!auth || signInProviders.length === 0) return signInProviders;
+    registeredIds ??= auth.$context
+      .then((context) => new Set(context.socialProviders.map((provider) => provider.id)))
+      .catch(() => null);
+    const ids = await registeredIds;
+    return ids ? signInProviders.filter((provider) => ids.has(provider.id)) : signInProviders;
+  };
   const contextFor = async (request: Request) => ({
     ...(await buildContext(db, auth, request.headers, originOf(request.url))),
     ...(live ? { live } : {}),
     jobs,
     devSignIn,
-    signInProviders,
+    signInProviders: await offeredProviders(),
   });
   app.use("/rpc/*", async (c, next) => {
     c.set("ctx", await contextFor(c.req.raw));

@@ -6,7 +6,7 @@ import { allowlistRule, member, workspace, type Db } from "@deevy/db";
 import { eq } from "drizzle-orm";
 import { allocateHandle, slugify } from "./handles.ts";
 import { betterAuth } from "better-auth";
-import { jwt } from "better-auth/plugins";
+import { genericOAuth, jwt } from "better-auth/plugins";
 import { fetchClientMetadataResource, type MetadataResourceFetch } from "./cimd.ts";
 import { appendEvent } from "./events.ts";
 import { authId, newId } from "./ids.ts";
@@ -33,6 +33,22 @@ export interface GitLabClient extends OAuthClient {
 }
 
 /**
+ * A generic OpenID Connect client: the pair, the issuer everything else is
+ * discovered from, and what the button should say. One entry, not a list — a
+ * self-hosted instance has one IdP, and a list of them would put JSON in a
+ * wrangler secret to serve a case nobody has (docs/plans/sign-in.md).
+ *
+ * `issuer` is required, because there is nothing to default it to: Okta,
+ * Entra, Keycloak and Authentik are all somewhere else. `name` is what the
+ * operator calls their own IdP, so naming it is a variable rather than an edit
+ * to the SPA.
+ */
+export interface OidcClient extends OAuthClient {
+  issuer: string;
+  name?: string;
+}
+
+/**
  * What a deployment configures: one optional entry per provider deevy offers.
  * A provider is configuration, not a constant, so offering another one is an
  * entry here and in `signInProviders` rather than an edit to the sign-in page
@@ -42,15 +58,26 @@ export interface AuthProviders {
   github?: OAuthClient;
   google?: OAuthClient;
   gitlab?: GitLabClient;
+  oidc?: OidcClient;
 }
 
 /** Where a GitLab client lives when the deployment names no instance of its own. */
 const DEFAULT_GITLAB_ISSUER = "https://gitlab.com";
 
+/** What deevy calls its one generic OIDC provider, in every URL it appears in. */
+export const OIDC_PROVIDER_ID = "oidc";
+
+/** What the button says when the operator did not name their own IdP. */
+const DEFAULT_OIDC_LABEL = "Single sign-on";
+
 /**
- * How the SPA starts a sign-in with a provider. `social` is Better Auth's own
- * `signIn.social`; a generic OIDC provider is posted differently and brings
- * the second value with it (docs/plans/sign-in.md).
+ * How the SPA starts a sign-in with a provider. One value, and honest: Better
+ * Auth 1.7.3's `genericOAuth` registers its configuration as a first-class
+ * social provider, so a generic OIDC entry is started with `signIn.social` and
+ * comes back on `callback/oidc` exactly as GitHub does. The field stays
+ * because what the server registered is what the page has to know, and a
+ * release that gives the generic plugin its own endpoints again would say so
+ * here rather than in `App.tsx` (docs/plans/sign-in.md).
  */
 export type SignInProviderKind = "social";
 
@@ -100,7 +127,7 @@ export function createAuth({ db, env }: CreateAuthOptions) {
     // Its rows get deevy's prefixed ids too (ids.ts, ADR-0015): usr_, ses_, acct_, key_…
     advanced: { database: { generateId: ({ model }) => authId(model) } },
     emailAndPassword: { enabled: false },
-    plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env)],
+    plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env), ...oidcPlugins(env.providers ?? {})],
     socialProviders: socialProvidersOf(env.providers ?? {}),
     account: { accountLinking: accountLinkingOf(env) },
     user: {
@@ -159,6 +186,8 @@ export function signInProviders(env: Pick<AuthEnv, "providers">): SignInProvider
     offered.push({ id: "google", label: "Google", kind: "social" });
   if (configuredClient(providers.gitlab))
     offered.push({ id: "gitlab", label: "GitLab", kind: "social" });
+  const oidc = configuredOidc(providers.oidc);
+  if (oidc) offered.push({ id: OIDC_PROVIDER_ID, label: oidc.label, kind: "social" });
   return offered;
 }
 
@@ -256,9 +285,66 @@ function socialProvidersOf(providers: AuthProviders) {
   };
 }
 
+/**
+ * The generic OpenID Connect provider, when the deployment configured one
+ * (docs/plans/sign-in.md). Everything but the client pair is discovered from
+ * the issuer's well-known document, so an operator behind Okta, Entra,
+ * Keycloak or Authentik configures four variables and nothing else.
+ *
+ * In Better Auth 1.7.3 `genericOAuth` registers what it is given as a
+ * first-class social provider, so this entry is signed in with
+ * `signIn.social` and comes back on `/api/auth/callback/oidc` the way GitHub
+ * does — there is no second endpoint shape for the SPA to know about.
+ *
+ * `requireIdTokenVerification` is on: an OIDC sign-in's identity is the
+ * `id_token`'s claims, so a discovery document that hands back no issuer and
+ * no `jwks_uri` must leave the provider unregistered rather than quietly
+ * downgrade it to decoding a token nobody checked. PKCE is on for the same
+ * reason it is on everywhere else — OAuth 2.1 requires it of every
+ * authorization code flow.
+ */
+function oidcPlugins(providers: AuthProviders) {
+  const oidc = configuredOidc(providers.oidc);
+  if (!oidc) return [];
+  return [
+    genericOAuth({
+      config: [
+        {
+          providerId: OIDC_PROVIDER_ID,
+          name: oidc.label,
+          discoveryUrl: `${oidc.issuer}/.well-known/openid-configuration`,
+          clientId: oidc.clientId,
+          clientSecret: oidc.clientSecret,
+          // The three every OpenID Provider serves, and no more: deevy wants
+          // the subject, the name and the address, and asks an IdP's admin to
+          // approve nothing beyond them.
+          scopes: ["openid", "profile", "email"],
+          pkce: true,
+          requireIdTokenVerification: true,
+        },
+      ],
+    }),
+  ];
+}
+
 /** The GitLab instance this deployment signs in against. */
 function gitlabIssuer(client: GitLabClient | undefined): string {
   return client?.issuer?.trim().replace(/\/+$/, "") || DEFAULT_GITLAB_ISSUER;
+}
+
+/**
+ * A generic OIDC entry with both halves of its pair *and* an issuer, or
+ * nothing. An issuer is as load-bearing as the pair here: without one there is
+ * no discovery document, so there is nothing to register and nothing a button
+ * could start.
+ */
+function configuredOidc(
+  client: OidcClient | undefined,
+): { clientId: string; clientSecret: string; issuer: string; label: string } | null {
+  const pair = configuredClient(client);
+  const issuer = client?.issuer.trim().replace(/\/+$/, "");
+  if (!pair || !issuer) return null;
+  return { ...pair, issuer, label: client?.name?.trim() || DEFAULT_OIDC_LABEL };
 }
 
 /** An entry with both halves of its pair, or nothing. */

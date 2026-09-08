@@ -380,6 +380,37 @@ labels the provider from `DEEVY_OIDC_NAME`; the SPA's button posts to `/sign-in/
 
 **Docs.** `docs/OPERATIONS.md` gains the four variables and the redirect URI an IdP has to be given.
 
+What shipped differently:
+
+- **There is no second shape.** Better Auth 1.7.3's `genericOAuth` registers what it is configured with as a
+  first-class social provider — its own docstring says so — so the entry is signed in with
+  `signIn.social({ provider: "oidc" })` and comes back on `/api/auth/callback/oidc` exactly as GitHub does.
+  There is no `/sign-in/oauth2`, no missing client plugin to work around, and nothing in `App.tsx` that knows
+  a fourth provider exists. `SignInProviderKind` therefore stays `"social"` alone: the field is the honest
+  description of what the server registered, and what it registered here is a social provider. A release that
+  gives the generic plugin its own endpoints again is a release that adds the second value.
+- **The issuer is a third half of the pair.** `OidcClient.issuer` is required rather than optional, and
+  `configuredOidc` offers nothing without all three: unlike GitLab there is nowhere to default it to, and
+  without a discovery document there is nothing to register and nothing a button could start.
+  `requireIdTokenVerification` is on for the same reason — an OIDC sign-in's identity is its `id_token`'s
+  claims, so a discovery document with no `jwks_uri` leaves the provider unregistered rather than quietly
+  downgraded to decoding a token nobody checked.
+- **The stub's code now carries the nonce.** A verified `id_token` is bound to a nonce from the authorization
+  request, and the dev form and the tests skip that request — they hand the callback a `code` directly. So the
+  code says `ada@example.com|<nonce>`, read off the authorization URL the sign-in already parses for `state`,
+  and the stub signs the nonce into the token. It is the one channel that reaches the token endpoint, and
+  removing it fails three tests rather than none. `DevSignIn` sends it only when the URL carries one, so
+  GitHub, Google and GitLab land exactly as they did.
+- **The generator config names its endpoints rather than discovering them.** `packages/db/auth.generate.config.ts`
+  mirrors the plugin list, and `genericOAuth` fetches its discovery document at init — which a schema
+  generation should not need a network or a live issuer for. `vp run db#generate:auth` rewrote
+  `src/schema/auth.ts` with no diff, as the slice said it must.
+- **The end-to-end sign-in needed no new loop.** `apps/server/tests/stub-oauth.test.ts` drives every provider
+  `signInProviders` reports, so adding the OIDC variables to that environment is what walks Better Auth
+  through discovery, PKCE, the token endpoint and a verified `id_token` to a session. Beside it: the label
+  comes from `DEEVY_OIDC_NAME` and falls back to "Single sign-on", an entry missing its issuer is not offered,
+  the account lands with `providerId: "oidc"`, and a Human who signed in with Google first keeps one Member.
+
 ---
 
 ## Slice 7: An invitation is a link (M)

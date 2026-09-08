@@ -22,6 +22,12 @@ GITLAB_CLIENT_ID=
 GITLAB_CLIENT_SECRET=
 # A self-hosted GitLab, if it is not gitlab.com.
 # GITLAB_ISSUER=https://gitlab.example.com
+# One generic OpenID Connect provider, discovered from its issuer. Redirect URI:
+# ${BETTER_AUTH_URL}/api/auth/callback/oidc. DEEVY_OIDC_NAME is what the button says.
+# DEEVY_OIDC_ISSUER=https://idp.example.com/realms/acme
+DEEVY_OIDC_CLIENT_ID=
+DEEVY_OIDC_CLIENT_SECRET=
+# DEEVY_OIDC_NAME=Acme SSO
 # The first sign-in with this email becomes the Workspace admin and creates the Workspace.
 DEEVY_ADMIN_EMAIL=
 DEEVY_WORKSPACE_NAME=deevy
