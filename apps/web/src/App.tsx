@@ -24,6 +24,11 @@ export function SignedOut() {
   // stub (DEEVY_DEV_STUB_GITHUB).
   const health = useQuery(orpc.health.ping.queryOptions());
   const providers = health.data?.providers;
+  // What a button that did not start says. Better Auth answers a provider it
+  // never registered with an error rather than a redirect — the case a
+  // discovery document that could not be fetched at startup leaves behind — and
+  // without this the click is a silent no-op (docs/plans/sign-in.md).
+  const [failed, setFailed] = useState<string | null>(null);
   return (
     <SignInFrame>
       <div className="flex flex-col gap-1">
@@ -37,13 +42,19 @@ export function SignedOut() {
           key={provider.id}
           size="lg"
           className="w-full"
-          onClick={() =>
-            authClient.signIn.social({
+          onClick={async () => {
+            setFailed(null);
+            const started = await authClient.signIn.social({
               provider: provider.id as Parameters<typeof authClient.signIn.social>[0]["provider"],
               callbackURL: home(),
               errorCallbackURL: home(),
-            })
-          }
+            });
+            if (started.error) {
+              setFailed(
+                `Sign-in with ${provider.label} could not start. Ask an operator to check this deployment's configuration.`,
+              );
+            }
+          }}
         >
           Sign in with {provider.label}
         </Button>
@@ -54,6 +65,15 @@ export function SignedOut() {
           id and secret and restarts it.
         </p>
       ) : null}
+      {/* A page that cannot ask what it offers says so. Without this the
+          buttons and the line above are both absent and the card is empty. */}
+      {health.isError ? (
+        <p className="text-sm text-destructive">
+          This deevy could not be reached, so there is nothing to sign in with yet. Reload to try
+          again.
+        </p>
+      ) : null}
+      {failed ? <p className="text-sm text-destructive">{failed}</p> : null}
       {health.data?.devSignIn ? <DevSignIn /> : null}
     </SignInFrame>
   );

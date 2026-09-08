@@ -38,6 +38,15 @@ function positive(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * What the stub stands in for: a provider is registered only when both halves
+ * of its client pair are set, and a developer running without an OAuth App has
+ * neither. So the flag supplies the halves it does not have, and a real value
+ * always wins — an instance configured with a pair keeps it
+ * (docs/DEVELOPMENT.md, "Running without an OAuth App").
+ */
+const stubbed = "dev-stub";
+
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
   const devStubGithub = env.DEEVY_DEV_STUB_GITHUB === "1";
   if (devStubGithub && env.NODE_ENV === "production") {
@@ -45,6 +54,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
       "DEEVY_DEV_STUB_GITHUB replaces GitHub sign-in and cannot be set in production",
     );
   }
+  const half = (value: string | undefined) => value || (devStubGithub ? stubbed : "");
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.
     port: Number(env.DEEVY_PORT ?? env.PORT ?? 3000),
@@ -55,8 +65,8 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     webOrigin: env.DEEVY_WEB_ORIGIN,
     providers: {
       github: {
-        clientId: env.GITHUB_CLIENT_ID ?? "",
-        clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+        clientId: half(env.GITHUB_CLIENT_ID),
+        clientSecret: half(env.GITHUB_CLIENT_SECRET),
       },
     },
     adminEmail: env.DEEVY_ADMIN_EMAIL,

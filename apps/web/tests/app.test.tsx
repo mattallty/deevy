@@ -11,6 +11,16 @@ const github: StubProvider = { id: "github", label: "GitHub", kind: "social" };
 const stub = vi.hoisted(() => ({
   devSignIn: false,
   providers: [{ id: "github", label: "GitHub", kind: "social" }] as StubProvider[],
+  /** The ping fails: the instance is unreachable rather than unconfigured. */
+  unreachable: false,
+  /** What `authClient.signIn.social` answers — an error is a button that did not start. */
+  signInError: null as { message: string } | null,
+}));
+
+vi.mock("../src/lib/auth.ts", () => ({
+  authClient: {
+    signIn: { social: async () => ({ data: null, error: stub.signInError }) },
+  },
 }));
 
 vi.mock("../src/lib/orpc.ts", async () => {
@@ -18,12 +28,15 @@ vi.mock("../src/lib/orpc.ts", async () => {
   const { stubClient } = await import("./stub-client.ts");
   const client = stubClient({
     health: {
-      ping: async () => ({
-        ok: true,
-        time: new Date(0).toISOString(),
-        devSignIn: stub.devSignIn,
-        providers: stub.providers,
-      }),
+      ping: async () => {
+        if (stub.unreachable) throw new Error("unreachable");
+        return {
+          ok: true,
+          time: new Date(0).toISOString(),
+          devSignIn: stub.devSignIn,
+          providers: stub.providers,
+        };
+      },
     },
   });
   return { client, orpc: createTanstackQueryUtils(client) };
@@ -36,6 +49,8 @@ const { orpc } = await import("../src/lib/orpc.ts");
 afterEach(() => {
   stub.devSignIn = false;
   stub.providers = [github];
+  stub.unreachable = false;
+  stub.signInError = null;
   vi.unstubAllGlobals();
 });
 
@@ -73,6 +88,31 @@ describe("SignedOut", () => {
     mount(<SignedOut />);
     expect(await screen.findByRole("form", { name: "Development sign-in" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign in with GitHub" })).toBeTruthy();
+  });
+
+  /**
+   * An instance that cannot be asked what it offers is not an instance that
+   * offers nothing: without this the buttons and the "no provider configured"
+   * line are both absent and the card is empty (docs/plans/sign-in.md).
+   */
+  it("says so when it could not ask what this deployment offers", async () => {
+    stub.unreachable = true;
+    mount(<SignedOut />);
+    expect(await screen.findByText(/could not be reached/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Sign in with/ })).toBeNull();
+    expect(screen.queryByText(/no sign-in provider configured/)).toBeNull();
+  });
+
+  /**
+   * A provider the page was told about but Better Auth never registered — a
+   * discovery document that could not be fetched at startup leaves exactly
+   * this — answers the click with an error rather than a redirect.
+   */
+  it("says so when a button does not start a sign-in", async () => {
+    stub.signInError = { message: "PROVIDER_NOT_FOUND" };
+    mount(<SignedOut />);
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in with GitHub" }));
+    expect(await screen.findByText(/could not start/)).toBeTruthy();
   });
 });
 
