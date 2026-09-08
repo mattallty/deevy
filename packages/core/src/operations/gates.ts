@@ -7,6 +7,7 @@ import {
   gateApprovers,
   nextState,
   previousState,
+  requesterFor,
   recordGateDecision,
 } from "../workflow.ts";
 import { resumeGateRuns } from "../runs.ts";
@@ -41,6 +42,18 @@ export const gates = {
         });
       }
       assertNamedApprover(await gateApprovers(context.db, from.id), context.member.id);
+
+      // A Gate may refuse the Human who put the Issue in front of it. The
+      // message names the reason: being the requester is not the same refusal
+      // as not being an approver (docs/plans/four-eyes-gates.md).
+      if (from.excludeRequester) {
+        const requester = await requesterFor(context.db, issue);
+        if (requester === context.member.id) {
+          throw new ORPCError("FORBIDDEN", {
+            message: `You brought ${input.key} to the ${from.name} Gate, and it asks somebody else to agree`,
+          });
+        }
+      }
 
       // A Gate may want more than one Human, and wants them distinct: approving
       // twice is one Human's opinion twice (docs/plans/four-eyes-gates.md).

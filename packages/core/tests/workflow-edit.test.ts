@@ -346,3 +346,73 @@ describe("workflow.update and a Gate's threshold", () => {
     expect(plain.states[0]).toMatchObject({ name: "Intent", approvalsRequired: 1 });
   });
 });
+
+describe("workflow.update and the requester", () => {
+  it("refuses a Gate nobody could open once the requester is left out", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, state } = await withProject(db);
+    const two = [
+      { id: state("Intent").id, name: "Intent", isGate: true, category: "backlog" as const },
+      { id: state("Done").id, name: "Done", isGate: false, category: "done" as const },
+    ];
+    const rest = [state("Spec").id, state("Plan").id, state("Build").id, state("Review").id];
+
+    // One Human, which is deevy's zero-config case: excluding the requester
+    // leaves nobody at all, and a Gate like that is a dead end.
+    await expect(
+      client.workflow.update({
+        projectKey: "DEV",
+        states: [{ ...two[0]!, excludeRequester: true }, two[1]!],
+        deleteStates: rest,
+      }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message:
+        "That Gate asks for 1 approval and only 0 Humans could give one, once the requester is left out",
+    });
+
+    // A second Human makes one approval reachable, but not two.
+    await memberContext(db, { name: "Grace" });
+    await client.workflow.update({
+      projectKey: "DEV",
+      states: [{ ...two[0]!, excludeRequester: true }, two[1]!],
+      deleteStates: rest,
+    });
+    await expect(
+      client.workflow.update({
+        projectKey: "DEV",
+        states: [{ ...two[0]!, excludeRequester: true, approvalsRequired: 2 }, two[1]!],
+        deleteStates: rest,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("keeps the exclusion a client did not mention, and clears it from a State that stops being a Gate", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, state } = await withProject(db);
+    await memberContext(db, { name: "Grace" });
+    const all = (isGate: boolean, excludeRequester?: boolean) => ({
+      projectKey: "DEV" as const,
+      states: [
+        {
+          id: state("Intent").id,
+          name: "Intent",
+          isGate,
+          category: "backlog" as const,
+          excludeRequester,
+        },
+        { id: state("Done").id, name: "Done", isGate: false, category: "done" as const },
+      ],
+      deleteStates: [state("Spec").id, state("Plan").id, state("Build").id, state("Review").id],
+    });
+    await client.workflow.update(all(true, true));
+
+    const kept = await client.workflow.update(all(true));
+    expect(kept.states[0]).toMatchObject({ name: "Intent", excludeRequester: true });
+
+    const plain = await client.workflow.update(all(false));
+    expect(plain.states[0]).toMatchObject({ name: "Intent", excludeRequester: false });
+  });
+});

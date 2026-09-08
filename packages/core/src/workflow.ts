@@ -1,5 +1,6 @@
 import {
   gateApprover as gateApproverTable,
+  event as eventTable,
   gateDecision as gateDecisionTable,
   issue as issueTable,
   member as memberTable,
@@ -9,7 +10,7 @@ import {
   type WorkflowState,
 } from "@deevy/db";
 import { ORPCError } from "@orpc/server";
-import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { issueUrl } from "./slack.ts";
 import { newId } from "./ids.ts";
 
@@ -197,6 +198,59 @@ export async function eligibleApprovers(
       ),
     );
   return rows.map((row) => row.id);
+}
+
+/**
+ * The Events that put an Issue where it is. A `gate.rejected` counts only when
+ * it moved the Issue: a rejection in the first State has nowhere to send it and
+ * leaves it in the Gate it was already in, which somebody else put it in.
+ */
+function movedTheIssue(row: { kind: string; payload: Record<string, unknown> | null }): boolean {
+  if (row.kind === "issue.created" || row.kind === "issue.moved") return true;
+  if (row.kind === "gate.approved") return true;
+  if (row.kind !== "gate.rejected") return false;
+  return row.payload?.to !== row.payload?.state;
+}
+
+/**
+ * The Human who put this Issue in front of the Gate it is in: the actor on the
+ * move that brought it here and, when that actor is an Agent, its Sponsor. That
+ * is PLAN.md's own rule for accountability — the accountable Human is the
+ * triggering Human, or the Sponsor when an Agent triggered it — asked about who
+ * should not be the one to wave the work through.
+ *
+ * Null when the log does not say: an Issue carried into a State by a Workflow
+ * edit has no Event of its own, and a rule that guessed would be worse than one
+ * that abstains. Only Events at or after `stateEnteredAt` are considered, which
+ * is what makes that case null rather than the previous move's actor.
+ */
+export async function requesterFor(
+  db: Db,
+  issue: Pick<Issue, "id" | "stateEnteredAt">,
+): Promise<string | null> {
+  const rows = await db
+    .select({
+      kind: eventTable.kind,
+      payload: eventTable.payload,
+      actorMemberId: eventTable.actorMemberId,
+      createdAt: eventTable.createdAt,
+    })
+    .from(eventTable)
+    .where(and(eq(eventTable.subjectType, "issue"), eq(eventTable.subjectId, issue.id)))
+    .orderBy(desc(eventTable.seq));
+
+  for (const row of rows) {
+    if (row.createdAt < issue.stateEnteredAt) return null;
+    if (!movedTheIssue(row)) continue;
+    if (!row.actorMemberId) return null;
+    const actor = await db.query.member.findFirst({
+      where: { id: row.actorMemberId },
+      columns: { id: true, kind: true, sponsorId: true },
+    });
+    if (!actor) return null;
+    return actor.kind === "agent" ? actor.sponsorId : actor.id;
+  }
+  return null;
 }
 
 /**

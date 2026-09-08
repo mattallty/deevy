@@ -50,19 +50,32 @@ async function statesWithApprovers(context: ContextFor<"member">, projectId: str
  */
 async function assertReachableThresholds(
   context: ContextFor<"member">,
-  states: Array<{ isGate: boolean; approverMemberIds: string[]; approvalsRequired: number }>,
+  states: Array<{
+    isGate: boolean;
+    approverMemberIds: string[];
+    approvalsRequired: number;
+    excludeRequester: boolean;
+  }>,
 ): Promise<void> {
   for (const state of states) {
-    if (!state.isGate || state.approvalsRequired <= 1) continue;
+    if (!state.isGate) continue;
+    if (state.approvalsRequired <= 1 && !state.excludeRequester) continue;
     const eligible = await eligibleApprovers(context.db, {
       workspaceId: context.workspace.id,
       named: state.approverMemberIds,
     });
-    if (state.approvalsRequired > eligible.length) {
+    // Which Human the requester will be is not known until there is an Issue,
+    // but that one of them will be is: excluding them costs a Human from every
+    // count, and a Workspace of one cannot exclude anybody at all.
+    const available = eligible.length - (state.excludeRequester ? 1 : 0);
+    if (state.approvalsRequired > available) {
+      const excepting = state.excludeRequester ? ", once the requester is left out" : "";
       throw new ORPCError("BAD_REQUEST", {
-        message: `That Gate asks for ${state.approvalsRequired} approvals and only ${eligible.length} ${
-          eligible.length === 1 ? "Human could give one" : "Humans could give one"
-        }`,
+        message: `That Gate asks for ${state.approvalsRequired} ${
+          state.approvalsRequired === 1 ? "approval" : "approvals"
+        } and only ${available} ${
+          available === 1 ? "Human could give one" : "Humans could give one"
+        }${excepting}`,
       });
     }
   }
@@ -163,6 +176,12 @@ export const workflow = {
            * a Gate by saving the Workflow (docs/plans/four-eyes-gates.md).
            */
           approvalsRequired: z.number().int().min(1).max(20).optional(),
+          /**
+           * Whether the Human who brought an Issue to this Gate may be one of
+           * the Humans who lets it through. Left out, an existing State keeps
+           * its answer (docs/plans/four-eyes-gates.md).
+           */
+          excludeRequester: z.boolean().optional(),
         }),
       ),
       deleteStates: z.array(z.string()).default([]),
@@ -193,12 +212,17 @@ export const workflow = {
       // A State that is not a Gate is never approved, so it holds no threshold:
       // resetting it keeps a number from lying in wait for the day somebody
       // ticks the Gate box.
-      const stored = new Map(existing.map((state) => [state.id, state.approvalsRequired]));
+      const stored = new Map(existing.map((state) => [state.id, state]));
       const resolved = input.states.map((state) => ({
         ...state,
         approvalsRequired: !state.isGate
           ? 1
-          : (state.approvalsRequired ?? (state.id ? (stored.get(state.id) ?? 1) : 1)),
+          : (state.approvalsRequired ??
+            (state.id ? (stored.get(state.id)?.approvalsRequired ?? 1) : 1)),
+        excludeRequester: !state.isGate
+          ? false
+          : (state.excludeRequester ??
+            (state.id ? (stored.get(state.id)?.excludeRequester ?? false) : false)),
       }));
       await assertReachableThresholds(context, resolved);
 
@@ -238,6 +262,7 @@ export const workflow = {
               position,
               isGate: state.isGate,
               approvalsRequired: state.approvalsRequired,
+              excludeRequester: state.excludeRequester,
               category: state.category,
               documentName: state.documentName ?? null,
               documentTemplate: state.documentTemplate ?? null,
@@ -254,6 +279,7 @@ export const workflow = {
             position,
             isGate: state.isGate,
             approvalsRequired: state.approvalsRequired,
+            excludeRequester: state.excludeRequester,
             category: state.category,
             documentName: state.documentName ?? null,
             documentTemplate: state.documentTemplate ?? null,

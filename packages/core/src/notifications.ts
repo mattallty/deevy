@@ -10,7 +10,7 @@ import {
   type Notification,
 } from "@deevy/db";
 import { eq } from "drizzle-orm";
-import { approvalsThisVisit, eligibleApprovers, gateApprovers } from "./workflow.ts";
+import { approvalsThisVisit, eligibleApprovers, gateApprovers, requesterFor } from "./workflow.ts";
 import { newId } from "./ids.ts";
 
 /**
@@ -283,16 +283,20 @@ async function recipientsFor(db: Db, event: Event): Promise<Recipient[]> {
     event.kind === "gate.rejected"
   ) {
     if (event.subjectType !== "issue") return [];
-    const stateId = await gateStateOf(db, event.subjectId);
-    if (!stateId) return [];
-    return gateRecipients(db, event, stateId);
+    const gate = await gateStateOf(db, event.subjectId);
+    if (!gate) return [];
+    return gateRecipients(db, event, gate);
   }
 
   // An Agent that reached a Gate mid-Run asks the same Humans the Gate itself
   // would ask, not the Human behind the Run: the decision is the Gate's to
   // make (ADR-0004), and the Sponsor may not be one of its approvers.
   const askedAbout = gateStateAsked(event);
-  if (askedAbout) return gateRecipients(db, event, askedAbout);
+  if (askedAbout) {
+    const asked = (event.payload as { issueId?: unknown } | null)?.issueId;
+    const gate = await gateAsked(db, askedAbout, typeof asked === "string" ? asked : null);
+    return gate ? gateRecipients(db, event, gate) : [];
+  }
 
   // A ruling is owed to whoever asked for it, and that is the Agent.
   if (event.kind === AGENT_ANSWERED && event.subjectType === "run") {
@@ -341,14 +345,49 @@ async function humanBehind(db: Db, memberId: string | null): Promise<string | nu
 }
 
 /** The Gate an Issue is sitting in, or none when the State it is in is not one. */
-async function gateStateOf(db: Db, issueId: string): Promise<string | null> {
+async function gateStateOf(db: Db, issueId: string): Promise<Gate | null> {
   const [row] = await db
-    .select({ id: workflowState.id, isGate: workflowState.isGate })
+    .select({
+      id: workflowState.id,
+      isGate: workflowState.isGate,
+      excludeRequester: workflowState.excludeRequester,
+      issueId: issueTable.id,
+      stateEnteredAt: issueTable.stateEnteredAt,
+    })
     .from(issueTable)
     .innerJoin(workflowState, eq(issueTable.stateId, workflowState.id))
     .where(eq(issueTable.id, issueId))
     .limit(1);
-  return row?.isGate === true ? row.id : null;
+  return row?.isGate === true ? row : null;
+}
+
+/** The Gate an Issue is in, with the Issue's visit to it. */
+interface Gate {
+  id: string;
+  excludeRequester: boolean;
+  issueId: string;
+  stateEnteredAt: Date;
+}
+
+/** The same, for a Gate named by a Run's question rather than by where the Issue is. */
+async function gateAsked(db: Db, stateId: string, issueId: string | null): Promise<Gate | null> {
+  const state = await db.query.workflowState.findFirst({
+    where: { id: stateId },
+    columns: { id: true, excludeRequester: true },
+  });
+  if (!state) return null;
+  const issue = issueId
+    ? await db.query.issue.findFirst({
+        where: { id: issueId },
+        columns: { id: true, stateEnteredAt: true },
+      })
+    : null;
+  return {
+    id: state.id,
+    excludeRequester: state.excludeRequester,
+    issueId: issue?.id ?? "",
+    stateEnteredAt: issue?.stateEnteredAt ?? new Date(0),
+  };
 }
 
 /**
@@ -356,32 +395,31 @@ async function gateStateOf(db: Db, issueId: string): Promise<string | null> {
  * one that names none asks every active Human, which is what M1 shipped
  * (schema/gate.ts). The actor is never asked about their own action either way.
  */
-async function gateRecipients(db: Db, event: Event, stateId: string): Promise<Recipient[]> {
-  const named = await gateApprovers(db, stateId);
+async function gateRecipients(db: Db, event: Event, gate: Gate): Promise<Recipient[]> {
+  const named = await gateApprovers(db, gate.id);
+  const visit = { id: gate.issueId, stateEnteredAt: gate.stateEnteredAt };
+  // Both of these cost a query and neither is the common case, so neither is
+  // paid for by a Workflow that wants one approval from anybody: creating an
+  // Issue in a Gate is deevy's busiest write (tests/budget.test.ts).
+  //
+  // A Gate that excludes the requester is asking them for nothing, so it does
+  // not put the question in their inbox; and a Gate that wants more than one
+  // Human keeps asking the ones who have not answered and stops asking the one
+  // who has, since an approval already given is not a question
+  // (docs/plans/four-eyes-gates.md).
+  const requester = gate.excludeRequester && gate.issueId ? await requesterFor(db, visit) : null;
+  const already =
+    event.kind === "gate.approval" && gate.issueId
+      ? await approvalsThisVisit(db, visit, gate.id)
+      : [];
   const humans = await eligibleApprovers(db, {
     workspaceId: event.workspaceId,
     named,
     exclude: event.actorMemberId,
   });
-  // A Gate that wants more than one Human keeps asking the ones who have not
-  // answered yet, and stops asking the ones who have: an approval already given
-  // is not a question (docs/plans/four-eyes-gates.md).
-  const already =
-    event.kind === "gate.approval" && event.subjectType === "issue"
-      ? await approvedAlready(db, event.subjectId, stateId)
-      : [];
   return humans
-    .filter((memberId) => !already.includes(memberId))
+    .filter((memberId) => memberId !== requester && !already.includes(memberId))
     .map((memberId) => ({ memberId, kind: "gate_awaiting" as const }));
-}
-
-/** Who has already approved the Gate an Issue is in, for the visit it is on. */
-async function approvedAlready(db: Db, issueId: string, stateId: string): Promise<string[]> {
-  const found = await db.query.issue.findFirst({
-    where: { id: issueId },
-    columns: { id: true, stateEnteredAt: true },
-  });
-  return found ? approvalsThisVisit(db, found, stateId) : [];
 }
 
 /** Of the given Members, those still able to act. Suspension silences an inbox. */

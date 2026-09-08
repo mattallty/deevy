@@ -233,7 +233,7 @@ async function withTwoHumans(db: MemberContext["db"]) {
   return { ...base, grace, asGrace };
 }
 
-/** Rewrite the Workflow whole, changing one Gate's threshold and nothing else. */
+/** Rewrite the Workflow whole, changing one Gate's rules and nothing else. */
 type Client = Awaited<ReturnType<typeof withIssue>>["client"];
 
 async function wants(
@@ -245,7 +245,7 @@ async function wants(
     category: "backlog" | "active" | "done";
   }>,
   gate: string,
-  approvalsRequired: number,
+  rules: { approvalsRequired?: number; excludeRequester?: boolean },
 ) {
   await client.workflow.update({
     projectKey: "DEV",
@@ -254,7 +254,7 @@ async function wants(
       name: state.name,
       isGate: state.isGate,
       category: state.category,
-      approvalsRequired: state.name === gate ? approvalsRequired : undefined,
+      ...(state.name === gate ? rules : {}),
     })),
   });
 }
@@ -264,7 +264,7 @@ describe("a Gate that wants two Humans", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { admin, client, project, asGrace, grace } = await withTwoHumans(db);
-    await wants(client, project.states, "Intent", 2);
+    await wants(client, project.states, "Intent", { approvalsRequired: 2 });
 
     const first = await client.gates.approve({ key: "DEV-1", note: "Worth doing" });
 
@@ -290,7 +290,7 @@ describe("a Gate that wants two Humans", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client, project } = await withTwoHumans(db);
-    await wants(client, project.states, "Intent", 2);
+    await wants(client, project.states, "Intent", { approvalsRequired: 2 });
     await client.gates.approve({ key: "DEV-1" });
 
     await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
@@ -304,7 +304,7 @@ describe("a Gate that wants two Humans", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client, project, asGrace } = await withTwoHumans(db);
-    await wants(client, project.states, "Intent", 2);
+    await wants(client, project.states, "Intent", { approvalsRequired: 2 });
     await client.gates.approve({ key: "DEV-1" });
 
     // Intent is the first State, so a rejection has nowhere to send the Issue
@@ -324,7 +324,7 @@ describe("a Gate that wants two Humans", () => {
     const { db, close } = testDb();
     closers.push(close);
     const { client, project, asGrace } = await withTwoHumans(db);
-    await wants(client, project.states, "Spec", 2);
+    await wants(client, project.states, "Spec", { approvalsRequired: 2 });
     await client.gates.approve({ key: "DEV-1" }); // Intent, which wants one
     await client.gates.approve({ key: "DEV-1" }); // Spec, one of two
     await asGrace.gates.approve({ key: "DEV-1" }); // Spec, and through
@@ -345,7 +345,7 @@ describe("a Gate that wants two Humans", () => {
     closers.push(close);
     const { client, project, asGrace } = await withTwoHumans(db);
     const admin = await db.query.member.findFirst({ where: { role: "admin" } });
-    await wants(client, project.states, "Intent", 2);
+    await wants(client, project.states, "Intent", { approvalsRequired: 2 });
     const agent = await agentContext(db, {
       sponsor: admin!,
       name: "Planner",
@@ -375,5 +375,108 @@ describe("a Gate that wants two Humans", () => {
     const approved = await client.gates.approve({ key: "DEV-1" });
 
     expect(approved.state.name).toBe("Spec");
+  });
+});
+
+/**
+ * A Gate that refuses the Human who asked for it (docs/plans/four-eyes-gates.md
+ * slice 2). The requester is the actor on the move that brought the Issue here,
+ * and the Sponsor when that actor was an Agent.
+ */
+describe("a Gate that excludes the requester", () => {
+  it("refuses the Human who brought the Issue, and takes another's approval", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace } = await withTwoHumans(db);
+    await wants(client, project.states, "Review", { excludeRequester: true });
+    for (const _ of ["Intent", "Spec", "Plan"]) await client.gates.approve({ key: "DEV-1" });
+    await client.issues.move({
+      key: "DEV-1",
+      stateId: project.states.find((s) => s.name === "Review")!.id,
+    });
+
+    await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "You brought DEV-1 to the Review Gate, and it asks somebody else to agree",
+    });
+
+    const approved = await asGrace.gates.approve({ key: "DEV-1" });
+    expect(approved.state.name).toBe("Done");
+  });
+
+  it("refuses the Agent's Sponsor when an Agent brought the Issue", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { admin, client, project, asGrace } = await withTwoHumans(db);
+    await wants(client, project.states, "Review", { excludeRequester: true });
+    for (const _ of ["Intent", "Spec", "Plan"]) await client.gates.approve({ key: "DEV-1" });
+    const agent = await agentContext(db, {
+      sponsor: admin.member,
+      name: "Builder",
+      grants: [project.id],
+    });
+    const asAgent = createRouterClient(router, { context: agent });
+
+    // The Agent moves it into Review, so its Sponsor is the Human accountable
+    // for the work and is not the one to agree it is done.
+    await asAgent.issues.move({
+      key: "DEV-1",
+      stateId: project.states.find((s) => s.name === "Review")!.id,
+    });
+
+    await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect((await asGrace.gates.approve({ key: "DEV-1" })).state.name).toBe("Done");
+  });
+
+  it("lets the same Human approve when the Gate does not exclude them", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project } = await withTwoHumans(db);
+    for (const _ of ["Intent", "Spec", "Plan"]) await client.gates.approve({ key: "DEV-1" });
+    await client.issues.move({
+      key: "DEV-1",
+      stateId: project.states.find((s) => s.name === "Review")!.id,
+    });
+
+    expect((await client.gates.approve({ key: "DEV-1" })).state.name).toBe("Done");
+  });
+
+  it("asks nobody in particular when the log does not say who brought the Issue", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project } = await withTwoHumans(db);
+    await wants(client, project.states, "Intent", { excludeRequester: true });
+
+    // Created straight into the Gate by the Human who then approves it: the
+    // Issue was created, not moved in, so `issue.created` is the move that
+    // brought it here and its actor is the requester.
+    await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("wants both rules at once when both are set", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client, project, asGrace } = await withTwoHumans(db);
+    const ines = await memberContext(db, { name: "Ines" });
+    const asInes = createRouterClient(router, { context: ines });
+    await wants(client, project.states, "Review", {
+      approvalsRequired: 2,
+      excludeRequester: true,
+    });
+    for (const _ of ["Intent", "Spec", "Plan"]) await client.gates.approve({ key: "DEV-1" });
+    await client.issues.move({
+      key: "DEV-1",
+      stateId: project.states.find((s) => s.name === "Review")!.id,
+    });
+
+    await expect(client.gates.approve({ key: "DEV-1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect((await asGrace.gates.approve({ key: "DEV-1" })).state.name).toBe("Review");
+    expect((await asInes.gates.approve({ key: "DEV-1" })).state.name).toBe("Done");
   });
 });
