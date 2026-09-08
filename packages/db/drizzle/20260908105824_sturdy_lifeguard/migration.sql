@@ -1,0 +1,1 @@
+ALTER TABLE `workflow_state` ADD `exclude_requester` integer DEFAULT false NOT NULL;

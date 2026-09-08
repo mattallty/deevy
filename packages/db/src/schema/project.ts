@@ -98,6 +98,12 @@ export const workflowState = sqliteTable(
      * keeps them behaving exactly as they did (docs/plans/four-eyes-gates.md).
      */
     approvalsRequired: integer("approvals_required").default(1).notNull(),
+    /**
+     * Whether the Human who put the Issue in front of this Gate may be one of
+     * the Humans who lets it through. False is what every Workflow did before
+     * this column existed (docs/plans/four-eyes-gates.md).
+     */
+    excludeRequester: integer("exclude_requester", { mode: "boolean" }).default(false).notNull(),
     category: text("category", { enum: workflowStateCategories }).notNull(),
     /** The Document this State asks for, created from its template on entry. */
     documentName: text("document_name"),

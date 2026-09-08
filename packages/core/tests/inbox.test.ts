@@ -305,3 +305,35 @@ describe("what a Notification carries", () => {
     expect(assignment?.comment).toBeNull();
   });
 });
+
+describe("a Gate that excludes the requester", () => {
+  it("does not ask the Human it will refuse", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { asAlice, asBob, asCarol } = await workspace(db);
+    const project = await asAlice.workflow.get({ projectKey: "DEV" });
+    await asAlice.workflow.update({
+      projectKey: "DEV",
+      states: project.states.map((state) => ({
+        id: state.id,
+        name: state.name,
+        isGate: state.isGate,
+        category: state.category,
+        excludeRequester: state.name === "Spec",
+      })),
+    });
+    await asAlice.issues.create({ projectKey: "DEV", title: "Ship it" });
+
+    // Bob approves Intent, which carries the Issue into the Spec Gate: he is
+    // the one who brought it there, so Spec has nothing to ask him.
+    await asBob.gates.approve({ key: "DEV-1" });
+
+    const asked = async (client: typeof asAlice) =>
+      (await client.inbox.list({})).notifications.filter(
+        (n) => n.kind === "gate_awaiting" && n.event.kind === "gate.approved",
+      ).length;
+    expect(await asked(asAlice)).toBe(1);
+    expect(await asked(asCarol)).toBe(1);
+    expect(await asked(asBob)).toBe(0);
+  });
+});
