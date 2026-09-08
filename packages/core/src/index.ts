@@ -1,5 +1,6 @@
 export { createApp, type App, type AppOptions } from "./app.ts";
 export {
+  accountLinkingOf,
   apiKeyPrefix,
   bearerApiKey,
   bearerToken,

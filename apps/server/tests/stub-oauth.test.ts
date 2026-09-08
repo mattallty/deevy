@@ -9,6 +9,7 @@
  * providers of slices 4 to 6 will be pointed at.
  */
 import { afterAll, describe, expect, it } from "vite-plus/test";
+import { account, user } from "@deevy/db";
 import { signInProviders } from "@deevy/core";
 import { readEnv } from "../src/env.ts";
 import { buildServer } from "../src/server.ts";
@@ -29,13 +30,14 @@ const stubbedEnv = {
   GITHUB_CLIENT_SECRET: "stub-secret",
 };
 
-function stubbedServer() {
+function stubbedServer(overrides: { adminEmail?: string } = {}) {
   return buildServer({
     ...readEnv(stubbedEnv),
     databasePath: ":memory:",
     migrationsFolder,
     baseURL: origin,
     secret,
+    ...overrides,
   });
 }
 
@@ -52,6 +54,18 @@ async function signIn(
   provider: string,
   email: string,
 ): Promise<string> {
+  return cookiesOf(await callbackFor(app, provider, email));
+}
+
+/**
+ * The same dance, stopping at the callback's own response — which is where a
+ * sign-in that Better Auth refuses says so, in a redirect rather than a body.
+ */
+async function callbackFor(
+  app: ReturnType<typeof stubbedServer>["app"],
+  provider: string,
+  email: string,
+): Promise<Response> {
   const started = await app.request("/api/auth/sign-in/social", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -60,11 +74,10 @@ async function signIn(
   const { url } = (await started.json()) as { url?: string };
   if (!url) throw new Error(`sign-in did not start for ${provider}: ${String(started.status)}`);
   const state = new URL(url).searchParams.get("state") ?? "";
-  const callback = await app.request(
+  return app.request(
     `/api/auth/callback/${provider}?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`,
     { headers: { cookie: cookiesOf(started) }, redirect: "manual" },
   );
-  return cookiesOf(callback);
 }
 
 describe("a sign-in through the stub", () => {
@@ -84,6 +97,74 @@ describe("a sign-in through the stub", () => {
       expect(session?.user?.email).toBe(email);
       close();
     }
+  });
+});
+
+/**
+ * One Human, one Member (docs/plans/sign-in.md slice 3): the linking policy
+ * `createAuth` states, decided by Better Auth's real callback rather than by a
+ * test of the options object.
+ *
+ * The provider that signed the Human up first is a seeded `account` row. Only
+ * GitHub is registered until slices 4 to 6 land, and a row written by another
+ * provider is the same row whichever one wrote it — what is under test is what
+ * happens when a *second* provider arrives on an address a first one already
+ * holds, which is exactly what the second half of this drives.
+ */
+describe("a second provider on an address deevy already knows", () => {
+  const email = "ada@example.com";
+
+  /** The Human as the provider that signed them up first left them. */
+  async function signedUpElsewhere(
+    db: ReturnType<typeof stubbedServer>["db"],
+    emailVerified: boolean,
+  ) {
+    await db
+      .insert(user)
+      .values({ id: "usr_stubada00001", name: "Ada Lovelace", email, emailVerified });
+    await db.insert(account).values({
+      id: "acct_stubada0001",
+      accountId: email,
+      providerId: "google",
+      userId: "usr_stubada00001",
+      updatedAt: new Date(),
+    });
+  }
+
+  it("links onto the Human who holds it, and leaves one Member", async () => {
+    const { app, db, close } = stubbedServer({ adminEmail: email });
+    await signedUpElsewhere(db, true);
+
+    const cookie = await signIn(app, "github", email);
+    expect(cookie).toContain("session_token");
+    // Again, because a Human signs in more than once and a repeat must not
+    // collect a second Member: `admit` runs from the session hook every time.
+    await signIn(app, "github", email);
+
+    expect(await db.query.user.findMany()).toMatchObject([{ id: "usr_stubada00001", email }]);
+    const accounts = await db.query.account.findMany({ where: { userId: "usr_stubada00001" } });
+    expect(accounts.map((row) => row.providerId).sort()).toEqual(["github", "google"]);
+    expect(await db.query.member.findMany()).toMatchObject([
+      { userId: "usr_stubada00001", role: "admin", handle: "ada-lovelace" },
+    ]);
+    close();
+  });
+
+  it("refuses the link when the row holding the address never proved it", async () => {
+    const { app, db, close } = stubbedServer({ adminEmail: email });
+    await signedUpElsewhere(db, false);
+
+    const callback = await callbackFor(app, "github", email);
+
+    // Better Auth's `requireLocalEmailVerified`: an unverified row is not
+    // proof of ownership, so the sign-in fails rather than linking — and
+    // fails rather than starting a second Human on the same address.
+    expect(callback.headers.get("location")).toContain("error=account_not_linked");
+    expect(cookiesOf(callback)).not.toContain("session_token");
+    expect(await db.query.user.findMany()).toHaveLength(1);
+    expect(await db.query.account.findMany()).toHaveLength(1);
+    expect(await db.query.member.findMany()).toHaveLength(0);
+    close();
   });
 });
 

@@ -87,6 +87,7 @@ export function createAuth({ db, env }: CreateAuthOptions) {
     emailAndPassword: { enabled: false },
     plugins: [...apiKeyPlugins(), ...oauthServerPlugins(env)],
     socialProviders: socialProvidersOf(env.providers ?? {}),
+    account: { accountLinking: accountLinkingOf(env) },
     user: {
       additionalFields: {
         kind: {
@@ -140,6 +141,46 @@ export function signInProviders(env: Pick<AuthEnv, "providers">): SignInProvider
   if (configuredClient(providers.github))
     offered.push({ id: "github", label: "GitHub", kind: "social" });
   return offered;
+}
+
+/**
+ * One Human, one Member (docs/plans/sign-in.md). A teammate who signed in with
+ * one provider in March and another in April is one user row with two accounts
+ * — one handle, one inbox, one Member — rather than two strangers who share an
+ * address. Better Auth links that way by default; this says so, because what a
+ * Workspace's identity model is should not be inherited from a minor release.
+ *
+ * **No provider is trusted by name.** Better Auth's `trustedProviders` does not
+ * mean "a provider this deployment offers"; it means "link this provider's
+ * sign-in without reading whether it says the address is verified". Every
+ * provider deevy ships reports a verified address when it has one — GitHub and
+ * Google always do, GitLab through the `confirmed_at` its profile carries — so
+ * naming them buys no case that works and costs the one refusal that matters:
+ * an IdP with open self-registration, telling the truth about an address it has
+ * not verified, would otherwise link a stranger onto the Member who holds it
+ * (docs/OPERATIONS.md).
+ *
+ * The cost of the empty list is a provider that reports nothing at all. An
+ * OpenID Connect IdP that omits `email_verified` — Entra does — cannot become
+ * somebody's second provider, and says so with `account_not_linked` rather than
+ * linking on a claim nobody made.
+ *
+ * The gate that stays is Better Auth's `requireLocalEmailVerified`, left at its
+ * default `true` — the row already holding the address must itself have proved
+ * it, so nobody collects somebody else's next sign-in by registering an
+ * unverified account at their address first. It is set nowhere here because the
+ * option is deprecated on its way to being unconditional, and a value written
+ * down now is a value to delete later.
+ *
+ * `allowDifferentEmails: false`: a link is one address at both ends. Two
+ * addresses are two Humans until deevy has a screen that says otherwise.
+ */
+export function accountLinkingOf(_env: Pick<AuthEnv, "providers">) {
+  return {
+    enabled: true,
+    trustedProviders: [],
+    allowDifferentEmails: false,
+  };
 }
 
 /**

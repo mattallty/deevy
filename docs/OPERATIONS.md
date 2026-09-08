@@ -338,6 +338,27 @@ client id and secret are both present, `health.ping` reports the same list publi
 draws one button per entry in that order. An instance with none configured says so on the page instead of
 offering a button that goes nowhere. GitHub is the one entry today (docs/plans/sign-in.md).
 
+**One Human is one Member.** A teammate who signs in with one provider and later with another lands on the
+same user row: the second sign-in links onto the address the first one registered, so they keep one handle,
+one inbox and one Member rather than becoming two people who share an email.
+
+What decides is the provider, not deevy's configuration of it. **No provider is trusted by name**: a second
+sign-in links only when the provider itself says the address is verified. GitHub and Google always do, and
+GitLab says so with the `confirmed_at` stamp on its profile, so for those three the rule is invisible. It is
+not invisible for an OpenID Connect IdP that omits the claim — Microsoft Entra omits it — where the second
+sign-in is refused with `account_not_linked` and the teammate has to keep using the provider they started
+with. That is the deliberate direction to fail in: the alternative, trusting whatever an operator configured,
+means an IdP with open self-registration can hand somebody an account on a colleague's address and have it
+linked onto that colleague's Member, even when the IdP truthfully reports the address as unverified.
+
+The other end of the link is guarded the same way. Better Auth also refuses to link onto a local row that is
+itself unverified, so somebody who signed in first with an address a provider would not vouch for does not
+collect the real owner's next sign-in; that one fails at the callback with `account_not_linked`, and no
+second Human is created on the address. Note what that row's flag is: deevy never writes it, so it holds
+whatever the provider that created the row reported. A Human whose first sign-in was unverified therefore
+stays on that provider until an operator changes the row. Linking is also same-address only — two addresses are two Humans, and deevy has no
+screen that says otherwise.
+
 `BETTER_AUTH_URL` has to be the origin the browser actually visits, character for character. Better Auth
 builds the OAuth callback from it and sets the session cookie for it, and `packages/core/src/auth.ts` pins
 the token issuer and the RFC 8707 resource identifier to it as well. A value naming a host nobody visits

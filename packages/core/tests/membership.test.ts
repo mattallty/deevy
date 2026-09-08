@@ -1,11 +1,11 @@
-import { allowlistRule, member, user } from "@deevy/db";
+import { account, allowlistRule, member, user } from "@deevy/db";
 import { createRouterClient } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { bootstrapWorkspace, joinWorkspace } from "../src/auth.ts";
+import { accountLinkingOf, bootstrapWorkspace, createAuth, joinWorkspace } from "../src/auth.ts";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb, type MemberContext } from "./helpers.ts";
-import { newId } from "../src/ids.ts";
+import { authId, newId } from "../src/ids.ts";
 
 /** An admin plus one allowlist rule: the arrangement every join test starts from. */
 async function allow(
@@ -223,5 +223,77 @@ describe("the admin the bootstrap creates", () => {
     expect(await db.query.member.findFirst({ where: { userId: "u1" } })).toMatchObject({
       handle: "ada-lovelace",
     });
+  });
+});
+
+/**
+ * One Human, one Member (docs/plans/sign-in.md slice 3). Two halves: what
+ * Better Auth is told about linking, and what deevy does when a second account
+ * arrives for a Member it already has. The dance itself — a second provider
+ * signing in on an address a first one already registered — is driven end to
+ * end against the stub in `apps/server/tests/stub-oauth.test.ts`, which is
+ * where a real provider and a real callback are.
+ */
+describe("one Human, one Member", () => {
+  /**
+   * Trusting a provider by name is not "this deployment offers it"; it is
+   * "link it without reading whether it says the address is verified". Every
+   * provider deevy ships reports a verified address when it has one, so the
+   * list buys no working case and costs the refusal that stops an IdP with
+   * open self-registration linking a stranger onto a Member.
+   */
+  it("trusts no provider by name, whatever the deployment configured", () => {
+    const github = { clientId: "id", clientSecret: "secret" };
+    expect(accountLinkingOf({ providers: { github } })).toEqual({
+      enabled: true,
+      trustedProviders: [],
+      allowDifferentEmails: false,
+    });
+    expect(accountLinkingOf({})).toMatchObject({ trustedProviders: [] });
+  });
+
+  it("carries that decision into the instance, where the linking rule reads it", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const auth = createAuth({
+      db,
+      env: {
+        baseURL: "https://deevy.example.com",
+        secret: "test-secret-that-is-at-least-32-characters",
+        providers: { github: { clientId: "id", clientSecret: "secret" } },
+      },
+    });
+
+    // `context.trustedProviders` is what handleOAuthUserInfo consults; the
+    // option alone would be a value nothing had resolved.
+    expect((await auth.$context).trustedProviders).toEqual([]);
+    expect(auth.options.account?.accountLinking).toMatchObject({ allowDifferentEmails: false });
+  });
+
+  it("adds no second Member when another account joins a Human who has one", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await allow(db, "example.com");
+    await db.insert(user).values({ id: "u-bob", name: "Bob Vance", email: "bob@example.com" });
+    const bob = { userId: "u-bob", email: "bob@example.com", name: "Bob Vance" };
+    await joinWorkspace(db, bob, { githubLogin: "bvance" });
+
+    // What a linked account looks like on the way back in: the same user, a
+    // second provider, and the join running again from Better Auth's hooks.
+    await db.insert(account).values({
+      id: authId("account"),
+      accountId: "bob@example.com",
+      providerId: "google",
+      userId: "u-bob",
+      updatedAt: new Date(),
+    });
+    await joinWorkspace(db, bob);
+    await bootstrapWorkspace(db, bob, { adminEmail: "bob@example.com" });
+
+    const members = await db.query.member.findMany({ where: { userId: "u-bob" } });
+    expect(members).toMatchObject([{ role: "member", handle: "bvance" }]);
+    const client = createRouterClient(router, { context: admin });
+    const page = await client.events.list({ subjectType: "member", subjectId: members[0]?.id });
+    expect(page.events).toMatchObject([{ kind: "member.joined" }]);
   });
 });
