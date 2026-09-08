@@ -4,7 +4,7 @@
  * The acceptance walk's claim is that the runtime cannot tell the two apart
  * (ADR-0006), so it has to be able to start both: a Node process from the
  * packed bundle, and workerd from the built Worker on a local D1. Neither needs
- * an account, and sign-in is a GitHub stub prepended to the bundle — the same
+ * an account, and sign-in is an OAuth stub prepended to the bundle — the same
  * trick `apps/web/scripts/smoke-workers.ts` uses, and the reason this walk
  * needs no OAuth App either (docs/m4-acceptance.md).
  */
@@ -17,7 +17,7 @@ import { join } from "node:path";
 
 const here = new URL(".", import.meta.url).pathname;
 const root = join(here, "../../..");
-const stub = join(root, "apps/web/scripts/stub-github.js");
+const stub = join(root, "apps/web/scripts/stub-oauth.js");
 const wrangler = join(root, "apps/web/node_modules/.bin/wrangler");
 const childEnv = { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" };
 
@@ -66,8 +66,8 @@ function waitForReady(child: ChildProcess, what: string, ready: RegExp): Promise
 
 /** The bundle with the outside world replaced, written beside the original. */
 async function stubbed(bundle: string, into: string): Promise<string> {
-  const [github, source] = await Promise.all([readFile(stub, "utf8"), readFile(bundle, "utf8")]);
-  await writeFile(into, `${github}\n${source}`);
+  const [oauth, source] = await Promise.all([readFile(stub, "utf8"), readFile(bundle, "utf8")]);
+  await writeFile(into, `${oauth}\n${source}`);
   return into;
 }
 

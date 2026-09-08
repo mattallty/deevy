@@ -2,8 +2,8 @@
  * A Workspace worth looking at, for a developer with no OAuth App.
  *
  * Everything here goes through the same doors a person or an Agent would use.
- * Humans sign in through the GitHub stub (apps/web/scripts/stub-github.js), so
- * the admin this creates is the one `DEEVY_DEV_STUB_GITHUB=1` signs in as
+ * Humans sign in through the OAuth stub (apps/web/scripts/stub-oauth.js), so
+ * the admin this creates is the one `DEEVY_DEV_STUB_OAUTH=1` signs in as
  * afterwards; Agents get their identity from `agents.create` and their key from
  * `agents.keys.issue`; and every Issue, Document, comment, Run and Gate ruling
  * is an operation call, so the Event log, the inbox and the Run states fill
@@ -38,7 +38,7 @@ if (force && env.databasePath !== ":memory:") {
 
 // Sign-in goes through the stub whatever the flag says: the seed is a
 // development tool by definition, and this is its own process.
-await import("../../web/scripts/stub-github.js");
+await import("../../web/scripts/stub-oauth.js");
 const { app, db, auth, close } = buildServer(env);
 const jobs = discardingJobQueue();
 
@@ -608,7 +608,7 @@ console.log(
 );
 console.log(`Inbox       ${String(inbox.unread)} unread for the admin`);
 console.log("");
-console.log("Sign in with DEEVY_DEV_STUB_GITHUB=1 as either Human. The Agents' keys, shown once:");
+console.log("Sign in with DEEVY_DEV_STUB_OAUTH=1 as either Human. The Agents' keys, shown once:");
 console.log(`  Planner   ${planner.key}`);
 console.log(`  Builder   ${builder.key}`);
 close();

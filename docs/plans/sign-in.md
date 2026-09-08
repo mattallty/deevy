@@ -170,6 +170,32 @@ suite for the rename.
 **What must stay true.** `vp run server#seed` produces the same seeded Workspace, signed in through GitHub
 by default, and the smoke run on Workers behaves as it does today.
 
+What shipped differently:
+
+- **The stub is one function, not a file of declarations.** Its source is prepended to a built bundle, and
+  the bundle already exports a `base64url`; esbuild refuses the duplicate rather than shadowing it, so
+  `wrangler dev` would not start. Everything now lives inside an IIFE, which declares nothing at module
+  scope and cannot collide again. `vp run agent#acceptance` is what caught it, exactly as the plan's last
+  risk said it would.
+- **GitLab and the OIDC issuer are matched by path, not by host.** The stub cannot read the environment —
+  on workerd there is none at load — so it cannot know which host the operator's issuer is on. It answers
+  `/oauth/token`, `/api/v4/user`, `/api/v4/groups` and `/.well-known/openid-configuration` on any host that
+  is not loopback; loopback is deevy itself and must answer for its own routes, including the OAuth server
+  metadata `mcp()` publishes. GitHub and Google stay keyed by host, because Better Auth hardcodes theirs.
+- **The signed `id_token` is insurance, not a requirement of today's Better Auth.** On the callback path
+  1.7.3's Google provider only decodes the token; it verifies a signature on the id-token sign-in path, and
+  `genericOAuth` refuses to register a provider whose discovery hands back no usable `jwks_uri`. The stub
+  signs anyway, and the test verifies the signature against the JWKS the stub served — which is the bet the
+  plan names, checked where it can be checked.
+- **The end-to-end sign-in is over the one provider the environment can configure.** `apps/server/tests/stub-oauth.test.ts`
+  loops `signInProviders(env)` and drives each entry through Better Auth to a session, so it grows with
+  slices 4 to 6 without being edited; the other three providers' endpoints are asserted directly, since
+  nothing registers them yet.
+- **The dev form still names GitHub.** `DevSignIn` posts `provider: "github"` and lands on that callback,
+  which is correct while GitHub is the only entry; the slice that adds a second provider is the one that can
+  see whether it needs a chooser. `docs/DEVELOPMENT.md` gained the stub's shape, `.env.example`, the
+  `dev:stub` launch configuration and the `deevy-ui` skill the new flag name.
+
 ---
 
 ## Slice 3: One Human, one Member (S)

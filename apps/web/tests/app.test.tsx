@@ -83,7 +83,7 @@ describe("SignedOut", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("offers the development form only when health.ping says GitHub is a stub", async () => {
+  it("offers the development form only when health.ping says sign-in is stubbed", async () => {
     stub.devSignIn = true;
     mount(<SignedOut />);
     expect(await screen.findByRole("form", { name: "Development sign-in" })).toBeTruthy();

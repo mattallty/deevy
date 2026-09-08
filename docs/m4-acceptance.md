@@ -18,14 +18,14 @@ smoke.
 
 ## Why it needs nothing outside this machine
 
-| What the walk needs                         | What it uses instead                                                                                                |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| A deployed Worker                           | `wrangler dev --local` — miniflare with a real local D1, no account                                                 |
-| The Docker image                            | The packed Node bundle, on a port it picks                                                                          |
-| A GitHub OAuth App, so a Human can sign in  | `apps/web/scripts/stub-github.js`, prepended to whichever bundle is under test: the OAuth code is the email address |
-| A repository the Agent may push to          | A bare git repository in a temporary directory, and real `git`                                                      |
-| GitHub's pull-request API                   | A stub HTTP server, reached through `DEEVY_AGENT_GITHUB_API`                                                        |
-| A model, and a coding-agent CLI to drive it | A scripted session — see below                                                                                      |
+| What the walk needs                         | What it uses instead                                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A deployed Worker                           | `wrangler dev --local` — miniflare with a real local D1, no account                                                |
+| The Docker image                            | The packed Node bundle, on a port it picks                                                                         |
+| An OAuth App, so a Human can sign in        | `apps/web/scripts/stub-oauth.js`, prepended to whichever bundle is under test: the OAuth code is the email address |
+| A repository the Agent may push to          | A bare git repository in a temporary directory, and real `git`                                                     |
+| GitHub's pull-request API                   | A stub HTTP server, reached through `DEEVY_AGENT_GITHUB_API`                                                       |
+| A model, and a coding-agent CLI to drive it | A scripted session — see below                                                                                     |
 
 Nothing is mocked on deevy's side. The Worker is the built Worker with its own bindings and asset routing;
 the Node server is the bundle the Docker image runs; sign-in is Better Auth's real OAuth dance with only the

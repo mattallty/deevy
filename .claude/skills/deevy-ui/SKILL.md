@@ -47,14 +47,14 @@ rules) and `frontend-design` (design process) beside it.
 
 ## Running the app without an OAuth App
 
-`DEEVY_DEV_STUB_GITHUB=1` makes the Node server import `apps/web/scripts/stub-github.js` — the same stub the
+`DEEVY_DEV_STUB_OAUTH=1` makes the Node server import `apps/web/scripts/stub-oauth.js` — the same stub the
 acceptance walk and the Workers smoke prepend to their bundles — so the OAuth `code` is the email address and
 the signed-out page offers "Sign in as this email". Refused under `NODE_ENV=production`. The Worker never has
 it. `health.ping` reports `devSignIn`, which is how the SPA knows to show the form.
 
 ```bash
 # in .claude/launch.json as "dev:stub": the stubbed instance on its own database file
-DEEVY_DEV_STUB_GITHUB=1 DEEVY_DATABASE_PATH=./data/stub.sqlite vp run -r --parallel dev
+DEEVY_DEV_STUB_OAUTH=1 DEEVY_DATABASE_PATH=./data/stub.sqlite vp run -r --parallel dev
 DEEVY_DATABASE_PATH=./data/stub.sqlite vp run server#seed        # a Workspace worth looking at
 ```
 

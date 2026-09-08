@@ -325,7 +325,9 @@ desaturated; text content is the name) · `state-badge.tsx` (dot by category; Ga
 
 ### 0 — Sign in without GitHub, seed a Workspace worth looking at, install the skills (shipped)
 
-- `DEEVY_DEV_STUB_GITHUB=1` → `devStubGithub` in `apps/server/src/env.ts`, refused when
+- `DEEVY_DEV_STUB_GITHUB=1` → `devStubGithub` in `apps/server/src/env.ts` (both renamed to
+  `DEEVY_DEV_STUB_OAUTH` / `devStubOAuth` when the stub grew to stand in for every provider,
+  docs/plans/sign-in.md), refused when
   `NODE_ENV=production`. `apps/server/src/index.ts` (Node entry only; the Worker never sees it) imports and
   installs `apps/web/scripts/stub-github.js` when set, logging one loud line. The file stays where
   `boot.ts`/`smoke-workers.ts` prepend it; a test asserts the server imports that same file.

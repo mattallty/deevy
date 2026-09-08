@@ -50,7 +50,7 @@ export function buildServer(env: ServerEnv) {
     origin,
     baseURL: env.baseURL,
     secret: env.secret,
-    devSignIn: env.devStubGithub,
+    devSignIn: env.devStubOAuth,
     // What the sign-in page draws its buttons from: the providers this
     // environment configured, decided where they are registered rather than in
     // the SPA (docs/plans/sign-in.md).

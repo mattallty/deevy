@@ -75,9 +75,9 @@ describe("the runner's environment", () => {
   });
 });
 
-describe("the development GitHub stub", () => {
+describe("the development OAuth stub", () => {
   it("is off unless asked for, and reported as such", async () => {
-    expect(readEnv({}).devStubGithub).toBe(false);
+    expect(readEnv({}).devStubOAuth).toBe(false);
     const { app, close } = testServer();
     const body = (await (await app.request("/api/health/ping")).json()) as { devSignIn: boolean };
     expect(body.devSignIn).toBe(false);
@@ -92,7 +92,7 @@ describe("the development GitHub stub", () => {
    */
   it("supplies the client pair a developer without an OAuth App does not have", () => {
     const stubbed = readEnv({
-      DEEVY_DEV_STUB_GITHUB: "1",
+      DEEVY_DEV_STUB_OAUTH: "1",
       GITHUB_CLIENT_ID: "",
       GITHUB_CLIENT_SECRET: "",
     });
@@ -103,7 +103,7 @@ describe("the development GitHub stub", () => {
     // A real pair always wins, so an instance that has one keeps it.
     expect(
       readEnv({
-        DEEVY_DEV_STUB_GITHUB: "1",
+        DEEVY_DEV_STUB_OAUTH: "1",
         GITHUB_CLIENT_ID: "real",
         GITHUB_CLIENT_SECRET: "pair",
       }).providers.github,
@@ -112,9 +112,9 @@ describe("the development GitHub stub", () => {
     expect(readEnv({}).providers.github).toMatchObject({ clientId: "", clientSecret: "" });
   });
 
-  it("is on for DEEVY_DEV_STUB_GITHUB=1, and health.ping says so", async () => {
-    const env = readEnv({ DEEVY_DEV_STUB_GITHUB: "1" });
-    expect(env.devStubGithub).toBe(true);
+  it("is on for DEEVY_DEV_STUB_OAUTH=1, and health.ping says so", async () => {
+    const env = readEnv({ DEEVY_DEV_STUB_OAUTH: "1" });
+    expect(env.devStubOAuth).toBe(true);
     const { app, close } = buildServer({
       ...env,
       databasePath: ":memory:",
@@ -128,7 +128,7 @@ describe("the development GitHub stub", () => {
   });
 
   it("is refused in production rather than ignored", () => {
-    expect(() => readEnv({ DEEVY_DEV_STUB_GITHUB: "1", NODE_ENV: "production" })).toThrow(
+    expect(() => readEnv({ DEEVY_DEV_STUB_OAUTH: "1", NODE_ENV: "production" })).toThrow(
       /production/,
     );
   });
@@ -140,7 +140,7 @@ describe("the development GitHub stub", () => {
    */
   it("installs the stub the harnesses use, from where they read it", () => {
     const entry = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
-    expect(entry).toContain('import("../../web/scripts/stub-github.js")');
-    expect(existsSync(new URL("../../web/scripts/stub-github.js", import.meta.url))).toBe(true);
+    expect(entry).toContain('import("../../web/scripts/stub-oauth.js")');
+    expect(existsSync(new URL("../../web/scripts/stub-oauth.js", import.meta.url))).toBe(true);
   });
 });

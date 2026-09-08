@@ -22,14 +22,15 @@ export interface ServerEnv {
   sweepIntervalSeconds: number;
   gateReminderHours: number;
   /**
-   * Replace GitHub with the stub the acceptance walk signs in through
-   * (apps/web/scripts/stub-github.js), so a developer needs no OAuth App and
-   * the OAuth `code` is the email address. Development only, by construction:
+   * Replace every sign-in provider with the stub the acceptance walk signs
+   * in through (apps/web/scripts/stub-oauth.js), so a developer needs no
+   * account anywhere and the OAuth `code` is the email address. Development
+   * only, by construction:
    * `readEnv` refuses it under `NODE_ENV=production` rather than ignoring it,
    * because a flag that is silently dropped is a flag somebody will one day
    * believe is on.
    */
-  devStubGithub: boolean;
+  devStubOAuth: boolean;
 }
 
 /** A positive number from the environment, or the default when it is absent or nonsense. */
@@ -43,18 +44,40 @@ function positive(value: string | undefined, fallback: number): number {
  * of its client pair are set, and a developer running without an OAuth App has
  * neither. So the flag supplies the halves it does not have, and a real value
  * always wins — an instance configured with a pair keeps it
- * (docs/DEVELOPMENT.md, "Running without an OAuth App").
+ * (docs/DEVELOPMENT.md, "Running without an OAuth App"). The stub answers
+ * whatever pair it is handed, because the OAuth `code` is the email address.
  */
-const stubbed = "dev-stub";
+const STUB_CLIENT = { clientId: "stub-client", clientSecret: "stub-secret" };
+
+/**
+ * Every entry with both halves filled in, so a provider added later is stubbed
+ * by being added rather than by remembering this function.
+ */
+function stubbedProviders(providers: AuthProviders): AuthProviders {
+  const filled: AuthProviders = {};
+  for (const [id, client] of Object.entries(providers)) {
+    filled[id as keyof AuthProviders] = {
+      ...client,
+      clientId: client.clientId || STUB_CLIENT.clientId,
+      clientSecret: client.clientSecret || STUB_CLIENT.clientSecret,
+    };
+  }
+  return filled;
+}
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
-  const devStubGithub = env.DEEVY_DEV_STUB_GITHUB === "1";
-  if (devStubGithub && env.NODE_ENV === "production") {
+  const devStubOAuth = env.DEEVY_DEV_STUB_OAUTH === "1";
+  if (devStubOAuth && env.NODE_ENV === "production") {
     throw new Error(
-      "DEEVY_DEV_STUB_GITHUB replaces GitHub sign-in and cannot be set in production",
+      "DEEVY_DEV_STUB_OAUTH replaces every sign-in provider and cannot be set in production",
     );
   }
-  const half = (value: string | undefined) => value || (devStubGithub ? stubbed : "");
+  const providers: AuthProviders = {
+    github: {
+      clientId: env.GITHUB_CLIENT_ID ?? "",
+      clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+    },
+  };
   return {
     // DEEVY_PORT first: tooling commonly injects a generic PORT meant for something else.
     port: Number(env.DEEVY_PORT ?? env.PORT ?? 3000),
@@ -63,18 +86,13 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     webOrigin: env.DEEVY_WEB_ORIGIN,
-    providers: {
-      github: {
-        clientId: half(env.GITHUB_CLIENT_ID),
-        clientSecret: half(env.GITHUB_CLIENT_SECRET),
-      },
-    },
+    providers: devStubOAuth ? stubbedProviders(providers) : providers,
     adminEmail: env.DEEVY_ADMIN_EMAIL,
     workspaceName: env.DEEVY_WORKSPACE_NAME,
     webDist: env.DEEVY_WEB_DIST,
     runStaleMinutes: positive(env.DEEVY_RUN_STALE_MINUTES, 30),
     sweepIntervalSeconds: positive(env.DEEVY_SWEEP_INTERVAL_SECONDS, 60),
     gateReminderHours: positive(env.DEEVY_GATE_REMINDER_HOURS, 4),
-    devStubGithub,
+    devStubOAuth,
   };
 }

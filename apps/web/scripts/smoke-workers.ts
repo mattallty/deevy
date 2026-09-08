@@ -174,21 +174,21 @@ const queueName = "deevy-jobs-smoke";
 
 /**
  * The same built Worker with the outside world replaced, and the configuration
- * that serves it. Better Auth hardcodes GitHub's endpoints and a subscription
- * URL has to be https, so the seam for both is the isolate's global `fetch`:
- * scripts/stub-github.js and scripts/stub-receiver.js go in front of the
+ * that serves it. Better Auth hardcodes a provider's endpoints and a
+ * subscription URL has to be https, so the seam for both is the isolate's
+ * global `fetch`: scripts/stub-oauth.js and scripts/stub-receiver.js go in front of the
  * bundle and everything else — the D1 binding, the routing table, createApp
  * itself — is what a deployment gets (docs/plans/m3.md slices 5 and 9).
  */
 async function stubbedOutside(): Promise<string> {
   const stubConfig = join(here, "../dist/deevy/wrangler.stub.json");
-  const [github, receiver, bundle, written] = await Promise.all([
-    readFile(join(here, "stub-github.js"), "utf8"),
+  const [oauth, receiver, bundle, written] = await Promise.all([
+    readFile(join(here, "stub-oauth.js"), "utf8"),
     readFile(join(here, "stub-receiver.js"), "utf8"),
     readFile(join(here, "../dist/deevy/index.js"), "utf8"),
     readFile(config, "utf8"),
   ]);
-  await writeFile(join(here, "../dist/deevy", stubMain), `${github}\n${receiver}\n${bundle}`);
+  await writeFile(join(here, "../dist/deevy", stubMain), `${oauth}\n${receiver}\n${bundle}`);
   await writeFile(stubConfig, JSON.stringify({ ...JSON.parse(written), main: stubMain }));
   return stubConfig;
 }

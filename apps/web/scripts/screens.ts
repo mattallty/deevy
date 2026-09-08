@@ -215,8 +215,7 @@ try {
        body: JSON.stringify({ provider: "github", callbackURL: location.origin + "/" }) })
      .then((r) => r.json()).then((j) => new URL(j.url).searchParams.get("state"))`,
   );
-  if (!state)
-    throw new Error("the server did not start a sign-in; is DEEVY_DEV_STUB_GITHUB=1 set?");
+  if (!state) throw new Error("the server did not start a sign-in; is DEEVY_DEV_STUB_OAUTH=1 set?");
   await goto(
     page,
     `/api/auth/callback/github?state=${encodeURIComponent(state)}&code=${encodeURIComponent(email)}`,
