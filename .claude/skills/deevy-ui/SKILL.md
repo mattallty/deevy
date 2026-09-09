@@ -306,6 +306,14 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   peek (`?peek=`); the peek is `modal={false}` here and `onDragStart` closes it.
 - **Filters** are the shared `IssueFilters` with `hideProject` and `nativeAssignee` — the Assignee is a plain
   `<select>` on the Board because its test drives it with a change event.
+- **The Board's sideways scroll is the Board's** (`components/issue-board.tsx`, 2026-09-08). The scroller is
+  `relative`, because an absolutely positioned descendant is clipped by its containing block and not by
+  whatever scrolls — without it the `sr-only` words a `StateBadge` and an avatar carry are laid out against
+  the page and every column past the fold widens it. It wears `scrollbar-thin` (an `@utility` in `index.css`:
+  `scrollbar-width` for Firefox, `::-webkit-scrollbar` for WebKit, the thumb in `--border`). And a wheel over
+  it moves the columns: a non-passive `wheel` listener that converts `deltaY` to `scrollLeft`, leaves a
+  trackpad's own `deltaX` and Shift alone, and stops at either end so the page scrolls once the Board has
+  nowhere left to go.
 
 ## What slice 8 settled (the Project)
 

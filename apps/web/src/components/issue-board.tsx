@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { MemberChip } from "@/components/member-chip";
 import {
@@ -140,6 +140,36 @@ export function IssueBoardView({
     [columns],
   );
   const [dragging, setDragging] = useState<BoardIssue | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+
+  // A wheel is what most mice have, and a Board is the one place in deevy that
+  // reads sideways: over the columns, a wheel moves them. It stops at either
+  // end rather than swallowing the gesture, so the page still scrolls once the
+  // Board has nowhere left to go — and a trackpad's own sideways gesture, or
+  // Shift held down, is already horizontal and is left alone.
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const onWheel = (event: WheelEvent) => {
+      if (event.shiftKey || event.deltaX !== 0 || event.deltaY === 0) return;
+      const furthest = board.scrollWidth - board.clientWidth;
+      if (furthest <= 0) return;
+      if (event.deltaY < 0 && board.scrollLeft <= 0) return;
+      if (event.deltaY > 0 && board.scrollLeft >= furthest) return;
+      // A wheel reports lines or pages as readily as pixels.
+      const by =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? event.deltaY * 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? event.deltaY * board.clientHeight
+            : event.deltaY;
+      event.preventDefault();
+      board.scrollLeft = Math.min(furthest, Math.max(0, board.scrollLeft + by));
+    };
+    // Not passive: turning a wheel sideways means the page must not also move.
+    board.addEventListener("wheel", onWheel, { passive: false });
+    return () => board.removeEventListener("wheel", onWheel);
+  }, []);
 
   function onMove({ event, activeContainer, overContainer }: KanbanMoveEvent) {
     const card = cardById.get(String(event.active.id));
@@ -161,7 +191,17 @@ export function IssueBoardView({
       onDragEnd={() => setDragging(null)}
       onDragCancel={() => setDragging(null)}
     >
-      <KanbanBoard className="flex auto-rows-auto items-start gap-3 overflow-x-auto pb-4 sm:grid-cols-none">
+      {/*
+       * `relative` is what keeps the board's scroll inside the board: an
+       * absolutely positioned descendant is clipped by its containing block,
+       * not by whatever scrolls, and the sr-only words a StateBadge and an
+       * avatar carry would otherwise be laid out against the page and widen it
+       * by every column past the fold.
+       */}
+      <KanbanBoard
+        render={<div ref={boardRef} />}
+        className="scrollbar-thin relative flex auto-rows-auto items-start gap-3 overflow-x-auto pb-4 sm:grid-cols-none"
+      >
         {columns.map((column) => {
           const inColumn = value[column.id] ?? [];
           // Dimmed while a card is dragged that this column would not take, so

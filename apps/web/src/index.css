@@ -177,6 +177,32 @@
 }
 
 /*
+ * A scrollbar on something that scrolls inside the page — the Board's columns —
+ * is a line in the border colour rather than the platform's full-width bar,
+ * which on a Board is a shelf under the cards. Both spellings, because Firefox
+ * and WebKit each know only their own.
+ */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  &::-webkit-scrollbar {
+    height: 0.5rem;
+    width: 0.5rem;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: var(--radius-full, 9999px);
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+  }
+}
+
+/*
  * Code, coloured by lowlight in both the reader (rehype-highlight) and the
  * editor (the code block extension), from the palette rather than a theme file:
  * one accent per token family, quiet by design.
