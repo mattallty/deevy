@@ -28,5 +28,15 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    /**
+     * Vitest's 5s default is the wrong budget for this package. Its tests run
+     * the real thing — git subprocesses against a real bare repository, a
+     * loopback proxy, a deevy of their own — and the slowest is ~1.4s on an
+     * idle machine. Under `vp run -r test`, where seven packages share the
+     * CPU, the same test has been seen at 5s and failing: not a hang, ten
+     * times the wall clock for the same work. A hung test still fails here,
+     * twenty seconds later rather than five.
+     */
+    testTimeout: 20_000,
   },
 });
