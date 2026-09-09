@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
 import {
@@ -60,6 +60,8 @@ export function BoardPage({
     orpc.issues.list.queryOptions({
       input: filterInput ?? { projectKey, limit: ISSUE_PAGE },
       enabled: filterInput !== null,
+      // The cards a Human was reading stay put while a changed filter loads.
+      placeholderData: keepPreviousData,
     }),
   );
 

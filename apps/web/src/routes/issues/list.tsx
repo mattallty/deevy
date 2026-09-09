@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
@@ -79,6 +79,10 @@ export function IssuesPage({
       input: filterInput ?? { limit: ISSUE_PAGE },
       // "Me" cannot be asked for until we know who that is.
       enabled: filterInput !== null,
+      // Changing a filter asks a new question, and the old answer stays on
+      // screen until the new one lands: the count and the rows a Human was
+      // reading do not blink out for a skeleton on the way.
+      placeholderData: keepPreviousData,
     }),
   );
 
