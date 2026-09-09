@@ -330,7 +330,7 @@ no schedule.
 
 `POST /mcp` is the third surface (ADR-0005), projected from the same operation registry as the HTTP API. It is
 stateless, so there is nothing to keep warm between requests. To try it against the dev server, create an
-Agent under Settings, Agents, grant it a Project, issue a key, then:
+Agent under Settings, Agents — which hands back its first key, once — grant it a Project, then:
 
 ```bash
 claude mcp add --transport http deevy http://localhost:3000/mcp --header "Authorization: Bearer <the key>"

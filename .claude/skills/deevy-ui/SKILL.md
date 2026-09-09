@@ -343,6 +343,14 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   h1s and control names are unchanged.
 - **Native selects stay in Settings** where a test drives them with a change event (schedules, routing
   rules, providers, approvers). Members and Agents tables show `MemberChip`s; the Sponsor is a chip.
+- **An Agent is created with its first key**, and the dialog that made it is the only place that key is
+  readable — the shape the invitation link already had. `agents.create` returns it (null where nothing can
+  mint one), so an Agent made over the API is born connectable too.
+- **Connecting is on the Agent, not on the list.** `Connect an Agent` (region, `tablist "Coding agent"`)
+  lives on `/settings/agents/$memberId`, beside the keys it needs: this deevy's endpoint, then one tab per
+  coding agent — Claude Code, OpenCode, Cursor CLI, Copilot CLI, and `Anything else` — each with the file or
+  the command it takes. The recipes are data in `lib/mcp.ts` (which also owns `mcpEndpoint()`, read off the
+  page), so a fifth is an entry there, and they follow the runtime's own recipes (docs/harnesses.md).
 - **The Agent detail** has Projects and API keys (regions kept), a Schedule section (`Wake`), Recent Runs
   (`runs.list({ agentMemberId })`), a danger section to Suspend/Reinstate, and — for an admin — a
   `Change Sponsor` select in the header (`agents.setSponsor`). The Agents table keeps its own

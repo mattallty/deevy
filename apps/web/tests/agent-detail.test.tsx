@@ -137,3 +137,32 @@ describe("the Agent's own settings", () => {
     expect(screen.getByRole("button", { name: "Suspend" })).toBeTruthy();
   });
 });
+
+describe("connecting an Agent over MCP", () => {
+  it("gives the endpoint and one recipe per coding agent, on the Agent's own page", async () => {
+    await mountAt("/settings/agents/m-planner");
+
+    const panel = await screen.findByRole("region", { name: /connect an agent/i });
+    expect(within(panel).getByText(`${window.location.origin}/mcp`)).toBeTruthy();
+
+    // Claude Code is the first tab, and every other CLI the runtime drives is
+    // a tab beside it, so nobody has to translate a command into their own.
+    const tabs = within(panel).getByRole("tablist", { name: /coding agent/i });
+    const labels = within(tabs)
+      .getAllByRole("tab")
+      .map((tab) => tab.textContent);
+    expect(labels).toEqual([
+      "Claude Code",
+      "OpenCode",
+      "Cursor CLI",
+      "Copilot CLI",
+      "Anything else",
+    ]);
+    expect(within(panel).getByText(/claude mcp add/i).textContent).toContain("--transport http");
+
+    fireEvent.click(within(tabs).getByRole("tab", { name: "OpenCode" }));
+    const opencode = await within(panel).findByText(/"type": "remote"/);
+    expect(opencode.textContent).toContain(`${window.location.origin}/mcp`);
+    expect(opencode.textContent).toContain("Authorization");
+  });
+});

@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { KEY_PLACEHOLDER, mcpEndpoint, mcpRecipes } from "@/lib/mcp";
 import { orpc } from "@/lib/orpc";
 
 /**
@@ -96,6 +98,7 @@ export function AgentPage({ memberId }: { memberId: string }) {
     >
       <Grants memberId={memberId} onChanged={refresh} />
       <Keys memberId={memberId} onChanged={refresh} />
+      <Connect />
 
       <SettingsSection title="Schedule">
         <div className="flex flex-col gap-2">
@@ -384,6 +387,50 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
       {(issue.error ?? revoke.error) ? (
         <p className="text-sm text-destructive">{(issue.error ?? revoke.error)?.message}</p>
       ) : null}
+    </SettingsSection>
+  );
+}
+
+/**
+ * Where an Agent's key is used: one tab per coding agent, each with the file
+ * or the command that points it at this deevy (`lib/mcp.ts`). It sits on the
+ * Agent's own page and not on the list, because connecting is something you do
+ * to one Agent with one key, right after the page above minted it.
+ */
+function Connect() {
+  const endpoint = mcpEndpoint();
+  const [client, setClient] = useState(mcpRecipes[0]?.label ?? "");
+  const chosen = mcpRecipes.find((recipe) => recipe.label === client) ?? mcpRecipes[0];
+
+  return (
+    <SettingsSection
+      aria-label="Connect an Agent"
+      title="Connect an Agent"
+      description="Point a coding agent at this deevy and hand it the key. Every tool speaks MCP; only where the configuration lives differs."
+    >
+      <code className="w-fit rounded bg-muted px-2 py-1 text-sm">{endpoint}</code>
+      <Tabs value={client} onValueChange={(next) => setClient(String(next))}>
+        {/* Five names are wider than a phone: the strip scrolls, the page does not. */}
+        <TabsList aria-label="Coding agent" className="scrollbar-thin max-w-full overflow-x-auto">
+          {mcpRecipes.map((recipe) => (
+            <TabsTrigger key={recipe.label} value={recipe.label}>
+              {recipe.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {chosen ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted-foreground">{chosen.where}</p>
+          <pre className="overflow-x-auto rounded bg-muted px-3 py-2 font-mono text-xs">
+            {chosen.snippet(endpoint)}
+          </pre>
+        </div>
+      ) : null}
+      <p className="text-sm text-muted-foreground">
+        {KEY_PLACEHOLDER} is one of this Agent&apos;s keys, readable only when it is issued. Issue
+        another above if you no longer have one.
+      </p>
     </SettingsSection>
   );
 }

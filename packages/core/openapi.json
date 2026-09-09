@@ -3286,6 +3286,79 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "start": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            "lastRequestAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "expiresAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "key": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "start",
+                            "createdAt",
+                            "lastRequestAt",
+                            "expiresAt",
+                            "enabled",
+                            "key"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -3302,7 +3375,8 @@
                     "sponsor",
                     "webhookUrl",
                     "scheduleMinutes",
-                    "grantedProjectIds"
+                    "grantedProjectIds",
+                    "key"
                   ],
                   "additionalProperties": false
                 }

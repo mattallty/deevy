@@ -26,6 +26,18 @@ import {
   SubscriptionUrl,
 } from "./shared.ts";
 
+/**
+ * What the key an Agent is created with is called, so a Sponsor reading the
+ * list later knows which one deevy issued and which ones they did.
+ */
+const FIRST_KEY_NAME = "first key";
+
+/**
+ * A new Agent, and the key it was created with — the only time that key is
+ * ever returned. Null when this instance cannot mint one at all.
+ */
+const CreatedAgentSchema = AgentSchema.extend({ key: IssuedKeySchema.nullable() });
+
 export const agents = {
   list: defineOperation({
     name: "agents.list",
@@ -51,7 +63,7 @@ export const agents = {
       /** Left out, the handle is slugged from the name and suffixed on collision. */
       handle: HandleInput.nullish(),
     }),
-    output: AgentSchema,
+    output: CreatedAgentSchema,
     handler: async ({ input, context }) => {
       const memberId = await createAgent({
         db: context.db,
@@ -68,7 +80,28 @@ export const agents = {
         subjectId: memberId,
         payload: { handle: created.handle, name: input.name },
       });
-      return created;
+      // An Agent with no key cannot reach deevy at all, so it is born with one
+      // rather than with a second errand for its Sponsor. Through the same
+      // store and the same Event as `agents.keys.issue`, so the log reads the
+      // same either way, and shown exactly once because deevy keeps a hash.
+      // Null where nothing wired a key store up: an instance without auth
+      // cannot mint one, and refusing to create the Agent would be worse.
+      const key = context.apiKeys
+        ? await apiKeysOf(context).issue({
+            userId: created.userId,
+            name: FIRST_KEY_NAME,
+            expiresInDays: null,
+          })
+        : null;
+      if (key) {
+        await appendEvent(context, {
+          kind: "agent.key_issued",
+          subjectType: "member",
+          subjectId: memberId,
+          payload: { keyId: key.id, name: FIRST_KEY_NAME },
+        });
+      }
+      return { ...created, key };
     },
   }),
 

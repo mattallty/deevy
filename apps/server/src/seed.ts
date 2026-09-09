@@ -164,10 +164,11 @@ async function agent(name: string, projectIds: string[]) {
   for (const projectId of projectIds) {
     await admin.api.agents.grants.add({ memberId: created.id, projectId });
   }
-  // Through the operation, so `agent.key_issued` is in the log like every
-  // other key an admin ever issued.
-  const issued = await admin.api.agents.keys.issue({ memberId: created.id, name: "seed" });
-  return { created, key: issued.key, ...(await asAgent(issued.key)) };
+  // The key an Agent is created with, the way a Sponsor gets one: `agent.
+  // key_issued` is already in the log, and issuing a second here would only
+  // seed a Workspace whose Agents each carry a key nothing uses.
+  if (!created.key) throw new Error("This instance cannot mint API keys");
+  return { created, key: created.key.key, ...(await asAgent(created.key.key)) };
 }
 
 const planner = await agent("Planner", [dev.id]);
