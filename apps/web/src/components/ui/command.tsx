@@ -153,7 +153,15 @@ function CommandItem({
       {...props}
     >
       {children}
-      <CheckIcon className="ml-auto opacity-0 group-has-data-[slot=command-shortcut]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+      {/*
+       * A deevy edit: the kit keeps this tick in the layout at `opacity-0` so a
+       * checkable list does not shift as the tick appears. It carries `ml-auto`
+       * of its own, and two `ml-auto` children of one flex row share the free
+       * space between them — which left a row's trailing text stranded mid-line,
+       * at a place that moved with the length of the title beside it. Hidden
+       * until it is wanted, the row has one `ml-auto` and the text sits right.
+       */}
+      <CheckIcon className="ml-auto hidden group-data-[checked=true]/command-item:block group-has-data-[slot=command-shortcut]/command-item:hidden" />
     </CommandPrimitive.Item>
   );
 }
