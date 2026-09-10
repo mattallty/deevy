@@ -176,7 +176,12 @@ export function IssueBoardView({
        * page unreachable until the last column had gone by. Sideways is
        * Shift and a wheel, a trackpad, or the bar below the cards.
        */}
-      <KanbanBoard className="scrollbar-thin relative flex auto-rows-auto items-stretch gap-3 overflow-x-auto pb-2 sm:grid-cols-none md:h-full md:min-h-0">
+      <KanbanBoard
+        // `pb-4` is the band the sideways bar lives in: a thin one is about
+        // 11px, so the cards clear it rather than being underlined by it, and
+        // an overlay bar floats in the same space with air above.
+        className="scrollbar-thin relative flex auto-rows-auto items-stretch gap-3 overflow-x-auto pb-4 sm:grid-cols-none md:h-full md:min-h-0"
+      >
         {columns.map((column) => {
           const inColumn = value[column.id] ?? [];
           // Dimmed while a card is dragged that this column would not take, so
