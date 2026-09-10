@@ -311,6 +311,10 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   around the `Outlet` is `overflow-y-auto`. So the top bar and the sidebar stay put, a screen may ask for
   `h-full` and mean it, and `min-h-0` on every flex ancestor is what lets that height reach the bottom of a
   page. The Inbox's `h-[calc(100vh-2.75rem)]` became `h-full` with it.
+- **A Project's header is its name, its description and its tabs** (2026-09-11). The Team that owns it is a
+  column on the Projects list under a heading that says so; above the title it was a bare word naming
+  nothing, so it is gone. `Archived` still shows there, because that is what the page has to say about
+  itself before its name.
 - **A Board spends no height on its own name.** The Project's Board tab has no `PageHeader`: the Project's
   name is the page's `h1`, the tab says Board, and its filters sit bare the way the Issues tab's do. The
   section also takes the page's bottom gutter back (`md:-mb-6 md:pb-2`, coupled to `p-6` in `shell.tsx`).

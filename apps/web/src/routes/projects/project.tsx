@@ -35,18 +35,23 @@ export function ProjectLayout({ projectKey }: { projectKey: string }) {
     );
   }
 
-  const { key, name, description, team, archivedAt } = project.data;
+  const { key, name, description, archivedAt } = project.data;
   const base = `/projects/${key}`;
   const current = tabs.find((tab) => tab.to !== "" && pathname.startsWith(base + tab.to))?.to ?? "";
 
   return (
     <section className="flex flex-1 flex-col gap-5 md:min-h-0">
       <header className="flex flex-col gap-3 border-b">
-        {/* The key is in every Issue key below and in the sidebar; the line above the name is the Team's. */}
-        {team || archivedAt ? (
+        {/*
+         * The key is in every Issue key below and in the sidebar, and the Team
+         * that owns a Project is a column on the Projects list, under a heading
+         * that says so. Above a title it was a bare word — "Platform" — that
+         * named nothing, so what is left here is the one thing this page has to
+         * say about itself before its name.
+         */}
+        {archivedAt ? (
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            {team ? <span className="text-muted-foreground">{team.name}</span> : null}
-            {archivedAt ? <Badge variant="outline">Archived</Badge> : null}
+            <Badge variant="outline">Archived</Badge>
           </div>
         ) : null}
         <div className="flex flex-col gap-1">
