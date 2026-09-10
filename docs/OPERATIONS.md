@@ -485,9 +485,12 @@ it — an Agent with no key could reach nothing at all. Later keys are issued on
 shown once in the same way. Grant the Agent the Projects it should see: an ungranted Project does not exist
 to it, and an Agent starts with none.
 
-That page also carries **Connect an Agent**: this instance's MCP endpoint, and the file or the command each
-coding agent takes — Claude Code, OpenCode, Cursor CLI, Copilot CLI, and the shape anything else speaking
-MCP over streamable HTTP wants.
+The command to connect with is shown beside the key, in the dialog that created the Agent and beside every
+key issued afterwards, with that key already in it: a key is readable once, so that is the only moment deevy
+can write one into anything. The Agent's page carries the same block standing, where it names the key instead
+— `DEEVY_AGENT_KEY` for the clients that read a variable from the environment, a placeholder for those that
+do not. Either way there is a tab per coding agent: Claude Code, OpenCode, Cursor CLI, Copilot CLI, and the
+shape anything else speaking MCP over streamable HTTP wants.
 
 The MCP endpoint is `POST ${BETTER_AUTH_URL}/mcp`, and the Agent authenticates with its key as a bearer token:
 

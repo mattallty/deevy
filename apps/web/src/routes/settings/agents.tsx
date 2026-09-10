@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ConnectAgent } from "@/components/connect-agent";
 import { MemberChip } from "@/components/member-chip";
 import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
@@ -264,7 +265,7 @@ function NewAgent({ open, onOpenChange }: { open: boolean; onOpenChange: (to: bo
   if (created) {
     return (
       <Dialog open={open} onOpenChange={close}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{created.name} is ready</DialogTitle>
             <DialogDescription>
@@ -274,10 +275,13 @@ function NewAgent({ open, onOpenChange }: { open: boolean; onOpenChange: (to: bo
             </DialogDescription>
           </DialogHeader>
           {created.key ? (
-            <div className="flex flex-col gap-1 rounded-md border border-gate/50 bg-gate/10 p-3">
+            <div className="flex flex-col gap-3 rounded-md border border-gate/50 bg-gate/10 p-3">
               <code className="overflow-x-auto rounded bg-background px-2 py-1 font-mono text-sm">
                 {created.key}
               </code>
+              {/* The command it is for, with the key already in it: after this
+                  dialog closes there is nothing left to fill it in with. */}
+              <ConnectAgent issuedKey={created.key} />
             </div>
           ) : null}
           <DialogFooter>

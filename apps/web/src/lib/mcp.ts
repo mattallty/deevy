@@ -10,31 +10,45 @@ export function mcpEndpoint(): string {
   return `${window.location.origin}/mcp`;
 }
 
+/** What the runtime already calls the variable holding an Agent's key. */
+export const KEY_ENV = "DEEVY_AGENT_KEY";
+
 /**
- * What the snippets put where the key goes. A key is readable once, when it is
- * minted, so no page can fill this in for you.
+ * What stands in for the key where deevy cannot supply it and the client
+ * cannot read it from the environment either.
  */
 export const KEY_PLACEHOLDER = "<the key>";
-
-const AUTHORIZATION = { Authorization: `Bearer ${KEY_PLACEHOLDER}` };
 
 export interface McpRecipe {
   /** What the tab says. */
   label: string;
   /** Where this goes: the file to write, or what the command writes for you. */
   where: string;
-  /** The command or the configuration, with this deevy's endpoint already in it. */
-  snippet: (endpoint: string) => string;
+  /**
+   * How this client spells a reference to an environment variable, where it
+   * has one that works. Absent is not an oversight: Cursor documents
+   * `${env:VAR}` but does not resolve it for a remote HTTP server, and
+   * Copilot's CLI documents nothing, so both are told the key itself rather
+   * than a reference that would be sent to deevy verbatim.
+   */
+  variable?: (name: string) => string;
+  /** The command or the configuration, with the endpoint and the key in it. */
+  snippet: (endpoint: string, secret: string) => string;
 }
 
 /** The JSON every client takes, differing in the key the server sits under. */
 function serverJson(
   wrapper: string,
   endpoint: string,
+  secret: string,
   server: Record<string, unknown> = {},
 ): string {
   return JSON.stringify(
-    { [wrapper]: { deevy: { ...server, url: endpoint, headers: AUTHORIZATION } } },
+    {
+      [wrapper]: {
+        deevy: { ...server, url: endpoint, headers: { Authorization: `Bearer ${secret}` } },
+      },
+    },
     null,
     2,
   );
@@ -50,27 +64,41 @@ export const mcpRecipes: McpRecipe[] = [
   {
     label: "Claude Code",
     where: "Run this where the Agent works, and it writes the entry itself.",
-    snippet: (endpoint) =>
-      `claude mcp add --transport http deevy ${endpoint} \\\n  --header "Authorization: Bearer ${KEY_PLACEHOLDER}"`,
+    // A shell command, so the shell expands it as the entry is written.
+    variable: (name) => `$${name}`,
+    snippet: (endpoint, secret) =>
+      `claude mcp add --transport http deevy ${endpoint} \\\n  --header "Authorization: Bearer ${secret}"`,
   },
   {
     label: "OpenCode",
     where: "In opencode.json, beside the repository or under ~/.config/opencode.",
-    snippet: (endpoint) => serverJson("mcp", endpoint, { type: "remote", enabled: true }),
+    variable: (name) => `{env:${name}}`,
+    snippet: (endpoint, secret) =>
+      serverJson("mcp", endpoint, secret, { type: "remote", enabled: true }),
   },
   {
     label: "Cursor CLI",
     where: "In ~/.cursor/mcp.json, the same file the editor reads.",
-    snippet: (endpoint) => serverJson("mcpServers", endpoint),
+    snippet: (endpoint, secret) => serverJson("mcpServers", endpoint, secret),
   },
   {
     label: "Copilot CLI",
     where: "In ~/.copilot/mcp-config.json.",
-    snippet: (endpoint) => serverJson("mcpServers", endpoint, { type: "http" }),
+    snippet: (endpoint, secret) => serverJson("mcpServers", endpoint, secret, { type: "http" }),
   },
   {
     label: "Anything else",
     where: "Any MCP client over streamable HTTP, with the key as a bearer token.",
-    snippet: (endpoint) => serverJson("mcpServers", endpoint, { type: "http" }),
+    snippet: (endpoint, secret) => serverJson("mcpServers", endpoint, secret, { type: "http" }),
   },
 ];
+
+/**
+ * What goes in the Authorization header: the key itself while deevy still has
+ * it to give, then whatever this client can be told to read instead — because
+ * a key is readable once and no page can fill it in afterwards.
+ */
+export function secretFor(recipe: McpRecipe, key: string | null): string {
+  if (key) return key;
+  return recipe.variable?.(KEY_ENV) ?? KEY_PLACEHOLDER;
+}

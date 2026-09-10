@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConnectAgent } from "@/components/connect-agent";
 import { MemberChip } from "@/components/member-chip";
 import { RunStatus, type RunStatusValue } from "@/components/run-status";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
@@ -25,8 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { KEY_PLACEHOLDER, mcpEndpoint, mcpRecipes } from "@/lib/mcp";
 import { orpc } from "@/lib/orpc";
 
 /**
@@ -332,11 +331,13 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
   return (
     <SettingsSection aria-label="API keys" title="API keys">
       {minted ? (
-        <div className="flex flex-col gap-1 rounded-md border border-gate/50 bg-gate/10 p-3">
+        <div className="flex flex-col gap-3 rounded-md border border-gate/50 bg-gate/10 p-3">
           <p className="text-sm font-medium">Copy this now: it is the only time you will see it.</p>
           <code className="overflow-x-auto rounded bg-background px-2 py-1 font-mono text-sm">
             {minted}
           </code>
+          {/* And what it is for, while deevy can still write it into the command. */}
+          <ConnectAgent issuedKey={minted} />
         </div>
       ) : null}
 
@@ -393,44 +394,19 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
 
 /**
  * Where an Agent's key is used: one tab per coding agent, each with the file
- * or the command that points it at this deevy (`lib/mcp.ts`). It sits on the
- * Agent's own page and not on the list, because connecting is something you do
- * to one Agent with one key, right after the page above minted it.
+ * or the command that points it at this deevy (`components/connect-agent.tsx`).
+ * It sits on the Agent's own page and not on the list, because connecting is
+ * something you do to one Agent with one key. With no key in hand it can only
+ * name one, so the same block appears beside a key the moment it is issued.
  */
 function Connect() {
-  const endpoint = mcpEndpoint();
-  const [client, setClient] = useState(mcpRecipes[0]?.label ?? "");
-  const chosen = mcpRecipes.find((recipe) => recipe.label === client) ?? mcpRecipes[0];
-
   return (
     <SettingsSection
       aria-label="Connect an Agent"
       title="Connect an Agent"
       description="Point a coding agent at this deevy and hand it the key. Every tool speaks MCP; only where the configuration lives differs."
     >
-      <code className="w-fit rounded bg-muted px-2 py-1 text-sm">{endpoint}</code>
-      <Tabs value={client} onValueChange={(next) => setClient(String(next))}>
-        {/* Five names are wider than a phone: the strip scrolls, the page does not. */}
-        <TabsList aria-label="Coding agent" className="scrollbar-thin max-w-full overflow-x-auto">
-          {mcpRecipes.map((recipe) => (
-            <TabsTrigger key={recipe.label} value={recipe.label}>
-              {recipe.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      {chosen ? (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">{chosen.where}</p>
-          <pre className="overflow-x-auto rounded bg-muted px-3 py-2 font-mono text-xs">
-            {chosen.snippet(endpoint)}
-          </pre>
-        </div>
-      ) : null}
-      <p className="text-sm text-muted-foreground">
-        {KEY_PLACEHOLDER} is one of this Agent&apos;s keys, readable only when it is issued. Issue
-        another above if you no longer have one.
-      </p>
+      <ConnectAgent />
     </SettingsSection>
   );
 }

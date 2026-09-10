@@ -139,10 +139,15 @@ describe("sponsoring an Agent", () => {
     await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(1));
     expect(calls.create.mock.calls[0]?.[0]).toMatchObject({ name: "Reviewer" });
 
-    // The key it was created with, in the one place it is ever readable.
+    // The key it was created with, in the one place it is ever readable — and
+    // the command it is for, with the key already written into it, because
+    // afterwards nothing can fill that in.
     const shown = await screen.findByRole("dialog");
     expect(within(shown).getByText("deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS")).toBeTruthy();
     expect(within(shown).getByText(/only time you will see it/i)).toBeTruthy();
+    const command = within(shown).getByText(/claude mcp add/i);
+    expect(command.textContent).toContain("Bearer deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS");
+    expect(within(shown).getByRole("tablist", { name: /coding agent/i })).toBeTruthy();
     expect(within(shown).getByRole("link", { name: /open reviewer/i })).toBeTruthy();
   });
 

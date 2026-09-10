@@ -158,11 +158,36 @@ describe("connecting an Agent over MCP", () => {
       "Copilot CLI",
       "Anything else",
     ]);
-    expect(within(panel).getByText(/claude mcp add/i).textContent).toContain("--transport http");
+    // With no key in hand the command names one instead: deevy keeps a hash and
+    // cannot write a key into a command it shows later.
+    const claude = within(panel).getByText(/claude mcp add/i);
+    expect(claude.textContent).toContain("--transport http");
+    expect(claude.textContent).toContain("Bearer $DEEVY_AGENT_KEY");
 
     fireEvent.click(within(tabs).getByRole("tab", { name: "OpenCode" }));
     const opencode = await within(panel).findByText(/"type": "remote"/);
     expect(opencode.textContent).toContain(`${window.location.origin}/mcp`);
-    expect(opencode.textContent).toContain("Authorization");
+    expect(opencode.textContent).toContain("Bearer {env:DEEVY_AGENT_KEY}");
+
+    // Cursor documents ${env:} and does not resolve it for a remote server, so
+    // it is told the key itself rather than a reference deevy would receive.
+    fireEvent.click(within(tabs).getByRole("tab", { name: "Cursor CLI" }));
+    const cursor = await within(panel).findByText(/"mcpServers"/);
+    expect(cursor.textContent).toContain("Bearer <the key>");
+  });
+
+  it("writes the key into the command at the one moment it can, when a key is issued", async () => {
+    await mountAt("/settings/agents/m-planner");
+
+    const keys = await screen.findByRole("region", { name: /api keys/i });
+    fireEvent.change(within(keys).getByLabelText(/key name/i), { target: { value: "laptop" } });
+    fireEvent.click(within(keys).getByRole("button", { name: "Issue" }));
+
+    await waitFor(() => expect(calls.issue).toHaveBeenCalledTimes(1));
+    const minted = await within(keys).findByText("deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS");
+    expect(minted).toBeTruthy();
+    // Beside it, the command with that key in it rather than a variable.
+    const command = within(keys).getByText(/claude mcp add/i);
+    expect(command.textContent).toContain("Bearer deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS");
   });
 });
