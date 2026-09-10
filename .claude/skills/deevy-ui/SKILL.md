@@ -310,10 +310,11 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `relative`, because an absolutely positioned descendant is clipped by its containing block and not by
   whatever scrolls — without it the `sr-only` words a `StateBadge` and an avatar carry are laid out against
   the page and every column past the fold widens it. It wears `scrollbar-thin` (an `@utility` in `index.css`:
-  `scrollbar-width` for Firefox, `::-webkit-scrollbar` for WebKit, the thumb in `--border`). And a wheel over
-  it moves the columns: a non-passive `wheel` listener that converts `deltaY` to `scrollLeft`, leaves a
-  trackpad's own `deltaX` and Shift alone, and stops at either end so the page scrolls once the Board has
-  nowhere left to go.
+  `scrollbar-width` for Firefox, `::-webkit-scrollbar` for WebKit, the thumb in `--border`). **The wheel
+  stays the browser's**: a listener that turned `deltaY` into `scrollLeft` shipped on 2026-09-08 and came
+  off on 2026-09-11, because a Board is taller than the window at least as often as it is wider and the
+  page could not be reached until the last column had gone by. Sideways is Shift and a wheel, a trackpad,
+  or the bar.
 
 ## What slice 8 settled (the Project)
 
