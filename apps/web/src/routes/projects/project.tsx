@@ -11,12 +11,11 @@ const tabs = [
   { label: "Issues", to: "" },
   { label: "Board", to: "/board" },
   { label: "Workflow", to: "/workflow" },
-  { label: "Settings", to: "/settings" },
 ] as const;
 
 /**
  * A Project's frame: its header, its Workflow as a strip of States, and the
- * tabs — Issues, Board, Workflow, Settings — each a route of its own so it is
+ * tabs — Issues, Board, Workflow — each a route of its own so it is
  * linkable and testable alone (docs/plans/ui-redesign.md slice 8).
  */
 export function ProjectLayout({ projectKey }: { projectKey: string }) {

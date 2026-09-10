@@ -311,6 +311,13 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   around the `Outlet` is `overflow-y-auto`. So the top bar and the sidebar stay put, a screen may ask for
   `h-full` and mean it, and `min-h-0` on every flex ancestor is what lets that height reach the bottom of a
   page. The Inbox's `h-[calc(100vh-2.75rem)]` became `h-full` with it.
+- **A Project is configured in Settings, not on itself** (2026-09-11). `Settings › Work › Projects`
+  (`routes/settings/projects.tsx`) is master–detail like Teams: `nav "Projects"` naming each by name and
+  key, `article "<Project>"` beside it, `?project=<KEY>` in the URL, and `ProjectSettingsForm`
+  (`routes/settings/project-settings.tsx`, moved from `routes/projects/`) as the pane. The Project's own
+  tabs are the work alone — Issues, Board, Workflow — and `/projects/$key/settings` redirects into
+  Settings, the way `settings/workflow` already redirected out of it. Creating a Project stays on
+  `/projects`, which is where you go to start one.
 - **A Project's header is its name, its description and its tabs** (2026-09-11). The Team that owns it is a
   column on the Projects list under a heading that says so; above the title it was a bare word naming
   nothing, so it is gone. `Archived` still shows there, because that is what the page has to say about

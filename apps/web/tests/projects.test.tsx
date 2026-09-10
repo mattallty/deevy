@@ -192,27 +192,47 @@ describe("the Teams settings page", () => {
 });
 
 describe("the Project's tabs", () => {
-  it("links Issues, Board, Workflow and Settings, and marks the one you are on", async () => {
-    await mountAt("/projects/DEV/settings");
+  it("links Issues, Board and Workflow, and marks the one you are on", async () => {
+    await mountAt("/projects/DEV/workflow");
 
     const nav = await screen.findByRole("navigation", { name: "Project" });
     expect(
       within(nav)
         .getAllByRole("link")
         .map((link) => link.getAttribute("href")),
-    ).toEqual([
-      "/projects/DEV",
-      "/projects/DEV/board",
-      "/projects/DEV/workflow",
-      "/projects/DEV/settings",
-    ]);
-    expect(within(nav).getByRole("link", { name: "Settings" }).getAttribute("aria-current")).toBe(
+    ).toEqual(["/projects/DEV", "/projects/DEV/board", "/projects/DEV/workflow"]);
+    // Configuring a Project is Settings' now, so the tabs are the work alone.
+    expect(within(nav).queryByRole("link", { name: "Settings" })).toBeNull();
+    expect(within(nav).getByRole("link", { name: "Workflow" }).getAttribute("aria-current")).toBe(
       "page",
     );
   });
+});
 
-  it("edits the Project's name from the Settings tab", async () => {
+describe("a Project's settings, in Settings", () => {
+  it("opens the Project the URL names, beside a rail of the others", async () => {
+    await mountAt("/settings/projects?project=WEB");
+
+    expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeTruthy();
+    const rail = screen.getByRole("navigation", { name: "Projects" });
+    expect(
+      within(rail)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["deevyDEV", "WebsiteWEB"]);
+    expect(screen.getByRole("article", { name: "Website" })).toBeTruthy();
+  });
+
+  it("still answers the tab's old address, so a link in the wild works", async () => {
     await mountAt("/projects/DEV/settings");
+
+    // Redirected into Settings, showing the Project the old URL named.
+    expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeTruthy();
+    expect(screen.getByRole("article", { name: "deevy" })).toBeTruthy();
+  });
+
+  it("edits the Project's name", async () => {
+    await mountAt("/settings/projects?project=DEV");
 
     const name = (await screen.findByLabelText("Name")) as HTMLInputElement;
     expect(name.value).toBe("deevy");
@@ -225,7 +245,7 @@ describe("the Project's tabs", () => {
   });
 
   it("refuses an empty name inline and restores the last one", async () => {
-    await mountAt("/projects/DEV/settings");
+    await mountAt("/settings/projects?project=DEV");
 
     const name = (await screen.findByLabelText("Name")) as HTMLInputElement;
     // stub.saved is shared across tests and never reset: nothing may be added to it.
