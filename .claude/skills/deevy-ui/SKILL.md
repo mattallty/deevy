@@ -124,7 +124,9 @@ only submit key. `src/lib/shortcuts.ts` owns a scope stack: an open Sheet, Dialo
 
 - **Sizes live in `components/ui`.** shadcn's `base-mira` is the compact style — 12px controls, 10px badges
   and kbd, 28px buttons. deevy resizes those files (button, input, textarea, native-select, select, label,
-  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights, and
+  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights,
+  drops `CommandDialog`'s `top-1/3 translate-y-0` so the palette keeps `DialogContent`'s own centring
+  rather than sliding to the bottom of the window as its list fills (2026-09-11), and
   strips `avatar`'s inner `after:` border, since the kind ring (`MemberChip`) is the avatar's one edge, and
   paints fields (`input`, `textarea`, `select` trigger, `combobox` chips, `input-group`) `bg-card` in light —
   base-mira's `bg-input/20` read as disabled (Matt, 2026-09-06) — with `disabled:bg-muted` now meaning it;

@@ -46,10 +46,12 @@ function CommandDialog({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent
-        className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0 sm:max-w-2xl",
-          className,
-        )}
+        // A deevy edit: the kit pins the palette a third of the way down with
+        // `top-1/3 translate-y-0`, which reads as centred while the list is
+        // short and slides to the bottom of the window as it fills. Dropping
+        // both leaves DialogContent's own centring, so the palette sits in the
+        // middle whatever it is showing.
+        className={cn("overflow-hidden rounded-xl! p-0 sm:max-w-2xl", className)}
         showCloseButton={showCloseButton}
       >
         {children}
