@@ -311,6 +311,9 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   around the `Outlet` is `overflow-y-auto`. So the top bar and the sidebar stay put, a screen may ask for
   `h-full` and mean it, and `min-h-0` on every flex ancestor is what lets that height reach the bottom of a
   page. The Inbox's `h-[calc(100vh-2.75rem)]` became `h-full` with it.
+- **A Board spends no height on its own name.** The Project's Board tab has no `PageHeader`: the Project's
+  name is the page's `h1`, the tab says Board, and its filters sit bare the way the Issues tab's do. The
+  section also takes the page's bottom gutter back (`md:-mb-6 md:pb-2`, coupled to `p-6` in `shell.tsx`).
 - **A Board is a frame from `md` up** (`components/issue-board.tsx`, 2026-09-11): the strip is `md:h-full`,
   a column `md:max-h-full`, and `KanbanColumnContent` is `md:min-h-0 md:flex-1 md:overflow-y-auto`, so the
   cards scroll and the headers, the counts and the Workflow do not. Below `md` every one of those is off and

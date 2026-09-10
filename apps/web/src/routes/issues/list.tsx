@@ -370,7 +370,13 @@ export function IssuesPage({
   return (
     // A board's columns scroll inside it, so the board fills what is left
     // rather than growing the page; a list grows as a list always has.
-    <section className={cn("flex flex-1 flex-col gap-4", board && "md:min-h-0")}>
+    <section
+      className={cn(
+        "flex flex-1 flex-col gap-4",
+        // The page's bottom gutter goes to the cards; see routes/projects/board.tsx.
+        board && "md:-mb-6 md:min-h-0 md:pb-2",
+      )}
+    >
       {embedded ? (
         <div className="flex flex-wrap items-center gap-3">
           {filters}
