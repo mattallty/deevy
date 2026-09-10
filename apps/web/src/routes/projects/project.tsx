@@ -40,7 +40,7 @@ export function ProjectLayout({ projectKey }: { projectKey: string }) {
   const current = tabs.find((tab) => tab.to !== "" && pathname.startsWith(base + tab.to))?.to ?? "";
 
   return (
-    <section className="flex flex-1 flex-col gap-5">
+    <section className="flex flex-1 flex-col gap-5 md:min-h-0">
       <header className="flex flex-col gap-3 border-b">
         {/* The key is in every Issue key below and in the sidebar; the line above the name is the Team's. */}
         {team || archivedAt ? (

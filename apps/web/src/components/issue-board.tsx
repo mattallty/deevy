@@ -149,6 +149,10 @@ export function IssueBoardView({
 
   return (
     <Kanban
+      // The root takes the room the page left it, so the strip inside can be
+      // `h-full` and the columns can scroll rather than the page — from `md`
+      // up, where there is room for that to be an improvement.
+      className="flex flex-col md:min-h-0 md:flex-1"
       value={value}
       onValueChange={() => {}}
       getItemValue={(issue) => issue.id}
@@ -172,7 +176,7 @@ export function IssueBoardView({
        * page unreachable until the last column had gone by. Sideways is
        * Shift and a wheel, a trackpad, or the bar below the cards.
        */}
-      <KanbanBoard className="scrollbar-thin relative flex auto-rows-auto items-start gap-3 overflow-x-auto pb-4 sm:grid-cols-none">
+      <KanbanBoard className="scrollbar-thin relative flex auto-rows-auto items-stretch gap-3 overflow-x-auto pb-2 sm:grid-cols-none md:h-full md:min-h-0">
         {columns.map((column) => {
           const inColumn = value[column.id] ?? [];
           // Dimmed while a card is dragged that this column would not take, so
@@ -197,7 +201,7 @@ export function IssueBoardView({
                 />
               }
               className={cn(
-                "flex w-72 shrink-0 flex-col gap-2 rounded-lg border bg-muted/30 p-2 transition-opacity",
+                "flex w-72 shrink-0 flex-col gap-2 rounded-lg border bg-muted/30 p-2 transition-opacity md:max-h-full",
                 column.isGate && "border-gate/40 bg-gate/5",
                 refuses && "cursor-not-allowed opacity-40",
               )}
@@ -208,7 +212,16 @@ export function IssueBoardView({
                   {inColumn.length}
                 </span>
               </header>
-              <KanbanColumnContent value={column.id} className="flex flex-col gap-2">
+              {/*
+               * The cards, and the only thing on a Board that scrolls
+               * vertically: the column keeps its header while its own list
+               * moves, so a wheel over a column reads down that column rather
+               * than moving the page or the Workflow.
+               */}
+              <KanbanColumnContent
+                value={column.id}
+                className="scrollbar-thin flex flex-col gap-2 md:min-h-0 md:flex-1 md:overflow-y-auto"
+              >
                 {inColumn.map((issue) => (
                   <KanbanItem key={issue.id} value={issue.id}>
                     <KanbanItemHandle cursor={false}>
@@ -289,7 +302,7 @@ export function IssueBoard({
     <>
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
       {loading ? (
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full md:h-auto md:min-h-0 md:flex-1" />
       ) : (
         <IssueBoardView
           columns={columns}

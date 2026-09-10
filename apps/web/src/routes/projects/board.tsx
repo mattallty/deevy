@@ -129,7 +129,10 @@ export function BoardPage({
   }
 
   return (
-    <section className="flex flex-col gap-4">
+    // From `md` up the Board is as tall as what is left and its columns scroll
+    // inside it. A phone has no room for that — the chrome above leaves about
+    // 300px — so there the Board grows and the page scrolls, as it always did.
+    <section className="flex flex-col gap-4 md:min-h-0 md:flex-1">
       <PageHeader title="Board">
         <IssueFilters
           value={search}

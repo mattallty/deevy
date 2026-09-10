@@ -22,6 +22,7 @@ import { useRowSelection } from "@/lib/row-selection";
 import { foldStates } from "@/lib/states";
 import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { ago } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
@@ -367,7 +368,9 @@ export function IssuesPage({
   );
 
   return (
-    <section className="flex flex-1 flex-col gap-4">
+    // A board's columns scroll inside it, so the board fills what is left
+    // rather than growing the page; a list grows as a list always has.
+    <section className={cn("flex flex-1 flex-col gap-4", board && "md:min-h-0")}>
       {embedded ? (
         <div className="flex flex-wrap items-center gap-3">
           {filters}

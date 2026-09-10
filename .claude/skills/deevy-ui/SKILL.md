@@ -306,6 +306,15 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   peek (`?peek=`); the peek is `modal={false}` here and `onDragStart` closes it.
 - **Filters** are the shared `IssueFilters` with `hideProject` and `nativeAssignee` — the Assignee is a plain
   `<select>` on the Board because its test drives it with a change event.
+- **The frame is the viewport's height, and the page area is what scrolls** (2026-09-11). The sidebar
+  wrapper is `h-svh overflow-hidden` (passed from `routes/shell.tsx`, not edited into the kit) and the div
+  around the `Outlet` is `overflow-y-auto`. So the top bar and the sidebar stay put, a screen may ask for
+  `h-full` and mean it, and `min-h-0` on every flex ancestor is what lets that height reach the bottom of a
+  page. The Inbox's `h-[calc(100vh-2.75rem)]` became `h-full` with it.
+- **A Board is a frame from `md` up** (`components/issue-board.tsx`, 2026-09-11): the strip is `md:h-full`,
+  a column `md:max-h-full`, and `KanbanColumnContent` is `md:min-h-0 md:flex-1 md:overflow-y-auto`, so the
+  cards scroll and the headers, the counts and the Workflow do not. Below `md` every one of those is off and
+  the Board grows with the page: the Project's chrome leaves about 300px on a phone, which is two cards.
 - **The Board's sideways scroll is the Board's** (`components/issue-board.tsx`, 2026-09-08). The scroller is
   `relative`, because an absolutely positioned descendant is clipped by its containing block and not by
   whatever scrolls — without it the `sr-only` words a `StateBadge` and an avatar carry are laid out against
