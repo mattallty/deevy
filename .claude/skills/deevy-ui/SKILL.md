@@ -489,10 +489,13 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 
 - **The theme** is clean slate: see "Design language" above. `--face-*`, `--radius`, `--density` and
   `--tracking` are the knobs; a candidate review is a dev-only switcher on `<html data-…>`, deleted after.
-- **A chip inside a sentence is `size="inline"`** (`member-chip.tsx`, 2026-09-11): the avatar is the height
-  of the line it sits on and the name is the size of the words either side of it, so an Activity row reads
-  as one sentence with a mark in it rather than as a badge followed by smaller text. `xs` and up stay what
-  they were, for a chip that stands on its own in a row or a cell.
+- **A chip inside a sentence is `size="inline"`** (`member-chip.tsx`, 2026-09-11): the name is the size of
+  the words either side of it and the mark beside it is the height of that line, so an Activity row reads as
+  one sentence rather than as a badge followed by smaller text. **A size budgets for the kind ring**, which
+  `ring-1 ring-offset-1` paints outside the box — 2px on every side, so `size-3.5` painted 18.7px on a 20px
+  line. `inline` is `size-3` with `ring-offset-0`, which lands at 14.6. The ring classes are composed
+  _before_ `style.avatar` for that reason: the size has the last word. `xs` and up stay what they were, for
+  a chip that stands on its own in a row or a cell.
 - **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
   itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
   names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
