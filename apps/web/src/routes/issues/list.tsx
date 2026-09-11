@@ -423,7 +423,6 @@ export function IssuesPage({
 
       <SidePeek
         issueKey={search.peek ?? null}
-        modal={!board}
         onClose={() => onSearch({ peek: undefined })}
         onOpenFull={openFull}
       />

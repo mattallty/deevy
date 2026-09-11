@@ -39,14 +39,21 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  /**
+   * A deevy addition: a Sheet that sits beside the page rather than over it
+   * wants no backdrop at all — the Issue peek, which is read while the list
+   * behind it is still being used.
+   */
+  showOverlay = true,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
+  showOverlay?: boolean;
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      {showOverlay ? <SheetOverlay /> : null}
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         data-side={side}

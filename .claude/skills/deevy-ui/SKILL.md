@@ -108,7 +108,8 @@ go through the catalog.
   rows and cards. The badge names itself `labelText(label)` (`epic: Agent loop`), which is what a test reads.
   Both themes; a real System/Light/Dark toggle. Round 1's warm Plex look is history (`docs/plans/ui-redesign.md`).
 - **Layout.** Full-bleed frame, 240px sidebar collapsing to 48px, edge-to-edge lists with a 40px filter bar,
-  720px side-peek, Issue page = main + 300px rail with the Gate ruling card always on top. Cards only for
+  a side-peek of `min(56rem, 92vw)` — wide enough to be the page it shows — Issue page = main + 300px rail
+  with the Gate ruling card always on top. Cards only for
   things that are cards (a Run, a Channel).
 - **Motion** only in answer to an action. Nothing on load.
 
@@ -215,9 +216,14 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
 - **`components/data-table.tsx`** is hand-rolled on `ui/table`: client sort per column, group rows that
   fold, skeleton, `Empty`, `aria-selected` on the keyboard row. No TanStack Table — it went to v9 with a new
   API and this list needs none of a grid. A row's accessible name is its text.
-- **`components/side-peek.tsx`** renders the whole `IssuePage` in a right Sheet (`sm:max-w-[720px]`),
-  keyed by `?peek=`. Base UI names the dialog from `SheetTitle` (`aria-labelledby` beats `aria-label`), so
-  a test finds it by `/DEV-1/`. It pushes the `peek` shortcut scope; `o` opens the full page; `Esc` closes.
+- **`components/side-peek.tsx`** renders the whole `IssuePage` in a right Sheet, keyed by `?peek=`. Base UI
+  names the dialog from `SheetTitle` (`aria-labelledby` beats `aria-label`), so a test finds it by
+  `/DEV-1/`. It pushes the `peek` shortcut scope; `o` opens the full page; `Esc` closes. Since 2026-09-11 it
+  is `min(56rem, 92vw)` wide, carries **no backdrop** (`showOverlay={false}`, a deevy prop on
+  `ui/sheet.tsx`) and is **never modal**. The width is load-bearing: it keeps the Issue's own container over
+  `@3xl`, so the peek is the page — two columns, rail on the right, sections in the same order — instead of
+  the stacked, rail-first shape a narrower panel produced. The other two keep the list behind it lit,
+  readable and, on the Board, still draggable; modal-except-on-the-Board was the old rule.
 - **Keyboard on a list**: `j`/`k`/arrows move `aria-selected`, `Enter` peeks, `o` opens, `Esc` clears — bound
   by the page with `useShortcut`, not by the table.
 - The sidebar has My Issues (`/?assignee=me`), My Agents' Issues (Sponsors only), All Issues (`/`) and

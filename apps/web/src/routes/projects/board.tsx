@@ -174,7 +174,6 @@ export function BoardPage({
 
       <SidePeek
         issueKey={search.peek ?? null}
-        modal={false}
         onClose={() => onSearch({ peek: undefined })}
         onOpenFull={openFull}
       />

@@ -13,37 +13,42 @@ import { useShortcut, useShortcutScope } from "@/lib/shortcuts";
 import { IssuePage } from "@/routes/issues/issue";
 
 /**
- * An Issue beside the list it was picked from, in a panel on the right: the
- * whole Issue page, in 720px, without leaving (docs/plans/ui-redesign.md). The
- * key it shows rides in the URL as `?peek=`, so a view with a peek open is a
- * link. `Esc` closes it (the Sheet's own), `o` opens the full page.
+ * An Issue beside the list it was picked from: the whole Issue page in a panel
+ * on the right, without leaving (docs/plans/ui-redesign.md). The key it shows
+ * rides in the URL as `?peek=`, so a view with a peek open is a link. `Esc`
+ * closes it (the Sheet's own), `o` opens the full page.
+ *
+ * Three things make it read as the page it is showing rather than as a modal
+ * over one. It is **wide enough for the Issue's own two-column layout**: the
+ * page switches at `@3xl`, so a narrower panel stacked the rail on top of the
+ * description and put the Issue in an order nothing else uses. There is **no
+ * backdrop**, and it is **never modal** — the list behind it stays lit and
+ * usable, which is also what keeps a drag alive on the Board.
  */
 export function SidePeek({
   issueKey,
   onClose,
   onOpenFull,
-  modal = true,
 }: {
   issueKey: string | null;
   onClose: () => void;
   onOpenFull: (key: string) => void;
-  /**
-   * Off on the Board: a modal Dialog puts `pointer-events: none` on everything
-   * behind it, which kills a drag (docs/plans/ui-redesign.md, risks).
-   */
-  modal?: boolean;
 }) {
   const open = issueKey !== null;
   useShortcutScope("peek", open);
   useShortcut("o", () => issueKey && onOpenFull(issueKey), { scope: "peek", enabled: open });
 
   return (
-    <Sheet open={open} modal={modal} onOpenChange={(next) => !next && onClose()}>
+    <Sheet open={open} modal={false} onOpenChange={(next) => !next && onClose()}>
       <SheetContent
         side="right"
+        showOverlay={false}
         aria-label={issueKey ? `Issue ${issueKey}` : "Issue"}
-        // The same variant chain as the base's `data-[side=right]:sm:max-w-sm`, so this one replaces it.
-        className="w-full gap-0 overflow-y-auto p-0 text-sm data-[side=right]:w-full data-[side=right]:sm:max-w-[720px]"
+        // The same variant chain as the base's `data-[side=right]:sm:max-w-sm`,
+        // so this one replaces it. 56rem leaves the Issue's own container over
+        // the `@3xl` it lays itself out in two columns at, and 92vw keeps a
+        // hand's width of the list visible on a narrower window.
+        className="w-full gap-0 overflow-y-auto p-0 text-sm data-[side=right]:w-full data-[side=right]:sm:max-w-[min(56rem,92vw)]"
       >
         <SheetHeader className="flex-row items-center gap-2 border-b px-4 py-2 pr-12 text-left">
           <SheetTitle className="font-mono text-sm font-medium">{issueKey}</SheetTitle>
