@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/combobox";
 import { LabelBadge, LabelText } from "@/components/label-badge";
 import { labelText } from "@/lib/labels";
+import { RailHeading } from "@/components/rail-heading";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
@@ -65,7 +66,7 @@ export function LabelPicker({ issueKey, labels, shortcutScope = PAGE_SCOPE }: Pi
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Labels</h2>
+      <RailHeading>Labels</RailHeading>
       <div role="group" aria-label="Labels">
         <Combobox
           multiple

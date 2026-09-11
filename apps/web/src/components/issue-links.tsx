@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { orpc } from "@/lib/orpc";
+import { RailHeading } from "@/components/rail-heading";
 
 const kindLabels = {
   pull_request: "Pull requests",
@@ -43,7 +44,7 @@ export function IssueLinks({ issueKey }: { issueKey: string }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-muted-foreground">Links</h2>
+      <RailHeading>Links</RailHeading>
 
       <form
         className="flex items-end gap-3"
@@ -71,7 +72,7 @@ export function IssueLinks({ issueKey }: { issueKey: string }) {
 
       {grouped.map((group) => (
         <div key={group.kind} className="flex flex-col gap-1">
-          <h3 className="text-xs font-medium text-muted-foreground">{kindLabels[group.kind]}</h3>
+          <h3 className="text-xs text-muted-foreground">{kindLabels[group.kind]}</h3>
           <ul aria-label={kindLabels[group.kind]} className="flex flex-col gap-1">
             {group.links.map((link) => (
               <li key={link.id} className="flex items-center gap-2 text-sm">

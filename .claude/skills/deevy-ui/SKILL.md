@@ -489,6 +489,11 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 
 - **The theme** is clean slate: see "Design language" above. `--face-*`, `--radius`, `--density` and
   `--tracking` are the knobs; a candidate review is a dev-only switcher on `<html data-…>`, deleted after.
+- **A rail section is named by `RailHeading`** (`components/rail-heading.tsx`, 2026-09-11): 12px, medium,
+  muted — the size deevy sets metadata in. State, Assignee, Labels, Parent, Children and Links each spelled
+  that out themselves and three had drifted to 14px, which is the size of a heading in the main column
+  (Documents, Runs, Activity) and not of a label on the rail. Inside Links the per-kind headings keep 12px
+  and lose the weight, so the section still leads.
 - **A chip inside a sentence is `size="inline"`** (`member-chip.tsx`, 2026-09-11): the name is the size of
   the words either side of it and the mark beside it is the height of that line, so an Activity row reads as
   one sentence rather than as a badge followed by smaller text. **A size budgets for the kind ring**, which

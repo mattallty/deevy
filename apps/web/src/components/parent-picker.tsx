@@ -14,6 +14,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
+import { RailHeading } from "@/components/rail-heading";
 
 /**
  * The Issue's parent, and the way to change it: a Popover with the Project's
@@ -57,7 +58,7 @@ export function ParentPicker({
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-xs font-medium text-muted-foreground">Parent</h2>
+      <RailHeading>Parent</RailHeading>
       <div className="flex items-center gap-2 text-sm">
         {parent ? (
           <Link

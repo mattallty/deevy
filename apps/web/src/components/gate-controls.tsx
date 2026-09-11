@@ -14,6 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
+import { RailHeading } from "@/components/rail-heading";
 
 interface State {
   id: string;
@@ -126,7 +127,7 @@ export function GateControls({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-muted-foreground">State</h2>
+      <RailHeading>State</RailHeading>
 
       {state.isGate ? (
         <div className="flex flex-col gap-3 rounded-lg border p-4">

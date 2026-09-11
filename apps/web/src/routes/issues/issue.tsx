@@ -29,6 +29,7 @@ import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/lib/orpc.ts";
 import { isNotFound, NotFoundPage } from "@/routes/not-found";
+import { RailHeading } from "@/components/rail-heading";
 
 const UNASSIGNED = "unassigned";
 
@@ -191,7 +192,7 @@ export function IssuePage({
           </div>
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-xs font-medium text-muted-foreground">Assignee</h2>
+            <RailHeading>Assignee</RailHeading>
             <Select
               value={assignee?.id ?? UNASSIGNED}
               disabled={update.isPending}
@@ -246,7 +247,7 @@ export function IssuePage({
 
           {children.length > 0 ? (
             <section className="flex flex-col gap-2">
-              <h2 className="text-xs font-medium text-muted-foreground">Children</h2>
+              <RailHeading>Children</RailHeading>
               <ul className="flex flex-col gap-1">
                 {children.map((child) => (
                   <li key={child.id} className="text-sm">
