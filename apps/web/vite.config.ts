@@ -9,6 +9,22 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 // apps/server; in dev it proxies the API to the Node server.
 const workers = process.env.DEEVY_TARGET === "workers";
 
+/**
+ * Where the SPA's dev proxy sends `/api`, `/rpc`, `/mcp` and the rest: the Node
+ * server, on the port that server itself listens on. `DEEVY_PORT` is one
+ * variable for both halves — the server reads it to bind, this reads it to
+ * find — so a machine where 3000 is taken (another project, another checkout of
+ * deevy) moves both with one line in `.env` instead of patching this file.
+ *
+ * Read from the environment rather than the root `.env`: the dev task runs
+ * through `vp run -r --parallel dev`, which starts the server with
+ * `--env-file-if-exists=../../.env`, and Vite's own config is loaded before any
+ * of that. So an override for the proxy belongs in the shell or the launch
+ * configuration, and the default stays the port `.env.example` ships.
+ */
+const apiOrigin =
+  process.env.DEEVY_API_ORIGIN ?? `http://localhost:${process.env.DEEVY_PORT ?? "3000"}`;
+
 export default defineConfig({
   run: {
     // Cached, and per package: see packages/core/vite.config.ts.
@@ -44,14 +60,14 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:3000",
-      "/rpc": "http://localhost:3000",
-      "/healthz": "http://localhost:3000",
+      "/api": apiOrigin,
+      "/rpc": apiOrigin,
+      "/healthz": apiOrigin,
       // An MCP client pointed at the dev origin has to reach the server, and
       // discovery has to answer from the same origin as the endpoint it
       // describes, or the OAuth dance in slice 7 looks at the wrong server.
-      "/mcp": "http://localhost:3000",
-      "/.well-known": "http://localhost:3000",
+      "/mcp": apiOrigin,
+      "/.well-known": apiOrigin,
     },
   },
   test: {

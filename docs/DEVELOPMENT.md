@@ -14,12 +14,20 @@ cp .env.example .env   # fill in the values described in the file
 vp run --parallel dev
 ```
 
-`vp run -r --parallel dev` starts two tasks: the Node server on http://localhost:3000 (rebuilt and restarted by
-`vp pack --watch` on every change) and the Vite dev server on http://localhost:5173, which serves the SPA and
-proxies `/api`, `/rpc`, `/healthz`, `/mcp` and `/.well-known` to the Node server. Open
-http://localhost:5173. The last two are there so an MCP client can be pointed at the dev origin: discovery has
-to answer from the same origin as the endpoint it describes, or a client looks for the authorization server in
-the wrong place.
+`vp run -r --parallel dev` starts two tasks: the Node server on `DEEVY_PORT` (3000 by default, and 3010 in the
+launch configurations, because 3000 is a port everything wants; rebuilt and restarted by `vp pack --watch` on
+every change) and the Vite dev server on http://localhost:5173, which serves the SPA and proxies `/api`,
+`/rpc`, `/healthz`, `/mcp` and `/.well-known` to it. Open http://localhost:5173. The last two are there so an
+MCP client can be pointed at the dev origin: discovery has to answer from the same origin as the endpoint it
+describes, or a client looks for the authorization server in the wrong place.
+
+**One port, both halves.** The proxy reads `DEEVY_PORT` too, so moving the server moves the proxy with it —
+which is what a machine already running something on 3000, or a second checkout of deevy, needs.
+`DEEVY_API_ORIGIN` overrides the target outright, for a server that is not on this machine. Neither is read
+from `.env`: Vite's configuration is loaded before the server's environment file is, so set them in the shell
+or in `.claude/launch.json`, which is where the 3010 comes from. A sign-in page with no buttons on it is what
+this looks like when it is wrong — the page draws one button per provider `health.ping` reports, and a proxy
+pointing at something that is not deevy answers nothing.
 
 The SQLite file lives at `DEEVY_DATABASE_PATH` (default `./data/deevy.sqlite`, relative to `apps/server`) and
 is created and migrated on start.
