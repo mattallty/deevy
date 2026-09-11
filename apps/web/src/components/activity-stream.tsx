@@ -286,7 +286,7 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
 
 function Who({ member }: { member: ChipMember | null }) {
   return member ? (
-    <MemberChip member={member} size="xs" />
+    <MemberChip member={member} size="inline" />
   ) : (
     <span className="text-muted-foreground">deevy</span>
   );

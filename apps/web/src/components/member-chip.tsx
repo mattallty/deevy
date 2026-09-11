@@ -13,6 +13,13 @@ export interface ChipMember {
 }
 
 const sizes = {
+  /**
+   * For a chip inside a sentence — who did a thing, in the Activity stream.
+   * The avatar is the height of the line it sits on rather than taller than
+   * it, and the name is the size of the words either side of it, so the row
+   * reads as one sentence with a mark in it.
+   */
+  inline: { avatar: "size-3.5 text-[8px]", text: "text-sm", gap: "gap-1.5" },
   xs: { avatar: "size-4 text-[9px]", text: "text-xs", gap: "gap-1.5" },
   sm: { avatar: "size-5 text-[10px]", text: "text-sm", gap: "gap-2" },
   md: { avatar: "size-7 text-xs", text: "text-sm", gap: "gap-2" },
