@@ -17784,6 +17784,11 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "writtenAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
                     }
                   },
                   "required": [
@@ -17795,7 +17800,8 @@
                     "updatedAt",
                     "version",
                     "body",
-                    "authorMemberId"
+                    "authorMemberId",
+                    "writtenAt"
                   ],
                   "additionalProperties": false
                 }
@@ -17889,6 +17895,11 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "writtenAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
                     }
                   },
                   "required": [
@@ -17900,7 +17911,8 @@
                     "updatedAt",
                     "version",
                     "body",
-                    "authorMemberId"
+                    "authorMemberId",
+                    "writtenAt"
                   ],
                   "additionalProperties": false
                 }

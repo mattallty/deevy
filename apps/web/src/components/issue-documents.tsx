@@ -7,7 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { useMentionables } from "@/lib/mentions";
+import { MemberChip } from "@/components/member-chip";
 import { orpc } from "@/lib/orpc";
+import { ago } from "@/lib/time";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 import {
   Select,
@@ -138,6 +140,19 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
             </SelectContent>
           </Select>
         </div>
+        {/*
+         * Who wrote the version you are reading. Half the words on a deevy
+         * Issue are an Agent's and the page never said which half; the row has
+         * carried `authorMemberId` since Documents were versioned (2026-09-11).
+         */}
+        <p className="flex flex-wrap items-center gap-1.5 pb-2 text-sm text-muted-foreground">
+          <span>written by</span>
+          <DocumentAuthor memberId={document.data.authorMemberId} />
+          {/* A version written before this field existed says who, not when. */}
+          {document.data.writtenAt ? (
+            <span>{ago(document.data.writtenAt, { short: true })}</span>
+          ) : null}
+        </p>
         <span className="flex-1" />
         {draft === null && !readingOlder ? (
           <Button
@@ -189,4 +204,12 @@ function DocumentPane({ issueKey, name, currentVersion }: PaneProps) {
       )}
     </div>
   );
+}
+
+/** The Member behind a version, or deevy itself where a row predates one. */
+function DocumentAuthor({ memberId }: { memberId: string | null }) {
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  const member = (members.data?.members ?? []).find((one) => one.id === memberId);
+  if (!member) return <span className="text-foreground">deevy</span>;
+  return <MemberChip member={member} size="inline" />;
 }

@@ -7,7 +7,6 @@ import { MemberChip } from "@/components/member-chip";
 import { RailHeading } from "@/components/rail-heading";
 import { RunStatus, type RunStatusValue } from "@/components/run-status";
 import { StateBadge } from "@/components/state-badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { orpc } from "@/lib/orpc";
 import { cn } from "@/lib/utils";
@@ -310,101 +309,25 @@ export function StatusHub({ parts }: { parts: Parts }) {
 
 /**
  * **Provenance.** Half the words on a deevy Issue were written by an Agent, and
- * the page never says which half. Linear shipped author indicators and
- * agent-edit highlighting for exactly this. Here the Document is the page and
- * its versions are the spine: every version says who wrote it and when, reading
- * one is a click, and the ruling sits beside the version you are reading.
+ * the page never said which half. The Document is the page, and it says who
+ * wrote the version you are reading — which is now `IssueDocuments`' own job,
+ * so the tabs, the version picker and the editor are the real ones rather than
+ * a spike's imitation of them. The rail is wide enough to hold a ruling and
+ * read like a column, not a gutter.
  */
 export function Provenance({ parts }: { parts: Parts }) {
-  const { issueKey } = parts.artifacts();
-  const documents = useQuery(orpc.documents.list.queryOptions({ input: { issueKey } }));
-  const list = documents.data?.documents ?? [];
-  const [name, setName] = useState<string | null>(null);
-  const chosen = list.find((document) => document.name === name) ?? list[0] ?? null;
-  const [version, setVersion] = useState<number | null>(null);
-  const showing = version ?? chosen?.currentVersion ?? 1;
-
-  const body = useQuery(
-    orpc.documents.get.queryOptions({
-      input: { issueKey, name: chosen?.name ?? "", version: showing },
-      enabled: Boolean(chosen),
-    }),
-  );
-
   return (
-    <article className="grid gap-6 @4xl:grid-cols-[minmax(0,1fr)_18rem]">
-      <div className="flex min-w-0 flex-col gap-4">
+    <article className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
+      <div className="flex min-w-0 flex-col gap-6">
         {parts.identity()}
-        <div className="flex flex-wrap items-center gap-2">
-          {list.map((document) => (
-            <button
-              key={document.id}
-              type="button"
-              onClick={() => {
-                setName(document.name);
-                setVersion(null);
-              }}
-              aria-current={document.name === chosen?.name ? "true" : undefined}
-              className={cn(
-                "rounded-md border px-2.5 py-1 text-xs hover:bg-accent",
-                document.name === chosen?.name && "border-primary/30 bg-primary/10 text-primary",
-              )}
-            >
-              {document.name}
-            </button>
-          ))}
-        </div>
-
-        {chosen ? (
-          <section className="flex flex-col gap-3 rounded-lg border p-5">
-            <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-mono">v{showing}</span>
-              <span>·</span>
-              {body.data ? <Author memberId={body.data.authorMemberId} /> : <span>…</span>}
-              {showing !== chosen.currentVersion ? (
-                <Button size="xs" variant="outline" onClick={() => setVersion(null)}>
-                  Back to current
-                </Button>
-              ) : null}
-            </p>
-            {body.isPending ? <Skeleton className="h-64 w-full" /> : null}
-            {body.data ? <Markdown>{body.data.body}</Markdown> : null}
-          </section>
-        ) : (
-          <p className="text-sm text-muted-foreground">No Documents on this Issue yet.</p>
-        )}
-
+        {parts.description()}
+        {parts.documents()}
         {parts.activity()}
       </div>
 
       <aside className="flex flex-col gap-5">
         {parts.gate()}
-        {chosen ? (
-          <section className="flex flex-col gap-2">
-            <RailHeading>Versions</RailHeading>
-            <ul className="flex flex-col gap-1">
-              {Array.from(
-                { length: chosen.currentVersion },
-                (_, index) => chosen.currentVersion - index,
-              ).map((candidate) => (
-                <li key={candidate}>
-                  <button
-                    type="button"
-                    onClick={() => setVersion(candidate)}
-                    aria-current={candidate === showing ? "true" : undefined}
-                    className={cn(
-                      "w-full rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-accent",
-                      candidate === showing && "bg-accent",
-                    )}
-                  >
-                    <span className="font-mono text-xs">v{candidate}</span>{" "}
-                    {candidate === chosen.currentVersion ? "current" : "older"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+        {parts.runs()}
         {parts.railProperties()}
       </aside>
     </article>

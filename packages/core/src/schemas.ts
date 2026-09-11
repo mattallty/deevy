@@ -112,6 +112,12 @@ export const DocumentAtVersionSchema = DocumentSchema.extend({
   version: z.number().int(),
   body: z.string(),
   authorMemberId: z.string().nullable(),
+  /**
+   * When this version was written, which is the version row's own time rather
+   * than the Document's: reading version 1 of a Document edited yesterday must
+   * say when version 1 was written, not when the Document last changed.
+   */
+  writtenAt: z.date(),
 });
 
 export const CommentSchema = createSelectSchema(comment);

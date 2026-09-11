@@ -45,11 +45,18 @@ vi.mock("../src/lib/orpc.ts", async () => {
           version: at,
           body: stub.bodies[`${name}:${at}`] ?? "",
           authorMemberId: null,
+          writtenAt: new Date("2026-09-08T10:00:00Z"),
         };
       },
       write: async (input: unknown) => {
         stub.written.push(input);
-        return { ...stub.documents[0], version: 3, body: "written", authorMemberId: null };
+        return {
+          ...stub.documents[0],
+          version: 3,
+          body: "written",
+          authorMemberId: null,
+          writtenAt: new Date(),
+        };
       },
     },
   });

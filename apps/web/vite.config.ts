@@ -72,6 +72,16 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    /**
+     * Vitest's 5s default is the wrong budget here for the same reason it was
+     * wrong for `apps/agent`: a case in this suite mounts the whole router, a
+     * QueryClient and a screen's worth of queries in jsdom. Alone that is under
+     * a second; under `vp run -r test`, with six other packages on the same
+     * CPU, cases that mount an Issue have been seen past 5s and failing on the
+     * clock rather than on an assertion. A test that genuinely hangs still
+     * fails, twenty seconds later rather than five.
+     */
+    testTimeout: 20_000,
     include: ["tests/**/*.test.tsx"],
     setupFiles: ["./tests/setup.ts"],
     globals: true,

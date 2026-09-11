@@ -21,12 +21,20 @@ export const toneClass: Record<EventTone, string> = {
 };
 
 /** The same tones as a timeline dot: an edge in the hue, a tint inside. */
+/**
+ * The timeline's dot is pinned to the top of its row, which is a hair above the
+ * line of text beside it: the dot is 16.8px and the line box 20, so it rides
+ * 1.6px high. `top-[0.1rem]` centres it on the first line, which is where the
+ * eye reads it as belonging to.
+ */
+const alignedToTheLine = "top-[0.1rem]";
+
 export const toneDotClass: Record<EventTone, string> = {
-  human: "border-human bg-human/15",
-  agent: "border-agent bg-agent/15",
-  gate: "border-gate bg-gate/25",
-  muted: "border-border bg-muted",
-  destructive: "border-destructive bg-destructive/15",
+  human: `${alignedToTheLine} border-human bg-human/15`,
+  agent: `${alignedToTheLine} border-agent bg-agent/15`,
+  gate: `${alignedToTheLine} border-gate bg-gate/25`,
+  muted: `${alignedToTheLine} border-border bg-muted`,
+  destructive: `${alignedToTheLine} border-destructive bg-destructive/15`,
 };
 
 export interface EventText {

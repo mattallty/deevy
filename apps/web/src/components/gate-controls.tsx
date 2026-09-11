@@ -14,7 +14,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
+import { MemberChip } from "@/components/member-chip";
 import { RailHeading } from "@/components/rail-heading";
+import { ago } from "@/lib/time";
 
 interface State {
   id: string;
@@ -61,6 +63,9 @@ interface GateControlsProps {
     decision: string;
     note: string | null;
     createdAt: string | Date;
+    /** Which Gate this was, and who ruled: what makes one ruling tell itself apart. */
+    stateId: string;
+    memberId: string | null;
   }>;
   /** How far along the Gate is; absent for a State that is not one. */
   standing?: GateStanding | null;
@@ -81,6 +86,9 @@ export function GateControls({
 }: GateControlsProps) {
   const queryClient = useQueryClient();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
+  // Who ruled, for the history below: the page has this list already, so it is
+  // a cache read rather than a request.
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
   // A ruling changes the Issue, what the inbox owes, and the Run that asked.
   const refresh = () =>
     Promise.all(
@@ -231,18 +239,39 @@ export function GateControls({
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       {decisions.length > 0 ? (
+        /*
+         * A ruling says which Gate it was at and who made it. Without those an
+         * Issue that came through Intent, Spec and Plan showed three lines that
+         * read the same — the word "approved" and a note — and nothing told you
+         * they were three different decisions (2026-09-11).
+         */
         <ul aria-label="Gate decisions" className="flex flex-col gap-2">
-          {decisions.map((decision) => (
-            <li key={decision.id} className="flex flex-wrap items-baseline gap-2 text-sm">
-              <Badge variant={decision.decision === "approved" ? "default" : "destructive"}>
-                {decision.decision}
-              </Badge>
-              {decision.note ? <span>{decision.note}</span> : null}
-              <span className="text-xs text-muted-foreground">
-                {new Date(decision.createdAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
+          {decisions.map((decision) => {
+            const at = (workflow.data?.states ?? []).find((one) => one.id === decision.stateId);
+            const by = (members.data?.members ?? []).find((one) => one.id === decision.memberId);
+            return (
+              <li key={decision.id} className="flex flex-col gap-1 text-sm">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{at?.name ?? "A Gate"}</span>
+                  <Badge variant={decision.decision === "approved" ? "default" : "destructive"}>
+                    {decision.decision}
+                  </Badge>
+                  {by ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground">by</span>
+                      <MemberChip member={by} size="inline" />
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-muted-foreground">
+                    {ago(decision.createdAt, { short: true })}
+                  </span>
+                </span>
+                {decision.note ? (
+                  <span className="text-muted-foreground">“{decision.note}”</span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>

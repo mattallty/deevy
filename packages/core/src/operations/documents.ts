@@ -51,7 +51,13 @@ export const documents = {
       if (!row) {
         throw new ORPCError("NOT_FOUND", { message: `No version ${version} of ${input.name}` });
       }
-      return { ...found, version: row.version, body: row.body, authorMemberId: row.authorMemberId };
+      return {
+        ...found,
+        version: row.version,
+        body: row.body,
+        authorMemberId: row.authorMemberId,
+        writtenAt: row.createdAt,
+      };
     },
   }),
 
@@ -86,6 +92,7 @@ export const documents = {
         version,
         body: input.body,
         authorMemberId: context.member.id,
+        writtenAt: new Date(),
       };
     },
   }),
