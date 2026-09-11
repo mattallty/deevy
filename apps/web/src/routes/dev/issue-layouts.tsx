@@ -15,6 +15,13 @@ import { StateBadge } from "@/components/state-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { orpc } from "@/lib/orpc";
+import {
+  Provenance,
+  ReviewScreen,
+  SessionConsole,
+  SplitQueue,
+  StatusHub,
+} from "./issue-layouts-more";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,38 +41,94 @@ import { cn } from "@/lib/utils";
  * about arrangement does not need a second copy of a Select.
  */
 
-type VariantId = "ruling" | "workbench" | "story" | "canvas" | "panels";
+type VariantId =
+  | "ruling"
+  | "workbench"
+  | "story"
+  | "canvas"
+  | "panels"
+  | "review"
+  | "console"
+  | "split"
+  | "hub"
+  | "provenance";
 
-const variants: Array<{ id: VariantId; name: string; centred: string; best: string }> = [
+const variants: Array<{
+  id: VariantId;
+  name: string;
+  centred: string;
+  best: string;
+  pass: 1 | 2;
+}> = [
   {
+    pass: 1,
     id: "ruling",
     name: "Ruling first",
     centred: "What is owed a Human, at the top and full width.",
     best: "A Workspace where Gates are the point and most Issues are waiting on somebody.",
   },
   {
+    pass: 1,
     id: "workbench",
     name: "Workbench",
     centred: "The Issue's artifacts as navigation: pick a Document, a Run, the conversation.",
     best: "Issues an Agent has worked several times, where Documents and Runs pile up.",
   },
   {
+    pass: 1,
     id: "story",
     name: "One story",
     centred: "Everything that happened, in order, in a single stream.",
     best: "Reading an Issue you have not seen before, or catching up after a week.",
   },
   {
+    pass: 1,
     id: "canvas",
     name: "Document canvas",
     centred: "The Document being written; everything else is beside it.",
     best: "Intent, Spec and Plan States, where the writing is the work.",
   },
   {
+    pass: 1,
     id: "panels",
     name: "Panels",
     centred: "One screen: every section folded to a line that says what is inside it.",
     best: "Working a queue — scan, act, move on — and keyboards over scrollbars.",
+  },
+  {
+    pass: 2,
+    id: "review",
+    name: "Review",
+    centred: "What changed, beside the decision about it: this version next to the last one.",
+    best: "Ruling on a Gate, which is a review and has never looked like one.",
+  },
+  {
+    pass: 2,
+    id: "console",
+    name: "Console",
+    centred: "The Agent's Run runs beside the Issue and stays there, as Cursor and Devin keep it.",
+    best: "Watching work happen, and answering an Agent without losing your place.",
+  },
+  {
+    pass: 2,
+    id: "split",
+    name: "Split queue",
+    centred: "The list you came from never leaves: it is the left half of the page.",
+    best: "Six Gates to rule, or a morning of triage.",
+  },
+  {
+    pass: 2,
+    id: "hub",
+    name: "Status hub",
+    centred: "What this Issue waits on, and what the work produced, pinned above everything.",
+    best: "Knowing where an Issue stands without reading it.",
+  },
+  {
+    pass: 2,
+    id: "provenance",
+    name: "Provenance",
+    centred: "The Document and its versions, each saying who wrote it — a Human or an Agent.",
+    best: "Reading what an Agent wrote, and seeing what it changed since you last looked.",
   },
 ];
 
@@ -116,20 +179,29 @@ export function IssueLayoutsPage() {
           </form>
         </div>
 
-        <nav aria-label="Layouts" className="flex flex-wrap gap-2">
-          {variants.map((variant) => (
-            <button
-              key={variant.id}
-              type="button"
-              aria-current={variant.id === chosen.id ? "true" : undefined}
-              onClick={() => go({ v: variant.id })}
-              className={cn(
-                "rounded-md border px-3 py-1.5 text-left text-sm hover:bg-accent",
-                variant.id === chosen.id && "border-primary/30 bg-primary/10 text-primary",
-              )}
-            >
-              {variant.name}
-            </button>
+        <nav aria-label="Layouts" className="flex flex-col gap-2">
+          {([1, 2] as const).map((pass) => (
+            <div key={pass} className="flex flex-wrap items-center gap-2">
+              <span className="w-28 text-xs text-muted-foreground">
+                {pass === 1 ? "First pass" : "After the research"}
+              </span>
+              {variants
+                .filter((variant) => variant.pass === pass)
+                .map((variant) => (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    aria-current={variant.id === chosen.id ? "true" : undefined}
+                    onClick={() => go({ v: variant.id })}
+                    className={cn(
+                      "rounded-md border px-3 py-1.5 text-left text-sm hover:bg-accent",
+                      variant.id === chosen.id && "border-primary/30 bg-primary/10 text-primary",
+                    )}
+                  >
+                    {variant.name}
+                  </button>
+                ))}
+            </div>
           ))}
         </nav>
         <p className="text-sm">
@@ -166,18 +238,23 @@ function Variant({ id, issueKey }: { id: VariantId; issueKey: string }) {
       {id === "story" ? <OneStory parts={parts} /> : null}
       {id === "canvas" ? <DocumentCanvas parts={parts} /> : null}
       {id === "panels" ? <Panels parts={parts} /> : null}
+      {id === "review" ? <ReviewScreen parts={parts} /> : null}
+      {id === "console" ? <SessionConsole parts={parts} /> : null}
+      {id === "split" ? <SplitQueue parts={parts} /> : null}
+      {id === "hub" ? <StatusHub parts={parts} /> : null}
+      {id === "provenance" ? <Provenance parts={parts} /> : null}
     </div>
   );
 }
 
-type IssueData = Awaited<ReturnType<typeof import("@/lib/orpc").client.issues.get>>;
-type Parts = ReturnType<typeof partsOf>;
+export type IssueData = Awaited<ReturnType<typeof import("@/lib/orpc").client.issues.get>>;
+export type Parts = ReturnType<typeof partsOf>;
 
 /**
  * The pieces every layout is made of, so a layout is a decision about
  * arrangement and nothing else.
  */
-function partsOf(issue: IssueData) {
+export function partsOf(issue: IssueData) {
   const atGate = issue.state.isGate;
   const stateName = issue.state.name;
 

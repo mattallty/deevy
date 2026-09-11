@@ -148,3 +148,115 @@ full-width ruling is a change any of the others could take on its own. What to d
 A question worth answering first, because it decides between them: **what is the commonest reason somebody
 opens an Issue in deevy?** If it is to rule, 1. If it is to see what an Agent produced, 2. If it is to catch
 up, 3. If it is to write, 4. If it is to triage a queue, 5.
+
+---
+
+# Second pass: what comparable software actually does
+
+The five above were rejected together, which was the right answer: they are one idea — a column with a rail —
+arranged five ways. None of them questioned the frame. This pass starts from what shipped elsewhere in 2026.
+
+## What the research says
+
+- **Linear** (July 2026) pins **diffs to the top of the issue's sidebar**, so the pull request is reachable
+  from anywhere on the page rather than being a link at the bottom of a list; its redesign notes describe
+  side panels for meta properties and split as a first-class view type, and the work was about "reducing
+  visual noise" and increasing hierarchy. It also shipped **author-name indicators** so you can tell whether
+  text was written by a colleague or added by an agent, **agent edits highlighted separately** for review,
+  and restoring from version history.
+- **Devin Desktop** (2026) makes the agent's session the primary surface and sorts by **what it is waiting
+  on**: in progress, blocked, ready for review.
+- **Cursor 3** (April 2026) keeps an **Agents panel** listing every session — the task that started it and
+  where it runs — on screen beside the work rather than behind a tab.
+
+deevy already has every noun those patterns need — Links to a branch and a pull request, Documents with a
+version history and an author per version, Runs with a live feed — and the current page shows none of them
+anywhere they can be reached. That, rather than where the Labels sit, is what these five are about.
+
+## 6. Review (`v=review`)
+
+An Issue at a Gate **is** a review, and a review screen shows what changed beside the decision about it.
+The Document as it stands sits next to the version before it, both real (`documents.get` takes a version and
+says who wrote it), with the pinned Links above and the ruling sticky on the right. The Issue's own
+description folds away: at a Gate it is context, not the subject.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ DEV-2 · Spec · Ada     [branch] [pull request]           │ ← pinned
+├───────────────────────────────────────────┬──────────────┤
+│ intent v1   spec v2                       │ Spec is a    │
+│ ┌ Before · v1 ─────┐ ┌ Now · v2 · Planner┐│ Gate         │
+│ │ (dimmed)         │ │                   ││ [Approve]    │
+│ └──────────────────┘ └───────────────────┘│ ▸ The Issue  │
+├───────────────────────────────────────────┴──────────────┤
+│ Activity                                                 │
+└──────────────────────────────────────────────────────────┘
+```
+
+## 7. Console (`v=console`)
+
+What an Agent is doing is not a section of the Issue, it is the other half of the room. The Issue reads on
+the left; the Run runs on the right, with the ruling above it, and stays there while you scroll.
+
+```
+┌───────────────────────────────┬──────────────────┐
+│ DEV-2 · Spec · Ada            │ 🤖 The Agent     │ ← sticky
+│ Checkout rewrite              │ Spec is a Gate   │
+│ facts · description           │ [Approve]        │
+│ Documents                     │ ──────────────── │
+│ Activity                      │ Run feed, live   │
+└───────────────────────────────┴──────────────────┘
+```
+
+## 8. Split queue (`v=split`)
+
+The list you came from never leaves. Ruling on six Gates is six clicks and no navigation; the Issue fills the
+rest of the page with its ruling directly under its name.
+
+```
+┌──────────────┬───────────────────────────────────┐
+│ DEV-29 Build │ DEV-2 · Spec · Ada                │
+│ DEV-27 Review│ Checkout rewrite                  │
+│ ▶ DEV-2 Spec │ Spec is a Gate — [Approve]        │
+│ DEV-26 Plan  │ facts · description · Documents   │
+│ DEV-23 Plan  │ Runs · Activity                   │
+└──────────────┴───────────────────────────────────┘
+```
+
+## 9. Status hub (`v=hub`)
+
+One line that says what the Issue is waiting on — Devin's question — and beside it what the work produced,
+pinned as Linear pins a diff. Both stay while the page scrolls.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Waiting on a Human at the Spec Gate   [branch] [PR]      │ ← sticky
+│ DEV-2 · Spec · Ada   Checkout rewrite                    │
+├──────────────────────────────────────────────────────────┤
+│        ruling · facts · description · Documents          │
+│        Runs · Activity                                   │
+└──────────────────────────────────────────────────────────┘
+```
+
+## 10. Provenance (`v=provenance`)
+
+Half the words on a deevy Issue were written by an Agent and the page never says which half. The Document is
+the page, its versions are the spine, and every version names its author — a Human or an Agent — with the
+ruling beside whichever version you are reading.
+
+```
+┌───────────────────────────────────┬──────────────┐
+│ DEV-2 · Spec · Ada                │ Spec is a    │
+│ intent  spec                      │ Gate         │
+│ ┌ v2 · 🤖 Planner ──────────────┐ │ Versions     │
+│ │ the Document                  │ │ ▸ v2 current │
+│ └───────────────────────────────┘ │   v1 older   │
+│ Activity                          │ facts        │
+└───────────────────────────────────┴──────────────┘
+```
+
+## What to decide
+
+6, 9 and 10 each fix something the current page gets wrong and could ship on their own; 7 and 8 are new
+frames that would replace it. A reasonable outcome is one frame plus one fix: **8 or 7** as the shape, with
+**9's pinned artifacts** and **10's authorship** folded into it.
