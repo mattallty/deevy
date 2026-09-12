@@ -177,7 +177,7 @@ describe("the inbox", () => {
     // The Issue, with the ruling card and the banner a Gate Notification earns.
     expect(await screen.findByRole("button", { name: "Approve" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
-    expect((await screen.findByRole("status")).textContent).toMatch(/Waiting on your ruling/);
+    expect(await screen.findByText(/Waiting on your ruling/)).toBeTruthy();
   });
 
   it("shows only what is unread when asked", async () => {

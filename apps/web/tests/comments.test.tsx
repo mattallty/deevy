@@ -99,8 +99,10 @@ describe("the comment thread", () => {
   it("suggests Members and Teams after an @", async () => {
     await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
-    // The Source view's own suggestions; the rich view has Tiptap's.
-    fireEvent.click(await screen.findByRole("tab", { name: "Source" }));
+    // The Source view's own suggestions; the rich view has Tiptap's. The page
+    // has three editors on it, so this one is named.
+    const composer = await screen.findByRole("tablist", { name: "Comment view" });
+    fireEvent.click(within(composer).getByRole("tab", { name: "Source" }));
     fireEvent.change(screen.getByLabelText("Comment", { selector: "textarea" }), {
       target: { value: "hi @a" },
     });

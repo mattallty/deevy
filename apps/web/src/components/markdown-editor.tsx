@@ -80,7 +80,10 @@ export function MarkdownEditor({
     >
       <div className="flex items-center justify-end border-b px-1">
         <Tabs value={view} onValueChange={(next) => setView(next === "source" ? "source" : "edit")}>
-          <TabsList aria-label="Editor view" className="h-7">
+          {/* Named for the editor it belongs to: an Issue page carries three
+              of these (description, Document, comment), and "Edit / Source"
+              three times over is ambiguous to a screen reader and to a test. */}
+          <TabsList aria-label={ariaLabel ? `${ariaLabel} view` : "Editor view"} className="h-7">
             <TabsTrigger value="edit" className="text-xs">
               Edit
             </TabsTrigger>

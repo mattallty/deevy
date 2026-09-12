@@ -191,8 +191,12 @@ describe("an Issue sitting in a Gate", () => {
   it("puts the ruling in front of the Human the link was for", async () => {
     await mountAt("/issues/DEV-1?gate=s1", { memberName: "Ada" });
 
-    const banner = await screen.findByRole("status");
-    expect(banner.textContent).toMatch(/Waiting on your ruling/);
+    // The page has a second live region for what it is saving, so the banner
+    // is found by what it says rather than by being the only one.
+    const banner = (await screen.findByText(/Waiting on your ruling/)).closest(
+      '[role="status"]',
+    ) as HTMLElement;
+    expect(banner).toBeTruthy();
     expect(banner.textContent).toMatch(/Intent/);
     expect(within(banner).getByRole("button", { name: "Rule now" })).toBeTruthy();
   });

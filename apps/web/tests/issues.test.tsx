@@ -150,15 +150,20 @@ describe("the Project page's Issue list", () => {
 });
 
 describe("the Issue page", () => {
-  it("shows the key, title, State, and the description as markdown", async () => {
+  it("shows the key, title, State, and the description in its editor", async () => {
     await mountAt("/issues/DEV-1");
 
     expect(await screen.findByText("DEV-1")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Ship the Event log", level: 1 })).toBeTruthy();
     // The State names the badge and the Gate controls, so both are expected.
     expect(screen.getAllByText("Intent").length).toBeGreaterThan(0);
-    // Rendered markdown, not the raw "## Why"
-    expect(screen.getByRole("heading", { name: "Why", level: 2 })).toBeTruthy();
+    // The description is the editor now, the way a Document is: the rich view
+    // renders the markdown, and the Source beside it holds what it renders.
+    // Both views carry the label, so this names the one holding the source.
+    const source = screen.getByLabelText("Description", {
+      selector: "textarea",
+    }) as HTMLTextAreaElement;
+    expect(source.value).toContain("## Why");
   });
 
   it("lists the children and links to the parent", async () => {
@@ -174,16 +179,59 @@ describe("the Issue page", () => {
     expect(within(timeline).getAllByRole("listitem")).toHaveLength(2);
   });
 
-  it("saves an edited title through issues.update", async () => {
+  it("saves the title where it is read, with no Edit button to press", async () => {
     await mountAt("/issues/DEV-1");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Ship it" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const heading = await screen.findByRole("heading", { name: "Ship the Event log" });
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(heading.getAttribute("contenteditable")).toBe("true");
+
+    heading.textContent = "Ship it";
+    fireEvent.blur(heading);
 
     await waitFor(() =>
       expect(stub.updated).toContainEqual(
         expect.objectContaining({ key: "DEV-1", title: "Ship it" }),
+      ),
+    );
+  });
+
+  it("saves the title on Enter, and only once when the blur follows", async () => {
+    await mountAt("/issues/DEV-1");
+
+    const heading = await screen.findByRole("heading", { name: "Ship the Event log" });
+    heading.textContent = "Ship it on Enter";
+    fireEvent.keyDown(heading, { key: "Enter" });
+    fireEvent.blur(heading);
+
+    await waitFor(() =>
+      expect(
+        stub.updated.filter((one) => (one as { title?: string }).title === "Ship it on Enter"),
+      ).toHaveLength(1),
+    );
+  });
+
+  it("puts the title back rather than saving an empty one", async () => {
+    await mountAt("/issues/DEV-1");
+
+    const heading = await screen.findByRole("heading", { name: "Ship the Event log" });
+    heading.textContent = "   ";
+    fireEvent.blur(heading);
+
+    expect(heading.textContent).toBe("Ship the Event log");
+    expect(stub.updated).not.toContainEqual(expect.objectContaining({ title: "" }));
+  });
+
+  it("saves the description when the editor is left", async () => {
+    await mountAt("/issues/DEV-1");
+
+    const body = await screen.findByLabelText("Description", { selector: "textarea" });
+    fireEvent.change(body, { target: { value: "Why this Issue is." } });
+    fireEvent.blur(body.closest('[data-slot="markdown-editor-frame"]')!);
+
+    await waitFor(() =>
+      expect(stub.updated).toContainEqual(
+        expect.objectContaining({ key: "DEV-1", description: "Why this Issue is." }),
       ),
     );
   });

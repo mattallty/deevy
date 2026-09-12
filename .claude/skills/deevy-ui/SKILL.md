@@ -246,10 +246,23 @@ each of them paid for; read it before rearranging this page.
 
 ## What slice 3 settled (the editor)
 
+- Each editor's Edit/Source tabs are named for the editor they belong to (`<aria-label> view`): an Issue
+  page carries three of them — description, Document, comment — and three tablists called "Editor view" are
+  ambiguous to a screen reader and to a test. A page can also hold more than one `role="status"` now (what
+  is saving, and what a Gate is waiting on), so a test names the one it means.
 - **`components/markdown-editor.tsx`** is the one editor: markdown in, markdown out, `mode="block"`
   (Documents, descriptions) or `"inline"` (comments, notes, answers), Edit/Source tabs. The Source view is a
   plain `Textarea` with `aria-label="Body"`, always mounted (hidden by class), so tests type there and a
   Human can always see the text as an Agent wrote it. `⌘Enter` submits in both views (`onSubmit`).
+- **So are an Issue's title and description** (`inline-title.tsx`, `routes/issues/issue.tsx`): no Edit
+  button, no form, no second copy of the words on screen. The title is a `contentEditable` `h1` rather than
+  an input dressed as one — a heading's accessible name is its text, and an `<input>` inside it would take
+  the title out of that name, which is how the page is found in every test. React must not own its children:
+  the initial text is rendered once from a ref and a later server value is written in by hand, never while
+  somebody is typing. `Enter` commits and gives up focus, `Escape` reverts, an empty title reverts rather
+  than saving; a `committed` ref stops the blur that follows `Enter` from saving twice. The description is
+  the same `MarkdownEditor` a Document uses, with the same transparent chrome, saving on blur and `⌘Enter`.
+  One `useAutosave` serves both, and one `role="status"` beside the key says Saving…/Saved or offers Retry.
 - **A Document is edited where it is read.** `IssueDocuments` has no read mode and no Save button: the
   editor is the view, `onBlur` (focus leaving the frame entirely) and `⌘Enter` write a version through
   `useAutosave`, and a `role="status"` line says Saving…/Saved or offers Retry. The editor there is passed
