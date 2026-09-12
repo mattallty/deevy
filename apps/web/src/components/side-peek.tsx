@@ -44,11 +44,18 @@ export function SidePeek({
         side="right"
         showOverlay={false}
         aria-label={issueKey ? `Issue ${issueKey}` : "Issue"}
-        // The same variant chain as the base's `data-[side=right]:sm:max-w-sm`,
-        // so this one replaces it. 56rem leaves the Issue's own container over
-        // the `@3xl` it lays itself out in two columns at, and 92vw keeps a
-        // hand's width of the list visible on a narrower window.
-        className="w-full gap-0 overflow-y-auto p-0 text-sm data-[side=right]:w-full data-[side=right]:sm:max-w-[min(56rem,92vw)]"
+        /*
+         * The same variant chain as the base's `data-[side=right]:sm:max-w-sm`,
+         * so this one replaces it, and three rules in one expression:
+         * 45% of the window on a desktop, because the Issue inside is the whole
+         * page now and a fixed width is either a gutter on a 34" display or too
+         * much on a laptop; never under 56rem, which is what keeps the Issue's
+         * own container over the `@3xl` it needs to lay out in two columns;
+         * never over 92vw, so a hand's width of the list stays visible — the
+         * reason to peek rather than navigate. Below `sm` none of it applies
+         * and the sheet is the window, which is what a phone wants.
+         */
+        className="w-full gap-0 overflow-y-auto p-0 text-sm data-[side=right]:w-full data-[side=right]:sm:max-w-[min(92vw,max(56rem,45vw))]"
       >
         <SheetHeader className="flex-row items-center gap-2 border-b px-4 py-2 pr-12 text-left">
           <SheetTitle className="font-mono text-sm font-medium">{issueKey}</SheetTitle>
