@@ -293,7 +293,11 @@ each of them paid for; read it before rearranging this page.
 - **Mentions are text.** `@` opens a `@tiptap/suggestion` popup (`role="listbox" aria-label="Mentions"`)
   fed by `useMentionables()` (`lib/mentions.ts`: Members and Teams by handle) and inserts `@handle ` as plain
   text — no Mention node, so markdown round-trips exactly and the server resolves handles as before. `/` at a
-  line start opens the block menu (`aria-label="Commands"`) the same way. Two suggestion plugins need two
+  line start opens the block menu (`aria-label="Commands"`) the same way — Heading 1–3, the three lists,
+  table, code block, quote, divider. Both popups are `position: fixed` and belong to a **line**, not to the
+  viewport: `popup()` keeps the suggestion's `clientRect` and re-places on `scroll` (captured, because the
+  scroller is a pane or the peek rather than the window) and on `resize`. Without that the menu sits still
+  while the words move. Two suggestion plugins need two
   `PluginKey`s or ProseMirror throws.
 - **Highlighting is lowlight in both places**: `rehype-highlight` in `components/markdown.tsx`, the code
   block extension in the editor, colours from the palette in `index.css` (`.hljs-*`). Not shiki: its rehype

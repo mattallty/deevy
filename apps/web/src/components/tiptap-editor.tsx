@@ -8,7 +8,7 @@ import { PluginKey } from "@tiptap/pm/state";
 import { EditorContent, ReactRenderer, useEditor, useEditorState } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { BubbleMenu } from "@tiptap/react/menus";
-import Suggestion, { type SuggestionOptions, type SuggestionProps } from "@tiptap/suggestion";
+import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import {
   Bold,
   Code,
@@ -149,11 +149,34 @@ function popup(label: string): SuggestionOptions<SuggestionItem>["render"] {
   return () => {
     let renderer: ReactRenderer<ListHandle> | null = null;
     let host: HTMLDivElement | null = null;
-    const place = (props: SuggestionProps<SuggestionItem>) => {
-      const rect = props.clientRect?.();
+    /*
+     * Where the caret is, asked again each time rather than remembered: the
+     * popup is `fixed` to the viewport and the line it belongs to is not, so
+     * anything that moves the line — a scroll, a resize — has to move the
+     * popup with it, or the menu drifts away from the words it is about.
+     */
+    let caret: (() => DOMRect | null) | null = null;
+    const place = () => {
+      const rect = caret?.();
       if (!host || !rect) return;
       host.style.left = `${String(rect.left)}px`;
       host.style.top = `${String(rect.bottom + 4)}px`;
+    };
+    // Capture: the scroll that moves the caret is usually a pane's or the
+    // peek's rather than the window's, and those do not bubble.
+    const follow = () => place();
+    const watch = () => {
+      window.addEventListener("scroll", follow, true);
+      window.addEventListener("resize", follow);
+    };
+    const unwatch = () => {
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+    };
+    const close = () => {
+      unwatch();
+      host?.remove();
+      host = null;
     };
     return {
       onStart(props) {
@@ -166,24 +189,27 @@ function popup(label: string): SuggestionOptions<SuggestionItem>["render"] {
         host.style.zIndex = "50";
         host.appendChild(renderer.element);
         document.body.appendChild(host);
-        place(props);
+        caret = props.clientRect ?? null;
+        place();
+        watch();
       },
       onUpdate(props) {
         renderer?.updateProps({ items: props.items, command: props.command, label });
-        place(props);
+        caret = props.clientRect ?? null;
+        place();
       },
       onKeyDown({ event }) {
         if (event.key === "Escape") {
-          host?.remove();
+          close();
           return true;
         }
         return renderer?.ref?.onKeyDown(event) ?? false;
       },
       onExit() {
-        host?.remove();
+        close();
         renderer?.destroy();
         renderer = null;
-        host = null;
+        caret = null;
       },
     };
   };
