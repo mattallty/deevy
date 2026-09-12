@@ -221,7 +221,11 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
   names the dialog from `SheetTitle` (`aria-labelledby` beats `aria-label`), so a test finds it by
   `/DEV-1/`. It pushes the `peek` shortcut scope; `o` opens the full page; `Esc` closes. Since 2026-09-11 it
   is `min(92vw, max(56rem, 45vw))` wide — 45% of a desktop window, 56rem floor, 92vw ceiling, and the whole
-  window below `sm` — carries **no backdrop** (`showOverlay={false}`, a deevy prop on
+  window below `sm` — **resizable by its left edge** (`role="separator"` named `Resize the Issue panel`,
+  arrow keys and `Home` as well as a drag; the width is remembered in `localStorage` and re-clamped when the
+  window changes, `lib/peek-width.ts`). That expression is the floor a drag cannot go under, and is written
+  in CSS so the first paint needs no JavaScript; `peekBounds().min` is the same number for the code that has
+  to reason about it. Carries **no backdrop** (`showOverlay={false}`, a deevy prop on
   `ui/sheet.tsx`) and is **never modal**. The width is load-bearing: it keeps the Issue's own container over
   `@3xl`, so the peek is the page — two columns, rail on the right, sections in the same order — instead of
   the stacked, rail-first shape a narrower panel produced. The other two keep the list behind it lit,
