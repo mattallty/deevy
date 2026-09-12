@@ -1,9 +1,9 @@
 import { Editor } from "@tiptap/core";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { Markdown, proseClassName } from "../src/components/markdown.tsx";
 import { MarkdownEditor } from "../src/components/markdown-editor.tsx";
-import { editorExtensions, toMarkdown } from "../src/components/tiptap-editor.tsx";
+import { editorExtensions, Toolbar, toMarkdown } from "../src/components/tiptap-editor.tsx";
 
 /** Markdown in, through exactly the extensions the component uses, markdown out. */
 function roundTrip(markdown: string, mode: "block" | "inline" = "block"): string {
@@ -153,9 +153,39 @@ describe("MarkdownEditor", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("has a toolbar in block mode and none inline", async () => {
+  it("turns the selection into what the bubble's buttons say", () => {
+    const editor = new Editor({
+      extensions: editorExtensions({ mode: "block" }),
+      content: "Some words",
+      contentType: "markdown",
+    });
+    render(<Toolbar editor={editor} />);
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    editor.commands.selectAll();
+
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Bold" }));
+    expect(editor.isActive("bold")).toBe(true);
+    // `focus()` in a chain puts the caret back where jsdom thinks it is, so
+    // the selection is made again rather than assumed to survive.
+    editor.commands.selectAll();
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Heading 2" }));
+    // What the Document would be saved as, which is the thing that matters:
+    // `isActive` is false for a selection that runs past the heading.
+    expect(toMarkdown(editor).trim()).toBe("## **Some words**");
+
+    // Inserting a table or a divider is not something a selection becomes:
+    // those live in the `/` menu, and the bubble does not carry them.
+    expect(within(toolbar).queryByRole("button", { name: "Table" })).toBeNull();
+    expect(within(toolbar).queryByRole("button", { name: "Divider" })).toBeNull();
+    editor.destroy();
+  });
+
+  it("keeps no toolbar in the flow: formatting is a bubble over the selection", async () => {
     const block = render(<MarkdownEditor value="x" onChange={() => {}} />);
-    expect(await screen.findByRole("toolbar", { name: "Formatting" })).toBeTruthy();
+    await waitFor(() => expect(document.querySelector(".tiptap")).toBeTruthy());
+    // The bubble exists only while something is selected, so an editor nobody
+    // has selected anything in carries no toolbar at all — which is the point.
+    expect(screen.queryByRole("toolbar")).toBeNull();
     block.unmount();
 
     render(<MarkdownEditor value="x" onChange={() => {}} mode="inline" />);

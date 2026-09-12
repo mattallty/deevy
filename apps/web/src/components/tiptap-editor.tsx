@@ -7,6 +7,7 @@ import { Markdown } from "@tiptap/markdown";
 import { PluginKey } from "@tiptap/pm/state";
 import { EditorContent, ReactRenderer, useEditor, useEditorState } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
+import { BubbleMenu } from "@tiptap/react/menus";
 import Suggestion, { type SuggestionOptions, type SuggestionProps } from "@tiptap/suggestion";
 import {
   Bold,
@@ -458,7 +459,19 @@ export default function TiptapEditor({
 
   return (
     <div data-slot="markdown-editor" className="flex flex-col">
-      {editor && mode === "block" ? <Toolbar editor={editor} /> : null}
+      {/*
+       * The formatting is where the words are: a bubble over the selection
+       * rather than a strip above the editor. A Document, a description and a
+       * comment are all read far more often than they are formatted, and a
+       * toolbar that is always there is chrome on every one of those readings.
+       * What to *insert* — a table, a divider, a code block — is the `/` menu,
+       * which is where it belongs: those are not things a selection becomes.
+       */}
+      {editor && mode === "block" ? (
+        <BubbleMenu editor={editor} options={{ placement: "top", offset: 8 }}>
+          <Toolbar editor={editor} />
+        </BubbleMenu>
+      ) : null}
       <EditorContent editor={editor} />
     </div>
   );
@@ -491,7 +504,12 @@ function ToolButton({
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+/**
+ * What a selection can become. Rendered inside a `BubbleMenu`, so it exists
+ * only while there is something selected — exported because that makes it
+ * unreachable to a test with no layout, and the buttons are worth testing.
+ */
+export function Toolbar({ editor }: { editor: Editor }) {
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -513,7 +531,7 @@ function Toolbar({ editor }: { editor: Editor }) {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex flex-wrap items-center gap-0.5 border-b px-1 py-1"
+      className="flex items-center gap-0.5 rounded-md border bg-popover p-0.5 shadow-md"
     >
       <ToolButton label="Bold" active={state.bold} onClick={() => chain().toggleBold().run()}>
         <Bold />
@@ -582,15 +600,6 @@ function Toolbar({ editor }: { editor: Editor }) {
         onClick={() => chain().toggleCodeBlock().run()}
       >
         <SquareCode />
-      </ToolButton>
-      <ToolButton
-        label="Table"
-        onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-      >
-        <TableIcon />
-      </ToolButton>
-      <ToolButton label="Divider" onClick={() => chain().setHorizontalRule().run()}>
-        <Minus />
       </ToolButton>
     </div>
   );

@@ -282,6 +282,14 @@ each of them paid for; read it before rearranging this page.
   on a user transaction; a `value` changed from outside is loaded with `emitUpdate: false`, so an untouched
   load never re-serializes. `editorExtensions()` and `toMarkdown()` are exported so a test round-trips
   through a headless `Editor` with exactly the component's extensions.
+- **Formatting is a bubble over the selection, never a strip above the text** (`BubbleMenu` from
+  `@tiptap/react/menus`, block mode only). A Document, a description and a comment are read far more often
+  than they are formatted, and a toolbar that is always there is chrome on every one of those readings. The
+  bubble carries what a selection can _become_ — bold, italic, code, H1–H3, the three lists, quote, code
+  block; what a Human _inserts_ — a table, a divider — is the `/` menu, because those are not things a
+  selection turns into. It mounts only while something is selected, so a test with no layout never sees it:
+  `Toolbar` is exported and tested as a component against a headless `Editor`, and the editor tests assert
+  that nothing sits in the flow. Its accessible name is still `toolbar "Formatting"`.
 - **Mentions are text.** `@` opens a `@tiptap/suggestion` popup (`role="listbox" aria-label="Mentions"`)
   fed by `useMentionables()` (`lib/mentions.ts`: Members and Teams by handle) and inserts `@handle ` as plain
   text — no Mention node, so markdown round-trips exactly and the server resolves handles as before. `/` at a
