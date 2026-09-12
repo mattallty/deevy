@@ -172,7 +172,7 @@ EmptyMedia variant="icon" + EmptyTitle + EmptyDescription`, with a lucide icon t
 - **Grouped buttons.** shadcn's rule: `ToggleGroup` for buttons that toggle a state (Inbox All/Unread, the
   filter bar's Any/Humans/Agents, Open/All, List/Board, Activity All/Comments/Changes), `ButtonGroup` for
   buttons that perform actions (a State's Move up/down in the Workflow editor); `Tabs` for views of one
-  thing (Documents, the editor's Edit/Source). Joined ToggleGroups are `variant="outline" spacing={0}`.
+  thing (the Documents on an Issue). Joined ToggleGroups are `variant="outline" spacing={0}`.
   A pressed Toggle is `bg-primary/10 text-primary` with a `border-primary/30` edge (`/20` fill in dark):
   the one "selected" language the sidebar, the Settings nav and the Tabs underline already speak; the kit's
   `bg-muted` was a 1% step off the page (Matt, 2026-09-06).
@@ -246,14 +246,16 @@ each of them paid for; read it before rearranging this page.
 
 ## What slice 3 settled (the editor)
 
-- Each editor's Edit/Source tabs are named for the editor they belong to (`<aria-label> view`): an Issue
-  page carries three of them — description, Document, comment — and three tablists called "Editor view" are
-  ambiguous to a screen reader and to a test. A page can also hold more than one `role="status"` now (what
-  is saving, and what a Gate is waiting on), so a test names the one it means.
+- A page can hold more than one `role="status"` (what is saving, and what a Gate is waiting on), so a test
+  names the one it means.
 - **`components/markdown-editor.tsx`** is the one editor: markdown in, markdown out, `mode="block"`
-  (Documents, descriptions) or `"inline"` (comments, notes, answers), Edit/Source tabs. The Source view is a
-  plain `Textarea` with `aria-label="Body"`, always mounted (hidden by class), so tests type there and a
-  Human can always see the text as an Agent wrote it. `⌘Enter` submits in both views (`onSubmit`).
+  (Documents, descriptions) or `"inline"` (comments, notes, answers). **No Edit/Source switch** (2026-09-12):
+  a pair of tabs above every Document, description and comment was a choice nobody was making and chrome on
+  every reading of them. The plain `Textarea` underneath stays mounted and **hidden** — same `value`, same
+  accessible name — because Tiptap is a ProseMirror view and jsdom has no layout to type into: a test asks
+  for it with `{ selector: "textarea" }` and gets the markdown exactly as stored. `⌘Enter` submits
+  (`onSubmit`). Nothing in the UI reaches it; if a Human ever needs the raw markdown again, the place for it
+  is the Document's `⋯` menu, not a tab strip on every editor.
 - **So are an Issue's title and description** (`inline-title.tsx`, `routes/issues/issue.tsx`): no Edit
   button, no form, no second copy of the words on screen. The title is a `contentEditable` `h1` rather than
   an input dressed as one — a heading's accessible name is its text, and an `<input>` inside it would take
@@ -320,9 +322,10 @@ aria-label="<State> Gate|State"`, with `data-focused` and a `role="status"` bann
   `<ol aria-label="Activity">` in time order, skipping `comment.*` Events; a filter All / Comments / Changes;
   the composer is the inline `MarkdownEditor` with `id="new-comment"` and `aria-label="Comment"`, button
   "Comment". The lists once named "Timeline" and "Comments" are gone; tests query within "Activity".
-- **Mentions in Source too.** `MarkdownEditor` given `mentions` shows the same `role="listbox"
-aria-label="Mentions"` under its textarea when `@handle` is being typed there, so the Source view and the
-  comments test both have it.
+- **Mentions are the rich editor's own.** Tiptap's suggestion popup (`role="listbox" aria-label="Mentions"`)
+  is the only one now; the textarea's parallel list went with the Source view it belonged to. What is ours
+  is the candidate list, `useMentionables()`, and that is what the comments test asserts — the popup needs a
+  ProseMirror view to open, which is the one thing jsdom cannot give it.
 - **Sheet width.** shadcn's `SheetContent` sets `data-[side=right]:sm:max-w-sm`; to widen it, use the same
   variant chain (`data-[side=right]:sm:max-w-[720px]`) or the narrower class wins.
 
@@ -338,8 +341,8 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `Textarea` named "Answer this Run" (⌘Enter sends) — a textarea, not the editor, because the runs test asks
   for one textbox and a reply to an Agent is a sentence. A Run waiting on a Gate shows "Open the Gate" and
   no answer box: the ruling card is the only place a Gate is decided (ADR-0004).
-- `MarkdownEditor`'s Source textarea is hidden with the HTML attribute, so it is never a second textbox to a
-  role query while a label still finds it.
+- `MarkdownEditor`'s markdown textarea is hidden with the HTML attribute, not a class, so it is never a
+  second textbox to a role query while a label still finds it.
 
 ## What slice 6 settled (the Inbox)
 
@@ -661,5 +664,5 @@ Event log, now named by a `<label>` rather than an `aria-label`.
 Round 2 added these names: `list "Notifications"` with `checkbox "Select <verb>"` and `toolbar "Selection"`
 (Inbox); `button "List"` / `button "Board"` in `group "Filters"` and `region "<State>"` columns on the
 Workspace board; `combobox "Labels"` with `button "Remove <label>"` chips; `button "Edit <State>"`,
-`form "<State>"`, `combobox "Approvers for <State>"`, `textbox "Template for <State>"` (Source tab) and the
+`form "<State>"`, `combobox "Approvers for <State>"`, `textbox "Template for <State>"` (ask for the textarea) and the
 `Save Workflow` / `Add State` / `Reset` footer in the Workflow editor; `status` on the Project settings form.

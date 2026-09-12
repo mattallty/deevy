@@ -140,12 +140,13 @@ describe("MarkdownEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("emits what is typed into Source, and ⌘Enter submits", () => {
+  it("emits what is typed into the markdown underneath, and ⌘Enter submits", () => {
     const onChange = vi.fn();
     const onSubmit = vi.fn();
     render(<MarkdownEditor value="" onChange={onChange} onSubmit={onSubmit} mode="inline" />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
+    // The hidden textarea: the same text as the editor, and the one a test can
+    // type into. There is no tab to reach it by any more.
     const source = screen.getByLabelText("Body", { selector: "textarea" });
     fireEvent.change(source, { target: { value: "A note" } });
     expect(onChange).toHaveBeenCalledWith("A note");
@@ -193,15 +194,16 @@ describe("MarkdownEditor", () => {
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
-  it("names the rich textbox and points the id at the view that is showing", async () => {
+  it("names the rich textbox, and is the only textbox anything can see", async () => {
     render(<MarkdownEditor id="body" aria-label="Comment" value="" onChange={() => {}} />);
     const rich = await screen.findByRole("textbox", { name: "Comment" });
     expect(rich.classList.contains("tiptap")).toBe(true);
+    // The id is the editor's: it is the control a Label points at, and now the
+    // only one on screen. The textarea under it is hidden, so nothing asking by
+    // role is offered two places to write the same text.
     expect(rich.id).toBe("body");
+    expect(screen.getAllByRole("textbox", { name: "Comment" })).toHaveLength(1);
     expect(screen.getByLabelText("Comment", { selector: "textarea" }).id).not.toBe("body");
-
-    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
-    expect(screen.getByLabelText("Comment", { selector: "textarea" }).id).toBe("body");
-    expect(rich.id).toBe("");
+    expect(screen.queryByRole("tab", { name: "Source" })).toBeNull();
   });
 });
