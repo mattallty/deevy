@@ -536,6 +536,11 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   20px line box. The translate is not a style choice: the ReUI `Timeline` sets
   `group-data-[orientation=vertical]/timeline:top-0` on the indicator, and a variant beats a plain `top-*`
   wherever it sits in the class list. Change the size and measure the pair in the browser again.
+- **A row of `items-baseline` wants children that have a baseline.** An `inline-flex items-center` button
+  has none of its own, so the browser synthesises one from whatever is inside it: the folded "N steps"
+  button pushed its own row 2.3px taller and its neighbours below both the button and the dot. An icon that
+  belongs in a line of text goes _in_ the line — `inline size-3.5 align-[-0.1875em]` — not in a flex box
+  beside it.
 - **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
   itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
   names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
