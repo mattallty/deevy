@@ -1,6 +1,6 @@
 ---
-"web": minor
-"core": minor
+"@deevy/web": minor
+"@deevy/core": minor
 ---
 
 Edit a Document where you read it. The intent, spec and plan panes have no Edit button and no read mode any

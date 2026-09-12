@@ -1,7 +1,7 @@
 ---
-"web": minor
-"core": minor
-"db": minor
+"@deevy/web": minor
+"@deevy/core": minor
+"@deevy/db": minor
 ---
 
 A Gate ruling now records what it ruled on. Every approval and rejection pins the version each of the

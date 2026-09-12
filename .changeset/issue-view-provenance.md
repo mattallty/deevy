@@ -1,5 +1,5 @@
 ---
-"web": minor
+"@deevy/web": minor
 ---
 
 The Issue view takes the shape chosen from ten layouts (docs/plans/issue-view.md): the Documents are the
