@@ -153,7 +153,9 @@ export function stubClient(overrides: StubOverrides = {}): never {
         version: 1,
         body: "",
         authorMemberId: null,
+        writtenAt: new Date("2026-09-01T10:00:00Z"),
       }),
+      versions: async () => ({ versions: [] }),
       write: async () => ({}),
     },
     inbox: {

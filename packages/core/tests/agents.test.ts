@@ -55,6 +55,9 @@ describe("the Agent capability rule", () => {
       "comments.list",
       "documents.get",
       "documents.list",
+      // Reading a Document's history is reading: an Agent that wrote a version
+      // may see what came before it, and write is still write.
+      "documents.versions",
       "documents.write",
       "inbox.list",
       // Its own inbox, scoped to the caller in the same statement it updates

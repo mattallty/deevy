@@ -1,6 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { pickOption } from "./select.ts";
 
 const stub = vi.hoisted(() => ({
   states: [{ id: "s1", name: "Intent", position: 0, isGate: true, category: "backlog" }],
@@ -33,10 +32,48 @@ vi.mock("../src/lib/orpc.ts", async () => {
     project: { id: "p1", key: "DEV", name: "deevy" },
   };
   const client = stubClient({
+    // A Document two people wrote: a Human's first version, an Agent's second.
+    members: {
+      list: async () => ({
+        members: [
+          {
+            id: "m-ada",
+            kind: "human",
+            handle: "ada",
+            suspendedAt: null,
+            user: { id: "u-ada", name: "Ada", email: "ada@example.com", image: null },
+          },
+          {
+            id: "m-planner",
+            kind: "agent",
+            handle: "planner",
+            suspendedAt: null,
+            user: {
+              id: "u-planner",
+              name: "Planner",
+              email: "planner@agents.invalid",
+              image: null,
+            },
+          },
+        ] as never,
+      }),
+    },
     issues: { get: async () => issue },
     workflow: { get: async () => ({ states: stub.states }) },
     documents: {
       list: async () => ({ documents: stub.documents }),
+      versions: async ({ name }: { name: string }) => ({
+        versions: Array.from(
+          { length: stub.documents.find((d) => d.name === name)!.currentVersion },
+          (_, index) => ({
+            version: index + 1,
+            // The second version of the intent is the Agent's, so the byline
+            // has two names to put together.
+            authorMemberId: index === 1 ? "m-planner" : "m-ada",
+            writtenAt: new Date("2026-09-08T10:00:00Z"),
+          }),
+        ).reverse(),
+      }),
       get: async ({ name, version }: { name: string; version?: number }) => {
         const doc = stub.documents.find((d) => d.name === name)!;
         const at = version ?? doc.currentVersion;
@@ -66,7 +103,7 @@ vi.mock("../src/lib/orpc.ts", async () => {
 const { mountAt } = await import("./mount.tsx");
 
 describe("the Documents section on an Issue", () => {
-  it("shows one tab per Document and renders the current version as markdown", async () => {
+  it("shows one tab per Document and the current version, open in the editor", async () => {
     await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
     const tabs = await screen.findByRole("tablist", { name: "Documents" });
@@ -75,30 +112,50 @@ describe("the Documents section on an Issue", () => {
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
     ).toEqual(["intent", "spec"]);
-    expect(await screen.findByText(/The Event log has no reader/)).toBeTruthy();
+    // No read mode to leave: the text is in the editor from the start.
+    const body = (await screen.findByLabelText("Body")) as HTMLTextAreaElement;
+    await waitFor(() => expect(body.value).toContain("The Event log has no reader"));
   });
 
-  it("writes a new version from the editor", async () => {
+  it("names everybody who has written a version, not only the last one", async () => {
     await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edit intent" }));
-    fireEvent.change(screen.getByLabelText("Body"), {
-      target: { value: "## Problem\n\nRewritten." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save version" }));
+    const written = await screen.findByText(/written by/);
+    const line = written.parentElement!;
+    expect(line.textContent).toContain("Ada");
+    expect(line.textContent).toContain("Planner");
+  });
+
+  it("writes a version when the editor is left, saying what it was based on", async () => {
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
+
+    const body = await screen.findByLabelText("Body");
+    fireEvent.change(body, { target: { value: "## Problem\n\nRewritten." } });
+    // Leaving the editor is the save; there is no button to press.
+    fireEvent.blur(body.closest('[data-slot="markdown-editor-frame"]')!);
 
     await waitFor(() =>
       expect(stub.written).toContainEqual(
-        expect.objectContaining({ name: "intent", body: "## Problem\n\nRewritten." }),
+        expect.objectContaining({
+          name: "intent",
+          body: "## Problem\n\nRewritten.",
+          baseVersion: 2,
+        }),
       ),
     );
   });
 
-  it("lets an older version be read", async () => {
+  it("keeps the older versions behind the menu, and reads one there", async () => {
     await mountAt("/issues/DEV-1", { memberName: "Ada" });
 
-    await pickOption(await screen.findByLabelText("Version"), "1");
+    fireEvent.click(await screen.findByRole("button", { name: "More for intent" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /History/ }));
 
-    await waitFor(() => expect(screen.queryByText(/The Event log has no reader/)).toBeNull());
+    const history = await screen.findByRole("dialog", { name: /intent/ });
+    const versions = within(history).getByRole("list", { name: "Versions of intent" });
+    expect(within(versions).getAllByRole("button")).toHaveLength(2);
+
+    fireEvent.click(within(versions).getAllByRole("button")[1]!);
+    expect(await within(history).findByRole("button", { name: "Restore v1" })).toBeTruthy();
   });
 });

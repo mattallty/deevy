@@ -250,14 +250,19 @@ export function IssuePage({
               <RailHeading>Children</RailHeading>
               <ul className="flex flex-col gap-1">
                 {children.map((child) => (
-                  <li key={child.id} className="text-sm">
+                  // One line each: a rail is narrow, and three Issues wrapping
+                  // to two lines apiece reads as six things rather than three.
+                  <li key={child.id} className="flex min-w-0 text-sm">
                     <Link
                       to="/issues/$issueKey"
                       params={{ issueKey: child.key }}
-                      className="hover:underline"
+                      title={`${child.key} ${child.title}`}
+                      className="flex min-w-0 items-baseline gap-1.5 hover:underline"
                     >
-                      <span className="font-mono text-xs text-muted-foreground">{child.key}</span>{" "}
-                      {child.title}
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                        {child.key}
+                      </span>
+                      <span className="truncate">{child.title}</span>
                     </Link>
                   </li>
                 ))}

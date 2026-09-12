@@ -20,6 +20,12 @@ export interface MarkdownEditorProps {
   mentions?: Mentionable[];
   /** ⌘Enter. */
   onSubmit?: () => void;
+  /**
+   * Focus leaving the editor altogether — not the Edit/Source tabs, which are
+   * inside it. What a Document saves on, so writing is not a mode you enter and
+   * leave with a button.
+   */
+  onBlur?: () => void;
   autoFocus?: boolean;
   /** The id a Label points at: it lands on whichever view is showing, so the Label always reaches a visible control. */
   id?: string;
@@ -46,6 +52,7 @@ export function MarkdownEditor({
   placeholder,
   mentions,
   onSubmit,
+  onBlur,
   autoFocus,
   id,
   "aria-label": ariaLabel = "Body",
@@ -61,6 +68,11 @@ export function MarkdownEditor({
     <div
       data-slot="markdown-editor-frame"
       data-view={view}
+      onBlur={(left) => {
+        // Only when focus has gone somewhere else entirely: moving between the
+        // rich view and Source is still being in the editor.
+        if (!left.currentTarget.contains(left.relatedTarget as Node | null)) onBlur?.();
+      }}
       className={cn(
         "flex flex-col rounded-md border border-input bg-input/20 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 dark:bg-input/30",
         className,

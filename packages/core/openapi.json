@@ -17706,6 +17706,78 @@
         }
       }
     },
+    "/issues/{issueKey}/documents/{name}/versions": {
+      "get": {
+        "operationId": "documents.versions",
+        "summary": "Every version of a Document: who wrote it and when, without the body",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "issueKey",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "required": true,
+            "name": "name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "authorMemberId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "writtenAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "authorMemberId",
+                          "writtenAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "versions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/issues/{issueKey}/documents/{name}": {
       "get": {
         "operationId": "documents.get",
@@ -17841,6 +17913,11 @@
                   "body": {
                     "type": "string",
                     "maxLength": 100000
+                  },
+                  "baseVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
                   }
                 },
                 "required": [

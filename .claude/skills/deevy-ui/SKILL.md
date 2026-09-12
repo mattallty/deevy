@@ -235,6 +235,16 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
   (Documents, descriptions) or `"inline"` (comments, notes, answers), Edit/Source tabs. The Source view is a
   plain `Textarea` with `aria-label="Body"`, always mounted (hidden by class), so tests type there and a
   Human can always see the text as an Agent wrote it. `⌘Enter` submits in both views (`onSubmit`).
+- **A Document is edited where it is read.** `IssueDocuments` has no read mode and no Save button: the
+  editor is the view, `onBlur` (focus leaving the frame entirely) and `⌘Enter` write a version through
+  `useAutosave`, and a `role="status"` line says Saving…/Saved or offers Retry. The editor there is passed
+  `border-transparent bg-transparent` — a Document is the page, not a field on it, so it takes the page's
+  own paper and ink; the input chrome stays for comments and notes, which are fields.
+- Every write carries `baseVersion`, so a save landing on top of somebody else's is refused with a
+  `CONFLICT` rather than quietly winning. Real simultaneous editing is `docs/plans/collaborative-documents.md`.
+- The byline names **every** Member who has written a version ("written by Ada and Planner · last edit 4d"),
+  from `documents.versions`; older versions live behind a `⋯` (`More for <name>`) with History and Copy as
+  Markdown, and History is a dialog that reads a version and can Restore it.
 - **`components/tiptap-editor.tsx`** (lazy) is Tiptap 3.31 with `@tiptap/markdown` (GFM), StarterKit,
   `TableKit`, `TaskList`/`TaskItem`, lowlight code blocks, Placeholder. It emits `editor.getMarkdown()` only
   on a user transaction; a `value` changed from outside is loaded with `emitUpdate: false`, so an untouched
@@ -568,7 +578,7 @@ Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` wit
 slice says otherwise: `Sign in with GitHub`; `New Issue` / `Create Issue` / `Add Issue`; `role=table` rows
 `DEV-1 · title · Build · Ada Lovelace`; `role=region` per Board column named by State with visible `Gate`;
 `Decide the Intent Gate on DEV-1`; `role=group` `… Gate` with `data-focused` for `?gate=`; `Note`, `Approve`,
-`Reject`, `Gate decisions`, `State`; `tablist Documents`, `Edit intent`, `Body`, `Save version`, `Version`;
+`Reject`, `Gate decisions`, `State`; `tablist Documents`, `Body`, `More for <name>`, `Versions of <name>`, `Restore v<n>`;
 `Notifications for DEV-1`, `Mark read`, `Mark all read`, `N unread`; `Comment` (textarea and button),
 `listbox Mentions`; `article` named by Run id, `Answer this Run`, link `/gate/`; `Add a link`, lists
 `Pull requests`/`Links`; `role=group Labels`; the settings h1s (`Workspace`, `Members`, `Agents`, …),
