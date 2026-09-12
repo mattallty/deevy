@@ -58,7 +58,15 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   server: {
-    port: 5173,
+    /*
+     * The port the preview launcher picked, when there is one: it hands the
+     * child a free `PORT` (`.claude/launch.json`, `autoPort`) and then opens
+     * that address. `strictPort` because the alternative is worse — Vite
+     * quietly moving to 5174 leaves `BETTER_AUTH_URL` pointing at a server
+     * nobody is running, and sign-in fails somewhere much further from here.
+     */
+    port: Number(process.env.PORT) || 5173,
+    strictPort: true,
     proxy: {
       "/api": apiOrigin,
       "/rpc": apiOrigin,
