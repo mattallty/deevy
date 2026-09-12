@@ -34,6 +34,14 @@ export interface GateStanding {
   refusedBecause: "not_an_approver" | "requester" | "approved" | "too_few_humans" | null;
 }
 
+/** What has been written since a ruling, as a sentence rather than a list. */
+function sentence(since: Array<{ name: string; version: number }>): string {
+  const named = since.map((one) => `${one.name} (now v${one.version})`);
+  const all =
+    named.length > 2 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)}` : named.join(" and ");
+  return `Written since: ${all}. What was approved is under History.`;
+}
+
 /** Why the buttons are not yours to press, said where they would be. */
 function whyNot(standing: GateStanding, issueKey: string, wanted: number): string | null {
   switch (standing.refusedBecause) {
@@ -66,6 +74,8 @@ interface GateControlsProps {
     /** Which Gate this was, and who ruled: what makes one ruling tell itself apart. */
     stateId: string;
     memberId: string | null;
+    /** What each Document said when this was ruled on. */
+    documents: Array<{ name: string; version: number }>;
   }>;
   /** How far along the Gate is; absent for a State that is not one. */
   standing?: GateStanding | null;
@@ -89,6 +99,9 @@ export function GateControls({
   // Who ruled, for the history below: the page has this list already, so it is
   // a cache read rather than a request.
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  // Where the Documents have got to since, so a ruling can say when the text it
+  // was made about has moved on. The Documents pane asks for this too.
+  const documents = useQuery(orpc.documents.list.queryOptions({ input: { issueKey } }));
   // A ruling changes the Issue, what the inbox owes, and the Run that asked.
   const refresh = () =>
     Promise.all(
@@ -113,6 +126,15 @@ export function GateControls({
   // a Gate puts the cursor in the Note; `⇧A` / `⇧R` do that with the ruling
   // chosen, so that `⌘↵` in the Note is the ruling. Nothing here commits
   // without that last key or a click.
+  /** The pinned Documents this ruling covered that have been written since. */
+  const movedOn = (pinned: Array<{ name: string; version: number }>) =>
+    pinned.flatMap((one) => {
+      const now = (documents.data?.documents ?? []).find((each) => each.name === one.name);
+      return now && now.currentVersion > one.version
+        ? [{ name: one.name, version: now.currentVersion }]
+        : [];
+    });
+
   const noteField = useRef<HTMLTextAreaElement>(null);
   const [stateOpen, setStateOpen] = useState(false);
   const [ruling, setRuling] = useState<"approve" | "reject">("approve");
@@ -266,6 +288,22 @@ export function GateControls({
                     {ago(decision.createdAt, { short: true })}
                   </span>
                 </span>
+                {decision.documents.length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    on {decision.documents.map((one) => `${one.name} v${one.version}`).join(" · ")}
+                  </span>
+                ) : null}
+                {/*
+                 * An approval is about words, and the words keep moving: an
+                 * Agent may write the spec again the minute after a Human
+                 * agreed to it. Say so where the approval is, rather than
+                 * letting the page imply the current text was the approved one.
+                 */}
+                {decision.decision === "approved" && movedOn(decision.documents).length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {sentence(movedOn(decision.documents))}
+                  </span>
+                ) : null}
                 {decision.note ? (
                   <span className="text-muted-foreground">“{decision.note}”</span>
                 ) : null}

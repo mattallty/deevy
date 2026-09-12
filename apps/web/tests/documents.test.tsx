@@ -71,6 +71,8 @@ vi.mock("../src/lib/orpc.ts", async () => {
             // has two names to put together.
             authorMemberId: index === 1 ? "m-planner" : "m-ada",
             writtenAt: new Date("2026-09-08T10:00:00Z"),
+            // v1 of the intent is the version the Intent Gate approved.
+            rulings: index === 0 ? [{ decision: "approved", stateId: "s1" }] : [],
           }),
         ).reverse(),
       }),
@@ -155,7 +157,11 @@ describe("the Documents section on an Issue", () => {
     const versions = within(history).getByRole("list", { name: "Versions of intent" });
     expect(within(versions).getAllByRole("button")).toHaveLength(2);
 
-    fireEvent.click(within(versions).getAllByRole("button")[1]!);
+    // The version a Gate ruled on says so, however far the Document has moved.
+    const older = within(versions).getAllByRole("button")[1]!;
+    expect(within(older).getByText("approved")).toBeTruthy();
+
+    fireEvent.click(older);
     expect(await within(history).findByRole("button", { name: "Restore v1" })).toBeTruthy();
   });
 });

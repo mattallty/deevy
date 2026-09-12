@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { document } from "./document.ts";
 import { issue } from "./issue.ts";
 import { workflowState } from "./project.ts";
 import { member } from "./workspace.ts";
@@ -29,6 +30,32 @@ export const gateDecision = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).default(now).notNull(),
   },
   (table) => [index("gate_decision_issueId_idx").on(table.issueId, table.createdAt)],
+);
+
+/**
+ * What the Documents said when a Gate was ruled on. A ruling is about text, and
+ * the text keeps moving: an Agent may write the spec again the minute after it
+ * was approved. Pinning the version every Document stood at makes "this was
+ * approved" a statement about something that cannot change afterwards, and lets
+ * a screen say when what is on it is no longer what somebody agreed to.
+ */
+export const gateDecisionDocument = sqliteTable(
+  "gate_decision_document",
+  {
+    decisionId: text("decision_id")
+      .notNull()
+      .references(() => gateDecision.id, { onDelete: "cascade" }),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => document.id, { onDelete: "cascade" }),
+    /** Kept beside the id so a decision still reads after a Document is gone. */
+    name: text("name").notNull(),
+    version: integer("version").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.decisionId, table.documentId] }),
+    index("gate_decision_document_documentId_idx").on(table.documentId, table.version),
+  ],
 );
 
 /**

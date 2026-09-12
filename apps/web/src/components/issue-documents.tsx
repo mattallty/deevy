@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Markdown } from "@/components/markdown";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -263,7 +264,12 @@ function DocumentHistory({
   issueKey: string;
   name: string;
   currentVersion: number;
-  versions: Array<{ version: number; authorMemberId: string | null; writtenAt: Date | string }>;
+  versions: Array<{
+    version: number;
+    authorMemberId: string | null;
+    writtenAt: Date | string;
+    rulings: Array<{ decision: "approved" | "rejected"; stateId: string }>;
+  }>;
   open: boolean;
   onOpenChange: (to: boolean) => void;
 }) {
@@ -313,11 +319,23 @@ function DocumentHistory({
                       one.version === at && "bg-accent",
                     )}
                   >
-                    <span className="flex items-center gap-2 text-sm">
+                    <span className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="font-mono text-xs">v{one.version}</span>
                       {one.version === currentVersion ? (
                         <span className="text-xs text-muted-foreground">current</span>
                       ) : null}
+                      {/* The version a Gate ruled on is the one somebody agreed
+                          to, which is worth finding again however far the
+                          Document has moved on since. */}
+                      {one.rulings.map((ruling, index) => (
+                        <Badge
+                          key={`${ruling.stateId}-${index}`}
+                          variant={ruling.decision === "approved" ? "default" : "destructive"}
+                          className="text-[10px]"
+                        >
+                          {ruling.decision}
+                        </Badge>
+                      ))}
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {member ? <MemberChip member={member} size="inline" /> : <span>deevy</span>}

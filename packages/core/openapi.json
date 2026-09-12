@@ -9116,6 +9116,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -9125,7 +9146,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -10858,6 +10880,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -10867,7 +10910,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -12130,6 +12174,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -12139,7 +12204,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -13383,6 +13449,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -13392,7 +13479,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -14639,6 +14727,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -14648,7 +14757,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -15896,6 +16006,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -15905,7 +16036,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -17153,6 +17285,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -17162,7 +17315,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -17756,12 +17910,49 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "rulings": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "decision": {
+                                  "type": "string",
+                                  "enum": [
+                                    "approved",
+                                    "rejected"
+                                  ]
+                                },
+                                "stateId": {
+                                  "type": "string"
+                                },
+                                "memberId": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "decision",
+                                "stateId",
+                                "memberId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
                           "version",
                           "authorMemberId",
-                          "writtenAt"
+                          "writtenAt",
+                          "rulings"
                         ],
                         "additionalProperties": false
                       }

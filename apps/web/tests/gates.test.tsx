@@ -36,6 +36,17 @@ const stub = vi.hoisted(() => {
           note: "Needs rethinking",
           stateId: "s1",
           createdAt: new Date(),
+          documents: [{ name: "spec", version: 1 }],
+        },
+        // An approval whose text has been written again since: the Document is
+        // at v3 below, and the approval was of v2.
+        {
+          id: "g2",
+          decision: "approved",
+          note: null,
+          stateId: "s1",
+          createdAt: new Date(),
+          documents: [{ name: "spec", version: 2 }],
         },
       ],
     },
@@ -114,6 +125,9 @@ vi.mock("../src/lib/orpc.ts", async () => {
       }),
     },
     workflow: { get: async () => ({ states: stub.states }) },
+    documents: {
+      list: async () => ({ documents: [{ name: "spec", currentVersion: 3 }] }),
+    },
     issues: {
       get: async ({ key }: { key: string }) => byKey[key],
       move: async (input: unknown) => {
@@ -199,6 +213,18 @@ describe("an Issue sitting in a Gate", () => {
 
     const decisions = await screen.findByRole("list", { name: "Gate decisions" });
     expect(within(decisions).getByText(/Needs rethinking/)).toBeTruthy();
+  });
+
+  it("says which version of a Document was ruled on, and when it has moved on since", async () => {
+    await mountAt("/issues/DEV-1", { memberName: "Ada" });
+
+    const decisions = await screen.findByRole("list", { name: "Gate decisions" });
+    expect(within(decisions).getByText("on spec v1")).toBeTruthy();
+    expect(within(decisions).getByText("on spec v2")).toBeTruthy();
+    // Only the approval is warned about: a rejection is meant to be rewritten.
+    const written = await within(decisions).findAllByText(/Written since/);
+    expect(written).toHaveLength(1);
+    expect(written[0]?.textContent).toMatch(/spec \(now v3\)/);
   });
 });
 

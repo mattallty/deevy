@@ -313,7 +313,6 @@ const epic = await issue("DEV", {
     "The Checkout flow is three Projects' worth of Issues pretending to be one. This is the umbrella: intent first, then one child per surface.\n\n" +
     "## Why now\n\nEvery Agent Run on Checkout in the last month ended in a question a Human had to answer twice.",
   labels: [checkout.id, high.id],
-  to: "Spec",
   assignee: admin.member.id,
 });
 // The epic's own Documents: what a Human and an Agent actually leave behind at
@@ -352,6 +351,10 @@ await admin.api.documents.write({
     "- Do we keep guest checkout, or is an account the price of buying?",
   ].join("\n"),
 });
+// Only now does the Intent Gate get to rule, so the ruling pins the intent as
+// written rather than the empty template the State opened with. Writing first
+// and approving second is also the order a Workspace works in.
+await advance(epic.key, "Spec");
 // The spec is the Planner's, so the Issue shows what deevy is actually for: a
 // Human writes the intent, an Agent writes the spec against it, and the page
 // says which of them wrote what.
@@ -387,6 +390,18 @@ await planner.api.documents.write({
     "- Guest checkout is still open from the intent, and requirement 1 is written as though the answer is yes.",
   ].join("\n"),
 });
+// Deliberate, and the case the Gate's version pin exists for: the Intent was
+// approved at v2 and the Planner answered one of its open questions afterwards.
+// The ruling in the rail should still say v2, and say the text has moved since.
+const approvedIntent = await planner.api.documents.get({ issueKey: epic.key, name: "intent" });
+await planner.api.documents.write({
+  issueKey: epic.key,
+  name: "intent",
+  body: approvedIntent.body.replace(
+    '- Is "one child per surface" three Issues or eight? Grace reads it as eight.',
+    "- Three children, one per surface: address, payment, review. Grace read it as eight; the spec settles it.",
+  ),
+});
 
 await issue("DEV", {
   title: "Checkout: replace the address form with one Field group",
@@ -415,7 +430,6 @@ const eventLog = await issue("DEV", {
   description:
     "The Workspace Event log has no view. Operators read it with sqlite3, which is the honest answer and a bad one.",
   labels: [frontend.id, agentLoop.id],
-  to: "Plan",
   assignee: planner.member.id,
 });
 await planner.api.documents.write({
@@ -427,6 +441,7 @@ await planner.api.documents.write({
     "## Affected users and systems\n\nAdmins. `events.list`, which pages forward only today.\n\n" +
     "## Constraints\n\nD1's per-invocation query budget: one query per page.\n\n## Open questions\n\n- Newest first needs a `before` cursor.\n",
 });
+await advance(eventLog.key, "Plan");
 await planner.api.documents.write({
   issueKey: eventLog.key,
   name: "plan",

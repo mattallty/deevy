@@ -283,7 +283,7 @@ export async function loadIssue(context: ContextFor<"member">, id: string) {
       project: true,
       parent: { with: issueWith },
       children: { with: issueWith, orderBy: { number: "asc" } },
-      gateDecisions: { orderBy: { createdAt: "asc" } },
+      gateDecisions: { orderBy: { createdAt: "asc" }, with: { documents: true } },
     },
   });
   if (!found) throw new ORPCError("NOT_FOUND", { message: "No such Issue" });
@@ -303,6 +303,13 @@ export async function loadIssue(context: ContextFor<"member">, id: string) {
     ...withKey(found, key),
     parent: found.parent ? withKey(found.parent, key) : null,
     children: found.children.map((child) => withKey(child, key)),
+    gateDecisions: found.gateDecisions.map((decision) => ({
+      ...decision,
+      documents: decision.documents.map((pinned) => ({
+        name: pinned.name,
+        version: pinned.version,
+      })),
+    })),
     gate,
   };
 }

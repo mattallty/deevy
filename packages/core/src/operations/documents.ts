@@ -49,6 +49,18 @@ export const documents = {
           version: z.number().int(),
           authorMemberId: z.string().nullable(),
           writtenAt: z.date(),
+          /**
+           * The Gate rulings made while this version was the current one: what
+           * a Human was looking at when they approved or rejected.
+           */
+          rulings: z.array(
+            z.object({
+              decision: z.enum(["approved", "rejected"]),
+              stateId: z.string(),
+              memberId: z.string().nullable(),
+              at: z.date(),
+            }),
+          ),
         }),
       ),
     }),
@@ -59,11 +71,24 @@ export const documents = {
         where: { documentId: found.id },
         orderBy: { version: "desc" },
       });
+      const pinned = await context.db.query.gateDecisionDocument.findMany({
+        where: { documentId: found.id },
+        with: { decision: true },
+      });
       return {
         versions: rows.map((row) => ({
           version: row.version,
           authorMemberId: row.authorMemberId,
           writtenAt: row.createdAt,
+          rulings: pinned
+            .filter((one) => one.version === row.version)
+            .map((one) => ({
+              decision: one.decision.decision,
+              stateId: one.decision.stateId,
+              memberId: one.decision.memberId,
+              at: one.decision.createdAt,
+            }))
+            .sort((a, b) => a.at.getTime() - b.at.getTime()),
         })),
       };
     },

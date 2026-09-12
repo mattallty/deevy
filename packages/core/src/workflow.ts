@@ -2,6 +2,7 @@ import {
   gateApprover as gateApproverTable,
   event as eventTable,
   gateDecision as gateDecisionTable,
+  gateDecisionDocument as gateDecisionDocumentTable,
   issue as issueTable,
   member as memberTable,
   type Db,
@@ -442,13 +443,32 @@ export interface RecordDecisionInput {
   memberId: string;
 }
 
-export async function recordGateDecision(db: Db, input: RecordDecisionInput): Promise<void> {
+/**
+ * A ruling, and what the Issue's Documents said when it was made. The pin is
+ * the point: a Human approves text, and an Agent may write that text again
+ * immediately afterwards, so without the version an approval records nothing
+ * about what was approved (docs/plans/collaborative-documents.md).
+ */
+export async function recordGateDecision(db: Db, input: RecordDecisionInput): Promise<string> {
+  const id = newId("decision");
   await db.insert(gateDecisionTable).values({
-    id: newId("decision"),
+    id,
     issueId: input.issueId,
     stateId: input.stateId,
     decision: input.decision,
     note: input.note ?? null,
     memberId: input.memberId,
   });
+  const documents = await db.query.document.findMany({ where: { issueId: input.issueId } });
+  if (documents.length > 0) {
+    await db.insert(gateDecisionDocumentTable).values(
+      documents.map((one) => ({
+        decisionId: id,
+        documentId: one.id,
+        name: one.name,
+        version: one.currentVersion,
+      })),
+    );
+  }
+  return id;
 }
