@@ -22,17 +22,20 @@ export const toneClass: Record<EventTone, string> = {
 
 /** The same tones as a timeline dot: an edge in the hue, a tint inside. */
 /**
- * The timeline's dot is pinned to the top of its row, which is a hair above the
- * line of text beside it: the dot is 16.8px and the line box 20, so its centre
- * rides 1.6px high and the words read as sitting below it.
+ * A bullet, not a bauble: `size-2.5` against the kit's `size-4`, which at
+ * deevy's density is 10.5px rather than 16.8 — the marks run down the edge of
+ * the Activity as punctuation, and at the larger size they were the first
+ * thing on every line.
  *
- * A translate rather than `top`, which is what this used to say: the Timeline
- * sets `group-data-[orientation=vertical]/timeline:top-0` on the indicator
- * itself, and a variant beats a plain `top-[0.1rem]` however late it is in the
- * class list — so the old rule never applied at all. Nothing else translates
- * the dot vertically, and Tailwind composes the two axes.
+ * The indicator is `absolute` and pinned to the top of its row, so it has to be
+ * pushed onto the centre of the line beside it: half the difference between the
+ * 20px line box and the dot, 4.75px. A translate rather than `top`, which is
+ * what this used to say and never did: the Timeline sets
+ * `group-data-[orientation=vertical]/timeline:top-0` on the indicator itself,
+ * and a variant beats a plain `top-*` however late it is in the class list.
+ * Change the size and measure the pair again in the browser.
  */
-const alignedToTheLine = "translate-y-[0.1rem]";
+const alignedToTheLine = "size-2.5 translate-y-[4.75px]";
 
 export const toneDotClass: Record<EventTone, string> = {
   human: `${alignedToTheLine} border-human bg-human/15`,

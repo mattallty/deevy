@@ -530,11 +530,12 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   a column of tone dots down its left edge, and a second column of pictures beside them is one more thing to
   read past on every line. The name alone, with an Agent's in the Agent colour and the kind still in the
   tooltip. Elsewhere — a byline, a Run header, a table — the avatar stays.
-- **The tone dot is centred on its line with `translate-y`, never `top`** (`lib/event-text.ts`): the ReUI
-  `Timeline` sets `group-data-[orientation=vertical]/timeline:top-0` on the indicator, and a variant beats a
-  plain `top-*` wherever it sits in the class list. The dot is 16.8px against a 20px line box, so it needs
-  1.6px (`0.1rem`) down to share the line's centre; measure it in the browser rather than trusting the class
-  to have applied.
+- **The tone dot is a bullet, centred on its line with `translate-y`, never `top`** (`lib/event-text.ts`):
+  `size-2.5` over the kit's `size-4` — 10.5px at deevy's density, punctuation down the edge of the Activity
+  rather than the first thing on every line — pushed 4.75px down, half the difference between it and the
+  20px line box. The translate is not a style choice: the ReUI `Timeline` sets
+  `group-data-[orientation=vertical]/timeline:top-0` on the indicator, and a variant beats a plain `top-*`
+  wherever it sits in the class list. Change the size and measure the pair in the browser again.
 - **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
   itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
   names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
