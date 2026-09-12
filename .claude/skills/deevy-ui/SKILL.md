@@ -526,6 +526,15 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   line. `inline` is `size-3` with `ring-offset-0`, which lands at 14.6. The ring classes are composed
   _before_ `style.avatar` for that reason: the size has the last word. `xs` and up stay what they were, for
   a chip that stands on its own in a row or a cell.
+- **A timeline shows no avatars** (`nameOnly` on the chip, 2026-09-12): the Activity stream already carries
+  a column of tone dots down its left edge, and a second column of pictures beside them is one more thing to
+  read past on every line. The name alone, with an Agent's in the Agent colour and the kind still in the
+  tooltip. Elsewhere — a byline, a Run header, a table — the avatar stays.
+- **The tone dot is centred on its line with `translate-y`, never `top`** (`lib/event-text.ts`): the ReUI
+  `Timeline` sets `group-data-[orientation=vertical]/timeline:top-0` on the indicator, and a variant beats a
+  plain `top-*` wherever it sits in the class list. The dot is 16.8px against a 20px line box, so it needs
+  1.6px (`0.1rem`) down to share the line's centre; measure it in the browser rather than trusting the class
+  to have applied.
 - **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
   itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
   names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the

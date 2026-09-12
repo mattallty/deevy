@@ -284,9 +284,15 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
   );
 }
 
+/**
+ * Who did the thing, in a line about it. No avatar: a timeline is already a
+ * column of marks down its left edge, and a second column of pictures beside
+ * it is one more thing to read past on every line. An Agent's name is in the
+ * Agent colour, which is the signal its ring carries everywhere else.
+ */
 function Who({ member }: { member: ChipMember | null }) {
   return member ? (
-    <MemberChip member={member} size="inline" />
+    <MemberChip member={member} size="inline" nameOnly />
   ) : (
     <span className="text-muted-foreground">deevy</span>
   );

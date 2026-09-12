@@ -23,11 +23,16 @@ export const toneClass: Record<EventTone, string> = {
 /** The same tones as a timeline dot: an edge in the hue, a tint inside. */
 /**
  * The timeline's dot is pinned to the top of its row, which is a hair above the
- * line of text beside it: the dot is 16.8px and the line box 20, so it rides
- * 1.6px high. `top-[0.1rem]` centres it on the first line, which is where the
- * eye reads it as belonging to.
+ * line of text beside it: the dot is 16.8px and the line box 20, so its centre
+ * rides 1.6px high and the words read as sitting below it.
+ *
+ * A translate rather than `top`, which is what this used to say: the Timeline
+ * sets `group-data-[orientation=vertical]/timeline:top-0` on the indicator
+ * itself, and a variant beats a plain `top-[0.1rem]` however late it is in the
+ * class list — so the old rule never applied at all. Nothing else translates
+ * the dot vertically, and Tailwind composes the two axes.
  */
-const alignedToTheLine = "top-[0.1rem]";
+const alignedToTheLine = "translate-y-[0.1rem]";
 
 export const toneDotClass: Record<EventTone, string> = {
   human: `${alignedToTheLine} border-human bg-human/15`,
