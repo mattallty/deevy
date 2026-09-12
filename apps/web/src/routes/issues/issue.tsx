@@ -128,7 +128,13 @@ export function IssuePage({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-8 @3xl:grid-cols-[minmax(0,1fr)_300px]">
+      {/*
+       * Provenance (docs/plans/issue-view.md, chosen from ten): the Documents
+       * are the page and say who wrote them, and the rail is wide enough to
+       * hold a ruling and the Run that asked for it — 300px was a gutter, and
+       * a Run feed under the Documents pushed the conversation off the screen.
+       */}
+      <div className="grid grid-cols-1 gap-8 @3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
         <div className="flex min-w-0 flex-col gap-6">
           <header className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -164,8 +170,6 @@ export function IssuePage({
 
           <IssueDocuments issueKey={key} shortcutScope={shortcutScope} />
 
-          <IssueRuns issueKey={key} decisions={gateDecisions} />
-
           <ActivityStream issueId={id} issueKey={key} />
         </div>
 
@@ -190,6 +194,8 @@ export function IssuePage({
               shortcutScope={shortcutScope}
             />
           </div>
+
+          <IssueRuns issueKey={key} decisions={gateDecisions} />
 
           <section className="flex flex-col gap-2">
             <RailHeading>Assignee</RailHeading>

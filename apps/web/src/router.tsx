@@ -18,7 +18,6 @@ import { parseIssuesSearch, type IssuesSearch } from "./components/issue-filters
 import { IssuesPage } from "./routes/issues/list.tsx";
 import { ProjectsPage } from "./routes/projects/projects.tsx";
 import { ConsentPage } from "./routes/consent.tsx";
-import { IssueLayoutsPage } from "./routes/dev/issue-layouts.tsx";
 import { TokensPage } from "./routes/dev/tokens.tsx";
 import { InboxPage, parseInboxSearch } from "./routes/inbox.tsx";
 import { NotFoundPage } from "./routes/not-found.tsx";
@@ -315,18 +314,6 @@ const tokensRoute = createRoute({
   component: TokensPage,
 });
 
-// Five arrangements of the Issue view, for choosing between (spike, delete
-// four of them afterwards). Not linked from anywhere, like /dev/tokens.
-const issueLayoutsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/dev/issue-layouts",
-  validateSearch: (search: Record<string, unknown>) => ({
-    ...(typeof search.issue === "string" && search.issue ? { issue: search.issue } : {}),
-    ...(typeof search.v === "string" && search.v ? { v: search.v } : {}),
-  }),
-  component: IssueLayoutsPage,
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   projectsRoute,
@@ -358,7 +345,6 @@ const routeTree = rootRoute.addChildren([
   inviteRoute,
   consentRoute,
   tokensRoute,
-  issueLayoutsRoute,
 ]);
 
 /** `?a=b&c=d` to `{ a: "b", c: "d" }`: strings, whatever they look like. */

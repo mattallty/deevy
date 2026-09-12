@@ -1,7 +1,7 @@
 # The Issue view: five layouts to choose between
 
-A spike, 2026-09-11. Five arrangements of the Issue detail view, clickable on a stubbed dev instance at
-`/dev/issue-layouts?issue=DEV-2&v=<id>` (`apps/web/src/routes/dev/issue-layouts.tsx`), the way round 2 chose
+A spike, 2026-09-11. Five arrangements of the Issue detail view, clickable while the spike lasted at
+`/dev/issue-layouts?issue=DEV-2&v=<id>` (deleted with the choice, below), the way round 2 chose
 its Inbox, Activity, Kanban and Workflow mockups (`docs/plans/ui-redesign-2.md`). Pick one; the route and the
 other four get deleted.
 
@@ -260,3 +260,36 @@ ruling beside whichever version you are reading.
 6, 9 and 10 each fix something the current page gets wrong and could ship on their own; 7 and 8 are new
 frames that would replace it. A reasonable outcome is one frame plus one fix: **8 or 7** as the shape, with
 **9's pinned artifacts** and **10's authorship** folded into it.
+
+---
+
+# Chosen: 10, Provenance — and what shipped
+
+2026-09-12. **Provenance** is the Issue view now (`apps/web/src/routes/issues/issue.tsx`, which the side peek
+mounts too, so both look the same). The spike route and the other nine variants are deleted; this document
+keeps the reasoning and the rejected shapes, because the next person to want a "quick" layout change should
+be able to read why the page is the way it is.
+
+What changed on the real page, in the order it was built:
+
+- **The Documents are the page, and they say who wrote them.** The byline names every Member who has written
+  a version — Humans and Agents together, "written by Ada and Planner" — rather than only the last author.
+  That was the whole point of the variant: half the words on a deevy Issue are an Agent's and the page never
+  said which half.
+- **The view is the editor.** No Edit button, no read mode, no Save: leaving the text or `⌘Enter` writes a
+  version. The version picker became a `⋯` menu — History, which reads any version in a dialog and can
+  restore one, and Copy as Markdown.
+- **A ruling pins what it ruled on.** Every Gate decision records the version each Document stood at, the
+  ruling says "on spec v2", and when the text has been written since it says so. Without that, "approved"
+  was a claim about words that were free to change afterwards.
+- **The rail is a column, not a gutter** — `minmax(18rem,22rem)` rather than a fixed 300px — and the Run
+  feed moved into it, beside the ruling it is waiting on. A long Run no longer pushes the conversation off
+  the screen.
+
+What the first pass got wrong is worth keeping too: five layouts that were one idea five ways. The second
+pass started from what shipped elsewhere — Linear pinning artifacts and marking agent authorship, Devin
+sorting by what a session waits on, Cursor keeping sessions beside the work — and the choice fell on the one
+that answered a question only deevy has.
+
+Still open, and deliberately not decided here: the State control (a select where the Issue is not at a Gate)
+and simultaneous editing (`docs/plans/collaborative-documents.md`).

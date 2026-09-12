@@ -229,6 +229,15 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
 - The sidebar has My Issues (`/?assignee=me`), My Agents' Issues (Sponsors only), All Issues (`/`) and
   Projects (`/projects`); `g m` / `g a` / `g p`. The palette searches Issues from two characters.
 
+## The Issue view (chosen 2026-09-12)
+
+`routes/issues/issue.tsx` is **Provenance**, picked from ten layouts in `docs/plans/issue-view.md`; the side
+peek mounts the same component, so the two cannot drift. Its rules: the Documents are the subject and say
+who wrote them, the rail is a column and not a gutter (`@3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]`),
+and the Run feed lives in that rail beside the ruling it waits on rather than under the Documents, where a
+long Run pushed the conversation off the screen. The nine rejected layouts are in that document with what
+each of them paid for; read it before rearranging this page.
+
 ## What slice 3 settled (the editor)
 
 - **`components/markdown-editor.tsx`** is the one editor: markdown in, markdown out, `mode="block"`
@@ -242,6 +251,10 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
   own paper and ink; the input chrome stays for comments and notes, which are fields.
 - Every write carries `baseVersion`, so a save landing on top of somebody else's is refused with a
   `CONFLICT` rather than quietly winning. Real simultaneous editing is `docs/plans/collaborative-documents.md`.
+- **A Gate ruling pins what it ruled on.** Every decision records the version each Document stood at
+  (`gate_decision_document`); the ruling reads "on spec v2", says so when the text has been written since,
+  and the History dialog badges the version a Gate approved or rejected. An approval is about words, and the
+  words keep moving.
 - The byline names **every** Member who has written a version ("written by Ada and Planner · last edit 4d"),
   from `documents.versions`; older versions live behind a `⋯` (`More for <name>`) with History and Copy as
   Markdown, and History is a dialog that reads a version and can Restore it.
