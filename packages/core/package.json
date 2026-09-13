@@ -22,6 +22,7 @@
     "@better-auth/drizzle-adapter": "catalog:",
     "@better-auth/mcp": "catalog:",
     "@deevy/db": "workspace:*",
+    "@hocuspocus/server": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/contract": "catalog:",
@@ -31,10 +32,13 @@
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "y-protocols": "catalog:",
+    "yjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@deevy/adapters": "workspace:*",
+    "@hocuspocus/provider": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

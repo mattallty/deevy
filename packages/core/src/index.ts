@@ -1,4 +1,4 @@
-export { createApp, type App, type AppOptions } from "./app.ts";
+export { buildContext, createApp, type App, type AppOptions } from "./app.ts";
 export {
   accountLinkingOf,
   apiKeyPrefix,
@@ -25,6 +25,18 @@ export {
   type ClientMetadataFetchOptions,
   type MetadataResourceFetch,
 } from "./cimd.ts";
+export {
+  createRoomServer,
+  roomAuthenticator,
+  roomSocket,
+  serveRoomSocket,
+  type Joining,
+  type RoomContext,
+  type RoomServerOptions,
+  type RoomSocket,
+  type RuntimeSocket,
+} from "./room-server.ts";
+export { authorizeRoom, parseRoomName, roomName, type OpenedRoom, type Room } from "./rooms.ts";
 export {
   appendEvent,
   type EventInput,

@@ -11,6 +11,7 @@ import {
   type DueWorkLimits,
 } from "@deevy/core";
 import type { WorkerBindings, WorkerEnv } from "./env.ts";
+export { DocumentRoom } from "./rooms.ts";
 import { readWorkerEnv, workerAuthEnv } from "./env.ts";
 
 /**
@@ -126,6 +127,22 @@ const cronLimits: DueWorkLimits = { maxPasses: 1, sweepLimit: 20, deliveryLimit:
 
 export default {
   async fetch(request: Request, bindings: WorkerBindings): Promise<Response> {
+    // A room is one live text, so it is one Durable Object, named after the
+    // room rather than after the connection (ADR-0021). Nothing else about the
+    // request matters here: the object itself decides who may join.
+    const url = new URL(request.url);
+    if (url.pathname === "/collab") {
+      const name = url.searchParams.get("room");
+      if (!name) return new Response("A room has a name", { status: 400 });
+      const rooms = bindings.ROOMS;
+      if (!rooms) {
+        return new Response("This deployment has no Durable Objects, so no live Documents", {
+          status: 501,
+        });
+      }
+      return rooms.get(rooms.idFromName(name)).fetch(request);
+    }
+
     const isolate = isolateFor(bindings);
     await isolate.ready;
     return isolate.app.fetch(request);

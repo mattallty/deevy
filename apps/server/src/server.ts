@@ -1,7 +1,14 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { mountSpa, openDatabase } from "@deevy/adapters/node";
-import { createApp, createAuth, signInProviders, type AuthEnv } from "@deevy/core";
+import {
+  buildContext,
+  createApp,
+  createAuth,
+  createRoomServer,
+  signInProviders,
+  type AuthEnv,
+} from "@deevy/core";
 import { fetchClientMetadataResource } from "./cimd.ts";
 import type { ServerEnv } from "./env.ts";
 
@@ -61,5 +68,12 @@ export function buildServer(env: ServerEnv) {
     signInProviders: signInProviders(identity),
   });
   if (env.webDist) mountSpa(app, resolve(env.webDist));
-  return { app, db, auth, close, authEnv: identity };
+  // The rooms live beside the app rather than inside it: `createApp` builds
+  // request/response handlers, and an upgrade is neither (ADR-0021). The
+  // listener wires it — `serveRooms` in `rooms.ts` — the way the background
+  // runner is wired beside the listener rather than inside the app.
+  const rooms = createRoomServer({
+    contextFrom: (request) => buildContext(db, auth, request.headers, env.baseURL),
+  });
+  return { app, db, auth, rooms, close, authEnv: identity };
 }

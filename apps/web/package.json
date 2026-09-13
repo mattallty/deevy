@@ -22,6 +22,7 @@
     "@dnd-kit/utilities": "catalog:",
     "@fontsource-variable/inter": "catalog:",
     "@fontsource-variable/jetbrains-mono": "catalog:",
+    "@hocuspocus/server": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/tanstack-query": "catalog:",
@@ -52,7 +53,8 @@
     "rehype-highlight": "catalog:",
     "remark-gfm": "catalog:",
     "sonner": "catalog:",
-    "tailwind-merge": "catalog:"
+    "tailwind-merge": "catalog:",
+    "yjs": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "catalog:",
