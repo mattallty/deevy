@@ -73,6 +73,7 @@ export function buildServer(env: ServerEnv) {
   // listener wires it — `serveRooms` in `rooms.ts` — the way the background
   // runner is wired beside the listener rather than inside the app.
   const rooms = createRoomServer({
+    db,
     contextFrom: (request) => buildContext(db, auth, request.headers, env.baseURL),
   });
   return { app, db, auth, rooms, close, authEnv: identity };

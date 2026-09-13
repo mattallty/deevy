@@ -38,6 +38,7 @@ export class DocumentRoom {
     const db = createDb(this.#bindings.DB);
     const auth = createAuth({ db, env: workerAuthEnv(env) });
     this.#room = createRoomServer({
+      db,
       // The session on the upgrade request, then the Member, then the same
       // authorization the Document's own operations apply.
       contextFrom: (request) => buildContext(db, auth, request.headers, env.baseURL),

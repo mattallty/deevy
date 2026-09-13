@@ -1,7 +1,9 @@
 import { Hocuspocus } from "@hocuspocus/server";
 import { ORPCError } from "@orpc/server";
+import type { Db } from "@deevy/db";
 import type { AppContext, ContextFor } from "./operations/registry.ts";
-import { authorizeRoom, type Room } from "./rooms.ts";
+import { openRoom, storeRoom } from "./room-store.ts";
+import { authorizeRoom, type OpenedRoom, type Room } from "./rooms.ts";
 
 /**
  * The room server: one live text per Document, and per Issue description, that
@@ -21,16 +23,29 @@ export interface RoomServerOptions {
    * test can hand over a caller without minting a session for them.
    */
   contextFrom: (request: Request) => Promise<AppContext>;
+  /** Where a room's state and its versions are written. */
+  db: Db;
+  /**
+   * How long a room has to be still before what is in it becomes a version.
+   * Thirty seconds by default, and a cap so a Document nobody stops typing in
+   * is still written down (ADR-0021).
+   */
+  quietMs?: number;
+  atMostEveryMs?: number;
 }
 
 /** What every later hook is given about a connection. */
 export interface RoomContext {
   member: ContextFor<"member">["member"];
+  /** The room, as the rules resolved it: the Issue, and the Document when there is one. */
+  opened: OpenedRoom;
   room: Room;
   issueKey: string;
   issueId: string;
   /** The Document's id, or null for an Issue's description. */
   documentId: string | null;
+  /** The Workspace, for the log a version is written to. */
+  workspaceId: string;
 }
 
 /** Hocuspocus hands this the document name and the upgrade request, and nothing else. */
@@ -44,7 +59,7 @@ export interface Joining {
  * Throws the same refusals the operations throw: UNAUTHORIZED for a caller who
  * is no Member, FORBIDDEN for an Agent, NOT_FOUND for a room that is not ours.
  */
-export function roomAuthenticator({ contextFrom }: RoomServerOptions) {
+export function roomAuthenticator({ contextFrom }: Pick<RoomServerOptions, "contextFrom">) {
   return async ({ documentName, request }: Joining): Promise<RoomContext> => {
     const context = await contextFrom(request);
     if (!context.member || !context.workspace) {
@@ -56,21 +71,76 @@ export function roomAuthenticator({ contextFrom }: RoomServerOptions) {
     const opened = await authorizeRoom(context as ContextFor<"member">, documentName);
     return {
       member: context.member,
+      opened,
       room: opened.room,
       issueKey: opened.issue.key,
       issueId: opened.issue.id,
       documentId: opened.document?.id ?? null,
+      workspaceId: context.workspace.id,
     };
   };
 }
 
-/** The server itself: the hooks above, wired to Hocuspocus. */
+/**
+ * The server itself: the hooks above, wired to Hocuspocus, plus the two that
+ * make a room a Document — what it opens holding, and what it writes when it
+ * goes quiet.
+ */
 export function createRoomServer(options: RoomServerOptions): Hocuspocus {
   const authenticate = roomAuthenticator(options);
+  const { db } = options;
+
+  /*
+   * Who has typed since the last version was cut, per room. Hocuspocus reports
+   * the origin of the last transaction only, and a version belongs to
+   * everybody whose words are in it — so the names are collected as they
+   * arrive and drained when the room is written.
+   */
+  const typists = new Map<string, Set<string>>();
+  const nameTypist = (documentName: string, memberId: string | undefined) => {
+    if (!memberId) return;
+    const names = typists.get(documentName) ?? new Set<string>();
+    names.add(memberId);
+    typists.set(documentName, names);
+  };
+
   return new Hocuspocus({
+    // Thirty seconds of stillness is a version; two minutes of typing without
+    // one is too long to have written nothing down.
+    debounce: options.quietMs ?? 30_000,
+    maxDebounce: options.atMostEveryMs ?? 120_000,
+
     // Every connection authenticates; there is no anonymous room.
     onAuthenticate: (payload) =>
       authenticate({ documentName: payload.documentName, request: payload.request }),
+
+    onLoadDocument: async ({ documentName, document, context }) => {
+      const room = (context as RoomContext).opened;
+      await openRoom({ db, room, doc: document });
+      typists.delete(documentName);
+      return document;
+    },
+
+    onChange: ({ documentName, context }) => {
+      nameTypist(documentName, (context as RoomContext).member.id);
+      return Promise.resolve();
+    },
+
+    onStoreDocument: async ({ documentName, document, lastContext }) => {
+      const room = (lastContext as RoomContext).opened;
+      const authors = [...(typists.get(documentName) ?? new Set<string>())];
+      typists.delete(documentName);
+      await storeRoom({
+        db,
+        room,
+        doc: document,
+        authors,
+        now: new Date(),
+        // The Workspace the Issue belongs to: the Event goes in the same log
+        // as every other write, because a version cut in a room is a write.
+        log: { workspace: { id: (lastContext as RoomContext).workspaceId } },
+      });
+    },
   });
 }
 

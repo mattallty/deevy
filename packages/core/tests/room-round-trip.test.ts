@@ -2,6 +2,7 @@ import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/pro
 import { createRouterClient } from "@orpc/server";
 import * as Y from "yjs";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { loadMarkdown } from "@deevy/editor";
 import { createRoomServer, serveRoomSocket } from "../src/room-server.ts";
 import { router } from "../src/operations/index.ts";
 import { memberContext, testDb, type MemberContext } from "./helpers.ts";
@@ -108,14 +109,23 @@ async function withIssue(db: MemberContext["db"]) {
   return admin;
 }
 
-/** A provider on the given room, over a socket that reaches `server` in-process. */
-function join(server: ReturnType<typeof createRoomServer>, name: string, doc: Y.Doc) {
+/**
+ * A provider on the given room, over a socket that reaches `server` in-process.
+ * `as` is who is connecting: a real upgrade carries a cookie, and the server's
+ * `contextFrom` reads it — here it reads a header, so one room can hold two
+ * Members without minting sessions for them.
+ */
+function join(server: ReturnType<typeof createRoomServer>, name: string, doc: Y.Doc, as = "ada") {
   // The socket is its own object in v4, and it is the half that takes the
   // WebSocket implementation — here, one that reaches the room in-process.
   const websocketProvider = new HocuspocusProviderWebsocket({
     url: "ws://loopback/collab",
     WebSocketPolyfill: loopback((half) => {
-      serveRoomSocket(server, half, new Request("https://deevy.test/collab"));
+      serveRoomSocket(
+        server,
+        half,
+        new Request("https://deevy.test/collab", { headers: { "x-test-member": as } }),
+      );
     }),
   });
   const provider = new HocuspocusProvider({
@@ -135,16 +145,102 @@ function join(server: ReturnType<typeof createRoomServer>, name: string, doc: Y.
   return provider;
 }
 
+/** Whoever the upgrade says it is, out of the Members a test set up. */
+function whoever(members: Record<string, MemberContext>) {
+  return async (request: Request) => {
+    const who = request.headers.get("x-test-member") ?? "ada";
+    return Promise.resolve(members[who] ?? Object.values(members)[0]!);
+  };
+}
+
 const settle = async (times = 40) => {
   for (let index = 0; index < times; index++) await new Promise((r) => setTimeout(r, 5));
 };
+
+describe("a room that goes quiet", () => {
+  it("writes a version of what the two of them typed, naming both", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await withIssue(db);
+    const grace = await memberContext(db, { name: "Grace" });
+    // The real rule is thirty seconds of stillness (ADR-0021); here it is a
+    // blink, because what is being tested is the chain and not the clock.
+    const server = createRoomServer({
+      db,
+      contextFrom: whoever({ ada: admin, grace }),
+      quietMs: 20,
+    });
+
+    const hers = new Y.Doc();
+    join(server, "document:DEV-1:intent", hers);
+    await settle();
+    loadMarkdown(hers, "## Problem\n\nAda wrote this.");
+    await settle();
+
+    const theirs = new Y.Doc();
+    join(server, "document:DEV-1:intent", theirs, "grace");
+    await settle();
+    loadMarkdown(theirs, "## Problem\n\nAda wrote this.\n\nGrace added this.");
+    await settle(60);
+
+    const client = createRouterClient(router, { context: admin });
+    const written = await client.documents.get({ issueKey: "DEV-1", name: "intent" });
+    expect(written.body).toContain("Grace added this.");
+
+    // A version names whoever typed into *it*: Ada's paragraph is carried into
+    // Grace's version, but Ada wrote nothing after the previous one was cut.
+    // The byline across versions is what says "written by Ada and Grace".
+    const versions = await client.documents.versions({ issueKey: "DEV-1", name: "intent" });
+    expect(versions.versions[0]?.authorMemberIds).toEqual([grace.member.id]);
+    const everybody = new Set(versions.versions.flatMap((one) => one.authorMemberIds));
+    expect([...everybody].toSorted()).toEqual([admin.member.id, grace.member.id].toSorted());
+
+    // And the log heard about it: a version cut in a room is a write like any
+    // other, so the Activity has a line for it and the inbox can act on it.
+    const issue = await client.issues.get({ key: "DEV-1" });
+    const page = await client.events.list({ subjectType: "issue", subjectId: issue.id });
+    expect(page.events.findLast((one) => one.kind === "document.updated")).toMatchObject({
+      payload: { name: "intent", authorMemberIds: [grace.member.id] },
+    });
+  });
+
+  it("names both when they were typing in the same stretch", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const admin = await withIssue(db);
+    const grace = await memberContext(db, { name: "Grace" });
+    // Long enough that both of them get into the same version.
+    const server = createRoomServer({
+      db,
+      contextFrom: whoever({ ada: admin, grace }),
+      quietMs: 150,
+    });
+
+    const hers = new Y.Doc();
+    const theirs = new Y.Doc();
+    join(server, "document:DEV-1:intent", hers);
+    join(server, "document:DEV-1:intent", theirs, "grace");
+    await settle();
+
+    loadMarkdown(hers, "## Problem\n\nAda wrote this.");
+    await settle(4);
+    loadMarkdown(theirs, "## Problem\n\nAda wrote this.\n\nAnd Grace, in the same breath.");
+    await settle(80);
+
+    const client = createRouterClient(router, { context: admin });
+    const versions = await client.documents.versions({ issueKey: "DEV-1", name: "intent" });
+    expect(versions.versions[0]?.authorMemberIds.toSorted()).toEqual(
+      [admin.member.id, grace.member.id].toSorted(),
+    );
+  });
+});
 
 describe("two Members in one room", () => {
   it("shows each of them what the other typed", async () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await withIssue(db);
-    const server = createRoomServer({ contextFrom: async () => admin });
+    const server = createRoomServer({ db, contextFrom: async () => admin });
 
     const ada = new Y.Doc();
     const grace = new Y.Doc();
@@ -171,7 +267,7 @@ describe("two Members in one room", () => {
     const { db, close } = testDb();
     closers.push(close);
     const admin = await withIssue(db);
-    const server = createRoomServer({ contextFrom: async () => admin });
+    const server = createRoomServer({ db, contextFrom: async () => admin });
 
     // The intent Document and the Issue's own description: two texts, two
     // rooms, one Issue and one socket each.
@@ -196,7 +292,7 @@ describe("two Members in one room", () => {
     closers.push(close);
     await withIssue(db);
     const planner = await memberContext(db, { kind: "agent", name: "Planner" });
-    const server = createRoomServer({ contextFrom: async () => planner });
+    const server = createRoomServer({ db, contextFrom: async () => planner });
 
     const doc = new Y.Doc();
     const provider = join(server, "document:DEV-1:intent", doc);
@@ -208,7 +304,7 @@ describe("two Members in one room", () => {
     expect(doc.getText("body").toJSON()).toBe("");
 
     const human = await memberContext(db, { name: "Grace" });
-    const open = createRoomServer({ contextFrom: async () => human });
+    const open = createRoomServer({ db, contextFrom: async () => human });
     const hers = join(open, "document:DEV-1:intent", new Y.Doc());
     await settle();
     expect(hers.isAuthenticated).toBe(true);

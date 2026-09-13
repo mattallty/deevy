@@ -22,6 +22,7 @@
     "@better-auth/drizzle-adapter": "catalog:",
     "@better-auth/mcp": "catalog:",
     "@deevy/db": "workspace:*",
+    "@deevy/editor": "workspace:*",
     "@hocuspocus/server": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
     "@orpc/client": "catalog:",

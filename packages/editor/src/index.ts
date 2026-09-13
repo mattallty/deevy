@@ -1,0 +1,88 @@
+import { getSchema } from "@tiptap/core";
+import type { AnyExtension } from "@tiptap/core";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { TableKit } from "@tiptap/extension-table";
+import { Markdown, MarkdownManager } from "@tiptap/markdown";
+import { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import StarterKit from "@tiptap/starter-kit";
+import { prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from "@tiptap/y-tiptap";
+import { common, createLowlight } from "lowlight";
+import type * as Y from "yjs";
+
+/**
+ * What a Document is made of — the one schema (ADR-0021). The browser's editor
+ * and the server that serialises a version share it, because a version is the
+ * markdown of a tree and two trees that disagree are two Documents.
+ *
+ * Only the schema lives here. How a Human types into it — placeholders, the `/`
+ * menu, mentions, ⌘Enter — is the SPA's, and none of it changes what a
+ * Document *is*.
+ */
+export function documentExtensions(): AnyExtension[] {
+  return [
+    StarterKit.configure({
+      // Lowlight takes the code block over; the rest of the kit stays.
+      codeBlock: false,
+      heading: { levels: [1, 2, 3, 4] },
+      link: { openOnClick: false, autolink: true },
+    }),
+    CodeBlockLowlight.configure({ lowlight: createLowlight(common) }),
+    TableKit.configure({ table: { resizable: false } }),
+    TaskList,
+    TaskItem,
+    Markdown.configure({ markedOptions: { gfm: true } }),
+  ];
+}
+
+/** The field a room's text lives under. Tiptap's own default, so the editor needs telling nothing. */
+export const DOCUMENT_FIELD = "default";
+
+let cached: { extensions: AnyExtension[]; schema: ReturnType<typeof getSchema> } | null = null;
+
+/** Built once: the schema is the same for every Document in the process. */
+function shared() {
+  if (!cached) {
+    const extensions = documentExtensions();
+    cached = { extensions, schema: getSchema(extensions) };
+  }
+  return cached;
+}
+
+/**
+ * The markdown a room currently holds. No editor and no DOM: the fragment
+ * becomes a ProseMirror document against the shared schema, and the markdown
+ * serialiser reads that — which is what lets a version be cut by a Durable
+ * Object with nobody watching.
+ */
+export function markdownOf(doc: Y.Doc, field: string = DOCUMENT_FIELD): string {
+  const { extensions, schema } = shared();
+  const fragment = doc.getXmlFragment(field);
+  if (fragment.length === 0) return "";
+  const root = yXmlFragmentToProseMirrorRootNode(fragment, schema);
+  const manager = new MarkdownManager({ extensions });
+  return manager.serialize(root.toJSON()).trim();
+}
+
+/**
+ * Put markdown into a room. Used to open one from the Document's last version,
+ * and — once the merge lands — to apply what an Agent wrote into a live room.
+ *
+ * A write that changes nothing writes nothing: the fragment is compared with
+ * what it would become before it is touched, so re-opening a room does not add
+ * to its history and an Agent's no-op edit is not an edit.
+ */
+export function loadMarkdown(doc: Y.Doc, markdown: string, field: string = DOCUMENT_FIELD): void {
+  if (markdownOf(doc, field) === markdown.trim()) return;
+
+  const { extensions, schema } = shared();
+  const manager = new MarkdownManager({ extensions });
+  const json = markdown.trim() === "" ? { type: "doc", content: [] } : manager.parse(markdown);
+  const root = ProseMirrorNode.fromJSON(schema, json);
+
+  doc.transact(() => {
+    const fragment = doc.getXmlFragment(field);
+    fragment.delete(0, fragment.length);
+    prosemirrorToYXmlFragment(root, fragment);
+  });
+}

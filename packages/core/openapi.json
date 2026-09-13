@@ -17906,6 +17906,12 @@
                               "null"
                             ]
                           },
+                          "authorMemberIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "writtenAt": {
                             "type": "string",
                             "format": "date-time",
@@ -17951,6 +17957,7 @@
                         "required": [
                           "version",
                           "authorMemberId",
+                          "authorMemberIds",
                           "writtenAt",
                           "rulings"
                         ],

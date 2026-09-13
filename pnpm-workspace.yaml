@@ -31,6 +31,7 @@ catalog:
   "@hocuspocus/server": 4.7.0
   "@hocuspocus/provider": 4.7.0
   "@hocuspocus/common": 4.7.0
+  "@tiptap/y-tiptap": 3.0.9
   # The websocket server Node has none of: the Worker gets its own from the
   # platform, so this is the one dependency only one runtime needs.
   ws: ^8.21.3

@@ -1,8 +1,7 @@
+import { documentExtensions } from "@deevy/editor";
 import { Editor, Extension, type Range } from "@tiptap/core";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
-import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extension-placeholder";
-import { TableKit } from "@tiptap/extension-table";
 import { Markdown } from "@tiptap/markdown";
 import { PluginKey } from "@tiptap/pm/state";
 import { EditorContent, ReactRenderer, useEditor, useEditorState } from "@tiptap/react";
@@ -383,20 +382,27 @@ export function editorExtensions(options: {
     },
   });
   return [
-    StarterKit.configure({
-      // Lowlight takes the code block over; the rest of the kit stays.
-      codeBlock: false,
-      heading: block ? { levels: [1, 2, 3, 4] } : false,
-      blockquote: block ? {} : false,
-      horizontalRule: block ? {} : false,
-      bulletList: block ? {} : false,
-      orderedList: block ? {} : false,
-      listItem: block ? {} : false,
-      link: { openOnClick: false, autolink: true },
-    }),
-    CodeBlockLowlight.configure({ lowlight }),
-    ...(block ? [TableKit.configure({ table: { resizable: false } }), TaskList, TaskItem] : []),
-    Markdown.configure({ markedOptions: { gfm: true } }),
+    // A Document's schema is shared with the server that serialises its
+    // versions (`@deevy/editor`, ADR-0021): two schemas that drift are two
+    // Documents. A comment is not versioned and does not want headings or
+    // tables, so `inline` keeps its own narrower list.
+    ...(block
+      ? documentExtensions()
+      : [
+          StarterKit.configure({
+            // Lowlight takes the code block over; the rest of the kit stays.
+            codeBlock: false,
+            heading: false,
+            blockquote: false,
+            horizontalRule: false,
+            bulletList: false,
+            orderedList: false,
+            listItem: false,
+            link: { openOnClick: false, autolink: true },
+          }),
+          CodeBlockLowlight.configure({ lowlight }),
+          Markdown.configure({ markedOptions: { gfm: true } }),
+        ]),
     Placeholder.configure({ placeholder: options.placeholder ?? "" }),
     mentionSuggestion(options.mentions ?? (() => [])),
     ...(block ? [slashCommands] : []),

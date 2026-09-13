@@ -47,7 +47,14 @@ export const documents = {
       versions: z.array(
         z.object({
           version: z.number().int(),
+          /** Who cut this version. */
           authorMemberId: z.string().nullable(),
+          /**
+           * Everybody whose keystrokes are in it. A version cut from a live
+           * room regularly has more than one author (ADR-0021), and the byline
+           * reads from this rather than guessing from the one above.
+           */
+          authorMemberIds: z.array(z.string()),
           writtenAt: z.date(),
           /**
            * The Gate rulings made while this version was the current one: what
@@ -70,6 +77,7 @@ export const documents = {
       const rows = await context.db.query.documentVersion.findMany({
         where: { documentId: found.id },
         orderBy: { version: "desc" },
+        with: { authors: true },
       });
       const pinned = await context.db.query.gateDecisionDocument.findMany({
         where: { documentId: found.id },
@@ -79,6 +87,14 @@ export const documents = {
         versions: rows.map((row) => ({
           version: row.version,
           authorMemberId: row.authorMemberId,
+          // A version written before rooms existed names its one author here
+          // too, so a byline never has to ask which kind of version it is.
+          authorMemberIds:
+            row.authors.length > 0
+              ? row.authors.map((one) => one.memberId)
+              : row.authorMemberId
+                ? [row.authorMemberId]
+                : [],
           writtenAt: row.createdAt,
           rulings: pinned
             .filter((one) => one.version === row.version)

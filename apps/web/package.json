@@ -16,6 +16,7 @@
     "@base-ui/react": "catalog:",
     "@deevy/adapters": "workspace:*",
     "@deevy/core": "workspace:*",
+    "@deevy/editor": "workspace:*",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/modifiers": "catalog:",
     "@dnd-kit/sortable": "catalog:",
