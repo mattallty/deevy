@@ -71,6 +71,11 @@
         "body": {
           "type": "string",
           "maxLength": 100000
+        },
+        "baseVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
       "required": [

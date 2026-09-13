@@ -14,6 +14,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/lib/orpc";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
+import { MemberChip } from "@/components/member-chip";
+import { RailHeading } from "@/components/rail-heading";
+import { ago } from "@/lib/time";
 
 interface State {
   id: string;
@@ -29,6 +32,14 @@ export interface GateStanding {
   approvals: Array<{ memberId: string; name: string | null; note: string | null }>;
   mayApprove: boolean;
   refusedBecause: "not_an_approver" | "requester" | "approved" | "too_few_humans" | null;
+}
+
+/** What has been written since a ruling, as a sentence rather than a list. */
+function sentence(since: Array<{ name: string; version: number }>): string {
+  const named = since.map((one) => `${one.name} (now v${one.version})`);
+  const all =
+    named.length > 2 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)}` : named.join(" and ");
+  return `Written since: ${all}. What was approved is under History.`;
 }
 
 /** Why the buttons are not yours to press, said where they would be. */
@@ -60,6 +71,11 @@ interface GateControlsProps {
     decision: string;
     note: string | null;
     createdAt: string | Date;
+    /** Which Gate this was, and who ruled: what makes one ruling tell itself apart. */
+    stateId: string;
+    memberId: string | null;
+    /** What each Document said when this was ruled on. */
+    documents: Array<{ name: string; version: number }>;
   }>;
   /** How far along the Gate is; absent for a State that is not one. */
   standing?: GateStanding | null;
@@ -80,6 +96,12 @@ export function GateControls({
 }: GateControlsProps) {
   const queryClient = useQueryClient();
   const workflow = useQuery(orpc.workflow.get.queryOptions({ input: { projectKey } }));
+  // Who ruled, for the history below: the page has this list already, so it is
+  // a cache read rather than a request.
+  const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
+  // Where the Documents have got to since, so a ruling can say when the text it
+  // was made about has moved on. The Documents pane asks for this too.
+  const documents = useQuery(orpc.documents.list.queryOptions({ input: { issueKey } }));
   // A ruling changes the Issue, what the inbox owes, and the Run that asked.
   const refresh = () =>
     Promise.all(
@@ -104,6 +126,15 @@ export function GateControls({
   // a Gate puts the cursor in the Note; `⇧A` / `⇧R` do that with the ruling
   // chosen, so that `⌘↵` in the Note is the ruling. Nothing here commits
   // without that last key or a click.
+  /** The pinned Documents this ruling covered that have been written since. */
+  const movedOn = (pinned: Array<{ name: string; version: number }>) =>
+    pinned.flatMap((one) => {
+      const now = (documents.data?.documents ?? []).find((each) => each.name === one.name);
+      return now && now.currentVersion > one.version
+        ? [{ name: one.name, version: now.currentVersion }]
+        : [];
+    });
+
   const noteField = useRef<HTMLTextAreaElement>(null);
   const [stateOpen, setStateOpen] = useState(false);
   const [ruling, setRuling] = useState<"approve" | "reject">("approve");
@@ -126,7 +157,7 @@ export function GateControls({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-muted-foreground">State</h2>
+      <RailHeading>State</RailHeading>
 
       {state.isGate ? (
         <div className="flex flex-col gap-3 rounded-lg border p-4">
@@ -230,18 +261,55 @@ export function GateControls({
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
       {decisions.length > 0 ? (
+        /*
+         * A ruling says which Gate it was at and who made it. Without those an
+         * Issue that came through Intent, Spec and Plan showed three lines that
+         * read the same — the word "approved" and a note — and nothing told you
+         * they were three different decisions (2026-09-11).
+         */
         <ul aria-label="Gate decisions" className="flex flex-col gap-2">
-          {decisions.map((decision) => (
-            <li key={decision.id} className="flex flex-wrap items-baseline gap-2 text-sm">
-              <Badge variant={decision.decision === "approved" ? "default" : "destructive"}>
-                {decision.decision}
-              </Badge>
-              {decision.note ? <span>{decision.note}</span> : null}
-              <span className="text-xs text-muted-foreground">
-                {new Date(decision.createdAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
+          {decisions.map((decision) => {
+            const at = (workflow.data?.states ?? []).find((one) => one.id === decision.stateId);
+            const by = (members.data?.members ?? []).find((one) => one.id === decision.memberId);
+            return (
+              <li key={decision.id} className="flex flex-col gap-1 text-sm">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{at?.name ?? "A Gate"}</span>
+                  <Badge variant={decision.decision === "approved" ? "default" : "destructive"}>
+                    {decision.decision}
+                  </Badge>
+                  {by ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground">by</span>
+                      <MemberChip member={by} size="inline" />
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-muted-foreground">
+                    {ago(decision.createdAt, { short: true })}
+                  </span>
+                </span>
+                {decision.documents.length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    on {decision.documents.map((one) => `${one.name} v${one.version}`).join(" · ")}
+                  </span>
+                ) : null}
+                {/*
+                 * An approval is about words, and the words keep moving: an
+                 * Agent may write the spec again the minute after a Human
+                 * agreed to it. Say so where the approval is, rather than
+                 * letting the page imply the current text was the approved one.
+                 */}
+                {decision.decision === "approved" && movedOn(decision.documents).length > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {sentence(movedOn(decision.documents))}
+                  </span>
+                ) : null}
+                {decision.note ? (
+                  <span className="text-muted-foreground">“{decision.note}”</span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>

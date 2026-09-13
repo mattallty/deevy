@@ -140,7 +140,6 @@ export function IssueBoardView({
     [columns],
   );
   const [dragging, setDragging] = useState<BoardIssue | null>(null);
-
   function onMove({ event, activeContainer, overContainer }: KanbanMoveEvent) {
     const card = cardById.get(String(event.active.id));
     const column = columnById.get(overContainer);
@@ -150,6 +149,10 @@ export function IssueBoardView({
 
   return (
     <Kanban
+      // The root takes the room the page left it, so the strip inside can be
+      // `h-full` and the columns can scroll rather than the page — from `md`
+      // up, where there is room for that to be an improvement.
+      className="flex flex-col md:min-h-0 md:flex-1"
       value={value}
       onValueChange={() => {}}
       getItemValue={(issue) => issue.id}
@@ -161,7 +164,24 @@ export function IssueBoardView({
       onDragEnd={() => setDragging(null)}
       onDragCancel={() => setDragging(null)}
     >
-      <KanbanBoard className="flex auto-rows-auto items-start gap-3 overflow-x-auto pb-4 sm:grid-cols-none">
+      {/*
+       * `relative` is what keeps the board's scroll inside the board: an
+       * absolutely positioned descendant is clipped by its containing block,
+       * not by whatever scrolls, and the sr-only words a StateBadge and an
+       * avatar carry would otherwise be laid out against the page and widen it
+       * by every column past the fold.
+       *
+       * The wheel is the browser's: a Board is taller than the window as often
+       * as it is wider, and a listener that turned a wheel sideways made the
+       * page unreachable until the last column had gone by. Sideways is
+       * Shift and a wheel, a trackpad, or the bar below the cards.
+       */}
+      <KanbanBoard
+        // `pb-4` is the band the sideways bar lives in: a thin one is about
+        // 11px, so the cards clear it rather than being underlined by it, and
+        // an overlay bar floats in the same space with air above.
+        className="scrollbar-thin relative flex auto-rows-auto items-stretch gap-3 overflow-x-auto pb-4 sm:grid-cols-none md:h-full md:min-h-0"
+      >
         {columns.map((column) => {
           const inColumn = value[column.id] ?? [];
           // Dimmed while a card is dragged that this column would not take, so
@@ -186,7 +206,7 @@ export function IssueBoardView({
                 />
               }
               className={cn(
-                "flex w-72 shrink-0 flex-col gap-2 rounded-lg border bg-muted/30 p-2 transition-opacity",
+                "flex w-72 shrink-0 flex-col gap-2 rounded-lg border bg-muted/30 p-2 transition-opacity md:max-h-full",
                 column.isGate && "border-gate/40 bg-gate/5",
                 refuses && "cursor-not-allowed opacity-40",
               )}
@@ -197,7 +217,16 @@ export function IssueBoardView({
                   {inColumn.length}
                 </span>
               </header>
-              <KanbanColumnContent value={column.id} className="flex flex-col gap-2">
+              {/*
+               * The cards, and the only thing on a Board that scrolls
+               * vertically: the column keeps its header while its own list
+               * moves, so a wheel over a column reads down that column rather
+               * than moving the page or the Workflow.
+               */}
+              <KanbanColumnContent
+                value={column.id}
+                className="scrollbar-thin flex flex-col gap-2 md:min-h-0 md:flex-1 md:overflow-y-auto"
+              >
                 {inColumn.map((issue) => (
                   <KanbanItem key={issue.id} value={issue.id}>
                     <KanbanItemHandle cursor={false}>
@@ -278,7 +307,7 @@ export function IssueBoard({
     <>
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
       {loading ? (
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full md:h-auto md:min-h-0 md:flex-1" />
       ) : (
         <IssueBoardView
           columns={columns}

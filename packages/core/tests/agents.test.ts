@@ -55,6 +55,9 @@ describe("the Agent capability rule", () => {
       "comments.list",
       "documents.get",
       "documents.list",
+      // Reading a Document's history is reading: an Agent that wrote a version
+      // may see what came before it, and write is still write.
+      "documents.versions",
       "documents.write",
       "inbox.list",
       // Its own inbox, scoped to the caller in the same statement it updates
@@ -155,6 +158,39 @@ describe("agents.create", () => {
       user: { name: "Planner", kind: "agent" },
     });
     expect(row?.agent).toBeTruthy();
+  });
+
+  it("gives the new Agent a key, once, and puts the issue in the log", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const keys = fakeApiKeys();
+    const asAda = createRouterClient(router, { context: { ...ada, apiKeys: keys } });
+
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    const row = await db.query.member.findFirst({ where: { id: created.id } });
+    expect(keys.issued).toMatchObject([{ userId: row?.userId, name: "first key" }]);
+    expect(created.key?.key).toBe(keys.issued[0]?.plaintext);
+
+    const events = await db.query.event.findMany({ orderBy: { seq: "asc" } });
+    expect(events.map((event) => event.kind)).toEqual(["agent.created", "agent.key_issued"]);
+
+    // Asking again never hands the plaintext back: deevy keeps a hash.
+    const listed = await asAda.agents.keys.list({ memberId: created.id });
+    expect(JSON.stringify(listed)).not.toContain(created.key?.key);
+  });
+
+  it("creates the Agent even where nothing can mint a key", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const ada = await memberContext(db, { role: "admin", name: "Ada" });
+    const asAda = createRouterClient(router, { context: ada });
+
+    const created = await asAda.agents.create({ name: "Planner" });
+
+    expect(created.key).toBeNull();
+    expect(created.handle).toBe("planner");
   });
 
   it("suffixes a handle that a Member or a Team already answers to", async () => {
@@ -421,11 +457,15 @@ describe("agents.keys", () => {
 
     const issued = await asAda.agents.keys.issue({ memberId: planner.id, name: "laptop" });
 
-    expect(keys.issued).toMatchObject([{ userId: row?.userId, name: "laptop" }]);
-    expect(issued.key).toBe(keys.issued[0]?.plaintext);
+    // The first is the one it was created with; this is the Sponsor's second.
+    expect(keys.issued).toMatchObject([
+      { userId: row?.userId, name: "first key" },
+      { userId: row?.userId, name: "laptop" },
+    ]);
+    expect(issued.key).toBe(keys.issued[1]?.plaintext);
 
     const listed = await asAda.agents.keys.list({ memberId: planner.id });
-    expect(listed.keys).toMatchObject([{ id: issued.id, name: "laptop" }]);
+    expect(listed.keys).toMatchObject([{ name: "first key" }, { id: issued.id, name: "laptop" }]);
     expect(JSON.stringify(listed)).not.toContain(issued.key);
   });
 
@@ -440,13 +480,18 @@ describe("agents.keys", () => {
     expect(await asAda.agents.keys.revoke({ memberId: planner.id, keyId: issued.id })).toEqual({
       revoked: true,
     });
-    expect((await asAda.agents.keys.list({ memberId: planner.id })).keys).toEqual([]);
+    // The key it was created with is untouched: only the named one was retired.
+    expect((await asAda.agents.keys.list({ memberId: planner.id })).keys).toMatchObject([
+      { name: "first key" },
+    ]);
     await expect(
       asAda.agents.keys.revoke({ memberId: planner.id, keyId: issued.id }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     const kinds = (await db.query.event.findMany({ orderBy: { seq: "asc" } })).map((e) => e.kind);
+    // Three: the key it was created with, the Sponsor's own, and the retirement.
     expect(kinds.filter((kind) => kind.startsWith("agent.key"))).toEqual([
+      "agent.key_issued",
       "agent.key_issued",
       "agent.key_revoked",
     ]);

@@ -73,6 +73,33 @@ describe("gates.approve", () => {
     });
   });
 
+  it("pins what each Document said, so a later write cannot rewrite an approval", async () => {
+    const { db, close } = testDb();
+    closers.push(close);
+    const { client } = await withIssue(db);
+    // The Intent Document exists from the Issue's first State; write it twice,
+    // so what is approved is v2 rather than the version the State opened with.
+    await client.documents.write({ issueKey: "DEV-1", name: "intent", body: "Worth doing" });
+
+    const approved = await client.gates.approve({ key: "DEV-1", note: "Go" });
+    expect(approved.gateDecisions).toMatchObject([{ documents: [{ name: "intent", version: 2 }] }]);
+
+    // An Agent writes the intent again afterwards, which is allowed and is the
+    // whole reason the version is pinned: the ruling still names v2.
+    await client.documents.write({ issueKey: "DEV-1", name: "intent", body: "Something else" });
+    const after = await client.issues.get({ key: "DEV-1" });
+    expect(after.gateDecisions).toMatchObject([{ documents: [{ name: "intent", version: 2 }] }]);
+    const intent = await client.documents.get({ issueKey: "DEV-1", name: "intent" });
+    expect(intent.currentVersion).toBe(3);
+
+    // And the history says which version was ruled on, so it can be found again.
+    const versions = await client.documents.versions({ issueKey: "DEV-1", name: "intent" });
+    expect(versions.versions.find((one) => one.version === 2)?.rulings).toMatchObject([
+      { decision: "approved" },
+    ]);
+    expect(versions.versions.find((one) => one.version === 3)?.rulings).toEqual([]);
+  });
+
   it("refuses when the Issue is not in a Gate", async () => {
     const { db, close } = testDb();
     closers.push(close);

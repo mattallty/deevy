@@ -108,7 +108,9 @@ go through the catalog.
   rows and cards. The badge names itself `labelText(label)` (`epic: Agent loop`), which is what a test reads.
   Both themes; a real System/Light/Dark toggle. Round 1's warm Plex look is history (`docs/plans/ui-redesign.md`).
 - **Layout.** Full-bleed frame, 240px sidebar collapsing to 48px, edge-to-edge lists with a 40px filter bar,
-  720px side-peek, Issue page = main + 300px rail with the Gate ruling card always on top. Cards only for
+  a side-peek of `min(92vw, max(56rem, 45vw))` — a share of the window rather than a fixed width, wide
+  enough to be the page it shows, which since Provenance means the rail too — Issue page = main + an 18–22rem
+  rail with the Gate ruling card always on top. Cards only for
   things that are cards (a Run, a Channel).
 - **Motion** only in answer to an action. Nothing on load.
 
@@ -124,7 +126,11 @@ only submit key. `src/lib/shortcuts.ts` owns a scope stack: an open Sheet, Dialo
 
 - **Sizes live in `components/ui`.** shadcn's `base-mira` is the compact style — 12px controls, 10px badges
   and kbd, 28px buttons. deevy resizes those files (button, input, textarea, native-select, select, label,
-  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights, and
+  table, badge, kbd, sidebar, dropdown-menu, command, dialog) to a 14px control size with 32px heights,
+  drops `CommandDialog`'s `top-1/3 translate-y-0` so the palette keeps `DialogContent`'s own centring
+  rather than sliding to the bottom of the window as its list fills, hides `CommandItem`'s unchecked tick
+  instead of leaving it at `opacity-0` — it carries an `ml-auto` of its own, and two of those in one flex row
+  split the free space, which stranded a row's trailing text mid-line (both 2026-09-11), and
   strips `avatar`'s inner `after:` border, since the kind ring (`MemberChip`) is the avatar's one edge, and
   paints fields (`input`, `textarea`, `select` trigger, `combobox` chips, `input-group`) `bg-card` in light —
   base-mira's `bg-input/20` read as disabled (Matt, 2026-09-06) — with `disabled:bg-muted` now meaning it;
@@ -166,7 +172,7 @@ EmptyMedia variant="icon" + EmptyTitle + EmptyDescription`, with a lucide icon t
 - **Grouped buttons.** shadcn's rule: `ToggleGroup` for buttons that toggle a state (Inbox All/Unread, the
   filter bar's Any/Humans/Agents, Open/All, List/Board, Activity All/Comments/Changes), `ButtonGroup` for
   buttons that perform actions (a State's Move up/down in the Workflow editor); `Tabs` for views of one
-  thing (Documents, the editor's Edit/Source). Joined ToggleGroups are `variant="outline" spacing={0}`.
+  thing (the Documents on an Issue). Joined ToggleGroups are `variant="outline" spacing={0}`.
   A pressed Toggle is `bg-primary/10 text-primary` with a `border-primary/30` edge (`/20` fill in dark):
   the one "selected" language the sidebar, the Settings nav and the Tabs underline already speak; the kit's
   `bg-muted` was a 1% step off the page (Matt, 2026-09-06).
@@ -211,29 +217,89 @@ className={sidebarMenuButtonVariants(...)}`), not `render={<SidebarMenuButton/>}
 - **`components/data-table.tsx`** is hand-rolled on `ui/table`: client sort per column, group rows that
   fold, skeleton, `Empty`, `aria-selected` on the keyboard row. No TanStack Table — it went to v9 with a new
   API and this list needs none of a grid. A row's accessible name is its text.
-- **`components/side-peek.tsx`** renders the whole `IssuePage` in a right Sheet (`sm:max-w-[720px]`),
-  keyed by `?peek=`. Base UI names the dialog from `SheetTitle` (`aria-labelledby` beats `aria-label`), so
-  a test finds it by `/DEV-1/`. It pushes the `peek` shortcut scope; `o` opens the full page; `Esc` closes.
+- **`components/side-peek.tsx`** renders the whole `IssuePage` in a right Sheet, keyed by `?peek=`. Base UI
+  names the dialog from `SheetTitle` (`aria-labelledby` beats `aria-label`), so a test finds it by
+  `/DEV-1/`. It pushes the `peek` shortcut scope; `o` opens the full page; `Esc` closes. Since 2026-09-11 it
+  is `min(92vw, max(56rem, 45vw))` wide — 45% of a desktop window, 56rem floor, 92vw ceiling, and the whole
+  window below `sm` — **resizable by its left edge** (`role="separator"` named `Resize the Issue panel`,
+  arrow keys and `Home` as well as a drag; the width is remembered in `localStorage` and re-clamped when the
+  window changes, `lib/peek-width.ts`). That expression is the floor a drag cannot go under, and is written
+  in CSS so the first paint needs no JavaScript; `peekBounds().min` is the same number for the code that has
+  to reason about it. Carries **no backdrop** (`showOverlay={false}`, a deevy prop on
+  `ui/sheet.tsx`) and is **never modal**. The width is load-bearing: it keeps the Issue's own container over
+  `@3xl`, so the peek is the page — two columns, rail on the right, sections in the same order — instead of
+  the stacked, rail-first shape a narrower panel produced. The other two keep the list behind it lit,
+  readable and, on the Board, still draggable; modal-except-on-the-Board was the old rule.
 - **Keyboard on a list**: `j`/`k`/arrows move `aria-selected`, `Enter` peeks, `o` opens, `Esc` clears — bound
   by the page with `useShortcut`, not by the table.
 - The sidebar has My Issues (`/?assignee=me`), My Agents' Issues (Sponsors only), All Issues (`/`) and
   Projects (`/projects`); `g m` / `g a` / `g p`. The palette searches Issues from two characters.
 
+## The Issue view (chosen 2026-09-12)
+
+`routes/issues/issue.tsx` is **Provenance**, picked from ten layouts in `docs/plans/issue-view.md`; the side
+peek mounts the same component, so the two cannot drift. Its rules: the Documents are the subject and say
+who wrote them, the rail is a column and not a gutter (`@3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]`),
+and the Run feed lives in that rail beside the ruling it waits on rather than under the Documents, where a
+long Run pushed the conversation off the screen. The nine rejected layouts are in that document with what
+each of them paid for; read it before rearranging this page.
+
 ## What slice 3 settled (the editor)
 
+- A page can hold more than one `role="status"` (what is saving, and what a Gate is waiting on), so a test
+  names the one it means.
 - **`components/markdown-editor.tsx`** is the one editor: markdown in, markdown out, `mode="block"`
-  (Documents, descriptions) or `"inline"` (comments, notes, answers), Edit/Source tabs. The Source view is a
-  plain `Textarea` with `aria-label="Body"`, always mounted (hidden by class), so tests type there and a
-  Human can always see the text as an Agent wrote it. `⌘Enter` submits in both views (`onSubmit`).
+  (Documents, descriptions) or `"inline"` (comments, notes, answers). **No Edit/Source switch** (2026-09-12):
+  a pair of tabs above every Document, description and comment was a choice nobody was making and chrome on
+  every reading of them. The plain `Textarea` underneath stays mounted and **hidden** — same `value`, same
+  accessible name — because Tiptap is a ProseMirror view and jsdom has no layout to type into: a test asks
+  for it with `{ selector: "textarea" }` and gets the markdown exactly as stored. `⌘Enter` submits
+  (`onSubmit`). Nothing in the UI reaches it; if a Human ever needs the raw markdown again, the place for it
+  is the Document's `⋯` menu, not a tab strip on every editor.
+- **So are an Issue's title and description** (`inline-title.tsx`, `routes/issues/issue.tsx`): no Edit
+  button, no form, no second copy of the words on screen. The title is a `contentEditable` `h1` rather than
+  an input dressed as one — a heading's accessible name is its text, and an `<input>` inside it would take
+  the title out of that name, which is how the page is found in every test. React must not own its children:
+  the initial text is rendered once from a ref and a later server value is written in by hand, never while
+  somebody is typing. `Enter` commits and gives up focus, `Escape` reverts, an empty title reverts rather
+  than saving; a `committed` ref stops the blur that follows `Enter` from saving twice. The description is
+  the same `MarkdownEditor` a Document uses, with the same transparent chrome, saving on blur and `⌘Enter`.
+  One `useAutosave` serves both, and one `role="status"` beside the key says Saving…/Saved or offers Retry.
+- **A Document is edited where it is read.** `IssueDocuments` has no read mode and no Save button: the
+  editor is the view, `onBlur` (focus leaving the frame entirely) and `⌘Enter` write a version through
+  `useAutosave`, and a `role="status"` line says Saving…/Saved or offers Retry. The editor there is passed
+  `border-transparent bg-transparent` — a Document is the page, not a field on it, so it takes the page's
+  own paper and ink; the input chrome stays for comments and notes, which are fields.
+- Every write carries `baseVersion`, so a save landing on top of somebody else's is refused with a
+  `CONFLICT` rather than quietly winning. Real simultaneous editing is `docs/plans/collaborative-documents.md`.
+- **A Gate ruling pins what it ruled on.** Every decision records the version each Document stood at
+  (`gate_decision_document`); the ruling reads "on spec v2", says so when the text has been written since,
+  and the History dialog badges the version a Gate approved or rejected. An approval is about words, and the
+  words keep moving.
+- The byline names **every** Member who has written a version ("written by Ada and Planner · last edit 4d"),
+  from `documents.versions`; older versions live behind a `⋯` (`More for <name>`) with History and Copy as
+  Markdown, and History is a dialog that reads a version and can Restore it.
 - **`components/tiptap-editor.tsx`** (lazy) is Tiptap 3.31 with `@tiptap/markdown` (GFM), StarterKit,
   `TableKit`, `TaskList`/`TaskItem`, lowlight code blocks, Placeholder. It emits `editor.getMarkdown()` only
   on a user transaction; a `value` changed from outside is loaded with `emitUpdate: false`, so an untouched
   load never re-serializes. `editorExtensions()` and `toMarkdown()` are exported so a test round-trips
   through a headless `Editor` with exactly the component's extensions.
+- **Formatting is a bubble over the selection, never a strip above the text** (`BubbleMenu` from
+  `@tiptap/react/menus`, block mode only). A Document, a description and a comment are read far more often
+  than they are formatted, and a toolbar that is always there is chrome on every one of those readings. The
+  bubble carries what a selection can _become_ — bold, italic, code, H1–H3, the three lists, quote, code
+  block; what a Human _inserts_ — a table, a divider — is the `/` menu, because those are not things a
+  selection turns into. It mounts only while something is selected, so a test with no layout never sees it:
+  `Toolbar` is exported and tested as a component against a headless `Editor`, and the editor tests assert
+  that nothing sits in the flow. Its accessible name is still `toolbar "Formatting"`.
 - **Mentions are text.** `@` opens a `@tiptap/suggestion` popup (`role="listbox" aria-label="Mentions"`)
   fed by `useMentionables()` (`lib/mentions.ts`: Members and Teams by handle) and inserts `@handle ` as plain
   text — no Mention node, so markdown round-trips exactly and the server resolves handles as before. `/` at a
-  line start opens the block menu (`aria-label="Commands"`) the same way. Two suggestion plugins need two
+  line start opens the block menu (`aria-label="Commands"`) the same way — Heading 1–3, the three lists,
+  table, code block, quote, divider. Both popups are `position: fixed` and belong to a **line**, not to the
+  viewport: `popup()` keeps the suggestion's `clientRect` and re-places on `scroll` (captured, because the
+  scroller is a pane or the peek rather than the window) and on `resize`. Without that the menu sits still
+  while the words move. Two suggestion plugins need two
   `PluginKey`s or ProseMirror throws.
 - **Highlighting is lowlight in both places**: `rehype-highlight` in `components/markdown.tsx`, the code
   block extension in the editor, colours from the palette in `index.css` (`.hljs-*`). Not shiki: its rehype
@@ -256,9 +322,10 @@ aria-label="<State> Gate|State"`, with `data-focused` and a `role="status"` bann
   `<ol aria-label="Activity">` in time order, skipping `comment.*` Events; a filter All / Comments / Changes;
   the composer is the inline `MarkdownEditor` with `id="new-comment"` and `aria-label="Comment"`, button
   "Comment". The lists once named "Timeline" and "Comments" are gone; tests query within "Activity".
-- **Mentions in Source too.** `MarkdownEditor` given `mentions` shows the same `role="listbox"
-aria-label="Mentions"` under its textarea when `@handle` is being typed there, so the Source view and the
-  comments test both have it.
+- **Mentions are the rich editor's own.** Tiptap's suggestion popup (`role="listbox" aria-label="Mentions"`)
+  is the only one now; the textarea's parallel list went with the Source view it belonged to. What is ours
+  is the candidate list, `useMentionables()`, and that is what the comments test asserts — the popup needs a
+  ProseMirror view to open, which is the one thing jsdom cannot give it.
 - **Sheet width.** shadcn's `SheetContent` sets `data-[side=right]:sm:max-w-sm`; to widen it, use the same
   variant chain (`data-[side=right]:sm:max-w-[720px]`) or the narrower class wins.
 
@@ -274,8 +341,8 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   `Textarea` named "Answer this Run" (⌘Enter sends) — a textarea, not the editor, because the runs test asks
   for one textbox and a reply to an Agent is a sentence. A Run waiting on a Gate shows "Open the Gate" and
   no answer box: the ruling card is the only place a Gate is decided (ADR-0004).
-- `MarkdownEditor`'s Source textarea is hidden with the HTML attribute, so it is never a second textbox to a
-  role query while a label still finds it.
+- `MarkdownEditor`'s markdown textarea is hidden with the HTML attribute, not a class, so it is never a
+  second textbox to a role query while a label still finds it.
 
 ## What slice 6 settled (the Inbox)
 
@@ -306,6 +373,38 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   peek (`?peek=`); the peek is `modal={false}` here and `onDragStart` closes it.
 - **Filters** are the shared `IssueFilters` with `hideProject` and `nativeAssignee` — the Assignee is a plain
   `<select>` on the Board because its test drives it with a change event.
+- **The frame is the viewport's height, and the page area is what scrolls** (2026-09-11). The sidebar
+  wrapper is `h-svh overflow-hidden` (passed from `routes/shell.tsx`, not edited into the kit) and the div
+  around the `Outlet` is `overflow-y-auto`. So the top bar and the sidebar stay put, a screen may ask for
+  `h-full` and mean it, and `min-h-0` on every flex ancestor is what lets that height reach the bottom of a
+  page. The Inbox's `h-[calc(100vh-2.75rem)]` became `h-full` with it.
+- **A Project is configured in Settings, not on itself** (2026-09-11). `Settings › Work › Projects`
+  (`routes/settings/projects.tsx`) is master–detail like Teams: `nav "Projects"` naming each by name and
+  key, `article "<Project>"` beside it, `?project=<KEY>` in the URL, and `ProjectSettingsForm`
+  (`routes/settings/project-settings.tsx`, moved from `routes/projects/`) as the pane. The Project's own
+  tabs are the work alone — Issues, Board, Workflow — and `/projects/$key/settings` redirects into
+  Settings, the way `settings/workflow` already redirected out of it. Creating a Project stays on
+  `/projects`, which is where you go to start one.
+- **A Project's header is its name, its description and its tabs** (2026-09-11). The Team that owns it is a
+  column on the Projects list under a heading that says so; above the title it was a bare word naming
+  nothing, so it is gone. `Archived` still shows there, because that is what the page has to say about
+  itself before its name.
+- **A Board spends no height on its own name.** The Project's Board tab has no `PageHeader`: the Project's
+  name is the page's `h1`, the tab says Board, and its filters sit bare the way the Issues tab's do. The
+  section also takes the page's bottom gutter back (`md:-mb-6 md:pb-2`, coupled to `p-6` in `shell.tsx`).
+- **A Board is a frame from `md` up** (`components/issue-board.tsx`, 2026-09-11): the strip is `md:h-full`,
+  a column `md:max-h-full`, and `KanbanColumnContent` is `md:min-h-0 md:flex-1 md:overflow-y-auto`, so the
+  cards scroll and the headers, the counts and the Workflow do not. Below `md` every one of those is off and
+  the Board grows with the page: the Project's chrome leaves about 300px on a phone, which is two cards.
+- **The Board's sideways scroll is the Board's** (`components/issue-board.tsx`, 2026-09-08). The scroller is
+  `relative`, because an absolutely positioned descendant is clipped by its containing block and not by
+  whatever scrolls — without it the `sr-only` words a `StateBadge` and an avatar carry are laid out against
+  the page and every column past the fold widens it. It wears `scrollbar-thin` (an `@utility` in `index.css`:
+  `scrollbar-width` for Firefox, `::-webkit-scrollbar` for WebKit, the thumb in `--border`). **The wheel
+  stays the browser's**: a listener that turned `deltaY` into `scrollLeft` shipped on 2026-09-08 and came
+  off on 2026-09-11, because a Board is taller than the window at least as often as it is wider and the
+  page could not be reached until the last column had gone by. Sideways is Shift and a wheel, a trackpad,
+  or the bar.
 
 ## What slice 8 settled (the Project)
 
@@ -335,6 +434,20 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
   h1s and control names are unchanged.
 - **Native selects stay in Settings** where a test drives them with a change event (schedules, routing
   rules, providers, approvers). Members and Agents tables show `MemberChip`s; the Sponsor is a chip.
+- **An Agent is created with its first key**, and the dialog that made it is the only place that key is
+  readable — the shape the invitation link already had. `agents.create` returns it (null where nothing can
+  mint one), so an Agent made over the API is born connectable too.
+- **Connecting is shown where the key is.** `ConnectAgent` (`components/connect-agent.tsx`, region
+  `Connect an Agent`, `tablist "Coding agent"`) renders this deevy's endpoint and one tab per coding agent —
+  Claude Code, OpenCode, Cursor CLI, Copilot CLI, `Anything else` — each with the file or the command it
+  takes. It is mounted three times, and `issuedKey` is what differs: in the create dialog and beside a
+  freshly issued key it writes that key into the command, because a key is readable once and no later screen
+  can fill it in; standing on `/settings/agents/$memberId` it names the key instead. The recipes are data in
+  `lib/mcp.ts` (which also owns `mcpEndpoint()`, read off the page), so a fifth is an entry there, and they
+  follow the runtime's own (docs/harnesses.md). **A recipe only gets a `variable` where that client really
+  expands one** — Claude Code `${VAR}`, OpenCode `{env:VAR}`; Cursor documents `${env:VAR}` and does not
+  resolve it for a remote server, and the Copilot CLI documents none, so both fall back to the placeholder
+  rather than to a reference deevy would be sent verbatim.
 - **The Agent detail** has Projects and API keys (regions kept), a Schedule section (`Wake`), Recent Runs
   (`runs.list({ agentMemberId })`), a danger section to Suspend/Reinstate, and — for an admin — a
   `Change Sponsor` select in the header (`agents.setSponsor`). The Agents table keeps its own
@@ -433,6 +546,33 @@ aria-label="Mentions"` under its textarea when `@handle` is being typed there, s
 
 - **The theme** is clean slate: see "Design language" above. `--face-*`, `--radius`, `--density` and
   `--tracking` are the knobs; a candidate review is a dev-only switcher on `<html data-…>`, deleted after.
+- **A rail section is named by `RailHeading`** (`components/rail-heading.tsx`, 2026-09-11): 12px, medium,
+  muted — the size deevy sets metadata in. State, Assignee, Labels, Parent, Children and Links each spelled
+  that out themselves and three had drifted to 14px, which is the size of a heading in the main column
+  (Documents, Runs, Activity) and not of a label on the rail. Inside Links the per-kind headings keep 12px
+  and lose the weight, so the section still leads.
+- **A chip inside a sentence is `size="inline"`** (`member-chip.tsx`, 2026-09-11): the name is the size of
+  the words either side of it and the mark beside it is the height of that line, so an Activity row reads as
+  one sentence rather than as a badge followed by smaller text. **A size budgets for the kind ring**, which
+  `ring-1 ring-offset-1` paints outside the box — 2px on every side, so `size-3.5` painted 18.7px on a 20px
+  line. `inline` is `size-3` with `ring-offset-0`, which lands at 14.6. The ring classes are composed
+  _before_ `style.avatar` for that reason: the size has the last word. `xs` and up stay what they were, for
+  a chip that stands on its own in a row or a cell.
+- **A timeline shows no avatars** (`nameOnly` on the chip, 2026-09-12): the Activity stream already carries
+  a column of tone dots down its left edge, and a second column of pictures beside them is one more thing to
+  read past on every line. The name alone, with an Agent's in the Agent colour and the kind still in the
+  tooltip. Elsewhere — a byline, a Run header, a table — the avatar stays.
+- **The tone dot is a bullet, centred on its line with `translate-y`, never `top`** (`lib/event-text.ts`):
+  `size-2.5` over the kit's `size-4` — 10.5px at deevy's density, punctuation down the edge of the Activity
+  rather than the first thing on every line — pushed 4.75px down, half the difference between it and the
+  20px line box. The translate is not a style choice: the ReUI `Timeline` sets
+  `group-data-[orientation=vertical]/timeline:top-0` on the indicator, and a variant beats a plain `top-*`
+  wherever it sits in the class list. Change the size and measure the pair in the browser again.
+- **A row of `items-baseline` wants children that have a baseline.** An `inline-flex items-center` button
+  has none of its own, so the browser synthesises one from whatever is inside it: the folded "N steps"
+  button pushed its own row 2.3px taller and its neighbours below both the button and the dot. An icon that
+  belongs in a line of text goes _in_ the line — `inline size-3.5 align-[-0.1875em]` — not in a flex box
+  beside it.
 - **Wording lives in `lib/event-text.ts` and `lib/notification-text.ts`.** A screen never phrases an Event
   itself; new Event kinds get a case in `describeEvent` (with a unit test) and new payload fields carry
   names beside ids so the log reads without lookups. Activity is a ReUI `Timeline` rendered as the
@@ -500,7 +640,7 @@ Tests in `apps/web/tests` query by role and accessible name, mock `lib/orpc` wit
 slice says otherwise: `Sign in with GitHub`; `New Issue` / `Create Issue` / `Add Issue`; `role=table` rows
 `DEV-1 · title · Build · Ada Lovelace`; `role=region` per Board column named by State with visible `Gate`;
 `Decide the Intent Gate on DEV-1`; `role=group` `… Gate` with `data-focused` for `?gate=`; `Note`, `Approve`,
-`Reject`, `Gate decisions`, `State`; `tablist Documents`, `Edit intent`, `Body`, `Save version`, `Version`;
+`Reject`, `Gate decisions`, `State`; `tablist Documents`, `Body`, `More for <name>`, `Versions of <name>`, `Restore v<n>`;
 `Notifications for DEV-1`, `Mark read`, `Mark all read`, `N unread`; `Comment` (textarea and button),
 `listbox Mentions`; `article` named by Run id, `Answer this Run`, link `/gate/`; `Add a link`, lists
 `Pull requests`/`Links`; `role=group Labels`; the settings h1s (`Workspace`, `Members`, `Agents`, …),
@@ -524,5 +664,5 @@ Event log, now named by a `<label>` rather than an `aria-label`.
 Round 2 added these names: `list "Notifications"` with `checkbox "Select <verb>"` and `toolbar "Selection"`
 (Inbox); `button "List"` / `button "Board"` in `group "Filters"` and `region "<State>"` columns on the
 Workspace board; `combobox "Labels"` with `button "Remove <label>"` chips; `button "Edit <State>"`,
-`form "<State>"`, `combobox "Approvers for <State>"`, `textbox "Template for <State>"` (Source tab) and the
+`form "<State>"`, `combobox "Approvers for <State>"`, `textbox "Template for <State>"` (ask for the textarea) and the
 `Save Workflow` / `Add State` / `Reset` footer in the Workflow editor; `status` on the Project settings form.

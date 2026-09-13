@@ -7,7 +7,8 @@ import { Markdown } from "@tiptap/markdown";
 import { PluginKey } from "@tiptap/pm/state";
 import { EditorContent, ReactRenderer, useEditor, useEditorState } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
-import Suggestion, { type SuggestionOptions, type SuggestionProps } from "@tiptap/suggestion";
+import { BubbleMenu } from "@tiptap/react/menus";
+import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import {
   Bold,
   Code,
@@ -148,11 +149,34 @@ function popup(label: string): SuggestionOptions<SuggestionItem>["render"] {
   return () => {
     let renderer: ReactRenderer<ListHandle> | null = null;
     let host: HTMLDivElement | null = null;
-    const place = (props: SuggestionProps<SuggestionItem>) => {
-      const rect = props.clientRect?.();
+    /*
+     * Where the caret is, asked again each time rather than remembered: the
+     * popup is `fixed` to the viewport and the line it belongs to is not, so
+     * anything that moves the line — a scroll, a resize — has to move the
+     * popup with it, or the menu drifts away from the words it is about.
+     */
+    let caret: (() => DOMRect | null) | null = null;
+    const place = () => {
+      const rect = caret?.();
       if (!host || !rect) return;
       host.style.left = `${String(rect.left)}px`;
       host.style.top = `${String(rect.bottom + 4)}px`;
+    };
+    // Capture: the scroll that moves the caret is usually a pane's or the
+    // peek's rather than the window's, and those do not bubble.
+    const follow = () => place();
+    const watch = () => {
+      window.addEventListener("scroll", follow, true);
+      window.addEventListener("resize", follow);
+    };
+    const unwatch = () => {
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+    };
+    const close = () => {
+      unwatch();
+      host?.remove();
+      host = null;
     };
     return {
       onStart(props) {
@@ -165,24 +189,27 @@ function popup(label: string): SuggestionOptions<SuggestionItem>["render"] {
         host.style.zIndex = "50";
         host.appendChild(renderer.element);
         document.body.appendChild(host);
-        place(props);
+        caret = props.clientRect ?? null;
+        place();
+        watch();
       },
       onUpdate(props) {
         renderer?.updateProps({ items: props.items, command: props.command, label });
-        place(props);
+        caret = props.clientRect ?? null;
+        place();
       },
       onKeyDown({ event }) {
         if (event.key === "Escape") {
-          host?.remove();
+          close();
           return true;
         }
         return renderer?.ref?.onKeyDown(event) ?? false;
       },
       onExit() {
-        host?.remove();
+        close();
         renderer?.destroy();
         renderer = null;
-        host = null;
+        caret = null;
       },
     };
   };
@@ -458,7 +485,19 @@ export default function TiptapEditor({
 
   return (
     <div data-slot="markdown-editor" className="flex flex-col">
-      {editor && mode === "block" ? <Toolbar editor={editor} /> : null}
+      {/*
+       * The formatting is where the words are: a bubble over the selection
+       * rather than a strip above the editor. A Document, a description and a
+       * comment are all read far more often than they are formatted, and a
+       * toolbar that is always there is chrome on every one of those readings.
+       * What to *insert* — a table, a divider, a code block — is the `/` menu,
+       * which is where it belongs: those are not things a selection becomes.
+       */}
+      {editor && mode === "block" ? (
+        <BubbleMenu editor={editor} options={{ placement: "top", offset: 8 }}>
+          <Toolbar editor={editor} />
+        </BubbleMenu>
+      ) : null}
       <EditorContent editor={editor} />
     </div>
   );
@@ -491,7 +530,12 @@ function ToolButton({
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+/**
+ * What a selection can become. Rendered inside a `BubbleMenu`, so it exists
+ * only while there is something selected — exported because that makes it
+ * unreachable to a test with no layout, and the buttons are worth testing.
+ */
+export function Toolbar({ editor }: { editor: Editor }) {
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -513,7 +557,7 @@ function Toolbar({ editor }: { editor: Editor }) {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex flex-wrap items-center gap-0.5 border-b px-1 py-1"
+      className="flex items-center gap-0.5 rounded-md border bg-popover p-0.5 shadow-md"
     >
       <ToolButton label="Bold" active={state.bold} onClick={() => chain().toggleBold().run()}>
         <Bold />
@@ -582,15 +626,6 @@ function Toolbar({ editor }: { editor: Editor }) {
         onClick={() => chain().toggleCodeBlock().run()}
       >
         <SquareCode />
-      </ToolButton>
-      <ToolButton
-        label="Table"
-        onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-      >
-        <TableIcon />
-      </ToolButton>
-      <ToolButton label="Divider" onClick={() => chain().setHorizontalRule().run()}>
-        <Minus />
       </ToolButton>
     </div>
   );

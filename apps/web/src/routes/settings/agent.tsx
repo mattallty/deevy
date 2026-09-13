@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ConnectAgent } from "@/components/connect-agent";
 import { MemberChip } from "@/components/member-chip";
 import { RunStatus, type RunStatusValue } from "@/components/run-status";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
@@ -96,6 +97,7 @@ export function AgentPage({ memberId }: { memberId: string }) {
     >
       <Grants memberId={memberId} onChanged={refresh} />
       <Keys memberId={memberId} onChanged={refresh} />
+      <Connect />
 
       <SettingsSection title="Schedule">
         <div className="flex flex-col gap-2">
@@ -329,11 +331,13 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
   return (
     <SettingsSection aria-label="API keys" title="API keys">
       {minted ? (
-        <div className="flex flex-col gap-1 rounded-md border border-gate/50 bg-gate/10 p-3">
+        <div className="flex flex-col gap-3 rounded-md border border-gate/50 bg-gate/10 p-3">
           <p className="text-sm font-medium">Copy this now: it is the only time you will see it.</p>
           <code className="overflow-x-auto rounded bg-background px-2 py-1 font-mono text-sm">
             {minted}
           </code>
+          {/* And what it is for, while deevy can still write it into the command. */}
+          <ConnectAgent issuedKey={minted} />
         </div>
       ) : null}
 
@@ -384,6 +388,25 @@ function Keys({ memberId, onChanged }: { memberId: string; onChanged: () => Prom
       {(issue.error ?? revoke.error) ? (
         <p className="text-sm text-destructive">{(issue.error ?? revoke.error)?.message}</p>
       ) : null}
+    </SettingsSection>
+  );
+}
+
+/**
+ * Where an Agent's key is used: one tab per coding agent, each with the file
+ * or the command that points it at this deevy (`components/connect-agent.tsx`).
+ * It sits on the Agent's own page and not on the list, because connecting is
+ * something you do to one Agent with one key. With no key in hand it can only
+ * name one, so the same block appears beside a key the moment it is issued.
+ */
+function Connect() {
+  return (
+    <SettingsSection
+      aria-label="Connect an Agent"
+      title="Connect an Agent"
+      description="Point a coding agent at this deevy and hand it the key. Every tool speaks MCP; only where the configuration lives differs."
+    >
+      <ConnectAgent />
     </SettingsSection>
   );
 }

@@ -1,9 +1,9 @@
 import { Editor } from "@tiptap/core";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { Markdown, proseClassName } from "../src/components/markdown.tsx";
 import { MarkdownEditor } from "../src/components/markdown-editor.tsx";
-import { editorExtensions, toMarkdown } from "../src/components/tiptap-editor.tsx";
+import { editorExtensions, Toolbar, toMarkdown } from "../src/components/tiptap-editor.tsx";
 
 /** Markdown in, through exactly the extensions the component uses, markdown out. */
 function roundTrip(markdown: string, mode: "block" | "inline" = "block"): string {
@@ -140,12 +140,13 @@ describe("MarkdownEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("emits what is typed into Source, and ⌘Enter submits", () => {
+  it("emits what is typed into the markdown underneath, and ⌘Enter submits", () => {
     const onChange = vi.fn();
     const onSubmit = vi.fn();
     render(<MarkdownEditor value="" onChange={onChange} onSubmit={onSubmit} mode="inline" />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
+    // The hidden textarea: the same text as the editor, and the one a test can
+    // type into. There is no tab to reach it by any more.
     const source = screen.getByLabelText("Body", { selector: "textarea" });
     fireEvent.change(source, { target: { value: "A note" } });
     expect(onChange).toHaveBeenCalledWith("A note");
@@ -153,9 +154,39 @@ describe("MarkdownEditor", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("has a toolbar in block mode and none inline", async () => {
+  it("turns the selection into what the bubble's buttons say", () => {
+    const editor = new Editor({
+      extensions: editorExtensions({ mode: "block" }),
+      content: "Some words",
+      contentType: "markdown",
+    });
+    render(<Toolbar editor={editor} />);
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    editor.commands.selectAll();
+
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Bold" }));
+    expect(editor.isActive("bold")).toBe(true);
+    // `focus()` in a chain puts the caret back where jsdom thinks it is, so
+    // the selection is made again rather than assumed to survive.
+    editor.commands.selectAll();
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Heading 2" }));
+    // What the Document would be saved as, which is the thing that matters:
+    // `isActive` is false for a selection that runs past the heading.
+    expect(toMarkdown(editor).trim()).toBe("## **Some words**");
+
+    // Inserting a table or a divider is not something a selection becomes:
+    // those live in the `/` menu, and the bubble does not carry them.
+    expect(within(toolbar).queryByRole("button", { name: "Table" })).toBeNull();
+    expect(within(toolbar).queryByRole("button", { name: "Divider" })).toBeNull();
+    editor.destroy();
+  });
+
+  it("keeps no toolbar in the flow: formatting is a bubble over the selection", async () => {
     const block = render(<MarkdownEditor value="x" onChange={() => {}} />);
-    expect(await screen.findByRole("toolbar", { name: "Formatting" })).toBeTruthy();
+    await waitFor(() => expect(document.querySelector(".tiptap")).toBeTruthy());
+    // The bubble exists only while something is selected, so an editor nobody
+    // has selected anything in carries no toolbar at all — which is the point.
+    expect(screen.queryByRole("toolbar")).toBeNull();
     block.unmount();
 
     render(<MarkdownEditor value="x" onChange={() => {}} mode="inline" />);
@@ -163,15 +194,16 @@ describe("MarkdownEditor", () => {
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
-  it("names the rich textbox and points the id at the view that is showing", async () => {
+  it("names the rich textbox, and is the only textbox anything can see", async () => {
     render(<MarkdownEditor id="body" aria-label="Comment" value="" onChange={() => {}} />);
     const rich = await screen.findByRole("textbox", { name: "Comment" });
     expect(rich.classList.contains("tiptap")).toBe(true);
+    // The id is the editor's: it is the control a Label points at, and now the
+    // only one on screen. The textarea under it is hidden, so nothing asking by
+    // role is offered two places to write the same text.
     expect(rich.id).toBe("body");
+    expect(screen.getAllByRole("textbox", { name: "Comment" })).toHaveLength(1);
     expect(screen.getByLabelText("Comment", { selector: "textarea" }).id).not.toBe("body");
-
-    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
-    expect(screen.getByLabelText("Comment", { selector: "textarea" }).id).toBe("body");
-    expect(rich.id).toBe("");
+    expect(screen.queryByRole("tab", { name: "Source" })).toBeNull();
   });
 });

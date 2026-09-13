@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Bot } from "lucide-react";
 import { DataTable, type DataColumn } from "@/components/data-table";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ConnectAgent } from "@/components/connect-agent";
 import { MemberChip } from "@/components/member-chip";
-import { SettingsPage, SettingsSection } from "@/components/settings-page";
+import { SettingsPage } from "@/components/settings-page";
 import { orpc } from "@/lib/orpc.ts";
 import {
   Select,
@@ -27,11 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-/** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
-function mcpEndpoint(): string {
-  return `${window.location.origin}/mcp`;
-}
 
 /**
  * The intervals a schedule offers. Anything finer than a quarter of an hour is
@@ -210,14 +206,6 @@ export function AgentsPage() {
       <NewAgent open={creating} onOpenChange={setCreating} />
       {failed ? <p className="text-sm text-destructive">{failed.message}</p> : null}
 
-      <SettingsSection aria-label="Connect an Agent" title="Connect an Agent">
-        <code className="rounded bg-muted px-2 py-1 text-sm">{mcpEndpoint()}</code>
-        <p className="text-sm text-muted-foreground">Or add it to Claude Code with:</p>
-        <code className="overflow-x-auto rounded bg-muted px-2 py-1 text-sm">
-          {`claude mcp add --transport http deevy ${mcpEndpoint()} --header "Authorization: Bearer <the key>"`}
-        </code>
-      </SettingsSection>
-
       <DataTable
         aria-label="Agents"
         columns={columns}
@@ -239,31 +227,90 @@ export function AgentsPage() {
  * Creating an Agent makes the Human who did it accountable for it (ADR-0001),
  * so there is no Sponsor to choose here. The handle is slugged from the name
  * when it is left out.
+ *
+ * The Agent is created with its first key, and this dialog is the only place
+ * that key is ever readable — the same bargain the invitation link makes, for
+ * the same reason: deevy keeps a hash and cannot show one twice.
  */
 function NewAgent({ open, onOpenChange }: { open: boolean; onOpenChange: (to: boolean) => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
+  const [created, setCreated] = useState<{ id: string; name: string; key: string | null } | null>(
+    null,
+  );
+
+  const close = (to: boolean) => {
+    if (!to) {
+      setName("");
+      setHandle("");
+      setCreated(null);
+    }
+    onOpenChange(to);
+  };
 
   const create = useMutation(
     orpc.agents.create.mutationOptions({
-      onSuccess: async () => {
-        setName("");
-        setHandle("");
-        onOpenChange(false);
+      onSuccess: async (agent: {
+        id: string;
+        user: { name: string };
+        key: { key: string } | null;
+      }) => {
+        setCreated({ id: agent.id, name: agent.user.name, key: agent.key?.key ?? null });
         await queryClient.invalidateQueries({ queryKey: orpc.agents.key() });
       },
     }),
   );
 
+  if (created) {
+    return (
+      <Dialog open={open} onOpenChange={close}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{created.name} is ready</DialogTitle>
+            <DialogDescription>
+              {created.key
+                ? "Its first key is below. Copy it now: this is the only time you will see it."
+                : "Grant it a Project to work in, and issue it a key from its own page."}
+            </DialogDescription>
+          </DialogHeader>
+          {created.key ? (
+            <div className="flex flex-col gap-3 rounded-md border border-gate/50 bg-gate/10 p-3">
+              <code className="overflow-x-auto rounded bg-background px-2 py-1 font-mono text-sm">
+                {created.key}
+              </code>
+              {/* The command it is for, with the key already in it: after this
+                  dialog closes there is nothing left to fill it in with. */}
+              <ConnectAgent issuedKey={created.key} />
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => close(false)}>
+              Done
+            </Button>
+            {/* A real link dressed as a button, the way the not-found page's ways out are. */}
+            <Link
+              to="/settings/agents/$memberId"
+              params={{ memberId: created.id }}
+              onClick={() => close(false)}
+              className={buttonVariants()}
+            >
+              Open {created.name}
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New Agent</DialogTitle>
           <DialogDescription>
-            You&apos;ll be its Sponsor. Once it&apos;s created, grant it a Project to work in and
-            issue it an API key so it can connect.
+            You&apos;ll be its Sponsor. It is created with its first API key, which you will see
+            once; then grant it a Project to work in.
           </DialogDescription>
         </DialogHeader>
         <form

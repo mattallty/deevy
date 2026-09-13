@@ -110,7 +110,7 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh overflow-hidden">
       <NewIssueProvider>
         <Sidebar collapsible="icon">
           <SidebarHeader>
@@ -265,9 +265,18 @@ export function AppShell({ workspaceName, memberName, member }: ShellProps) {
             {/* In the top bar, so it is one click from anywhere and `c` from anywhere. */}
             <NewIssueButton variant="default" size="default" withShortcut />
           </div>
-          {/* SidebarInset is the <main>; this is the page inside it. */}
+          {/*
+           * SidebarInset is the <main>; this is the page inside it, and it is
+           * what scrolls. The frame is exactly the viewport's height (below),
+           * so the sidebar and the top bar stay put and a screen that asks for
+           * `h-full` — the Board, whose columns scroll on their own — gets the
+           * room that is actually there rather than growing the window.
+           */}
           <div
-            className={cn("min-w-0 flex-1", bleed ? "flex min-h-0 flex-col" : "flex flex-col p-6")}
+            className={cn(
+              "min-w-0 flex-1 overflow-y-auto",
+              bleed ? "flex min-h-0 flex-col" : "flex flex-col p-6",
+            )}
           >
             <Outlet />
           </div>

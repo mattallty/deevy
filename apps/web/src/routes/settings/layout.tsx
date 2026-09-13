@@ -32,7 +32,10 @@ export const settingsNav: Array<{ group: string; pages: SettingsNavPage[] }> = [
   },
   {
     group: "Work",
-    pages: [{ label: "Labels", to: "/settings/labels" }],
+    pages: [
+      { label: "Projects", to: "/settings/projects" },
+      { label: "Labels", to: "/settings/labels" },
+    ],
   },
   {
     group: "Agents and delivery",

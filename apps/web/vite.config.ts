@@ -9,6 +9,22 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 // apps/server; in dev it proxies the API to the Node server.
 const workers = process.env.DEEVY_TARGET === "workers";
 
+/**
+ * Where the SPA's dev proxy sends `/api`, `/rpc`, `/mcp` and the rest: the Node
+ * server, on the port that server itself listens on. `DEEVY_PORT` is one
+ * variable for both halves — the server reads it to bind, this reads it to
+ * find — so a machine where 3000 is taken (another project, another checkout of
+ * deevy) moves both with one line in `.env` instead of patching this file.
+ *
+ * Read from the environment rather than the root `.env`: the dev task runs
+ * through `vp run -r --parallel dev`, which starts the server with
+ * `--env-file-if-exists=../../.env`, and Vite's own config is loaded before any
+ * of that. So an override for the proxy belongs in the shell or the launch
+ * configuration, and the default stays the port `.env.example` ships.
+ */
+const apiOrigin =
+  process.env.DEEVY_API_ORIGIN ?? `http://localhost:${process.env.DEEVY_PORT ?? "3000"}`;
+
 export default defineConfig({
   run: {
     // Cached, and per package: see packages/core/vite.config.ts.
@@ -42,20 +58,38 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   server: {
-    port: 5173,
+    /*
+     * The port the preview launcher picked, when there is one: it hands the
+     * child a free `PORT` (`.claude/launch.json`, `autoPort`) and then opens
+     * that address. `strictPort` because the alternative is worse — Vite
+     * quietly moving to 5174 leaves `BETTER_AUTH_URL` pointing at a server
+     * nobody is running, and sign-in fails somewhere much further from here.
+     */
+    port: Number(process.env.PORT) || 5173,
+    strictPort: true,
     proxy: {
-      "/api": "http://localhost:3000",
-      "/rpc": "http://localhost:3000",
-      "/healthz": "http://localhost:3000",
+      "/api": apiOrigin,
+      "/rpc": apiOrigin,
+      "/healthz": apiOrigin,
       // An MCP client pointed at the dev origin has to reach the server, and
       // discovery has to answer from the same origin as the endpoint it
       // describes, or the OAuth dance in slice 7 looks at the wrong server.
-      "/mcp": "http://localhost:3000",
-      "/.well-known": "http://localhost:3000",
+      "/mcp": apiOrigin,
+      "/.well-known": apiOrigin,
     },
   },
   test: {
     environment: "jsdom",
+    /**
+     * Vitest's 5s default is the wrong budget here for the same reason it was
+     * wrong for `apps/agent`: a case in this suite mounts the whole router, a
+     * QueryClient and a screen's worth of queries in jsdom. Alone that is under
+     * a second; under `vp run -r test`, with six other packages on the same
+     * CPU, cases that mount an Issue have been seen past 5s and failing on the
+     * clock rather than on an assertion. A test that genuinely hangs still
+     * fails, twenty seconds later rather than five.
+     */
+    testTimeout: 20_000,
     include: ["tests/**/*.test.tsx"],
     setupFiles: ["./tests/setup.ts"],
     globals: true,

@@ -372,7 +372,7 @@ export function InboxPage({
   }
 
   return (
-    <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-2.75rem)]">
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel defaultSize={34} minSize={24} className="min-w-0">
         {list}
       </ResizablePanel>

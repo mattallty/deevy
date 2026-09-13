@@ -234,6 +234,37 @@ describe("the Issues home", () => {
     expect(router.state.location.pathname).toBe("/issues/DEV-1");
   });
 
+  it("lets the peek be dragged wider, and remembers how wide", async () => {
+    // jsdom has no layout, so the drag itself is the arrow keys the handle
+    // offers for the same purpose: what is asserted is the width it settles on
+    // and that it survives the next Issue, not the pointer arithmetic.
+    const router = await mountAt("/?peek=DEV-1", { member: { ...ada, image: null } });
+    const peek = await screen.findByRole("dialog", { name: /DEV-1/ });
+    const handle = within(peek).getByRole("separator", { name: "Resize the Issue panel" });
+
+    const widthOf = (element: HTMLElement) => element.style.getPropertyValue("--peek-width");
+    // Until somebody drags it, the width is the stylesheet's own expression.
+    expect(widthOf(peek)).toContain("45vw");
+
+    fireEvent.keyDown(handle, { key: "ArrowLeft", shiftKey: true });
+    const dragged = Number.parseInt(widthOf(peek), 10);
+    const floor = Math.max(56 * 16, window.innerWidth * 0.45);
+    expect(dragged).toBeGreaterThan(floor);
+    expect(dragged).toBeLessThanOrEqual(window.innerWidth * 0.92);
+    expect(window.localStorage.getItem("deevy:peek-width")).toBe(String(dragged));
+
+    // Home puts it back to the width it opens at, and no narrower.
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(Number.parseInt(widthOf(peek), 10)).toBe(Math.round(floor));
+
+    await act(async () => {
+      await router.navigate({ to: "/", search: { peek: "OPS-1" } });
+      await router.load();
+    });
+    const next = await screen.findByRole("dialog", { name: /OPS-1/ });
+    expect(Number.parseInt(widthOf(next), 10)).toBe(Math.round(floor));
+  });
+
   it("opens a row by clicking it", async () => {
     const router = await mountAt("/", { member: { ...ada, image: null } });
     const table = await screen.findByRole("table", { name: "Issues" });

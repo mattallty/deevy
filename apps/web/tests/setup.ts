@@ -1,3 +1,5 @@
+import { configure } from "@testing-library/react";
+
 /**
  * jsdom implements neither matchMedia nor ResizeObserver, which the shadcn
  * Sidebar (through use-mobile) and Sonner's Toaster both reach for on mount,
@@ -69,3 +71,14 @@ if (!Range.prototype.getBoundingClientRect) {
 if (!document.elementFromPoint) {
   document.elementFromPoint = () => null;
 }
+
+/**
+ * `findBy*` and `waitFor` default to one second, which is a budget for the
+ * machine rather than for the code: a case here mounts the router, a
+ * QueryClient and a screen's worth of queries, and under `vp run -r test` with
+ * six other packages on the same CPU that has been seen past a second — the
+ * failure is "unable to find" a line the page does render, a moment later.
+ * Five seconds, well inside the 20s `testTimeout`, so a test that genuinely
+ * never renders still fails and says what was missing.
+ */
+configure({ asyncUtilTimeout: 5_000 });

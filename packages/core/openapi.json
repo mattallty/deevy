@@ -3286,6 +3286,79 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "key": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "start": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "x-native-type": "date"
+                            },
+                            "lastRequestAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "expiresAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "key": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "start",
+                            "createdAt",
+                            "lastRequestAt",
+                            "expiresAt",
+                            "enabled",
+                            "key"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -3302,7 +3375,8 @@
                     "sponsor",
                     "webhookUrl",
                     "scheduleMinutes",
-                    "grantedProjectIds"
+                    "grantedProjectIds",
+                    "key"
                   ],
                   "additionalProperties": false
                 }
@@ -9042,6 +9116,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -9051,7 +9146,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -10784,6 +10880,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -10793,7 +10910,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -12056,6 +12174,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -12065,7 +12204,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -13309,6 +13449,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -13318,7 +13479,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -14565,6 +14727,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -14574,7 +14757,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -15822,6 +16006,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -15831,7 +16036,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -17079,6 +17285,27 @@
                             "type": "string",
                             "format": "date-time",
                             "x-native-type": "date"
+                          },
+                          "documents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -17088,7 +17315,8 @@
                           "decision",
                           "note",
                           "memberId",
-                          "createdAt"
+                          "createdAt",
+                          "documents"
                         ],
                         "additionalProperties": false
                       }
@@ -17632,6 +17860,115 @@
         }
       }
     },
+    "/issues/{issueKey}/documents/{name}/versions": {
+      "get": {
+        "operationId": "documents.versions",
+        "summary": "Every version of a Document: who wrote it and when, without the body",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "issueKey",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "required": true,
+            "name": "name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "authorMemberId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "writtenAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "x-native-type": "date"
+                          },
+                          "rulings": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "decision": {
+                                  "type": "string",
+                                  "enum": [
+                                    "approved",
+                                    "rejected"
+                                  ]
+                                },
+                                "stateId": {
+                                  "type": "string"
+                                },
+                                "memberId": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "x-native-type": "date"
+                                }
+                              },
+                              "required": [
+                                "decision",
+                                "stateId",
+                                "memberId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "authorMemberId",
+                          "writtenAt",
+                          "rulings"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "versions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/issues/{issueKey}/documents/{name}": {
       "get": {
         "operationId": "documents.get",
@@ -17710,6 +18047,11 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "writtenAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
                     }
                   },
                   "required": [
@@ -17721,7 +18063,8 @@
                     "updatedAt",
                     "version",
                     "body",
-                    "authorMemberId"
+                    "authorMemberId",
+                    "writtenAt"
                   ],
                   "additionalProperties": false
                 }
@@ -17761,6 +18104,11 @@
                   "body": {
                     "type": "string",
                     "maxLength": 100000
+                  },
+                  "baseVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
@@ -17815,6 +18163,11 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "writtenAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "x-native-type": "date"
                     }
                   },
                   "required": [
@@ -17826,7 +18179,8 @@
                     "updatedAt",
                     "version",
                     "body",
-                    "authorMemberId"
+                    "authorMemberId",
+                    "writtenAt"
                   ],
                   "additionalProperties": false
                 }

@@ -284,9 +284,15 @@ export function ActivityStream({ issueId, issueKey }: { issueId: string; issueKe
   );
 }
 
+/**
+ * Who did the thing, in a line about it. No avatar: a timeline is already a
+ * column of marks down its left edge, and a second column of pictures beside
+ * it is one more thing to read past on every line. An Agent's name is in the
+ * Agent colour, which is the signal its ring carries everywhere else.
+ */
 function Who({ member }: { member: ChipMember | null }) {
   return member ? (
-    <MemberChip member={member} size="xs" />
+    <MemberChip member={member} size="inline" nameOnly />
   ) : (
     <span className="text-muted-foreground">deevy</span>
   );
@@ -345,13 +351,24 @@ function FoldedSteps({ step, entries }: { step: number; entries: EventEntry[] })
           className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-normal"
         >
           <Who member={first.actor} />
+          {/*
+           * The chevron rides in the text rather than in a flex box beside it.
+           * A row of `items-baseline` asks every child for a baseline, and an
+           * `inline-flex items-center` button has none of its own — the browser
+           * synthesises one from the icon, which pushed the name 2.3px below
+           * the button and the whole line below its dot.
+           */}
           <button
             type="button"
             aria-expanded={open}
-            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
             onClick={() => setOpen((current) => !current)}
           >
-            {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {open ? (
+              <ChevronDown className="mr-1 inline size-3.5 align-[-0.1875em]" />
+            ) : (
+              <ChevronRight className="mr-1 inline size-3.5 align-[-0.1875em]" />
+            )}
             {entries.length} steps
           </button>
           <span className="font-mono text-xs text-muted-foreground/70">{ago(last.at)}</span>

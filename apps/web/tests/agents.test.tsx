@@ -45,7 +45,21 @@ const stub = vi.hoisted(() => ({
 }));
 
 const calls = vi.hoisted(() => ({
-  create: vi.fn(async (_input: { name: string; handle?: string | null }) => ({ id: "m-new" })),
+  create: vi.fn(async (input: { name: string; handle?: string | null }) => ({
+    id: "m-new",
+    handle: input.handle ?? "reviewer",
+    user: { id: "u-new", name: input.name, email: "reviewer@agents.invalid", image: null },
+    key: {
+      id: "k-first",
+      name: "first key",
+      start: "deevy_sk_abcd",
+      createdAt: new Date(),
+      lastRequestAt: null,
+      expiresAt: null,
+      enabled: true,
+      key: "deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS",
+    },
+  })),
   suspend: vi.fn(async (_input: { memberId: string }) => ({})),
   reinstate: vi.fn(async (_input: { memberId: string }) => ({})),
 }));
@@ -94,16 +108,6 @@ describe("the Agents settings page", () => {
   });
 });
 
-describe("connecting an Agent over MCP", () => {
-  it("gives the endpoint and a command to paste, so a Sponsor need not guess", async () => {
-    await mountAt("/settings/agents");
-
-    const panel = await screen.findByRole("region", { name: /connect an agent/i });
-    expect(within(panel).getByText(`${window.location.origin}/mcp`)).toBeTruthy();
-    expect(within(panel).getByText(/claude mcp add/i).textContent).toContain("--transport http");
-  });
-});
-
 describe("an Agent's schedule", () => {
   it("shows the interval each Agent wakes on, and sets one", async () => {
     await mountAt("/settings/agents");
@@ -134,6 +138,17 @@ describe("sponsoring an Agent", () => {
 
     await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(1));
     expect(calls.create.mock.calls[0]?.[0]).toMatchObject({ name: "Reviewer" });
+
+    // The key it was created with, in the one place it is ever readable — and
+    // the command it is for, with the key already written into it, because
+    // afterwards nothing can fill that in.
+    const shown = await screen.findByRole("dialog");
+    expect(within(shown).getByText("deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS")).toBeTruthy();
+    expect(within(shown).getByText(/only time you will see it/i)).toBeTruthy();
+    const command = within(shown).getByText(/claude mcp add/i);
+    expect(command.textContent).toContain("Bearer deevy_sk_THE_ONLY_TIME_YOU_SEE_THIS");
+    expect(within(shown).getByRole("tablist", { name: /coding agent/i })).toBeTruthy();
+    expect(within(shown).getByRole("link", { name: /open reviewer/i })).toBeTruthy();
   });
 
   it("stops one that is working, and brings back one that is not", async () => {

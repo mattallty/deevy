@@ -24,7 +24,7 @@ import { NotFoundPage } from "./routes/not-found.tsx";
 import { IssuePage } from "./routes/issues/issue.tsx";
 import { BoardPage } from "./routes/projects/board.tsx";
 import { ProjectIssuesTab, ProjectLayout } from "./routes/projects/project.tsx";
-import { ProjectSettingsPage } from "./routes/projects/project-settings.tsx";
+import { ProjectsSettingsPage } from "./routes/settings/projects.tsx";
 import { WorkflowPage } from "./routes/projects/workflow.tsx";
 import { ChannelsPage } from "./routes/settings/channels.tsx";
 import { EventLogPage } from "./routes/settings/events.tsx";
@@ -152,11 +152,13 @@ const workflowRoute = createRoute({
     return <WorkflowPage projectKey={projectRoute.useParams().key} />;
   },
 });
+// Where a Project's settings used to be a tab; they are an entity's section in
+// Settings now, and links in the wild keep working.
 const projectSettingsRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "settings",
-  component: function ProjectSettings() {
-    return <ProjectSettingsPage projectKey={projectRoute.useParams().key} />;
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: "/settings/projects", search: { project: params.key } });
   },
 });
 // Where the Workflow editor used to live; links in the wild keep working.
@@ -208,6 +210,23 @@ const teamsRoute = createRoute({
       <TeamsPage
         selected={team ?? null}
         onSelect={(next) => void navigate({ search: () => (next ? { team: next } : {}) })}
+      />
+    );
+  },
+});
+const projectsSettingsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "projects",
+  // `?project=` names the Project being configured, the way `?team=` does.
+  validateSearch: (search: Record<string, unknown>) =>
+    typeof search.project === "string" && search.project ? { project: search.project } : {},
+  component: function ProjectsSettings() {
+    const { project } = projectsSettingsRoute.useSearch();
+    const navigate = projectsSettingsRoute.useNavigate();
+    return (
+      <ProjectsSettingsPage
+        selected={project ?? null}
+        onSelect={(next) => void navigate({ search: () => (next ? { project: next } : {}) })}
       />
     );
   },
@@ -311,6 +330,7 @@ const routeTree = rootRoute.addChildren([
     settingsIndexRoute,
     workspaceRoute,
     teamsRoute,
+    projectsSettingsRoute,
     labelsRoute,
     membersRoute,
     agentsRoute,

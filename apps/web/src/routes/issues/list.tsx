@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ClipboardList, SearchX } from "lucide-react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/data-table";
@@ -22,6 +22,7 @@ import { useRowSelection } from "@/lib/row-selection";
 import { foldStates } from "@/lib/states";
 import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { ago } from "@/lib/time";
+import { cn } from "@/lib/utils";
 
 type IssueRow = Awaited<
   ReturnType<typeof import("@/lib/orpc").client.issues.list>
@@ -79,6 +80,10 @@ export function IssuesPage({
       input: filterInput ?? { limit: ISSUE_PAGE },
       // "Me" cannot be asked for until we know who that is.
       enabled: filterInput !== null,
+      // Changing a filter asks a new question, and the old answer stays on
+      // screen until the new one lands: the count and the rows a Human was
+      // reading do not blink out for a skeleton on the way.
+      placeholderData: keepPreviousData,
     }),
   );
 
@@ -363,7 +368,15 @@ export function IssuesPage({
   );
 
   return (
-    <section className="flex flex-1 flex-col gap-4">
+    // A board's columns scroll inside it, so the board fills what is left
+    // rather than growing the page; a list grows as a list always has.
+    <section
+      className={cn(
+        "flex flex-1 flex-col gap-4",
+        // The page's bottom gutter goes to the cards; see routes/projects/board.tsx.
+        board && "md:-mb-6 md:min-h-0 md:pb-2",
+      )}
+    >
       {embedded ? (
         <div className="flex flex-wrap items-center gap-3">
           {filters}
@@ -410,7 +423,6 @@ export function IssuesPage({
 
       <SidePeek
         issueKey={search.peek ?? null}
-        modal={!board}
         onClose={() => onSearch({ peek: undefined })}
         onOpenFull={openFull}
       />

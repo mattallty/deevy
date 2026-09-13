@@ -238,17 +238,21 @@ describe("the order and the template", () => {
     expect(saved?.map((state) => state.name)).toEqual(["Plan", "Intent", "Build"]);
   });
 
-  it("edits a Document template in the editor's Source tab", async () => {
+  it("edits the Document template a State asks for", async () => {
     stub.saved.length = 0;
     mount(<WorkflowPage projectKey="DEV" />);
     const build = await open("Build");
     fireEvent.change(within(build).getByLabelText("Document it asks for"), {
       target: { value: "plan" },
     });
-    fireEvent.click(await within(build).findByRole("tab", { name: "Source" }));
-    fireEvent.change(await within(build).findByLabelText("Template for Build"), {
-      target: { value: "## Steps" },
-    });
+    fireEvent.change(
+      await within(build).findByLabelText("Template for Build", {
+        selector: "textarea",
+      }),
+      {
+        target: { value: "## Steps" },
+      },
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
     await waitFor(() => expect(stub.saved).toHaveLength(1));
     expect(stub.saved[0]?.states).toMatchObject([

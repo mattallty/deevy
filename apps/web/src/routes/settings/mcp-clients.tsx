@@ -3,12 +3,8 @@ import { Plug } from "lucide-react";
 import { DataTable, type DataColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { SettingsPage, SettingsSection } from "@/components/settings-page";
+import { mcpEndpoint } from "@/lib/mcp";
 import { orpc } from "@/lib/orpc";
-
-/** The MCP endpoint is this deevy, so it is read off the page rather than configured. */
-function mcpEndpoint(): string {
-  return `${window.location.origin}/mcp`;
-}
 
 /**
  * The MCP clients one Human has let act as themselves. An Agent authenticates

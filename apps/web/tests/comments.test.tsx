@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 const stub = vi.hoisted(() => {
@@ -96,16 +97,29 @@ describe("the comment thread", () => {
     );
   });
 
-  it("suggests Members and Teams after an @", async () => {
+  it("offers every Member and Team a @ may name", async () => {
+    // What `@` proposes is Tiptap's popup over this list, and the list is the
+    // part that is ours: Members with a handle, Teams with a handle, nobody
+    // suspended. The popup itself needs a ProseMirror view to open, which is
+    // the one thing jsdom cannot give it — it is walked in the browser.
     await mountAt("/issues/DEV-1", { memberName: "Ada" });
+    await screen.findByLabelText("Comment", { selector: "textarea" });
 
-    // The Source view's own suggestions; the rich view has Tiptap's.
-    fireEvent.click(await screen.findByRole("tab", { name: "Source" }));
-    fireEvent.change(screen.getByLabelText("Comment", { selector: "textarea" }), {
-      target: { value: "hi @a" },
-    });
+    const { useMentionables } = await import("../src/lib/mentions.ts");
+    const seen: string[] = [];
+    function Probe() {
+      for (const one of useMentionables()) seen.push(`@${one.handle}`);
+      return null;
+    }
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <Probe />
+      </QueryClientProvider>,
+    );
 
-    const suggestions = await screen.findByRole("listbox", { name: "Mentions" });
-    expect(within(suggestions).getByText("@ada")).toBeTruthy();
+    await waitFor(() => expect(seen).toContain("@ada"));
+    expect(seen).toContain("@core");
   });
 });

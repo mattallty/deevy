@@ -69,7 +69,14 @@ export const IssueSummarySchema = IssueSchema.extend({
   labels: z.array(LabelSchema),
 });
 
-export const GateDecisionSchema = createSelectSchema(gateDecision);
+export const GateDecisionSchema = createSelectSchema(gateDecision).extend({
+  /**
+   * What each of the Issue's Documents said when this ruling was made. A Gate
+   * approves text, and the text keeps moving afterwards; this is the record of
+   * which words were agreed to.
+   */
+  documents: z.array(z.object({ name: z.string(), version: z.number().int() })),
+});
 
 /**
  * Where the Gate an Issue is in has got to, and what the Human reading it may
@@ -112,6 +119,12 @@ export const DocumentAtVersionSchema = DocumentSchema.extend({
   version: z.number().int(),
   body: z.string(),
   authorMemberId: z.string().nullable(),
+  /**
+   * When this version was written, which is the version row's own time rather
+   * than the Document's: reading version 1 of a Document edited yesterday must
+   * say when version 1 was written, not when the Document last changed.
+   */
+  writtenAt: z.date(),
 });
 
 export const CommentSchema = createSelectSchema(comment);

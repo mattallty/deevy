@@ -164,10 +164,11 @@ async function agent(name: string, projectIds: string[]) {
   for (const projectId of projectIds) {
     await admin.api.agents.grants.add({ memberId: created.id, projectId });
   }
-  // Through the operation, so `agent.key_issued` is in the log like every
-  // other key an admin ever issued.
-  const issued = await admin.api.agents.keys.issue({ memberId: created.id, name: "seed" });
-  return { created, key: issued.key, ...(await asAgent(issued.key)) };
+  // The key an Agent is created with, the way a Sponsor gets one: `agent.
+  // key_issued` is already in the log, and issuing a second here would only
+  // seed a Workspace whose Agents each carry a key nothing uses.
+  if (!created.key) throw new Error("This instance cannot mint API keys");
+  return { created, key: created.key.key, ...(await asAgent(created.key.key)) };
 }
 
 const planner = await agent("Planner", [dev.id]);
@@ -204,6 +205,40 @@ interface Seed {
 
 const mention = (member: { handle: string | null }) => `@${member.handle ?? ""}`;
 
+/**
+ * What a Human writes when they let an Issue through a Gate. One per Gate,
+ * because a note that says the same thing at Intent, Spec and Plan makes three
+ * rulings read as one repeated line — which is exactly how it looked.
+ */
+const notes: Record<string, string[]> = {
+  Intent: [
+    "The problem is real and the outcome is the right shape. Go and spec it.",
+    "Agreed this is worth doing now. The constraints section is what sold me.",
+    "Yes — though keep the second open question in view when you write the spec.",
+  ],
+  Spec: [
+    "Requirements read cleanly and the flagged concern is handled. Plan it.",
+    "Good. The design covers the failure case I was worried about.",
+    "Approved. The alternative you rejected was the one I would have asked about.",
+  ],
+  Plan: [
+    "The order of work is right and the tests prove the thing. Build it.",
+    "Files and order both make sense; the migration is in the right slice.",
+    "Approved — the third step could be its own Issue later, but not today.",
+  ],
+  Review: [
+    "Read the diff and the Run's own summary. Ship it.",
+    "Tests cover the case in the plan. Good to go.",
+  ],
+};
+
+/** A note for this Gate, varied so a Workspace does not read as one sentence. */
+let ruled = 0;
+function rulingNote(gate: string): string {
+  const forGate = notes[gate] ?? ["Approved."];
+  return forGate[ruled++ % forGate.length] ?? "Approved.";
+}
+
 /** Walks an Issue forward through DEV's Workflow: a move where allowed, a ruling where a Gate holds it. */
 async function advance(key: string, toName: string) {
   const order = dev.states.map((state) => state.name);
@@ -212,7 +247,7 @@ async function advance(key: string, toName: string) {
     const next = order[order.indexOf(current.name) + 1];
     if (!next) throw new Error(`${key} cannot go past ${current.name}`);
     const issue = current.isGate
-      ? await admin.api.gates.approve({ key, note: `Approved on the way to ${toName}` })
+      ? await admin.api.gates.approve({ key, note: rulingNote(current.name) })
       : await admin.api.issues.move({ key, stateId: devState(next).id });
     current = issue.state;
   }
@@ -278,9 +313,96 @@ const epic = await issue("DEV", {
     "The Checkout flow is three Projects' worth of Issues pretending to be one. This is the umbrella: intent first, then one child per surface.\n\n" +
     "## Why now\n\nEvery Agent Run on Checkout in the last month ended in a question a Human had to answer twice.",
   labels: [checkout.id, high.id],
-  to: "Spec",
   assignee: admin.member.id,
 });
+// The epic's own Documents: what a Human and an Agent actually leave behind at
+// Intent and Spec, rather than the State's empty template. A screen is only as
+// honest as the fixture under it.
+await admin.api.documents.write({
+  issueKey: epic.key,
+  name: "intent",
+  body: [
+    "## Problem",
+    "",
+    "Checkout is four screens and three of them were written for a flow we stopped running in April. Two",
+    'Issues a week arrive as "checkout is broken" and each one turns out to be a different screen. Nobody can',
+    "say what the flow is supposed to be without reading the code, so every fix is a guess and every Run an",
+    "Agent makes on it ends with a question a Human has to answer twice.",
+    "",
+    "## Proposed outcome",
+    "",
+    "One flow, described here, with a child Issue per surface: address, payment, review. A Human can read this",
+    "Document and know what Checkout does; an Agent can read it and know what it is building against.",
+    "",
+    "## Affected users and systems",
+    "",
+    "Everybody who buys anything. `packages/core/src/operations/checkout.ts`, the address form, the payment",
+    "intents, and the receipt mail that quotes the order back.",
+    "",
+    "## Constraints",
+    "",
+    "- The payment provider's idempotency window is 24 hours; anything we retry after that is a second charge.",
+    "- Address validation is a third party and is down often enough to plan for.",
+    "- No downtime: the old flow keeps working until the last child Issue is Done.",
+    "",
+    "## Open questions",
+    "",
+    '- Is "one child per surface" three Issues or eight? Grace reads it as eight.',
+    "- Do we keep guest checkout, or is an account the price of buying?",
+  ].join("\n"),
+});
+// Only now does the Intent Gate get to rule, so the ruling pins the intent as
+// written rather than the empty template the State opened with. Writing first
+// and approving second is also the order a Workspace works in.
+await advance(epic.key, "Spec");
+// The spec is the Planner's, so the Issue shows what deevy is actually for: a
+// Human writes the intent, an Agent writes the spec against it, and the page
+// says which of them wrote what.
+await planner.api.documents.write({
+  issueKey: epic.key,
+  name: "spec",
+  body: [
+    "## Requirements",
+    "",
+    "1. A Checkout is one server-side object from the first address keystroke to the receipt. The client holds",
+    "   no state the server cannot rebuild.",
+    "2. Every payment attempt carries an idempotency key derived from the Checkout id and the attempt number,",
+    "   so a retry inside the provider's window is the same charge and outside it is refused rather than",
+    "   duplicated.",
+    "3. Address validation failing is not checkout failing: the address is kept unvalidated with a warning on",
+    "   the review screen.",
+    "4. The receipt quotes the order as it was at payment, not as the catalogue is now.",
+    "",
+    "## Design",
+    "",
+    "`checkout.create` opens the object and returns its id. `checkout.setAddress`, `checkout.setPayment` and",
+    "`checkout.confirm` are the three writes; each appends an Event, so a support question is answered from",
+    "the log rather than from a guess. `confirm` is the only one that talks to the provider.",
+    "",
+    "The three surfaces become three child Issues, and they share nothing but this Document: the address form",
+    "can ship before payment is touched.",
+    "",
+    "## Concerns",
+    "",
+    "- **Flagged:** the 24-hour idempotency window means a Run that resumes after a Gate has waited overnight",
+    "  must re-read the attempt number rather than reuse the key it held. Called out because it is the kind of",
+    "  thing that looks fine in review and charges somebody twice in production.",
+    "- Guest checkout is still open from the intent, and requirement 1 is written as though the answer is yes.",
+  ].join("\n"),
+});
+// Deliberate, and the case the Gate's version pin exists for: the Intent was
+// approved at v2 and the Planner answered one of its open questions afterwards.
+// The ruling in the rail should still say v2, and say the text has moved since.
+const approvedIntent = await planner.api.documents.get({ issueKey: epic.key, name: "intent" });
+await planner.api.documents.write({
+  issueKey: epic.key,
+  name: "intent",
+  body: approvedIntent.body.replace(
+    '- Is "one child per surface" three Issues or eight? Grace reads it as eight.',
+    "- Three children, one per surface: address, payment, review. Grace read it as eight; the spec settles it.",
+  ),
+});
+
 await issue("DEV", {
   title: "Checkout: replace the address form with one Field group",
   labels: [checkout.id, frontend.id],
@@ -308,7 +430,6 @@ const eventLog = await issue("DEV", {
   description:
     "The Workspace Event log has no view. Operators read it with sqlite3, which is the honest answer and a bad one.",
   labels: [frontend.id, agentLoop.id],
-  to: "Plan",
   assignee: planner.member.id,
 });
 await planner.api.documents.write({
@@ -320,6 +441,7 @@ await planner.api.documents.write({
     "## Affected users and systems\n\nAdmins. `events.list`, which pages forward only today.\n\n" +
     "## Constraints\n\nD1's per-invocation query budget: one query per page.\n\n## Open questions\n\n- Newest first needs a `before` cursor.\n",
 });
+await advance(eventLog.key, "Plan");
 await planner.api.documents.write({
   issueKey: eventLog.key,
   name: "plan",

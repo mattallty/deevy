@@ -9,10 +9,7 @@ import { IssueLinks } from "@/components/issue-links";
 import { IssueRuns } from "@/components/run-card";
 import { LabelPicker } from "@/components/label-picker";
 import { ParentPicker } from "@/components/parent-picker";
-import { Markdown } from "@/components/markdown.tsx";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,11 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { InlineTitle } from "@/components/inline-title";
+import { useAutosave } from "@/lib/autosave";
 import { useMentionables } from "@/lib/mentions";
 import { PAGE_SCOPE, useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
-import { orpc } from "@/lib/orpc.ts";
+import { client as orpcClient, orpc } from "@/lib/orpc.ts";
 import { isNotFound, NotFoundPage } from "@/routes/not-found";
+import { RailHeading } from "@/components/rail-heading";
 
 const UNASSIGNED = "unassigned";
 
@@ -47,7 +47,6 @@ export function IssuePage({
   const queryClient = useQueryClient();
   const issue = useQuery(orpc.issues.get.queryOptions({ input: { key: issueKey } }));
   const members = useQuery(orpc.members.list.queryOptions({ input: {} }));
-  const [editing, setEditing] = useState(false);
   // `a` opens the Assignee picker (docs/plans/ui-redesign.md, "Keyboard").
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   useShortcut("a", () => setAssigneeOpen(true), { scope: shortcutScope });
@@ -69,19 +68,27 @@ export function IssuePage({
     if (gateFocused) gatePanel.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [gateFocused]);
 
-  const update = useMutation(
-    orpc.issues.update.mutationOptions({
-      onSuccess: async () => {
-        setEditing(false);
-        // The timeline and the Runs on this page read the edit too.
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: orpc.issues.key() }),
-          queryClient.invalidateQueries({ queryKey: orpc.events.key() }),
-          queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
-        ]);
-      },
-    }),
-  );
+  const refresh = () =>
+    // The timeline and the Runs on this page read the edit too.
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: orpc.issues.key() }),
+      queryClient.invalidateQueries({ queryKey: orpc.events.key() }),
+      queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+    ]);
+
+  const update = useMutation(orpc.issues.update.mutationOptions({ onSuccess: refresh }));
+
+  /*
+   * The title and the description are edited in place, so there is no Save
+   * button to report what happened: one autosave serves both, and the line
+   * beside the key says Saving…/Saved or offers Retry (`lib/autosave.ts`).
+   */
+  const edits = useAutosave<{ title?: string; description?: string | null }>(async (patch) => {
+    await orpcClient.issues.update({ key: issueKey, ...patch });
+    await refresh();
+  });
+  const [draftDescription, setDraftDescription] = useState<string | null>(null);
+  const mentionables = useMentionables();
 
   if (issue.isPending) return <p className="text-muted-foreground">Loading {issueKey}…</p>;
   if (issue.isError) {
@@ -101,6 +108,14 @@ export function IssuePage({
     name: state.name,
     isGate: state.isGate,
     category: state.category as "backlog" | "active" | "done",
+  };
+
+  /** Leaving the description, or ⌘Enter in it, is the save. Empty means none. */
+  const saveDescription = () => {
+    if (draftDescription === null || draftDescription === (description ?? "")) return;
+    void edits
+      .saveNow({ description: draftDescription.trim() === "" ? null : draftDescription })
+      .then(() => setDraftDescription(null));
   };
 
   return (
@@ -127,43 +142,58 @@ export function IssuePage({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-8 @3xl:grid-cols-[minmax(0,1fr)_300px]">
+      {/*
+       * Provenance (docs/plans/issue-view.md, chosen from ten): the Documents
+       * are the page and say who wrote them, and the rail is wide enough to
+       * hold a ruling and the Run that asked for it — 300px was a gutter, and
+       * a Run feed under the Documents pushed the conversation off the screen.
+       */}
+      <div className="grid grid-cols-1 gap-8 @3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
         <div className="flex min-w-0 flex-col gap-6">
           <header className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <span className="font-mono text-muted-foreground">{key}</span>
               <StateBadge state={badgeState} />
+              <span className="flex-1" />
+              <span role="status" className="text-xs text-muted-foreground">
+                {edits.status === "saving"
+                  ? "Saving…"
+                  : edits.status === "saved"
+                    ? "Saved"
+                    : edits.status === "error"
+                      ? (edits.error ?? "Not saved")
+                      : null}
+              </span>
+              {edits.status === "error" ? (
+                <Button size="xs" variant="outline" onClick={edits.retry}>
+                  Retry
+                </Button>
+              ) : null}
             </div>
 
-            {editing ? (
-              <EditIssue
-                title={title}
-                description={description}
-                pending={update.isPending}
-                onCancel={() => setEditing(false)}
-                onSave={(next) => update.mutate({ key, ...next })}
-              />
-            ) : (
-              <div className="flex items-start gap-3">
-                <h1 className="flex-1 text-xl font-semibold tracking-tight">{title}</h1>
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  Edit
-                </Button>
-              </div>
-            )}
-            {update.error ? (
-              <p className="text-sm text-destructive">{update.error.message}</p>
-            ) : null}
+            <InlineTitle value={title} onSave={(next) => void edits.saveNow({ title: next })} />
           </header>
 
-          {!editing && description ? <Markdown>{description}</Markdown> : null}
-          {!editing && !description ? (
-            <p className="text-sm text-muted-foreground">No description yet.</p>
-          ) : null}
+          {/*
+           * The description is edited where it is read too, and by the same
+           * rule as a Document: leaving it writes it. It wears no input chrome
+           * for the same reason — it is the page's own words, not a field on a
+           * form about them.
+           */}
+          <MarkdownEditor
+            className="border-transparent bg-transparent shadow-none focus-within:border-transparent focus-within:ring-0 dark:bg-transparent"
+            id={`description-${key}`}
+            aria-label="Description"
+            value={draftDescription ?? description ?? ""}
+            onChange={setDraftDescription}
+            onBlur={saveDescription}
+            onSubmit={saveDescription}
+            mentions={mentionables}
+            rows={6}
+            placeholder="What this Issue is, and why."
+          />
 
           <IssueDocuments issueKey={key} shortcutScope={shortcutScope} />
-
-          <IssueRuns issueKey={key} decisions={gateDecisions} />
 
           <ActivityStream issueId={id} issueKey={key} />
         </div>
@@ -190,8 +220,10 @@ export function IssuePage({
             />
           </div>
 
+          <IssueRuns issueKey={key} decisions={gateDecisions} />
+
           <section className="flex flex-col gap-2">
-            <h2 className="text-xs font-medium text-muted-foreground">Assignee</h2>
+            <RailHeading>Assignee</RailHeading>
             <Select
               value={assignee?.id ?? UNASSIGNED}
               disabled={update.isPending}
@@ -246,17 +278,22 @@ export function IssuePage({
 
           {children.length > 0 ? (
             <section className="flex flex-col gap-2">
-              <h2 className="text-xs font-medium text-muted-foreground">Children</h2>
+              <RailHeading>Children</RailHeading>
               <ul className="flex flex-col gap-1">
                 {children.map((child) => (
-                  <li key={child.id} className="text-sm">
+                  // One line each: a rail is narrow, and three Issues wrapping
+                  // to two lines apiece reads as six things rather than three.
+                  <li key={child.id} className="flex min-w-0 text-sm">
                     <Link
                       to="/issues/$issueKey"
                       params={{ issueKey: child.key }}
-                      className="hover:underline"
+                      title={`${child.key} ${child.title}`}
+                      className="flex min-w-0 items-baseline gap-1.5 hover:underline"
                     >
-                      <span className="font-mono text-xs text-muted-foreground">{child.key}</span>{" "}
-                      {child.title}
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                        {child.key}
+                      </span>
+                      <span className="truncate">{child.title}</span>
                     </Link>
                   </li>
                 ))}
@@ -272,68 +309,5 @@ export function IssuePage({
         </aside>
       </div>
     </article>
-  );
-}
-
-interface EditIssueProps {
-  title: string;
-  description: string | null;
-  pending: boolean;
-  onCancel: () => void;
-  onSave: (next: { title: string; description: string | null }) => void;
-}
-
-function EditIssue({ title, description, pending, onCancel, onSave }: EditIssueProps) {
-  const [draftTitle, setDraftTitle] = useState(title);
-  const [draftDescription, setDraftDescription] = useState(description ?? "");
-  const mentionables = useMentionables();
-  // One door for the Save button and ⌘Enter in the editor: neither sends an
-  // empty title, and neither sends twice while a save is in flight.
-  const submit = () => {
-    if (pending || !draftTitle.trim()) return;
-    onSave({
-      title: draftTitle.trim(),
-      description: draftDescription.trim() === "" ? null : draftDescription,
-    });
-  };
-
-  return (
-    <form
-      className="flex flex-col gap-3"
-      onSubmit={(submitted) => {
-        submitted.preventDefault();
-        submit();
-      }}
-    >
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="issue-title">Title</Label>
-        <Input
-          id="issue-title"
-          value={draftTitle}
-          onChange={(changed) => setDraftTitle(changed.target.value)}
-        />
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="issue-description">Description</Label>
-        <MarkdownEditor
-          id="issue-description"
-          aria-label="Description"
-          value={draftDescription}
-          onChange={setDraftDescription}
-          mentions={mentionables}
-          rows={10}
-          placeholder="What this Issue is, and why."
-          onSubmit={submit}
-        />
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" disabled={pending || !draftTitle.trim()}>
-          Save
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
   );
 }

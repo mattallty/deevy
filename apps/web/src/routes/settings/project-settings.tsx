@@ -23,12 +23,13 @@ const NO_TEAM = "__none";
 /**
  * What a Project is called, what it is for, and whose it is — `projects.update`
  * and `projects.archive` had no UI until here (docs/plans/ui-redesign.md
- * slice 8). Every field saves itself (docs/plans/ui-redesign-2.md slice G):
+ * slice 8). The detail pane of Settings › Projects, which is where a Project is
+ * configured; it was a tab on the Project itself until 2026-09-11. Every field saves itself (docs/plans/ui-redesign-2.md slice G):
  * text on blur or Enter, the Team on change, each sending only what changed;
  * one status line says Saving, Saved, or what went wrong. The key is not here:
  * it prefixes every Issue and cannot change.
  */
-export function ProjectSettingsPage({ projectKey }: { projectKey: string }) {
+export function ProjectSettingsForm({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const project = useQuery(orpc.projects.get.queryOptions({ input: { key: projectKey } }));
   const teams = useQuery(orpc.teams.list.queryOptions({ input: {} }));

@@ -480,8 +480,17 @@ deevy never runs an agent (ADR-0003). It gives each Agent an identity and a key,
 takes a Run back; something outside deevy does the running.
 
 A Sponsor creates an Agent under Settings, Agents. Creating one makes a Member with `kind = agent` whose
-Sponsor is the Human who created it, and issuing a key shows the key **once**. Grant the Agent the Projects it
-should see: an ungranted Project does not exist to it, and an Agent starts with none.
+Sponsor is the Human who created it, and mints its first API key, shown **once** in the dialog that created
+it — an Agent with no key could reach nothing at all. Later keys are issued on the Agent's own page and are
+shown once in the same way. Grant the Agent the Projects it should see: an ungranted Project does not exist
+to it, and an Agent starts with none.
+
+The command to connect with is shown beside the key, in the dialog that created the Agent and beside every
+key issued afterwards, with that key already in it: a key is readable once, so that is the only moment deevy
+can write one into anything. The Agent's page carries the same block standing, where it names the key instead
+— `DEEVY_AGENT_KEY` for the clients that read a variable from the environment, a placeholder for those that
+do not. Either way there is a tab per coding agent: Claude Code, OpenCode, Cursor CLI, Copilot CLI, and the
+shape anything else speaking MCP over streamable HTTP wants.
 
 The MCP endpoint is `POST ${BETTER_AUTH_URL}/mcp`, and the Agent authenticates with its key as a bearer token:
 
@@ -746,14 +755,15 @@ to. Point it at a Docker instance or at a `workers.dev` origin and the only thin
 
 ### Setting one up
 
-1. **Create the Agent.** Settings, Agents. The Human who creates it is its Sponsor and is accountable for it.
+1. **Create the Agent.** Settings, Agents. The Human who creates it is its Sponsor and is accountable for
+   it, and the dialog hands back its first API key — shown once, and what becomes `DEEVY_AGENT_KEY`. Issue
+   another from the Agent's own page if you lose it; deevy keeps only a hash.
 2. **Grant it the Projects it should work in.** An Agent starts with none, and one it was not granted does
    not exist to it.
-3. **Issue an API key.** The plaintext is shown once. It becomes `DEEVY_AGENT_KEY`.
-4. **Give it somewhere to work**, if it should write code: `DEEVY_AGENT_REPO` and a `DEEVY_AGENT_GIT_TOKEN`
+3. **Give it somewhere to work**, if it should write code: `DEEVY_AGENT_REPO` and a `DEEVY_AGENT_GIT_TOKEN`
    scoped to that one repository, with permission to push a branch and open a pull request and nothing else.
    Leave both unset and the runtime works Documents, Gates and Runs only.
-5. **Run it.** `docker compose --profile agent up -d`, or the image directly. The image carries one
+4. **Run it.** `docker compose --profile agent up -d`, or the image directly. The image carries one
    coding-agent CLI, chosen at build time; `claude-code` is the default and `opencode`, `cursor` and
    `copilot` are the others ([docs/harnesses.md](./harnesses.md)):
 
@@ -761,7 +771,7 @@ to. Point it at a Docker instance or at a `workers.dev` origin and the only thin
 docker build -f apps/agent/Dockerfile --build-arg HARNESS=claude-code -t deevy-agent:claude-code .
 ```
 
-6. **Optionally, tell it rather than let it ask.** Set the Agent's webhook URL to the runtime's listener and
+5. **Optionally, tell it rather than let it ask.** Set the Agent's webhook URL to the runtime's listener and
    choose a secret; give the runtime the same secret as `DEEVY_AGENT_WEBHOOK_SECRET`. A delivery then starts a
    Run when it is assigned instead of at the next poll. Polling stays on either way, so a missed delivery
    costs latency and never a Run.

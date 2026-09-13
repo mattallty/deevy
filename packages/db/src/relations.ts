@@ -27,7 +27,7 @@ import { comment } from "./schema/comment.ts";
 import { notification } from "./schema/notification.ts";
 import { issueLink } from "./schema/link.ts";
 import { document, documentVersion } from "./schema/document.ts";
-import { gateApprover, gateDecision } from "./schema/gate.ts";
+import { gateApprover, gateDecision, gateDecisionDocument } from "./schema/gate.ts";
 import { issue } from "./schema/issue.ts";
 import { issueLabel, label } from "./schema/label.ts";
 import { project, team, teamMember, workflowState } from "./schema/project.ts";
@@ -75,6 +75,7 @@ export const tables = {
   delivery,
   webhookSubscription,
   gateApprover,
+  gateDecisionDocument,
 };
 
 const appRelations = defineRelationsPart(tables, (r) => ({
@@ -231,6 +232,22 @@ const appRelations = defineRelationsPart(tables, (r) => ({
       optional: false,
     }),
     decidedBy: r.one.member({ from: r.gateDecision.memberId, to: r.member.id }),
+    documents: r.many.gateDecisionDocument({
+      from: r.gateDecision.id,
+      to: r.gateDecisionDocument.decisionId,
+    }),
+  },
+  gateDecisionDocument: {
+    decision: r.one.gateDecision({
+      from: r.gateDecisionDocument.decisionId,
+      to: r.gateDecision.id,
+      optional: false,
+    }),
+    document: r.one.document({
+      from: r.gateDecisionDocument.documentId,
+      to: r.document.id,
+      optional: false,
+    }),
   },
   workflowState: {
     project: r.one.project({ from: r.workflowState.projectId, to: r.project.id, optional: false }),

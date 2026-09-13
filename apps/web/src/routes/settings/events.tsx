@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { DataTable, type DataColumn } from "@/components/data-table";
 import { Label as FieldLabel } from "@/components/ui/label";
@@ -89,6 +89,9 @@ export function EventLogPage() {
         ...(subjectType !== ANY ? { subjectType } : {}),
         ...(projectId !== ANY ? { projectId } : {}),
       },
+      // A changed filter, or a page back, keeps the rows on screen until the
+      // next answer lands rather than emptying the log to a skeleton.
+      placeholderData: keepPreviousData,
     }),
   );
   const projects = useQuery(orpc.projects.list.queryOptions({ input: {} }));

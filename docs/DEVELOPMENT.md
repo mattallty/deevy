@@ -14,12 +14,26 @@ cp .env.example .env   # fill in the values described in the file
 vp run --parallel dev
 ```
 
-`vp run -r --parallel dev` starts two tasks: the Node server on http://localhost:3000 (rebuilt and restarted by
-`vp pack --watch` on every change) and the Vite dev server on http://localhost:5173, which serves the SPA and
-proxies `/api`, `/rpc`, `/healthz`, `/mcp` and `/.well-known` to the Node server. Open
-http://localhost:5173. The last two are there so an MCP client can be pointed at the dev origin: discovery has
-to answer from the same origin as the endpoint it describes, or a client looks for the authorization server in
-the wrong place.
+`vp run -r --parallel dev` starts two tasks: the Node server on `DEEVY_PORT` (3000 by default, and 3010 in the
+launch configurations, because 3000 is a port everything wants; rebuilt and restarted by `vp pack --watch` on
+every change) and the Vite dev server on http://localhost:5173, which serves the SPA and proxies `/api`,
+`/rpc`, `/healthz`, `/mcp` and `/.well-known` to it. Open http://localhost:5173. The last two are there so an
+MCP client can be pointed at the dev origin: discovery has to answer from the same origin as the endpoint it
+describes, or a client looks for the authorization server in the wrong place.
+
+**One port, both halves.** The proxy reads `DEEVY_PORT` too, so moving the server moves the proxy with it —
+which is what a machine already running something on 3000, or a second checkout of deevy, needs.
+`DEEVY_API_ORIGIN` overrides the target outright, for a server that is not on this machine. Neither is read
+from `.env`: Vite's configuration is loaded before the server's environment file is, so set them in the shell
+or in `.claude/launch.json`, which is where the 3010 comes from. A sign-in page with no buttons on it is what
+this looks like when it is wrong — the page draws one button per provider `health.ping` reports, and a proxy
+pointing at something that is not deevy answers nothing.
+
+**And the SPA's own port follows the launcher.** Both configurations in `.claude/launch.json` set
+`autoPort`, so a busy 5173 does not stop the preview: the launcher picks a free port, hands it to the child
+as `PORT`, and Vite's `server.port` reads it. `strictPort` is on, because the alternative is Vite quietly
+moving to 5174 while `BETTER_AUTH_URL` still names 5173, which fails much later and somewhere else;
+`dev:stub` builds that variable from the port it was actually given.
 
 The SQLite file lives at `DEEVY_DATABASE_PATH` (default `./data/deevy.sqlite`, relative to `apps/server`) and
 is created and migrated on start.
@@ -330,7 +344,7 @@ no schedule.
 
 `POST /mcp` is the third surface (ADR-0005), projected from the same operation registry as the HTTP API. It is
 stateless, so there is nothing to keep warm between requests. To try it against the dev server, create an
-Agent under Settings, Agents, grant it a Project, issue a key, then:
+Agent under Settings, Agents — which hands back its first key, once — grant it a Project, then:
 
 ```bash
 claude mcp add --transport http deevy http://localhost:3000/mcp --header "Authorization: Bearer <the key>"
@@ -345,7 +359,8 @@ review, and an oRPC bump that reshapes a schema shows up as a diff.
 A Human's own client needs no header: deevy is the authorization server (ADR-0007, docs/OPERATIONS.md). It is
 all built from `BETTER_AUTH_URL`, and everything in the dance has to happen on one origin, so in development
 that has to name the Vite dev server rather than the Node server. The `dev:stub` launch configuration sets
-`BETTER_AUTH_URL=http://localhost:5173` itself, over whatever `.env` says. With a real GitHub OAuth App, set
+`BETTER_AUTH_URL=http://localhost:${PORT:-5173}` itself, over whatever `.env` says — the port the launcher
+picked, so `autoPort` and sign-in agree. With a real GitHub OAuth App, set
 it in `.env` and move the App's callback URL to `http://localhost:5173/api/auth/callback/github` for as long
 as it stays there.
 

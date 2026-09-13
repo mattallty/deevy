@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { IssueBoard, type BoardColumn, type BoardIssue } from "@/components/issue-board";
 import {
@@ -9,7 +9,6 @@ import {
   type FilterState,
   type IssuesSearch,
 } from "@/components/issue-filters";
-import { PageHeader } from "@/components/page-header";
 import { SidePeek } from "@/components/side-peek";
 import { groupingFrom, groupingsFor } from "@/lib/groupings";
 import { orpc } from "@/lib/orpc";
@@ -60,6 +59,8 @@ export function BoardPage({
     orpc.issues.list.queryOptions({
       input: filterInput ?? { projectKey, limit: ISSUE_PAGE },
       enabled: filterInput !== null,
+      // The cards a Human was reading stay put while a changed filter loads.
+      placeholderData: keepPreviousData,
     }),
   );
 
@@ -127,8 +128,20 @@ export function BoardPage({
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <PageHeader title="Board">
+    // From `md` up the Board is as tall as what is left and its columns scroll
+    // inside it. A phone has no room for that — the chrome above leaves about
+    // 300px — so there the Board grows and the page scrolls, as it always did.
+    //
+    // `-mb-6` is the page's own bottom gutter (`p-6` in routes/shell.tsx), which
+    // a Board spends on cards instead: `pb-2` leaves it the one small breath a
+    // frame needs, rather than a margin the size of a card's title.
+    <section className="flex flex-col gap-4 md:-mb-6 md:min-h-0 md:flex-1 md:pb-2">
+      {/*
+       * No heading of its own: the Project's name is the page's h1 and the tab
+       * above already says Board, so a third "Board" spent a card's worth of
+       * height saying what two things said. The Issues tab reads the same way.
+       */}
+      <div className="flex flex-wrap items-center gap-3">
         <IssueFilters
           value={search}
           onChange={onSearch}
@@ -140,7 +153,7 @@ export function BoardPage({
           groupings={groupings}
           allowNoGrouping={false}
         />
-      </PageHeader>
+      </div>
 
       <IssueBoard
         columns={columns}
@@ -161,7 +174,6 @@ export function BoardPage({
 
       <SidePeek
         issueKey={search.peek ?? null}
-        modal={false}
         onClose={() => onSearch({ peek: undefined })}
         onOpenFull={openFull}
       />
