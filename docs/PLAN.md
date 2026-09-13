@@ -245,6 +245,13 @@ afterwards by a suspension states its arithmetic on the Issue rather than being 
 four slices from [four-eyes-gates.md](./plans/four-eyes-gates.md), recorded in
 [ADR-0020](./adr/0020-a-gate-may-want-more-than-one-human-and-may-exclude-the-one-who-asked.md).
 
+**Live Documents** is planned and not yet built: two Members writing in one Document at the same time, with
+the Agent still reading and writing markdown over MCP. Decided in
+[collaborative-documents.md](./plans/collaborative-documents.md) and recorded in
+[ADR-0021](./adr/0021-a-document-is-live-and-markdown-is-what-it-becomes.md); roughly three weeks in six
+slices, the first of which is a spike that decides the rest. What shipped before it — a Gate ruling pinning
+the version it approved, and a write refusing to land on top of somebody else's — is the floor it builds on.
+
 **After v1**, in rough order: agent-to-agent delegation through sub-issues; cost and time accounting per Run;
 mirroring Documents into the code repository; the Slack app; email Channel; private Projects; Postgres
 adapter; a CLI.
