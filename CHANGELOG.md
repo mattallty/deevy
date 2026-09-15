@@ -7,6 +7,21 @@ A release is two Docker images and one `vX.Y.Z` tag — see [docs/OPERATIONS.md]
 
 <!-- Entries are inserted below this line by `vp run version`. -->
 
+## 0.7.1
+
+### Patch Changes
+
+- **server, agent** — [#61](https://github.com/WeAreNendo/deevy/pull/61) [`3d3e6f8`](https://github.com/WeAreNendo/deevy/commit/3d3e6f826e66638e30a1334dc65eaec2821faba9) Thanks [@mattallty](https://github.com/mattallty)! - deevy has moved to the WeAreNendo organisation on GitHub, and its images with it. From this release on they
+  are published as `ghcr.io/WeAreNendo/deevy` and `ghcr.io/WeAreNendo/deevy-agent`; the old paths under
+  `ghcr.io/mattallty` keep every tag they already have and receive no new ones. Change the image in your
+  compose file or `docker run` line, and the `DEEVY_AGENT_IMAGE` you pass to the runtime if you set one. The
+  repository itself redirects from its old address, so links and clones keep working.
+- **agent** — [#62](https://github.com/WeAreNendo/deevy/pull/62) [`8d54abc`](https://github.com/WeAreNendo/deevy/commit/8d54abc6c2805c84dbc37fade971221e3455f433) Thanks [@mattallty](https://github.com/mattallty)! - The runtime no longer goes down when the git it serves a local repository with answers before it has read
+  the whole request, or is not there to be started. Both showed up as a crash of the supervisor rather than
+  as a failed push, and only with a repository on disk as the remote — the acceptance walk and the tests —
+  never with a remote on the internet. A backend that finishes early now has its answer relayed as it was,
+  and a git that cannot be started is a 502 that says so.
+
 ## 0.7.0
 
 ### Minor Changes
